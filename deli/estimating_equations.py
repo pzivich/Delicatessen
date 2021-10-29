@@ -137,6 +137,9 @@ def ee_mean_robust(theta, y, k):
     ----------
     Boos DD, & Stefanski LA. (2013). M-estimation (estimating equations). In Essential Statistical Inference
     (pp. 297-337). Springer, New York, NY.
+
+    Huber PJ. (1992). Robust estimation of a location parameter. In Breakthroughs in statistics (pp. 492-518).
+    Springer, New York, NY.
     """
     var = np.asarray(y)                   # Convert y to NumPy array
     var = np.where(var > k, k, var)       # Apply the upper bound

@@ -53,8 +53,12 @@ Contents:
 -------------------------------------
 
 .. toctree::
-  :maxdepth: 2
+  :maxdepth: 3
 
+  Examples.rst
+  Built-in Equations <Built-in Equations.rst>
+  Custom Equations <Custom Equations.rst>
+  Optimization Advice <Optimization Advice.rst>
   Reference/index
   Create a GitHub Issue <https://github.com/pzivich/Deli/issues>
 
