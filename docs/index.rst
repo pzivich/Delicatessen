@@ -53,7 +53,7 @@ Contents:
 -------------------------------------
 
 .. toctree::
-  :maxdepth: 3
+  :maxdepth: 2
 
   Reference/index
   Create a GitHub Issue <https://github.com/pzivich/Deli/issues>

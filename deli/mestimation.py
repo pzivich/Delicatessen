@@ -6,7 +6,7 @@ from deli.utilities import partial_derivative
 
 
 class MEstimator:
-    """M-Estimation for generalized stacked equations.
+    r"""M-Estimation for generalized stacked equations.
 
     M-estimation, or loosely estimating equations, is a general approach to point and variance estimation that consists
     of defining an estimator as the solution to an estimating equation (but does not require the derivative of a log-
@@ -22,6 +22,7 @@ class MEstimator:
     framework, and thus be considered as consistent asymptotically normal estimators. This simplifies analysis under
     large-sample approximation methods.
 
+
     M-Estimation consists of two broad step: point estimation and variance estimation. Point estimation is carried out
     by determining at which values of theta the given estimating equations are equal to zero. This is done via SciPy's
     `newton` algorithm by default.
@@ -30,17 +31,17 @@ class MEstimator:
 
     .. math::
 
-        B_n(Y, \hat{theta})^{-1} \times M_n(Y, \hat{theta}) \times B_n(Y, (\hat{theta})^{-1})^T
+        B_n(Y, \hat{\theta})^{-1} \times M_n(Y, \hat{\theta}) \times B_n(Y, (\hat{\theta})^{-1})^T
 
     where B is the bread and M is the meat
 
     .. math::
 
-        B_n(Y, \hat{theta}) = 1/n \sum_{i=1}^{n} - \psi'(Y_i, \hat{\theta})
+        B_n(Y, \hat{\theta}) = 1/n \sum_{i=1}^{n} - \psi'(Y_i, \hat{\theta})
 
     .. math::
 
-        M_n(Y, \hat{theta}) = 1/n \sum_{i=1}^{n} \psi(Y_i, \hat{\theta}) \times \psi(Y_i, \hat{\theta})^T
+        M_n(Y, \hat{\theta}) = 1/n \sum_{i=1}^{n} \psi(Y_i, \hat{\theta}) \times \psi(Y_i, \hat{\theta})^T
 
     The partial derivatives for the bread are calculated using an adaptation of SciPy's `derivative` functionality
     for partial derivatives. Inverting the bread is done via NumPy's `linalg.inv`. For the meat, the dot product is
@@ -51,6 +52,7 @@ class MEstimator:
     The harder part (that must be done by the user) is to specify the stacked estimating equations. Be sure to check
     the provided examples for the format. But pre-built estimating equations for common problems are also available.
 
+
     After completion of these steps, point and variance estimates for theta stored. These can be directly pulled from
     the class object and further manipulated. For example, to calculate 95% confidence intervals for some parameters.
 
@@ -60,6 +62,7 @@ class MEstimator:
     specializing in solely logistic regression). Therefore, optimization of logistic regression via a separate
     functionality can be done then those estimated parameters are fed forward as the initial values (which should
     result in a more stable optimization).
+
 
     Parameters
     ----------

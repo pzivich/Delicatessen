@@ -19,6 +19,8 @@
 
 # -- General configuration ------------------------------------------------
 
+import os
+
 # If your documentation needs a minimal Sphinx version, state it here.
 # needs_sphinx = '1.0'
 
@@ -43,10 +45,14 @@ master_doc = "index"
 
 # generate autosummary pages
 autosummary_generate = True
+autodoc_default_options = {
+    'members': True,
+    'member-order': 'bysource',
+}
 
 # General information about the project.
 project = "Deli"
-copyright = "2011, Paul Zivich"
+copyright = "2021, Paul Zivich"
 version = "0.1b"
 
 # The name of the Pygments (syntax highlighting) style to use.
@@ -58,11 +64,8 @@ pygments_style = "sphinx"
 # a list of builtin themes.
 
 
-html_theme = "default"
-
-# use RTFD theme locally
-# on_rtd is whether we are on readthedocs.org, this line of code grabbed from docs.readthedocs.org
-import os
+# html_theme = "nature"
+add_module_names = False
 
 on_rtd = os.environ.get("READTHEDOCS", None) == "True"
 

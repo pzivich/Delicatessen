@@ -6,7 +6,7 @@ from deli.utilities import logit, inverse_logit
 
 
 def ee_mean(theta, y):
-    """Default stacked estimating equation for the mean. The estimating equation for the mean is
+    r"""Default stacked estimating equation for the mean. The estimating equation for the mean is
 
     .. math::
 
@@ -16,6 +16,7 @@ def ee_mean(theta, y):
     ----
     All provided estimating equations are meant to be wrapped inside a user-specified function. Throughtout, these
     user-defined functions are defined as `psi`.
+
 
     Parameters
     ----------
@@ -68,7 +69,7 @@ def ee_mean(theta, y):
 
 
 def ee_mean_robust(theta, y, k):
-    """Default stacked estimating equation for robust mean (robust location) estimator. The estimating equation for
+    r""" Default stacked estimating equation for robust mean (robust location) estimator. The estimating equation for
     the robust mean is
 
     .. math::
@@ -82,10 +83,12 @@ def ee_mean_robust(theta, y, k):
     Since psi is non-differentiable at k or -k, it must be assumed that the mean is sufficiently far from k. Otherwise,
     difficulties might arise in the variance calculation.
 
+
     Note
     ----
     All provided estimating equations are meant to be wrapped inside a user-specified function. Throughtout, these
     user-defined functions are defined as `psi`.
+
 
     Parameters
     ----------
@@ -144,7 +147,7 @@ def ee_mean_robust(theta, y, k):
 
 
 def ee_mean_variance(theta, y):
-    """Default stacked estimating equation for mean and variance. The estimating equations for the mean and
+    r"""Default stacked estimating equation for mean and variance. The estimating equations for the mean and
      variance are
 
     .. math::
@@ -160,6 +163,7 @@ def ee_mean_variance(theta, y):
     ----
     All provided estimating equations are meant to be wrapped inside a user-specified function. Throughtout, these
     user-defined functions are defined as `psi`.
+
 
     Parameters
     ----------
@@ -218,7 +222,7 @@ def ee_mean_variance(theta, y):
 
 
 def ee_linear_regression(theta, X, y):
-    """Default stacked estimating equation for linear regression. The estimating equation is
+    r"""Default stacked estimating equation for linear regression. The estimating equation is
 
     .. math::
 
@@ -232,6 +236,7 @@ def ee_linear_regression(theta, X, y):
     ----
     All provided estimating equations are meant to be wrapped inside a user-specified function. Throughtout, these
     user-defined functions are defined as `psi`.
+
 
     Here, theta corresponds to the coefficients in a linear regression model
 
@@ -310,7 +315,7 @@ def ee_linear_regression(theta, X, y):
 
 
 def ee_logistic_regression(theta, X, y):
-    """Default stacked estimating equation for logistic regression. The estimating equation is
+    r"""Default stacked estimating equation for logistic regression. The estimating equation is
 
     .. math::
 
@@ -331,6 +336,7 @@ def ee_logistic_regression(theta, X, y):
     All provided estimating equations are meant to be wrapped inside a user-specified function. Throughtout, these
     user-defined functions are defined as `psi`.
 
+
     Here, theta corresponds to the coefficients in a logistic regression model, and therefore are the log-odds.
 
     Note
@@ -339,6 +345,7 @@ def ee_logistic_regression(theta, X, y):
     specializing in solely logistic regression). Therefore, optimization of logistic regression via a separate
     functionality can be done then those estimated parameters are fed forward as the initial values (which should
     result in a more stable optimization).
+
 
     Parameters
     ----------
@@ -414,7 +421,7 @@ def ee_logistic_regression(theta, X, y):
 
 
 def ee_kaplan_meier(theta, time, delta, adjust=1e-5):
-    """Default stacked estimating equation for non-parametric estimator of the risk function. While the form of the
+    r"""Default stacked estimating equation for non-parametric estimator of the risk function. While the form of the
     estimator is not the Kaplan-Meier, this estimator is exactly equivalent to the Kaplan-Meier (as formally shown in
     Satten & Datta 2001). The estimating equations are the following equation stacked for each of the times
 
@@ -441,6 +448,7 @@ def ee_kaplan_meier(theta, time, delta, adjust=1e-5):
     ----
     All provided estimating equations are meant to be wrapped inside a user-specified function. Throughtout, these
     user-defined functions are defined as `psi`.
+
 
     Here, theta corresponds to the estimated risk function in the sorted unique event times observed in the data.
 
@@ -543,7 +551,7 @@ def ee_kaplan_meier(theta, time, delta, adjust=1e-5):
 
 
 def ee_cox_ph_model(theta, X, time, delta):
-    """Default stacked estimating equation for the semi-parametric Cox proportional hazards model. The estimating
+    r"""Default stacked estimating equation for the semi-parametric Cox proportional hazards model. The estimating
     equation is
 
     .. math::
@@ -558,6 +566,7 @@ def ee_cox_ph_model(theta, X, time, delta):
     The form above requires that no two events happen at the exact same time. While there are existing methods to
     handle ties, the estimating equations here expect the user to manually break / prevent any ties.
 
+
     Here, theta corresponds to the estimated log-transformed hazard ratios for the covariates.
 
     Note
@@ -565,12 +574,14 @@ def ee_cox_ph_model(theta, X, time, delta):
     All provided estimating equations are meant to be wrapped inside a user-specified function. Throughtout, these
     user-defined functions are defined as `psi`.
 
+
     Note
     ----
     For complex regression problems, the optimizer behind the scenes is not particularly robust (unlike functions
     specializing in solely Cox models). Therefore, optimization of Cox model via a separate functionality can be done
     then those estimated parameters are fed forward as the initial values (which should result in a more stable
     optimization).
+
 
     Parameters
     ----------
@@ -660,7 +671,7 @@ def ee_cox_ph_model(theta, X, time, delta):
 
 
 def ee_gformula(theta, X, y, treat_index, force_continuous=False):
-    """Default stacked estimating equation for the parametric g-formula in the time-fixed setting. The parameter(s) of
+    r"""Default stacked estimating equation for the parametric g-formula in the time-fixed setting. The parameter(s) of
     interest is the risk difference, with potential interest in the underlying risk or mean functions. For continuous
     Y, the linear regression estimating equation is
 
@@ -704,6 +715,7 @@ def ee_gformula(theta, X, y, treat_index, force_continuous=False):
     All provided estimating equations are meant to be wrapped inside a user-specified function. Throughtout, these
     user-defined functions are defined as `psi`.
 
+
     Here, theta corresponds to a variety of different quantities. The *first* value in theta vector is the risk / mean
     difference (or average treatment effect), the *second* is the risk / mean had everyone been given treatment=0, the
     *third* is the risk / mean had everyone been given treatment=1. The remainder of the parameters correspond to the
@@ -715,6 +727,7 @@ def ee_gformula(theta, X, y, treat_index, force_continuous=False):
     specializing in solely regression models). Therefore, optimization of the regression model via a separate
     functionality can be done then those estimated parameters are fed forward as the initial values (which should
     result in a more stable optimization).
+
 
     Parameters
     ----------
