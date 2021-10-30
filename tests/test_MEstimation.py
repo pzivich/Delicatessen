@@ -8,7 +8,7 @@ from scipy.stats import logistic
 from deli import MEstimator
 from deli.estimating_equations import (ee_mean, ee_mean_variance, ee_mean_robust,
                                        ee_linear_regression, ee_logistic_regression,
-                                       ee_kaplan_meier, ee_cox_ph_model)
+                                       )
 from deli.utilities import inverse_logit
 
 
