@@ -267,28 +267,240 @@ still have an appropriate variance estimator, several causal inference estimator
 It is recommended that you are familiar with causal inference (particularly the identification conditions of these
 estimators) before using this utility widely. Causal inference is a difficult endeavour, my dear user!
 
+In the following examples, we will use the generic data example here, where W is a confounder of the A-Y relationship
+
+.. code::
+
+    n = 200
+    d = pd.DataFrame()
+    d['W'] = np.random.binomial(1, p=0.5, size=n)
+    d['A'] = np.random.binomial(1, p=(0.25 + 0.5*d['W']), size=n)
+    d['Ya0'] = np.random.binomial(1, p=(0.75 - 0.5*d['W']), size=n)
+    d['Ya1'] = np.random.binomial(1, p=(0.75 - 0.5*d['W'] - 0.1*1), size=n)
+    d['Y'] = (1-d['A'])*d['Ya0'] + d['A']*d['Ya1']
+    d['C'] = 1
+
+Now to the examples
+
 G-computation
 ----------------------------
 
-The key advantage here, is that the M-estimator *appropriately* estimates the variance. We do *not* need to bootstrap
-in this case (and more generally if the sample size is sufficiently large). Here, we really get to see the
-advantages of M-Estimation!
+First, is g-computation. The built-in estimating equations for g-computation calculate the average treatment effect,
+risk / mean under all-treated, and the risk / mean under none-treated.
+
+*A limitation*: the g-computation, as implemented in the built-in estimating equation only uses a single outcome model
+and that outcome model does *not* support interaction terms. Here the g-computation is meant as a basic example. For
+more general use, the provided estimating equation should be adapted. But the built-in estimating equation will provide
+a basic structure for user's to build off of.
+
+To load the estimating equations, we call
+
+.. code::
+
+    from deli import MEstimators
+    from deli.estimating_equations import ee_gformula
+
+Again, we will wrap the built-in estimating equations inside a function.
+
+.. code::
+
+    def psi(theta):
+        return ee_gformula(theta, X=d[['C', 'A', 'W']], y=d['Y'], treat_index=1)
+
+The arguments for `ee_gformula` are the theta values, the covariates (including an intercept (C) and the treatment (A)),
+the outcome values (Y), and the column index for the treatment in X. Here, 1 designates the second column (python uses
+zero-indexing), which corresponds to 'A' in how the X data is formatted.
+
+Now we can call the M-estimator to solve for the values and the variance. Here, the initial values provided must be
+3+*b* (where *b* is the number of columns in X). This is because the g-computation estimating equations output the
+average treatment effect, risk under all-treated, risk under none-treated, and the regression model coefficients.
+
+As for starting values, it will likely be best practice to have the initial values set as  [0., 0.5, 0.5, ...] in
+general. The regression initial values can also be pre-washed to speed up optimization.
+
+.. code::
+
+    mestimation = MEstimator(stacked_equations=psi, init=[0., 0.5, 0.5, 0., 0., 0.])
+    mestimation.estimate(solver='lm')
+
+Now the average treatment effect, as well as the variance, can be output. Here, a key advantage of M-estimation can be
+seen. The form of an M-estimator allows us to estimate the variance directly, while appropriately allowing for the
+uncertainty in the regression model parameters to be carried forward. M-estimation does this automatically for us.
+Essentially, we do not need to bootstrap to estimate the variance!
+
+.. code::
+
+    mestimation.theta[0]
+    mestimation.variance[0, 0]
+
+Besides the average treatment effect, the risk / mean under all-treated can be extracted by
+
+.. code::
+
+    mestimation.theta[1]
+    mestimation.variance[1, 1]
+
+and the risk / mean under none-treated can be extracted by
+
+.. code::
+
+    mestimation.theta[2]
+    mestimation.variance[2, 2]
+
+The `ee_gformula` supports both binary and continuous outcomes. Inside the function, it automatically detects whether
+the outcome data is binary. If the outcome data is not binary, then it defaults to using a linear regression model
+(but you can also force the use of a linear regression model for binary data by setting `force_continuous=True`
+
+To summarize, the key advantage of M-estimation here is that it *appropriately* estimates the variance. We do *not*
+need to bootstrap in this case (and more generally if the sample size is sufficiently large).
 
 Inverse probability weighting
 -------------------------------------
 
-... to be added ...
+Rather than modeling the outcome, we can choose the inverse probability weighting (IPW) estimator, which models the
+probability of treatment. The estimating equations for the IPW estimator are also built-in to `deli`.
+
+To load the estimating equations, we call
+
+.. code::
+
+    from deli import MEstimators
+    from deli.estimating_equations import ee_ipw
+
+As with every built-in estimating equation, we will wrap it inside a function.
+
+.. code::
+
+    def psi(theta):
+        return ee_ipw(theta, X=d[['C', 'A', 'W']], y=d['Y'], treat_index=1)
+
+The arguments for `ee_ipw` are the theta values, the covariates (including an intercept (C) and the treatment (A)),
+the outcome values (Y), and the column index for the treatment in X. Here, 1 designates the second column (python uses
+zero-indexing), which corresponds to 'A' in how the X data is formatted.
+
+Now we can call the M-estimator to solve for the values and the variance. Here, the initial values provided must be
+3+*b* (where *b* is the number of columns in X *minus 1*). This is because the IPW estimating equations output the
+average treatment effect, risk under all-treated, risk under none-treated, and the logistic regression model
+coefficients. Since we are modeling the conditional probability of A, one column in X is excluded from the covariates.
+
+As for starting values, it will likely be best practice to have the initial values set as  [0., 0.5, 0.5, ...] in
+general. The regression initial values can also be pre-washed to speed up optimization.
+
+.. code::
+
+    mestimation = MEstimator(stacked_equations=psi, init=[0., 0.5, 0.5, 0., 0., 0.])
+    mestimation.estimate(solver='lm')
+
+Now the average treatment effect, as well as the variance, can be output. Here, a key advantage of M-estimation can be
+seen. The form of an M-estimator allows us to estimate the variance directly, while appropriately allowing for the
+uncertainty in the regression model parameters to be carried forward. M-estimation does this automatically for us.
+Essentially, we do not need to bootstrap or use the GEE-trick for IPW to estimate the variance!
+
+.. code::
+
+    mestimation.theta[0]
+    mestimation.variance[0, 0]
+
+Besides the average treatment effect, the risk / mean under all-treated can be extracted by
+
+.. code::
+
+    mestimation.theta[1]
+    mestimation.variance[1, 1]
+
+and the risk / mean under none-treated can be extracted by
+
+.. code::
+
+    mestimation.theta[2]
+    mestimation.variance[2, 2]
+
+The `ee_ipw` supports both binary and continuous outcomes automatically. Both of these variable types are handled in
+the same way due to the form of the Horwitz-Thompson estimator.
+
+Unlike the GEE-trick for IPW (which provides a conservative estimator of the variance), the variance estimator here
+is correct. This means it will be narrower than the GEE-trick. Therefore, this approach is generally preferred over
+the GEE-trick to calculating the variance for the IPW estimator. It is also much more computationally efficient than
+the bootstrap.
 
 Augmented inverse probability weighting
 ----------------------------------------------
 
-... to be added ...
+Before, we model the outcome and treatment models separately. Now, we will consider the augmented inverse probability
+weighting (AIPW) model, which incorporates both the treatment and outcome models. AIPW is a semi-parametric
+doubly-robust estimator for the average treatment effect. For a basic overview, see Funk et al. (2011).
 
+*A limitation*: as with g-computation, the built-in AIPW estimating equation only uses a single outcome model
+and that outcome model does *not* support interaction terms. Here the AIPW is meant as a basic example. For
+more general use, the provided estimating equation should be adapted. But the built-in estimating equation will provide
+a basic structure for user's to build off of.
+
+The estimating equations for the AIPW estimator are also provided in `deli`. To load the estimating equations, we call
+
+.. code::
+
+    from deli import MEstimators
+    from deli.estimating_equations import ee_aipw
+
+As always, we will wrap the built-in estimating equation inside a function.
+
+.. code::
+
+    def psi(theta):
+        return ee_aipw(theta, X=d[['C', 'A', 'W']], y=d['Y'], treat_index=1)
+
+The arguments for `ee_aipw` are the theta values, the covariates (including an intercept (C) and the treatment (A)),
+the outcome values (Y), and the column index for the treatment in X. Here, 1 designates the second column (python uses
+zero-indexing), which corresponds to 'A' in how the X data is formatted.
+
+Now we can call the M-estimator to solve for the values and the variance. Here, the initial values provided must be
+3+*b*+*b-1* (where *b* is the number of columns in X). This is because the AIPW estimating equations output the
+average treatment effect, risk under all-treated, risk under none-treated, and the outcome model coefficients, and
+the treatment model coefficients.
+
+As for starting values, it will likely be best practice to have the initial values set as  [0., 0.5, 0.5, ...] in
+general. The regression initial values can also be pre-washed to speed up optimization.
+
+.. code::
+
+    mestimation = MEstimator(stacked_equations=psi, init=[0., 0.5, 0.5, 0., 0., 0.])
+    mestimation.estimate(solver='lm')
+
+Now the average treatment effect, as well as the variance, can be output. Here, a key advantage of M-estimation can be
+seen. The form of an M-estimator allows us to estimate the variance directly, while appropriately allowing for the
+uncertainty in the regression model parameters to be carried forward. M-estimation does this automatically for us.
+Essentially, we do not need to bootstrap or use the GEE-trick for IPW to estimate the variance!
+
+.. code::
+
+    mestimation.theta[0]
+    mestimation.variance[0, 0]
+
+Besides the average treatment effect, the risk / mean under all-treated can be extracted by
+
+.. code::
+
+    mestimation.theta[1]
+    mestimation.variance[1, 1]
+
+and the risk / mean under none-treated can be extracted by
+
+.. code::
+
+    mestimation.theta[2]
+    mestimation.variance[2, 2]
+
+The variance estimator in this case will match the influence function estimator of the variance that is commonly used
+for AIPW. See Boos & Stefanski (2013) for more detailed discussion on the relation between M-estimation and influence
+curves.
 
 Further Readings
 =============================
 Boos DD, & Stefanski LA. (2013). M-estimation (estimating equations). In Essential Statistical Inference
 (pp. 297-337). Springer, New York, NY.
+
+Funk MJ, Westreich D, Wiesen C, Stürmer T, Brookhart MA, & Davidian M. (2011). Doubly robust estimation of causal
+effects. *American Journal of Epidemiology*, 173(7), 761-767.
 
 Huber PJ. (1992). Robust estimation of a location parameter. In Breakthroughs in statistics (pp. 492-518).
 Springer, New York, NY.
