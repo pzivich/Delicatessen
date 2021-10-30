@@ -138,7 +138,7 @@ class MEstimator:
         self.variance = None              # Covariance matrix for theta values (calculated later)
         self.asymptotic_variance = None   # Asymptotic covariance matrix for theta values (calculated later)
 
-    def estimate(self, solver='newton', maxiter=1000, tolerance=1e-9):
+    def estimate(self, solver='newton', maxiter=1000, tolerance=1e-9, allow_pinv=True):
         """Function to carry out the point and variance estimation of theta. After this procedure, the point estimates
         (in `theta`) and the covariance matrix (in `variance`) can be extracted.
 
@@ -155,6 +155,10 @@ class MEstimator:
             Maximum tolerance for errors in the root finding. This argument is passed `scipy.optimize` via the
             `tol` parameter. Default is 1e-9, which I have seen good performance with. I do not recommend going below
             this tolerance level (at this time).
+        allow_pinv : bool, optional
+            The default is `True` which uses `numpy.linalg.pinv` to find the inverse (or pseudo-inverse if matrix is
+            non-invertible) for the bread. This default option is more robust to the possible matrices. If you want
+            to use `numpy.linalg.inv` instead (which does not support pseudo-inverse), set this parameter to False.
         """
         # Trick to get the number of observations from the estimating equations
         self.n_obs = np.asarray(self.stacked_equations(theta=self.init)  # ... convert output to an array
@@ -181,7 +185,10 @@ class MEstimator:
         if self.bread.ndim == 0:                        # NumPy's linalg throws an error if bread is a single value
             bread_invert = 1 / self.bread               # ... so directly take inverse of the single value
         else:                                           # otherwise bread must be a matrix
-            bread_invert = np.linalg.inv(self.bread)    # ... so use linalg.inv to find the inverse
+            if allow_pinv:
+                bread_invert = np.linalg.pinv(self.bread)   # ... so find the inverse (or pseudo-inverse)
+            else:
+                bread_invert = np.linalg.inv(self.bread)    # ... so find the inverse (NOT pseudo-inverse)
         # Two sets of matrix multiplication to get the sandwich variance
         sandwich = np.dot(np.dot(bread_invert, self.meat), bread_invert.T)
 
