@@ -24,6 +24,9 @@ all 0's, or even all -1's. However, we can be nice to the optimizer by providing
 
 For regression, starting values of 0 are likely to be preferred (without outside information).
 
+If initial values are placed outside of the bounds of a particular theta, this can also break the optimization
+procedure. So make sure your initial values are (1) reasonable, and (2) within the bounds of the measure theta.
+
 Pre-wash initials
 --------------------
 
