@@ -6,10 +6,33 @@ specified. Basically, it will allow for any estimating equation to be passed to 
 equation(s) *must* be unbiased for the theory behind M-estimation to hold). Here, I provide an overview and tips for
 how to build your own estimating equation.
 
+In general, it will be best if you find an explicit paper or book (most likely written by a statistician) that directly
+provides the estimating equation(s) to you. Deriving your own *unbiased* estimating equation may be a lot of effort
+and will require a statistical proof. This section does *not* address this part of M-estimation. Rather, this section
+provides information on how to construct an estimating equation within `deli`. `deli` assumes you are giving it a
+valid estimating equation.
+
+Building from scratch
+-------------------------------------
+
+First, we will go through the case of building an estimating equation completely from scratch. To do this, I will
+go through an example with linear regression. This is how I went about building the `ee_linear_regression`
+functionality.
+
+First, we have the estimating equation provided in Boos & Stefanski (2013), but this is just the score function.
+
+.. math::
+
+    \sum_i^n \psi(Y_i, X_i, \theta) = ... = 0
 
 
-Building your own custom-regression model is easy if you have access to the score function (and can feasibly program
-the score function).
+
+Building with basics
+-------------------------------------
+
+Instead of building everything from scratch, you can also piece together the built-in estimating equations with your
+own code. To demonstrate this, I will go through how I developed the code for the g-formula.
+
 
 Common Mistakes
 -------------------------------------

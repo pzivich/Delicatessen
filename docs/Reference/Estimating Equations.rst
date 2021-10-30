@@ -29,18 +29,6 @@ Regression
   ee_logistic_regression
 
 
-Survival Analysis
--------------------
-
-.. currentmodule:: deli.estimating_equations
-
-.. autosummary::
-  :toctree: generated/
-
-  ee_kaplan_meier
-  ee_cox_ph_model
-
-
 Causal Inference
 -------------------
 
