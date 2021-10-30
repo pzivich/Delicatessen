@@ -597,7 +597,7 @@ def ee_gformula(theta, X, y, treat_index, force_continuous=False):
         ya1 = inverse_logit(np.dot(X, beta)) - theta[1]
 
     # Calculating Y(a=1) - Y(a=0)
-    ate = X[:, 0] * (theta[1] - theta[2]) - theta[0]
+    ate = np.ones(y.shape[0]) * (theta[1] - theta[2]) - theta[0]
 
     # Output (3+b)-by-n stacked array
     return np.vstack((ate,            # theta[0] is for the ATE
@@ -765,3 +765,212 @@ def ee_ipw(theta, X, y, treat_index):
                       ya1[None, :],    # theta[1] is for R1
                       ya0[None, :],    # theta[2] is for R0
                       preds_reg))      # theta[3:] is for the regression coefficients
+
+
+def ee_aipw(theta, X, y, treat_index, force_continuous=False):
+    r"""Default stacked estimating equation for augmented inverse probability weighting in the time-fixed setting. The
+    parameter(s) of interest is the average treatment effect, with potential interest in the underlying risk or mean
+    functions. For estimation of the weights (or propensity scores), a logistic model is used. Therefore, the first
+    estimating equation is
+
+    .. math::
+
+        \sum_i^n \psi(A_i, W_i, \theta) = \sum_i^n (A_i - expit(W_i^T \theta)) W_i = 0
+
+    where A is the treatment and W is the set of confounders. Both of these are processed from the input `X` and the
+    specified `treat_index`.
+
+    Next, an outcome model is specified. For continuous Y, the linear regression estimating equation is
+
+    .. math::
+
+        \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n (Y_i - X_i^T \theta) X_i = 0
+
+    and for logistic regression, the estimating equation is
+
+    .. math::
+
+        \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n (Y_i - expit(X_i^T \theta)) X_i = 0
+
+    By default, `ee_aipw` detects whether `y` is all binary (zero or one), and applies logistic regression if that
+    happens. See the parameters for more details.
+
+    For the implementation of the augmented inverse probability weighting estimator, stacked estimating equations are
+    also used for the risk / mean had everyone been given treatment=1, the risk / mean had everyone been given
+    treatment=0, and the risk / mean difference between those two risks. Respectively, those estimating equations
+    look like
+
+    y1_star = (y*A/pi - ya1*(A-pi)/pi) - r1
+    # Calculating Y(a=0)
+    y0_star = (y*(1-A)/(1-pi) + ya0*(A-pi)/(1-pi)) - r0
+
+
+    .. math::
+
+        \sum_i^n \psi_1(Y_i, A_i, W_i, \pi_i, \theta_1) = \sum_i^n (\frac{A_i \times Y_i}{\pi_i} - \frac{\hat{Y^1}(A_i-\pi_i}{\pi_i}) - \theta_1 = 0
+
+    .. math::
+
+        \sum_i^n \psi_0(Y_i, A_i, \pi_i, \theta_2) = \sum_i^n (\frac{(1-A_i) \times Y_i}{1-\pi_i} + \frac{\hat{Y^0}(A_i-\pi_i}{1-\pi_i})) - \theta_2 = 0
+
+    .. math::
+
+        \sum_i^n \psi_0(Y_i, A_i, \pi_i, \theta_0) = \sum_i^n (\theta_1 - \theta_2) - \theta_0 = 0
+
+    where Y^a is the predicted values of Y from the outcome model under treatment assignment A=a.
+
+    Due to these 3 extra values and two nuisance models, the length of the theta vector is b+(b-1)+3, where b is the
+    number of covariats included in `X`.
+
+    Note
+    ----
+    All provided estimating equations are meant to be wrapped inside a user-specified function. Throughtout, these
+    user-defined functions are defined as `psi`.
+
+
+    Here, theta corresponds to a variety of different quantities. The *first* value in theta vector is the risk / mean
+    difference (or average treatment effect), the *second* is the risk / mean had everyone been given treatment=0, the
+    *third* is the risk / mean had everyone been given treatment=1. The remainder of the parameters correspond to the
+    regression model coefficients, in the order input. The first 'chuck' of coefficients correspond to the outcome model
+    and the last 'chuck' correspond to the treatment model.
+
+    Note
+    ----
+    For complex regression problems, the optimizer behind the scenes is not particularly robust (unlike functions
+    specializing in solely regression models). Therefore, optimization of the regression model via a separate
+    functionality can be done then those estimated parameters are fed forward as the initial values (which should
+    result in a more stable optimization).
+
+
+    Parameters
+    ----------
+    theta : array, list
+        Array of parameters to estimate. For the Cox model, corresponds to the log hazard ratios
+    X : vector
+        2-dimensional vector of n observed values for b variables. No missing data should be included (missing data
+        may cause unexpected behavior).
+    y : vector
+        1-dimensional vector of n observed values. The Y values should all be 0 or 1. No missing data should be
+        included (missing data may cause unexpected behavior).
+    treat_index : int
+        Column index for the treatment vector.
+    force_continuous : bool, optional
+        Option to force the use of linear regression despite detection of a binary variable.
+
+    Returns
+    -------
+    array :
+        Returns a (3+b+(b-1))-by-n NumPy array evaluated for the input theta and y
+
+    Examples
+    --------
+    Construction of a estimating equation(s) with `ee_aipw` should be done similar to the following
+
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> from deli import MEstimator
+    >>> from deli.estimating_equations import ee_aipw
+
+    Some generic causal data
+
+    >>> n = 200
+    >>> d = pd.DataFrame()
+    >>> d['W'] = np.random.binomial(1, p=0.5, size=n)
+    >>> d['A'] = np.random.binomial(1, p=(0.25 + 0.5*d['W']), size=n)
+    >>> d['Ya0'] = np.random.binomial(1, p=(0.75 - 0.5*d['W']), size=n)
+    >>> d['Ya1'] = np.random.binomial(1, p=(0.75 - 0.5*d['W'] - 0.1*1), size=n)
+    >>> d['Y'] = (1-d['A'])*d['Ya0'] + d['A']*d['Ya1']
+    >>> d['C'] = 1
+
+    Defining psi, or the stacked estimating equations. Note that 'A' is the treatment of interest, so `treat_index` is
+    set to 1 (compared to input `X`).
+
+    >>> def psi(theta):
+    >>>     return ee_aipw(theta, X=d[['C', 'A', 'W']], y=d['Y'], treat_index=1)
+
+    Calling the M-estimation procedure. Since `X` is 3-by-n here and g-formula has 3 additional parameters, the initial
+    values should be of length 3+3=6. In general, it will be best to start with [0., 0.5, 0.5, ...] as the initials for
+    the risk parameters. This will start the initial at the exact middle value for each of the first 3 parameters. For
+    the regression coefficients, those can be set as zero, or if there is difficulty in simultaneous optimization,
+    coefficient estimates from outside `MEstimator` can be provided as inputs.
+
+    >>> mestimation = MEstimator(stacked_equations=psi, init=[0., 0.5, 0.5, 0., 0., 0., 0., 0.])
+    >>> mestimation.estimate()
+
+    Inspecting the parameter estimates and the variance
+
+    >>> mestimation.theta
+    >>> mestimation.variance
+
+    More specifically, the average treatment effect and its variance are
+
+    >>> mestimation.theta[0]
+    >>> mestimation.variance[0, 0]
+
+    The risk / mean had all been given treatment=1
+
+    >>> mestimation.theta[1]
+    >>> mestimation.variance[1, 1]
+
+    The risk / mean had all been given treatment=0
+
+    >>> mestimation.theta[2]
+    >>> mestimation.variance[2, 2]
+
+    References
+    ----------
+    Funk MJ, Westreich D, Wiesen C, Stürmer T, Brookhart MA, & Davidian M. (2011). Doubly robust estimation of causal
+    effects. *American Journal of Epidemiology*, 173(7), 761-767.
+
+    Tsiatis AA. (2006). Semiparametric theory and missing data. Springer, New York, NY.
+    """
+    # Giving parameters short-hand names for simplicity of code
+    diff = theta[0]                 # This is the ATE
+    r1 = theta[1]                   # This is R1
+    r0 = theta[2]                   # This is R0
+    beta = theta[3:3+X.shape[1]]    # These are the regression coefficients for the outcome model
+    alpha = theta[3+X.shape[1]:]    # These are the regression coefficients for the treatment model
+
+    # Ensuring correct typing
+    X = np.asarray(X)               # Convert to NumPy array
+    y = np.asarray(y)               # Convert to NumPy array
+
+    # Splitting X into A,W (treatment, covariates)
+    W = np.delete(X, treat_index, axis=1)             # Extract all-but treatment col A
+    A = X[:, treat_index].copy()                      # Extract treatment col A (MUST BE A COPY)
+
+    # pi-model (logistic regression)
+    pi_model = ee_logistic_regression(theta=alpha,    # Estimating logistic model
+                                      X=W,
+                                      y=A)
+    pi = inverse_logit(np.dot(W, alpha))              # Estimating the predicted probabilities for pi
+
+    # m-model (logistic regression)
+    if np.isin(y, [0, 1]).all() and not force_continuous:      # Checking outcome variable type is binary
+        m_model = ee_logistic_regression(theta=beta,           # Logistic regression parameters
+                                         X=X,
+                                         y=y)
+        X[:, treat_index] = 1                                  # Setting treatment to A=1 for all
+        ya1 = inverse_logit(np.dot(X, beta))                   # Calculating \hat{Y}(a=1)
+        X[:, treat_index] = 0                                  # Setting treatment to A=0 for all
+        ya0 = inverse_logit(np.dot(X, beta))                   # Calculating \hat{Y}(a=1)
+    else:
+        m_model = ee_linear_regression(theta=beta,             # Linear regression parameters
+                                       X=X,
+                                       y=y)
+        X[:, treat_index] = 1                                  # Setting treatment to A=1 for all
+        ya1 = np.dot(X, beta)                                  # Calculating \hat{Y}(a=1)
+        X[:, treat_index] = 0                                  # Setting treatment A=0 for all
+        ya0 = np.dot(X, beta)                                  # Calculating \hat{Y}(a=0)
+
+    # AIPW estimator
+    y1_star = (y*A/pi - ya1*(A-pi)/pi) - r1                    # Calculating \tilde{Y}(a=1)
+    y0_star = (y*(1-A)/(1-pi) + ya0*(A-pi)/(1-pi)) - r0        # Calculating \tilde{Y}(a=0)
+    ate = np.ones(y.shape[0]) * (r1 - r0) - diff               # Calculating the ATE
+
+    # Output (3+b+(b-1))-by-n array
+    return np.vstack((ate,               # theta[0] is for the ATE
+                      y1_star[None, :],  # theta[1] is for R1
+                      y0_star[None, :],  # theta[2] is for R0
+                      m_model,           # theta[3:b] is for the outcome model coefficients
+                      pi_model))         # theta[b:] is for the treatment model coefficients
