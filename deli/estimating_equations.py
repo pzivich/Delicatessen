@@ -430,13 +430,13 @@ def ee_gformula(theta, X, y, treat_index, force_continuous=False):
 
     .. math::
 
-        \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n (Y_i - X_i^T \theta) X_i = 0
+        \sum_i^n \psi_m(Y_i, X_i, \theta) = \sum_i^n (Y_i - X_i^T \theta) X_i = 0
 
     and for logistic regression, the estimating equation is
 
     .. math::
 
-        \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n (Y_i - expit(X_i^T \theta)) X_i = 0
+        \sum_i^n \psi_m(Y_i, X_i, \theta) = \sum_i^n (Y_i - expit(X_i^T \theta)) X_i = 0
 
     By default, `ee_gformula` detects whether `y` is all binary (zero or one), and applies logistic regression if that
     happens. See the parameters for more details.
@@ -614,7 +614,7 @@ def ee_ipw(theta, X, y, treat_index):
 
     .. math::
 
-        \sum_i^n \psi(A_i, W_i, \theta) = \sum_i^n (A_i - expit(W_i^T \theta)) W_i = 0
+        \sum_i^n \psi_g(A_i, W_i, \theta) = \sum_i^n (A_i - expit(W_i^T \theta)) W_i = 0
 
     where A is the treatment and W is the set of confounders. Both of these are processed from the input `X` and the
     specified `treat_index`.
@@ -775,7 +775,7 @@ def ee_aipw(theta, X, y, treat_index, force_continuous=False):
 
     .. math::
 
-        \sum_i^n \psi(A_i, W_i, \theta) = \sum_i^n (A_i - expit(W_i^T \theta)) W_i = 0
+        \sum_i^n \psi_g(A_i, W_i, \theta) = \sum_i^n (A_i - expit(W_i^T \theta)) W_i = 0
 
     where A is the treatment and W is the set of confounders. Both of these are processed from the input `X` and the
     specified `treat_index`.
@@ -784,13 +784,13 @@ def ee_aipw(theta, X, y, treat_index, force_continuous=False):
 
     .. math::
 
-        \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n (Y_i - X_i^T \theta) X_i = 0
+        \sum_i^n \psi_m(Y_i, X_i, \theta) = \sum_i^n (Y_i - X_i^T \theta) X_i = 0
 
     and for logistic regression, the estimating equation is
 
     .. math::
 
-        \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n (Y_i - expit(X_i^T \theta)) X_i = 0
+        \sum_i^n \psi_m(Y_i, X_i, \theta) = \sum_i^n (Y_i - expit(X_i^T \theta)) X_i = 0
 
     By default, `ee_aipw` detects whether `y` is all binary (zero or one), and applies logistic regression if that
     happens. See the parameters for more details.
@@ -799,11 +799,6 @@ def ee_aipw(theta, X, y, treat_index, force_continuous=False):
     also used for the risk / mean had everyone been given treatment=1, the risk / mean had everyone been given
     treatment=0, and the risk / mean difference between those two risks. Respectively, those estimating equations
     look like
-
-    y1_star = (y*A/pi - ya1*(A-pi)/pi) - r1
-    # Calculating Y(a=0)
-    y0_star = (y*(1-A)/(1-pi) + ya0*(A-pi)/(1-pi)) - r0
-
 
     .. math::
 

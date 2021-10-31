@@ -27,7 +27,7 @@ class MEstimator:
     by determining at which values of theta the given estimating equations are equal to zero. This is done via SciPy's
     `newton` algorithm by default.
 
-    For variance estimation, the sandwich variance estimator is used, which consists of
+    For variance estimation, the sandwich asymptotic variance estimator is used, which consists of
 
     .. math::
 
@@ -37,11 +37,11 @@ class MEstimator:
 
     .. math::
 
-        B_n(Y, \hat{\theta}) = 1/n \sum_{i=1}^{n} - \psi'(Y_i, \hat{\theta})
+        B_n(Y, \hat{\theta}) = n^{-1} \sum_{i=1}^{n} - \psi'(Y_i, \hat{\theta})
 
     .. math::
 
-        M_n(Y, \hat{\theta}) = 1/n \sum_{i=1}^{n} \psi(Y_i, \hat{\theta}) \times \psi(Y_i, \hat{\theta})^T
+        M_n(Y, \hat{\theta}) = n^{-1} \sum_{i=1}^{n} \psi(Y_i, \hat{\theta}) \times \psi(Y_i, \hat{\theta})^T
 
     The partial derivatives for the bread are calculated using an adaptation of SciPy's `derivative` functionality
     for partial derivatives. Inverting the bread is done via NumPy's `linalg.inv`. For the meat, the dot product is

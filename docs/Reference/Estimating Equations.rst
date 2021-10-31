@@ -38,3 +38,5 @@ Causal Inference
   :toctree: generated/
 
   ee_gformula
+  ee_ipw
+  ee_aipw
