@@ -19,7 +19,7 @@ First, we will go through the case of building an estimating equation completely
 go through an example with linear regression. This is how I went about building the `ee_linear_regression`
 functionality.
 
-First, we have the estimating equation provided in Boos & Stefanski (2013), but this is just the score function.
+First, we have the estimating equation (which is the score function in this case) provided in Boos & Stefanski (2013)
 
 .. math::
 

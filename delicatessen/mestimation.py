@@ -2,7 +2,7 @@ import numpy as np
 from scipy.optimize import newton, root
 from scipy.misc import derivative
 
-from deli.utilities import partial_derivative
+from delicatessen.utilities import partial_derivative
 
 
 class MEstimator:
@@ -79,8 +79,8 @@ class MEstimator:
     >>> import numpy as np
     >>> import pandas as pd
     >>> from scipy.stats import logistic
-    >>> from deli import MEstimator
-    >>> from deli.estimating_equations import ee_mean_variance
+    >>> from delicatessen import MEstimator
+    >>> from delicatessen.estimating_equations import ee_mean_variance
 
     >>> y_dat = [1, 2, 4, 1, 2, 3, 1, 5, 2]
 

@@ -1,24 +1,24 @@
-"""Deli is a one-stop shop for all your sandwich (variance) needs. Specifically, `deli` implements a general API
+"""Delicatessen is a one-stop shop for all your sandwich (variance) needs. Specifically, `delicatessen` implements a general API
 for M-estimation. Estimating equations are both pre-built and can be custom-made. For help on creating custom
 estimating equations, be sure to check out the ReadTheDocs documentation.
 
-To install the deli library, use the following command
+To install the delicatessen library, use the following command
 
-$ python -m pip install deli
+$ python -m pip install delicatessen
 
 """
 
 from setuptools import setup
 
-exec(compile(open('deli/version.py').read(),
-             'deli/version.py', 'exec'))
+exec(compile(open('delicatessen/version.py').read(),
+             'delicatessen/version.py', 'exec'))
 
 
-setup(name='deli',
+setup(name='delicatessen',
       version=__version__,
       description='Generalized M-Estimation',
       keywords='m-estimation sandwich-variance estimating-equations',
-      packages=['deli',
+      packages=['delicatessen',
                 ],
       include_package_data=True,
       license='MIT',

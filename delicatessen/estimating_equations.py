@@ -1,5 +1,5 @@
 import numpy as np
-from deli.utilities import logit, inverse_logit
+from delicatessen.utilities import logit, inverse_logit
 
 #################################################################
 # Basic Estimating Equations
@@ -36,8 +36,8 @@ def ee_mean(theta, y):
     --------
     Construction of a estimating equation(s) with `ee_mean` should be done similar to the following
 
-    >>> from deli import MEstimator
-    >>> from deli.estimating_equations import ee_mean
+    >>> from delicatessen import MEstimator
+    >>> from delicatessen.estimating_equations import ee_mean
 
     Some generic data to estimate the mean for
 
@@ -110,8 +110,8 @@ def ee_mean_robust(theta, y, k):
     --------
     Construction of a estimating equation(s) with `ee_mean_robust` should be done similar to the following
 
-    >>> from deli import MEstimator
-    >>> from deli.estimating_equations import ee_mean_robust
+    >>> from delicatessen import MEstimator
+    >>> from delicatessen.estimating_equations import ee_mean_robust
 
     Some generic data to estimate the mean for
 
@@ -185,8 +185,8 @@ def ee_mean_variance(theta, y):
     --------
     Construction of a estimating equation(s) with `ee_mean_variance` should be done similar to the following
 
-    >>> from deli import MEstimator
-    >>> from deli.estimating_equations import ee_mean_variance
+    >>> from delicatessen import MEstimator
+    >>> from delicatessen.estimating_equations import ee_mean_variance
 
     Some generic data to estimate the mean for
 
@@ -272,8 +272,8 @@ def ee_linear_regression(theta, X, y):
 
     >>> import numpy as np
     >>> import pandas as pd
-    >>> from deli import MEstimator
-    >>> from deli.estimating_equations import ee_linear_regression
+    >>> from delicatessen import MEstimator
+    >>> from delicatessen.estimating_equations import ee_linear_regression
 
     Some generic data to estimate a linear regresion model
 
@@ -374,8 +374,8 @@ def ee_logistic_regression(theta, X, y):
     >>> import numpy as np
     >>> import pandas as pd
     >>> from scipy.stats import logistic
-    >>> from deli import MEstimator
-    >>> from deli.estimating_equations import ee_logistic_regression
+    >>> from delicatessen import MEstimator
+    >>> from delicatessen.estimating_equations import ee_logistic_regression
 
     Some generic data to estimate a logistic regresion model
 
@@ -508,8 +508,8 @@ def ee_gformula(theta, X, y, treat_index, force_continuous=False):
 
     >>> import numpy as np
     >>> import pandas as pd
-    >>> from deli import MEstimator
-    >>> from deli.estimating_equations import ee_gformula
+    >>> from delicatessen import MEstimator
+    >>> from delicatessen.estimating_equations import ee_gformula
 
     Some generic confounded data
 
@@ -681,8 +681,8 @@ def ee_ipw(theta, X, y, treat_index):
 
     >>> import numpy as np
     >>> import pandas as pd
-    >>> from deli import MEstimator
-    >>> from deli.estimating_equations import ee_ipw
+    >>> from delicatessen import MEstimator
+    >>> from delicatessen.estimating_equations import ee_ipw
 
     Some generic causal data
 
@@ -863,8 +863,8 @@ def ee_aipw(theta, X, y, treat_index, force_continuous=False):
 
     >>> import numpy as np
     >>> import pandas as pd
-    >>> from deli import MEstimator
-    >>> from deli.estimating_equations import ee_aipw
+    >>> from delicatessen import MEstimator
+    >>> from delicatessen.estimating_equations import ee_aipw
 
     Some generic causal data
 

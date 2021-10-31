@@ -51,7 +51,7 @@ autodoc_default_options = {
 }
 
 # General information about the project.
-project = "Deli"
+project = "Delicatessen"
 copyright = "2021, Paul Zivich"
 version = "0.1b"
 
