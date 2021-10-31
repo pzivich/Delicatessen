@@ -1,3 +1,5 @@
+![delicatessen](docs/images/delicatessen_header.png)
+
 # Delicatessen
 
 [![PyPI version](https://badge.fury.io/py/delicatessen.svg)](https://badge.fury.io/py/delicatessen)

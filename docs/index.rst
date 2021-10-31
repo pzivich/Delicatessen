@@ -1,3 +1,5 @@
+.. image:: images/delicatessen_header.png
+
 Delicatessen
 =====================================
 
