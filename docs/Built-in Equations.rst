@@ -116,8 +116,8 @@ The mean-variance estimating equation can be implemented as follows (remember th
     print("theta:     ", mestimation.theta)
     print("Var(theta):", mestimation.variance)
 
-*Note* the `init` here takes two values because the stacked estimating equations has a length of 2 (theta is b-by-1
-where b=2). The first value of theta is the mean and the second is the variance. Now, the variance output provides
+*Note* the `init` here takes two values because the stacked estimating equations has a length of 2 (`theta` is b-by-1
+where b=2). The first value of `theta` is the mean and the second is the variance. Now, the variance output provides
 a 2-by-2 covariance matrix. The leading diagonal of that matrix are the variances (where the first is the estimated
 variance of the mean and the second is the estimated variance of the variance).
 
@@ -307,9 +307,9 @@ Again, we will wrap the built-in estimating equations inside a function.
     def psi(theta):
         return ee_gformula(theta, X=d[['C', 'A', 'W']], y=d['Y'], treat_index=1)
 
-The arguments for `ee_gformula` are the theta values, the covariates (including an intercept (C) and the treatment (A)),
-the outcome values (Y), and the column index for the treatment in X. Here, 1 designates the second column (python uses
-zero-indexing), which corresponds to 'A' in how the X data is formatted.
+The arguments for `ee_gformula` are the :math:`\theta` values, the covariates (including an intercept (C) and the
+treatment (A)), the outcome values (Y), and the column index for the treatment in X. Here, 1 designates the second
+column (python uses zero-indexing), which corresponds to 'A' in how the X data is formatted.
 
 Now we can call the M-estimator to solve for the values and the variance. Here, the initial values provided must be
 3+*b* (where *b* is the number of columns in X). This is because the g-computation estimating equations output the
@@ -374,9 +374,9 @@ As with every built-in estimating equation, we will wrap it inside a function.
     def psi(theta):
         return ee_ipw(theta, X=d[['C', 'A', 'W']], y=d['Y'], treat_index=1)
 
-The arguments for `ee_ipw` are the theta values, the covariates (including an intercept (C) and the treatment (A)),
-the outcome values (Y), and the column index for the treatment in X. Here, 1 designates the second column (python uses
-zero-indexing), which corresponds to 'A' in how the X data is formatted.
+The arguments for `ee_ipw` are the :math:`\theta` values, the covariates (including an intercept (C) and the treatment
+(A)), the outcome values (Y), and the column index for the treatment in X. Here, 1 designates the second column
+(python uses zero-indexing), which corresponds to 'A' in how the X data is formatted.
 
 Now we can call the M-estimator to solve for the values and the variance. Here, the initial values provided must be
 3+*b* (where *b* is the number of columns in X *minus 1*). This is because the IPW estimating equations output the
@@ -450,9 +450,9 @@ As always, we will wrap the built-in estimating equation inside a function.
     def psi(theta):
         return ee_aipw(theta, X=d[['C', 'A', 'W']], y=d['Y'], treat_index=1)
 
-The arguments for `ee_aipw` are the theta values, the covariates (including an intercept (C) and the treatment (A)),
-the outcome values (Y), and the column index for the treatment in X. Here, 1 designates the second column (python uses
-zero-indexing), which corresponds to 'A' in how the X data is formatted.
+The arguments for `ee_aipw` are the :math:`\theta` values, the covariates (including an intercept (C) and the treatment
+(A)), the outcome values (Y), and the column index for the treatment in X. Here, 1 designates the second column
+(python uses zero-indexing), which corresponds to 'A' in how the X data is formatted.
 
 Now we can call the M-estimator to solve for the values and the variance. Here, the initial values provided must be
 3+*b*+*b-1* (where *b* is the number of columns in X). This is because the AIPW estimating equations output the

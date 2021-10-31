@@ -17,14 +17,14 @@ estimating equation takes the form of
      \sum_i^n \psi(Z_i, \theta) = 0
 
 where `Z` is independent observations (these need not be identically distributed). The parameter(s) of interest are
-the *b*-dimensional vector theta, and psi is a *b*-by-1 function that is known. A large number of consistent and
-asymptotically normal statistics can be put into the M-Estimation framework. Some examples include: mean, regression,
-delta method, and many others.
+the *b*-dimensional vector :math:`\theta`, and :math:`\psi` is a *b*-by-1 function that is known. A large number of
+consistent and asymptotically normal statistics can be put into the M-Estimation framework. Some examples include:
+mean, regression, delta method, and many others.
 
-To apply the M-Estimator, we solve for theta given the data and stacked estimating equations. This is similar to other
-approaches, but M-estimation requires the equations take the form provided above. The key advantage of M-Estimators is
-the straightforward estimation of the variance following from this framework, under suitable regularity conditions
-(and whatever else is needed). Specifically, M-Estimation provides the following sandwich variance estimator:
+To apply the M-Estimator, we solve for :math:`\theta` given the data and stacked estimating equations. This is similar
+to other approaches, but M-estimation requires the equations take the form provided above. The key advantage of
+M-Estimators is the straightforward estimation of the variance following from this framework, under suitable regularity
+conditions (and whatever else is needed). Specifically, M-Estimation provides the following sandwich variance estimator:
 
 .. math::
 

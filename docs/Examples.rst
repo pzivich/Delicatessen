@@ -17,9 +17,8 @@ equations are
 
 .. math::
 
-    \psi_1(Y_i, \theta) = Y_i - \theta_1
-
-    \psi_2(Y_i, \theta) = (Y_i - \theta_1)^2 - \theta_2
+    \psi_1(Y_i, \theta) &= Y_i - \theta_1 \\
+    \psi_2(Y_i, \theta) &= (Y_i - \theta_1)^2 - \theta_2
 
 To demonstrate the example, we will use some generic data for Y
 
@@ -44,8 +43,8 @@ After defining the stacked estimating equations, the M-estimator can be called
     mestimate = MEstimator(psi, init=[0, 1])
     mestimate.estimate()
 
-The M-estimator will solve for theta via a root finding procedure. For the sandwich variance, `delicatessen` uses a
-numerical approximation procedure for the derivative. This is different from the closed-form variance estimator
+The M-estimator will solve for :math:`\theta` via a root finding procedure. For the sandwich variance, `delicatessen`
+uses a numerical approximation procedure for the derivative. This is different from the closed-form variance estimator
 provided in Chapter 7, but both should return the same answer (within computational error). The advantage of the
 numerical derivatives are that they can be done for arbitrary estimating equations.
 
@@ -87,11 +86,9 @@ The chapter also provides an alternative series of estimating equations for the 
 
 .. math::
 
-    \psi_1(Y_i, X_i, \theta) = Y_i - \theta_1
-
-    \psi_2(Y_i, X_i, \theta) = X_i - \theta_2
-
-    \psi_3(Y_i, X_i, \theta) = \theta_1 - \theta_2 \times \theta_3
+    \psi_1(Y_i, X_i, \theta) &= Y_i - \theta_1 \\
+    \psi_2(Y_i, X_i, \theta) &= X_i - \theta_2 \\
+    \psi_3(Y_i, X_i, \theta) &= \theta_1 - \theta_2 \times \theta_3
 
 
 Similarly, this can also be programmed via
@@ -123,13 +120,10 @@ their corresponding mean. The stacked estimating equations are
 
 .. math::
 
-    \psi_1(Y_i, \theta) = Y_i - \theta_1
-
-    \psi_2(Y_i, \theta) = (Y_i - \theta_1)^2 - \theta_2
-
-    \psi_3(Y_i, \theta) = \sqrt{\theta_2} - \theta_3
-
-    \psi_4(Y_i, \theta) = \log(\theta_2) - \theta_4
+    \psi_1(Y_i, \theta) &= Y_i - \theta_1 \\
+    \psi_2(Y_i, \theta) &= (Y_i - \theta_1)^2 - \theta_2 \\
+    \psi_3(Y_i, \theta) &= \sqrt{\theta_2} - \theta_3 \\
+    \psi_4(Y_i, \theta) &= \log(\theta_2) - \theta_4 \\
 
 
 These equations can be expressed programmatically for `delicatessen` as
@@ -160,9 +154,8 @@ The first set of estimating equations for the instrumental variable analysis are
 
 .. math::
 
-    \psi_1(Y_i, W_i, T_i, \theta) = \theta_1 - T
-
-    \psi_2(Y_i, W_i, T_i, \theta) = (Y - \theta_2 W)(\theta_1 - T)
+    \psi_1(Y_i, W_i, T_i, \theta) &= \theta_1 - T \\
+    \psi_2(Y_i, W_i, T_i, \theta) &= (Y - \theta_2 W)(\theta_1 - T) \\
 
 To demonstrate the example, below is some generic simulated data
 
@@ -191,13 +184,10 @@ estimating equations from before were further updated to
 
 .. math::
 
-    \psi_1(Y_i, W_i, T_i, \theta) = \theta_1 - T
-
-    \psi_2(Y_i, W_i, T_i, \theta) = \theta_2 - W
-
-    \psi_3(Y_i, W_i, T_i, \theta) = (Y - \theta_3 W)(\theta_2 - W)
-
-    \psi_4(Y_i, W_i, T_i, \theta) = (Y - \theta_4 W)(\theta_1 - T)
+    \psi_1(Y_i, W_i, T_i, \theta) &= \theta_1 - T \\
+    \psi_2(Y_i, W_i, T_i, \theta) &= \theta_2 - W \\
+    \psi_3(Y_i, W_i, T_i, \theta) &= (Y - \theta_3 W)(\theta_2 - W) \\
+    \psi_4(Y_i, W_i, T_i, \theta) &= (Y - \theta_4 W)(\theta_1 - T) \\
 
 Again, we can easily write these equations for `delicatessen`,
 
