@@ -1,8 +1,8 @@
-Deli
+Delicatessen
 =====================================
 
-`deli` is a one-stop shop for all your sandwich (variance) needs. This Python 3.6+ package supports a generalization
-of M-Estimation theory.
+`delicatessen` is a one-stop shop for all your sandwich (variance) needs. This Python 3.6+ package supports a
+generalization of M-Estimation theory.
 
 Here, we provide a brief overview of M-estimation theory. For a more detailed and formal introduction to M-estimation,
 I highly recommend chapter 7 of Boos & Stefanski (2013). M-estimation is a generalization of robust inference (here
@@ -44,9 +44,9 @@ Therefore, we have a relatively simple way to calculate the variance for a large
 Additionally, this variance estimator is robust.
 
 While M-Estimation is a powerful tool, the derivatives and matrix algebra can quickly become unwieldy. This is where
-`deli` comes in. `deli` takes stacked estimating equations and data and works through all the necessary calculations.
-Therefore, M-Estimation can be more widely adopted without needing to solve every derivative for your particular
-problem. We can let the computer do all that hard work of finding the roots and numerically approximating the
+`delicatessen` comes in. `delicatessen` takes stacked estimating equations and data and works through all the necessary
+calculations. Therefore, M-Estimation can be more widely adopted without needing to solve every derivative for your
+particular problem. We can let the computer do all that hard work of finding the roots and numerically approximating the
 derivatives for us.
 
 Contents:
@@ -65,20 +65,21 @@ Contents:
 Installation:
 -------------
 
-To install `deli`, use the following command in terminal or command prompt
+To install `delicatessen`, use the following command in terminal or command prompt
 
-``python -m pip install deli``
+``python -m pip install delicatessen``
 
-Only two dependencies are necessary for `deli` (both of which you already have installed): NumPy and SciPy.
+Only two dependencies are necessary for `delicatessen` (both of which you will likely have already installed): NumPy
+and SciPy.
 
-To replicate the tests in `tests/` you will need to install statsmodels as well (but this is not necessary for
-use of the package).
+To replicate the tests in `tests/` you will need to install `statsmodels` and `pytest` (but this is not necessary for
+general use of the package).
 
 
 Code and Issue Tracker
 -----------------------------
 
-Available on Github `pzivich/Deli <https://github.com/pzivich/Deli/>`_
+Available on Github `pzivich/Deli <https://github.com/pzivich/Delicatessen/>`_
 Please report bugs, issues, and feature requests there.
 
 Also feel free to contact me via email (gmail: zivich.5) or on Twitter (@PausalZ)

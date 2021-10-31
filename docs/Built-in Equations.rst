@@ -1,8 +1,8 @@
 Built-in Estimating Equations
 '''''''''''''''''''''''''''''''''''''
 
-Here, we provide an overview of some of the built-in estimating equations with `deli`. This documentation is split into
-four sections, corresponding to basic, regression, survival, and causal estimating equations.
+Here, we provide an overview of some of the built-in estimating equations with `delicatessen`. This documentation is
+split into four sections, corresponding to basic, regression, survival, and causal estimating equations.
 
 All built-in estimating equations need to be 'wrapped' inside a outer function. Below is an example of an outer
 function, `psi` for the generic estimating equation `ee` (`ee` does not exist but it a placeholder here).
@@ -13,8 +13,8 @@ function, `psi` for the generic estimating equation `ee` (`ee` does not exist bu
         return ee(theta=theta, data=dat)
 
 Here, the generic `ee` takes two inputs `theta` and `data`. `theta` is the general theta vector that is present in
-all stacked estimating equations expected by `deli`. `data` is an argument that takes an input source of data. The
-`dat` provided should be **in the local scope** of the .py file this function lives in.
+all stacked estimating equations expected by `delicatessen`. `data` is an argument that takes an input source of data.
+The `dat` provided should be **in the local scope** of the .py file this function lives in.
 
 After wrapped in an outer function, the function can be passed to `MEstimator`. See the examples below for further
 details and examples.
@@ -38,7 +38,7 @@ To use `ee_mean` with `MEstimator`, this function will be wrapped in an outer fu
 
 .. code::
 
-    from deli.estimating_equations import ee_mean
+    from delicatessen.estimating_equations import ee_mean
 
     def psi(theta):
         return ee_mean(theta=theta, y=obs_vals)
@@ -49,7 +49,7 @@ After creating the wrapper function, the M-Estimator can be called like the foll
 
 .. code::
 
-    from deli import MEstimator
+    from delicatessen import MEstimator
 
     mestimation = MEstimator(stacked_equations=psi, init=[0, ])
     mestimation.estimate()
@@ -76,8 +76,8 @@ function and call).
 
 .. code::
 
-    from deli import MEstimator
-    from deli.estimating_equations import ee_mean_robust
+    from delicatessen import MEstimator
+    from delicatessen.estimating_equations import ee_mean_robust
 
     def psi(theta):
         return ee_mean_robust(theta=theta, y=obs_vals, k=6)
@@ -104,8 +104,8 @@ The mean-variance estimating equation can be implemented as follows (remember th
 
 .. code::
 
-    from deli import MEstimator
-    from deli.estimating_equations import ee_mean_variance
+    from delicatessen import MEstimator
+    from delicatessen.estimating_equations import ee_mean_variance
 
     def psi(theta):
         return ee_mean_variance(theta=theta, y=obs_vals)
@@ -155,8 +155,8 @@ For this data, we can now create the wrapper function for the `ee_linear_regress
 
 .. code::
 
-    from deli import MEstimator
-    from deli.estimating_equations import ee_linear_regression
+    from delicatessen import MEstimator
+    from delicatessen.estimating_equations import ee_linear_regression
 
     def psi(theta):
         return ee_linear_regression(theta=theta,
@@ -187,9 +187,9 @@ estimate the same quantities with `statsmodels.glm`.
     print(np.asarray(glm.params))         # Point estimates
     print(np.asarray(glm.cov_params()))   # Covariance matrix
 
-While `statsmodels` likely runs faster, the benefit of M-estimation and `deli` is that multiple estimating equations
-can be stacked together (including multiple regression models). This advantage will become clearer in the survival
-and causal sections.
+While `statsmodels` likely runs faster, the benefit of M-estimation and `delicatessen` is that multiple estimating
+equations can be stacked together (including multiple regression models). This advantage will become clearer in the
+causal section.
 
 Logistic Regression
 ----------------------------
@@ -220,8 +220,8 @@ For this data, we can now create the wrapper function for the `ee_logistic_regre
 
 .. code::
 
-    from deli import MEstimator
-    from deli.estimating_equations import ee_logistic_regression
+    from delicatessen import MEstimator
+    from delicatessen.estimating_equations import ee_logistic_regression
 
     def psi(theta):
         return ee_logistic_regression(theta=theta,
@@ -253,8 +253,8 @@ estimate the same quantities with `statsmodels.glm`.
     print(np.asarray(glm.params))         # Point estimates
     print(np.asarray(glm.cov_params()))   # Covariance matrix
 
-While `statsmodels` likely runs faster, the benefit of M-estimation and `deli` is that multiple estimating equations
-can be stacked together (including multiple regression models). This advantage will become clearer in the
+While `statsmodels` likely runs faster, the benefit of M-estimation and `delicatessen` is that multiple estimating
+equations can be stacked together (including multiple regression models). This advantage will become clearer in the
 causal section.
 
 
@@ -297,8 +297,8 @@ To load the estimating equations, we call
 
 .. code::
 
-    from deli import MEstimators
-    from deli.estimating_equations import ee_gformula
+    from delicatessen import MEstimators
+    from delicatessen.estimating_equations import ee_gformula
 
 Again, we will wrap the built-in estimating equations inside a function.
 
@@ -358,14 +358,14 @@ Inverse probability weighting
 -------------------------------------
 
 Rather than modeling the outcome, we can choose the inverse probability weighting (IPW) estimator, which models the
-probability of treatment. The estimating equations for the IPW estimator are also built-in to `deli`.
+probability of treatment. The estimating equations for the IPW estimator are also built-in to `delicatessen`.
 
 To load the estimating equations, we call
 
 .. code::
 
-    from deli import MEstimators
-    from deli.estimating_equations import ee_ipw
+    from delicatessen import MEstimators
+    from delicatessen.estimating_equations import ee_ipw
 
 As with every built-in estimating equation, we will wrap it inside a function.
 
@@ -435,12 +435,13 @@ and that outcome model does *not* support interaction terms. Here the AIPW is me
 more general use, the provided estimating equation should be adapted. But the built-in estimating equation will provide
 a basic structure for user's to build off of.
 
-The estimating equations for the AIPW estimator are also provided in `deli`. To load the estimating equations, we call
+The estimating equations for the AIPW estimator are also provided in `delicatessen`. To load the estimating equations,
+we call
 
 .. code::
 
-    from deli import MEstimators
-    from deli.estimating_equations import ee_aipw
+    from delicatessen import MEstimators
+    from delicatessen.estimating_equations import ee_aipw
 
 As always, we will wrap the built-in estimating equation inside a function.
 

@@ -1,7 +1,7 @@
-﻿deli.mestimation.MEstimator
-===========================
+﻿delicatessen.mestimation.MEstimator
+===================================
 
-.. currentmodule:: deli.mestimation
+.. currentmodule:: delicatessen.mestimation
 
 .. autoclass:: MEstimator
 

@@ -1,13 +1,13 @@
 Estimating Equations
 =====================
-To ease use, `deli` comes with several built-in estimating equation functionalities. These basic functionalities cover
-a variety of common use cases. Below is reference documentation for currently available estimating equations.
+To ease use, `delicatessen` comes with several built-in estimating equation functionalities. These basic functionalities
+cover a variety of common use cases. Below is reference documentation for currently available estimating equations.
 
 
 Basic
 -------------------
 
-.. currentmodule:: deli.estimating_equations
+.. currentmodule:: delicatessen.estimating_equations
 
 .. autosummary::
   :toctree: generated/
@@ -20,7 +20,7 @@ Basic
 Regression
 -------------------
 
-.. currentmodule:: deli.estimating_equations
+.. currentmodule:: delicatessen.estimating_equations
 
 .. autosummary::
   :toctree: generated/
@@ -32,7 +32,7 @@ Regression
 Causal Inference
 -------------------
 
-.. currentmodule:: deli.estimating_equations
+.. currentmodule:: delicatessen.estimating_equations
 
 .. autosummary::
   :toctree: generated/

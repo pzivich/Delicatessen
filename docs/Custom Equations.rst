@@ -1,7 +1,7 @@
 Custom Estimating Equations
 =====================================
 
-One of the key advantages of `deli` is that it has a lot of flexibility in the estimating equations that can be
+One of the key advantages of `delicatessen` is that it has a lot of flexibility in the estimating equations that can be
 specified. Basically, it will allow for any estimating equation to be passed to it (but not that the estimating
 equation(s) *must* be unbiased for the theory behind M-estimation to hold). Here, I provide an overview and tips for
 how to build your own estimating equation.
@@ -9,8 +9,8 @@ how to build your own estimating equation.
 In general, it will be best if you find an explicit paper or book (most likely written by a statistician) that directly
 provides the estimating equation(s) to you. Deriving your own *unbiased* estimating equation may be a lot of effort
 and will require a statistical proof. This section does *not* address this part of M-estimation. Rather, this section
-provides information on how to construct an estimating equation within `deli`. `deli` assumes you are giving it a
-valid estimating equation.
+provides information on how to construct an estimating equation within `delicatessen`. `delicatessen` assumes you are
+giving it a valid estimating equation.
 
 Building from scratch
 -------------------------------------

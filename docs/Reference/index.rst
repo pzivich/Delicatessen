@@ -1,11 +1,11 @@
 Reference
 ==========================
 
-This page links to the documentation for each functionality within `deli`. *M-Estimator* contains documentation for
-the general M-Estimator procedure. *Estimating Equations* details the built-in estimating equations that come with
-`deli`.
+This page links to the documentation for each functionality within `delicatessen`. *M-Estimator* contains documentation
+for the general M-Estimator procedure. *Estimating Equations* details the built-in estimating equations that come with
+`delicatessen`.
 
-For a more narrative-driven description of M-Estimation and how to use `deli`, please see the side-bar.
+For a more narrative-driven description of M-Estimation and how to use `delicatessen`, please see the side-bar.
 
 
 .. toctree::
