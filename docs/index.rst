@@ -4,7 +4,8 @@ Delicatessen
 =====================================
 
 `delicatessen` is a one-stop shop for all your sandwich (variance) needs. This Python 3.6+ package supports a
-generalization of M-Estimation theory.
+generalization of M-Estimation theory. `delicatessen` draws inspiration from the R library `geex` for generalized
+M-estimation (`details here <https://bsaul.github.io/geex/>`_) from Saul & Hudgens (2020).
 
 Here, we provide a brief overview of M-estimation theory. For a more detailed and formal introduction to M-estimation,
 I highly recommend chapter 7 of Boos & Stefanski (2013). M-estimation is a generalization of robust inference (here
@@ -92,3 +93,6 @@ Stefanski LA, & Boos DD. (2002). The calculus of M-estimation. *The American Sta
 
 Boos DD, & Stefanski LA. (2013). M-estimation (estimating equations). In Essential Statistical Inference
 (pp. 297-337). Springer, New York, NY.
+
+Saul BC, & Hudgens MG. (2020). The Calculus of M-Estimation in R with geex. *Journal of Statistical Software*,
+92(2).
