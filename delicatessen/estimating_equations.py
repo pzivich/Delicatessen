@@ -633,7 +633,7 @@ def ee_ipw(theta, X, y, treat_index):
 
     .. math::
 
-        \sum_i^n \psi_0(Y_i, A_i, \pi_i, \theta_0) = \sum_i^n (\theta_1 - \theta_2) - \theta_0 = 0
+        \sum_i^n \psi_d(Y_i, A_i, \pi_i, \theta_0) = \sum_i^n (\theta_1 - \theta_2) - \theta_0 = 0
 
     Due to these 3 extra values, the length of the theta vector is b+3, where b is the number of parameters in the
     regression model.

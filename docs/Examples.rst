@@ -235,10 +235,6 @@ Below is the estimating equation in Python
 Notice that the estimating equation here is not smooth. Specifically, there is a jump at *k*. Therefore, this will only
 work for values of theta that are differentiable (i.e., the true mean can't be at *k*).
 
-Positive Mean Deviation (7.4.3)
--------------------------------
-
-... to be added ...
 
 Linear Regression (7.5.1)
 -------------------------------
@@ -279,7 +275,26 @@ The estimating equation and M-estimation procedure is then called by
 
 As mentioned, a for-loop version can also be used. Below is an example of the for-loop version for regression
 
-... to be added ...
+.. code::
+
+    def psi(theta):
+        # Transforming to arrays
+        X = np.asarray(d[['C', 'X', 'W']])
+        y = np.asarray(d['Y'])
+        beta = np.asarray(theta)[:, None]
+        n = X.shape[0]
+
+        # Where to store each of the resulting estimates
+        est_vals = []
+
+        # Looping through each observation
+        for i in range(n):
+            v_i = (y[i] - np.dot(X[i], beta)) * X[i]
+            est_vals.append(v_i)
+
+        # returning 3-by-n object
+        return np.asarray(est_vals).T
+
 
 GEE (7.5.6)
 -------------------------------
