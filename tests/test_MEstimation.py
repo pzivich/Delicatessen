@@ -374,6 +374,34 @@ class TestEstimatingEquations:
                             mpee.variance,
                             atol=1e-6)
 
+    def test_wls(self):
+        """Tests weighted linear regression by-hand with a single estimating equation.
+        """
+        n = 500
+        data = pd.DataFrame()
+        data['X'] = np.random.normal(size=n)
+        data['Z'] = np.random.normal(size=n)
+        data['Y'] = 0.5 + 2 * data['X'] - 1 * data['Z'] + np.random.normal(loc=0, size=n)
+        data['C'] = 1
+        data['w'] = np.random.uniform(1, 10, size=n)
+
+        def psi_regression(theta):
+            return ee_linear_regression(theta,
+                                        X=data[['C', 'X', 'Z']],
+                                        y=data['Y'],
+                                        weights=data['w'])
+
+        mestimator = MEstimator(psi_regression, init=[0.1, 0.1, 0.1])
+        mestimator.estimate()
+
+        # Comparing to statsmodels GLM (with robust covariance)
+        glm = smf.glm("Y ~ X + Z", data, freq_weights=data['w']).fit(cov_type="HC1")
+
+        # Checking mean estimate
+        npt.assert_allclose(mestimator.theta,
+                            np.asarray(glm.params),
+                            atol=1e-6)
+
     def test_logitic(self):
         n = 500
         data = pd.DataFrame()
@@ -407,6 +435,34 @@ class TestEstimatingEquations:
         # Checking variance estimates
         npt.assert_allclose(mcee.variance,
                             mpee.variance,
+                            atol=1e-6)
+
+    def test_weighted_logistic(self):
+        """Tests weighted logistic regression by-hand with a single estimating equation.
+        """
+        n = 500
+        data = pd.DataFrame()
+        data['X'] = np.random.normal(size=n)
+        data['Z'] = np.random.normal(size=n)
+        data['Y'] = np.random.binomial(n=1, p=logistic.cdf(0.5 + 2*data['X'] - 1*data['Z']), size=n)
+        data['C'] = 1
+        data['w'] = np.random.uniform(1, 10, size=n)
+
+        def psi_regression(theta):
+            return ee_logistic_regression(theta,
+                                          X=data[['C', 'X', 'Z']],
+                                          y=data['Y'],
+                                          weights=data['w'])
+
+        mestimator = MEstimator(psi_regression, init=[0., 0., 0.])
+        mestimator.estimate()
+
+        # Comparing to statsmodels GLM (with robust covariance)
+        glm = smf.glm("Y ~ X + Z", data, freq_weights=data['w'], family=sm.families.Binomial()).fit(cov_type="HC1")
+
+        # Checking mean estimate
+        npt.assert_allclose(mestimator.theta,
+                            np.asarray(glm.params),
                             atol=1e-6)
 
     @pytest.fixture

@@ -224,7 +224,7 @@ def ee_mean_variance(theta, y):
 # Regression Estimating Equations
 
 
-def ee_linear_regression(theta, X, y):
+def ee_linear_regression(theta, X, y, weights=None):
     r"""Default stacked estimating equation for linear regression. The estimating equation is
 
     .. math::
@@ -260,6 +260,9 @@ def ee_linear_regression(theta, X, y):
     y : vector
         1-dimensional vector of n observed values. No missing data should be included (missing data may cause unexpected
         behavior).
+    weights : vector, None, optional
+        1-dimensional vector of n weights. No missing weights should be included. Default is None, which assigns a
+        weight of 1 to all observations.
 
     Returns
     -------
@@ -311,13 +314,19 @@ def ee_linear_regression(theta, X, y):
     y = np.asarray(y)[:, None]              # Convert to NumPy array and ensure correct shape for matrix algebra
     beta = np.asarray(theta)[:, None]       # Convert to NumPy array and ensure correct shape for matrix algebra
 
+    # Allowing for a weighted linear model
+    if weights is None:                     # If weights is unspecified
+        w = np.ones(X.shape[0])                 # ... assign weight of 1 to all observations
+    else:                                   # Otherwise
+        w = np.asarray(weights)                 # ... set weights as input vector
+
     # Output b-by-n matrix
-    return ((y -                            # Speedy matrix algebra for regression
-             np.dot(X, beta))               # ... linear regression requires no transfomrations
-            * X).T                          # ... multiply by coefficient and transpose for correct orientation
+    return w*((y -                            # Speedy matrix algebra for regression
+               np.dot(X, beta))               # ... linear regression requires no transfomrations
+               * X).T                         # ... multiply by coefficient and transpose for correct orientation
 
 
-def ee_logistic_regression(theta, X, y):
+def ee_logistic_regression(theta, X, y, weights=None):
     r"""Default stacked estimating equation for logistic regression. The estimating equation is
 
     .. math::
@@ -361,6 +370,9 @@ def ee_logistic_regression(theta, X, y):
     y : vector
         1-dimensional vector of n observed values. The Y values should all be 0 or 1. No missing data should be
         included (missing data may cause unexpected behavior).
+    weights : vector, None, optional
+        1-dimensional vector of n weights. No missing weights should be included. Default is None, which assigns a
+        weight of 1 to all observations.
 
     Returns
     -------
@@ -413,10 +425,16 @@ def ee_logistic_regression(theta, X, y):
     y = np.asarray(y)[:, None]             # Convert to NumPy array and ensure correct shape for matrix algebra
     beta = np.asarray(theta)[:, None]      # Convert to NumPy array and ensure correct shape for matrix algebra
 
+    # Allowing for a weighted linear model
+    if weights is None:                     # If weights is unspecified
+        w = np.ones(X.shape[0])                 # ... assign weight of 1 to all observations
+    else:                                   # Otherwise
+        w = np.asarray(weights)                 # ... set weights as input vector
+
     # Output b-by-n matrix
-    return ((y -                                # Speedy matrix algebra for regression
-             inverse_logit(np.dot(X, beta)))    # ... inverse-logit transformation of predictions
-            * X).T                              # ... multiply by coefficient and transpose for correct orientation
+    return w*((y -                                # Speedy matrix algebra for regression
+               inverse_logit(np.dot(X, beta)))    # ... inverse-logit transformation of predictions
+              * X).T                              # ... multiply by coefficient and transpose for correct orientation
 
 
 #################################################################
