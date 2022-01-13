@@ -127,10 +127,10 @@ class MEstimator:
     Stefanski LA, & Boos DD. (2002). The calculus of M-estimation. The American Statistician, 56(1), 29-38.
     """
     def __init__(self, stacked_equations, init=None):
-        self.stacked_equations = stacked_equations
-        self.init = init
+        self.stacked_equations = stacked_equations     # User-input stacked estimating equations
+        self.init = init                               # User-input initial starting values for solving estimating eqs
 
-        # Storage for results
+        # Storage for results from the M-Estimation procedure
         self.n_obs = None                 # Number of unique observations (calculated later)
         self.theta = None                 # Optimized theta values (calculated later)
         self.bread = None                 # Bread from theta values (calculated later)
@@ -138,7 +138,7 @@ class MEstimator:
         self.variance = None              # Covariance matrix for theta values (calculated later)
         self.asymptotic_variance = None   # Asymptotic covariance matrix for theta values (calculated later)
 
-    def estimate(self, solver='newton', maxiter=1000, tolerance=1e-9, allow_pinv=True):
+    def estimate(self, solver='newton', maxiter=1000, tolerance=1e-9, dx=1e-9, allow_pinv=True):
         """Function to carry out the point and variance estimation of theta. After this procedure, the point estimates
         (in `theta`) and the covariance matrix (in `variance`) can be extracted.
 
@@ -155,10 +155,18 @@ class MEstimator:
             Maximum tolerance for errors in the root finding. This argument is passed `scipy.optimize` via the
             `tol` parameter. Default is 1e-9, which I have seen good performance with. I do not recommend going below
             this tolerance level (at this time).
+        dx : float
+            Spacing to use to numerically approximate the partial derivatives of the bread matrix. Default is 1e-9,
+            which should work well for most applications. It is generally not recommended to increase dx, since some
+            large values can poorly approximate derivatives.
         allow_pinv : bool, optional
             The default is `True` which uses `numpy.linalg.pinv` to find the inverse (or pseudo-inverse if matrix is
             non-invertible) for the bread. This default option is more robust to the possible matrices. If you want
             to use `numpy.linalg.inv` instead (which does not support pseudo-inverse), set this parameter to False.
+
+        Returns
+        -------
+        None
         """
         # Trick to get the number of observations from the estimating equations
         self.n_obs = np.asarray(self.stacked_equations(theta=self.init)  # ... convert output to an array
@@ -174,8 +182,9 @@ class MEstimator:
 
         # Step 2: calculating Variance
         # Step 2.1: baking the Bread
-        self.bread = self._bread_matrix_(theta=self.theta,                                       # Use inner function
-                                         stacked_equations=self.stacked_equations) / self.n_obs  # ... and divide by n
+        self.bread = self._bread_matrix_(theta=self.theta,                           # Use inner function for bread
+                                         stacked_equations=self.stacked_equations,
+                                         dx=dx) / self.n_obs                         # ... and divide by n
 
         # Step 2.2: slicing the meat
         evald_theta = np.asarray(self.stacked_equations(theta=self.theta))  # Evaluating EE at the optim values of theta
@@ -193,8 +202,8 @@ class MEstimator:
         sandwich = np.dot(np.dot(bread_invert, self.meat), bread_invert.T)
 
         # Step 3: updating storage for results
-        self.asymptotic_variance = sandwich       # Asymp. variance estimate requires division by n once (done above)
-        self.variance = sandwich / self.n_obs     # Variance estimate requires division by n twice
+        self.asymptotic_variance = sandwich       # Asymptotic variance estimate requires division by n (done above)
+        self.variance = sandwich / self.n_obs     # Variance estimate requires division by n^2
 
     def _mestimation_answer_(self, theta):
         """Internal function to evaluate the sum of the estimating equations. The summation must be internally evaluated
@@ -214,7 +223,7 @@ class MEstimator:
 
         if len(stacked_equations.shape) == 1:        # If stacked_equation returns 1 value, only return that 1 value
             vals = np.sum(stacked_equations)         # ... avoids SciPy error by returning value rather than tuple
-        else:                                        # Else return a tuplefor optimization
+        else:                                        # Else return a tuple for optimization
             vals = ()                                # ... create empty tuple
             for i in self.stacked_equations(theta):  # ... go through each individual theta
                 vals += (np.sum(i),)                 # ... add the theta sum to the tuple of thetas
@@ -245,6 +254,7 @@ class MEstimator:
         psi: array
             Solved or optimal values for theta given the estimating equations and data
         """
+        # Newton solver has a special catch (is not nested in root())
         if method == "newton":
             psi = newton(stacked_equations,    # ... stacked equations to solve (should be written as sums)
                          x0=np.asarray(init),  # ... initial values for solver
@@ -252,12 +262,13 @@ class MEstimator:
                          maxiter=maxiter,      # ... setting maximum number of iterations
                          tol=tolerance,        # ... setting some tolerance values (should be able to update)
                          disp=True)            # ... option to raise RuntimeError if doesn't converge
+        # Otherwise, goes to root with some selected optimizers
         elif method in ['lm', ]:
             options = {"maxiter": maxiter}
             opt = root(stacked_equations,      # ... stacked equations to solve (should be written as sums)
                        x0=np.asarray(init),    # ... initial values for solver
                        method=method,          # ... allow for valid root-finding methods
-                       tol=1e-9,               # ... setting some tolerance values (should be able to update)
+                       tol=tolerance,          # ... setting some tolerance values
                        options=options)        # ... options for the selected solver
             psi = opt.x                        # Error handling if fails to converge
             if opt.success == 0:
@@ -273,7 +284,7 @@ class MEstimator:
         return psi                             # Return optimized theta array
 
     @staticmethod
-    def _bread_individual_(theta, variable_index, output_index, stacked_equations):
+    def _bread_individual_(theta, variable_index, output_index, stacked_equations, dx):
         """Calculate the partial derivative for a cell of the bread matrix. Transforms the partial derivative by taking
         the negative sum.
 
@@ -282,31 +293,37 @@ class MEstimator:
         theta
             Solved values of theta to evaluate at
         variable_index
-            Index of ...
+            Index of the input theta (e.g., variable_index=1 means that derivative of theta[1] is approximated).
         output_index
-            Index of ...
+            Index of the output theta (e.g., out_index=1 means that theta[1] is output).
         stacked_equations
             Function containing the estimating equations
+        dx : float
+            Spacing to use to numerically approximate the partial derivatives of the bread matrix.
 
         Returns
         -------
         float
         """
-        d = partial_derivative(stacked_equations,
-                               var=variable_index,
-                               point=theta,
-                               output=output_index)
-        return -1 * np.sum(d)
+        # Calculate the partial derivatives for a single i,j of the bread matrix
+        d = partial_derivative(stacked_equations,    # ... stacked estimating equations
+                               var=variable_index,   # ... index for the theta of interest
+                               point=theta,          # ... point to evaluate the derivative at
+                               output=output_index,  # ... index location to output
+                               dx=dx)                # ... spacing for derivative approximation
+        return -1 * np.sum(d)                        # Calculate the bread for i,j
 
-    def _bread_matrix_(self, theta, stacked_equations):
+    def _bread_matrix_(self, theta, stacked_equations, dx):
         """Evaluate the bread matrix by taking all partial derivatives of the thetas in the estimating equation.
 
         Parameters
         ----------
-        theta
+        theta : ndarray, float
             Solved values of theta to evaluate at
-        stacked_equations
+        stacked_equations : function
             Function containing the estimating equations
+        dx : float
+            Spacing to use to numerically approximate the partial derivatives of the bread matrix.
 
         Returns
         -------
@@ -315,17 +332,18 @@ class MEstimator:
         # Check how many values of theta there is
         val_range = len(theta)
 
-        # Evaluate the bread
+        # Evaluate the bread matrix
         if val_range == 1:                                       # When only a single theta is present
-            d = derivative(stacked_equations, theta, dx=1e-9)    # ... take the normal derivative
+            d = derivative(stacked_equations, theta, dx=dx)      # ... approximate the derivative
             return -1 * np.sum(d)                                # ... then return negative sum
-        else:                                                    # Otherwise
+        else:                                                    # Otherwise approximate the partial derivatives
             bread_matrix = np.empty((val_range, val_range))      # ... create empty matrix
-            for i in range(val_range):                           # ... for each i,j in the len(theta)-by-len(theta)
-                for j in range(val_range):                       # ...
-                    b = self._bread_individual_(theta=theta,     # ... calculate the cell value by neg sum of deriv
+            for i in range(val_range):                           # ... for each i in len(theta)
+                for j in range(val_range):                       # ... for each j in len(theta)
+                    b = self._bread_individual_(theta=theta,     # ... calculate the i,j cell value by -sum part-deriv
                                                 variable_index=i,
                                                 output_index=j,
-                                                stacked_equations=stacked_equations)
+                                                stacked_equations=stacked_equations,
+                                                dx=dx)
                     bread_matrix[j, i] = b                       # ... update bread matrix value with new
             return bread_matrix                                  # Return completed bread matrix
