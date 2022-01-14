@@ -3,8 +3,8 @@
 Delicatessen
 =====================================
 
-`delicatessen` is a one-stop shop for all your sandwich (variance) needs. This Python 3.6+ package supports a
-generalization of M-Estimation theory. `delicatessen` draws inspiration from the R library `geex` for generalized
+``delicatessen`` is a one-stop shop for all your sandwich (variance) needs. This Python 3.6+ package supports a
+generalization of M-Estimation theory. ``delicatessen`` draws inspiration from the R library ``geex`` for generalized
 M-estimation (`details here <https://bsaul.github.io/geex/>`_) from Saul & Hudgens (2020).
 
 Here, we provide a brief overview of M-estimation theory. For a more detailed and formal introduction to M-estimation,
@@ -17,7 +17,7 @@ estimating equation takes the form of
 
      \sum_i^n \psi(Z_i, \theta) = 0
 
-where `Z` is independent observations (these need not be identically distributed). The parameter(s) of interest are
+where ``Z`` is independent observations (these need not be identically distributed). The parameter(s) of interest are
 the *b*-dimensional vector :math:`\theta`, and :math:`\psi` is a *b*-by-1 function that is known. A large number of
 consistent and asymptotically normal statistics can be put into the M-Estimation framework. Some examples include:
 mean, regression, delta method, and many others.

@@ -20,6 +20,15 @@
 # -- General configuration ------------------------------------------------
 
 import os
+from configparser import RawConfigParser
+
+
+def get_version():
+    """Return package version from setup.cfg."""
+    config = RawConfigParser()
+    config.read(os.path.join('..', 'setup.cfg'))
+    return config.get('metadata', 'version')
+
 
 # If your documentation needs a minimal Sphinx version, state it here.
 # needs_sphinx = '1.0'
@@ -52,8 +61,11 @@ autodoc_default_options = {
 
 # General information about the project.
 project = "Delicatessen"
-copyright = "2021, Paul Zivich"
-version = "0.1b"
+copyright = '2021, Paul Zivich'
+version = get_version()
+release = version
+latex_documents = [('index', 'deli_documentation.tex', 'Delicatessen Documentation',
+                    'Paul Zivich', 'manual'), ]
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = "sphinx"
