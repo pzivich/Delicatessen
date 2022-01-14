@@ -22,3 +22,7 @@ sphinx:
 python:
    install:
    - requirements: docs/requirements.txt
+
+# Build PDF as well
+formats:
+  - pdf
