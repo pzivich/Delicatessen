@@ -6,11 +6,11 @@ from delicatessen.utilities import partial_derivative
 
 
 class MEstimator:
-    r"""M-Estimation for generalized stacked equations.
+    r"""Generalized M-Estimator for stacked estimating equations.
 
-    M-estimation, or loosely estimating equations, is a general approach to point and variance estimation that consists
-    of defining an estimator as the solution to an estimating equation (but does not require the derivative of a log-
-    likelihood function). M-estimators satisify the following constraint
+    M-estimation, or loosely referred to as estimating equations, is a general approach to point and variance
+    estimation that consists of defining an estimator as the solution to an estimating equation (but does not require
+    the derivative of a log-likelihood function). M-estimators satisify the following constraint
 
     .. math::
 
@@ -18,9 +18,8 @@ class MEstimator:
 
     Note
     ----
-    An advantage of the M-Estimation approach is that many things can be framed within the generalized M-Estimation
-    framework, and thus be considered as consistent asymptotically normal estimators. This simplifies analysis under
-    large-sample approximation methods.
+    One advantage of M-Estimation is that many estimators can be written as M-Estimators. This simplifies theoretical
+    analysis and application under a large-sample approximation framework.
 
 
     M-Estimation consists of two broad step: point estimation and variance estimation. Point estimation is carried out
@@ -31,9 +30,9 @@ class MEstimator:
 
     .. math::
 
-        B_n(Y, \hat{\theta})^{-1} \times M_n(Y, \hat{\theta}) \times B_n(Y, (\hat{\theta})^{-1})^T
+        B_n(Y, \hat{\theta})^{-1} \times F_n(Y, \hat{\theta}) \times B_n(Y, (\hat{\theta})^{-1})^T
 
-    where B is the bread and M is the meat
+    where B is the bread and F is the filling
 
     .. math::
 
@@ -41,32 +40,30 @@ class MEstimator:
 
     .. math::
 
-        M_n(Y, \hat{\theta}) = n^{-1} \sum_{i=1}^{n} \psi(Y_i, \hat{\theta}) \times \psi(Y_i, \hat{\theta})^T
+        F_n(Y, \hat{\theta}) = n^{-1} \sum_{i=1}^{n} \psi(Y_i, \hat{\theta}) \times \psi(Y_i, \hat{\theta})^T
 
-    The partial derivatives for the bread are calculated using an adaptation of SciPy's `derivative` functionality
-    for partial derivatives. Inverting the bread is done via NumPy's `linalg.inv`. For the meat, the dot product is
-    taken between the evaluated theta's.
+    The partial derivatives for the bread are calculated using an adaptation of SciPy's ``derivative`` functionality
+    for partial derivatives. Inverting the bread is done via NumPy's ``linalg.pinv``. For the filling, the dot product
+    is taken for the evaluated theta's.
 
     Note
     ----
-    The harder part (that must be done by the user) is to specify the stacked estimating equations. Be sure to check
-    the provided examples for the format. But pre-built estimating equations for common problems are also available.
-
+    A hard part (that must be done by the user) is to specify the stacked estimating equations. Be sure to check
+    the provided examples for the format. Pre-built estimating equations for common problems are available to ease
+    burden.
 
     After completion of these steps, point and variance estimates for theta stored. These can be directly pulled from
-    the class object and further manipulated. For example, to calculate 95% confidence intervals for some parameters.
+    the class object and further manipulated. For example, calculation of 95% confidence intervals.
 
     Note
     ----
     For complex regression problems, the optimizer behind the scenes is not particularly robust (unlike functions
-    specializing in solely logistic regression). Therefore, optimization of logistic regression via a separate
-    functionality can be done then those estimated parameters are fed forward as the initial values (which should
-    result in a more stable optimization).
-
+    specializing in solely logistic regression). Therefore, pre-washed values can be fed forward as the initial values
+    (which should result in a more stable optimization).
 
     Parameters
     ----------
-    stacked_equations : function
+    stacked_equations : function, callable
         Function that returns a b-by-n NumPy array of the estimating equations. See documentation for how to construct
         a set of estimating equations.
     init : list, set, array
@@ -84,7 +81,7 @@ class MEstimator:
 
     >>> y_dat = [1, 2, 4, 1, 2, 3, 1, 5, 2]
 
-    M-estimation with built-in estimating equation for the mean and variance. First, `psi`, or the stacked estimating
+    M-estimation with built-in estimating equation for the mean and variance. First, ``psi``, or the stacked estimating
     equations, is defined
 
     >>> def psi(theta):
@@ -102,9 +99,9 @@ class MEstimator:
     >>> mestimation.asymptotic_variance
 
     Alternatively, a custom estimating equation can be specified. This is done by constructing a valid estimating
-    equation for the `MEstimator`. The `MEstimator` expects the `psi` function to return a b-by-n array, where b is the
-    number of parameters (length of theta) and n is the total number of observations. Below is an example of the mean
-    and variance estimating equation from before
+    equation for the ``MEstimator``. The ``MEstimator`` expects the `psi` function to return a b-by-n array, where b is
+    the number of parameters (length of theta) and n is the total number of observations. Below is an example of the
+    mean and variance estimating equation from before
 
     >>> def psi(theta):
     >>>     y = np.array(y_dat)
@@ -117,7 +114,26 @@ class MEstimator:
     >>> mestimation = MEstimator(stacked_equations=psi, init=[0, 0, ])
     >>> mestimation.estimate()
 
-    Note that `len(init)` should be equal to b. So in this case, two initial values are provided.
+    Note that ``len(init)`` should be equal to b. So in this case, two initial values are provided.
+
+    # TODO provide custom root-finding example here.
+    Finally, the M-Estimator can also be run with a user-provided root-finding algorithm. To specify a custom
+    root-finder, a function must be created by the user that consists of two keyword arguments (``stacked_equations``,
+    ``init``) and must return only the optimized values. The following is an example with SciPy's Levenberg-Marquardt
+    algorithm in ``root``.
+
+    >>> def custom_solver(stacked_equations, init):
+    >>>     options = {"maxiter": 1000}
+    >>>     opt = root(stacked_equations,
+    >>>                x0=np.asarray(init), method='lm', tol=1e-9,
+    >>>                options=options)
+    >>>     return opt.x
+
+    The provided custom root-finder can then be implemented like the following (continuing with the estimating equation
+    from the previous example):
+
+    >>> mestimation = MEstimator(stacked_equations=psi, init=[0, 0, ])
+    >>> mestimation.estimate(solver=custom_solver)
 
     References
     ----------
@@ -140,29 +156,33 @@ class MEstimator:
 
     def estimate(self, solver='newton', maxiter=1000, tolerance=1e-9, dx=1e-9, allow_pinv=True):
         """Function to carry out the point and variance estimation of theta. After this procedure, the point estimates
-        (in `theta`) and the covariance matrix (in `variance`) can be extracted.
+        (in ``theta``) and the covariance matrix (in ``variance``) can be extracted.
 
         Parameters
         ----------
-        solver : str
-            Method to use for the root finding procedure. Default is the secant method (`scipy.optimize.newton`).
-            Other options include those in `scipy.optimize.root`. I have had the best results with 'newton' (the
-            default) or `lm`.
-        maxiter : int
+        solver : str, function, callable, optional
+            Method to use for the root finding procedure. Default is the secant method (``scipy.optimize.newton``).
+            Another built-in option is the Levenberg-Marquardt algorithm (``scipy.optimize.root(method='lm')``).
+            Finally, any generic root-finding algorithm can be used via a user-provided callable object (function).
+            The function should consist of two keyword arguments: ``stacked_equations``, and ``init``. Additionally,
+            the function should return only the optimized values. Please review the example in the documentation or on
+            ReadTheDocs for how to provide a custom root-finding algorithm.
+        maxiter : int, optional
             Maximum iterations to consider for the root finding procedure. Default is 1000 iterations. For complex
-            estimating equations (without preceding optimization), this value may need to be increased.
-        tolerance : float
-            Maximum tolerance for errors in the root finding. This argument is passed `scipy.optimize` via the
-            `tol` parameter. Default is 1e-9, which I have seen good performance with. I do not recommend going below
-            this tolerance level (at this time).
-        dx : float
+            estimating equations (without preceding optimization), this value may need to be increased. This argument
+            is not used for user-specified solvers
+        tolerance : float, optional
+            Maximum tolerance for errors in the root finding. This argument is passed ``scipy.optimize`` via the
+            ``tol`` parameter. Default is 1e-9, which I have seen good performance with. I do not recommend going below
+            this tolerance level (at this time). This argument is not used for user-specified solvers
+        dx : float, optional
             Spacing to use to numerically approximate the partial derivatives of the bread matrix. Default is 1e-9,
             which should work well for most applications. It is generally not recommended to increase dx, since some
             large values can poorly approximate derivatives.
         allow_pinv : bool, optional
-            The default is `True` which uses `numpy.linalg.pinv` to find the inverse (or pseudo-inverse if matrix is
+            The default is ``True`` which uses ``numpy.linalg.pinv`` to find the inverse (or pseudo-inverse if matrix is
             non-invertible) for the bread. This default option is more robust to the possible matrices. If you want
-            to use `numpy.linalg.inv` instead (which does not support pseudo-inverse), set this parameter to False.
+            to use ``numpy.linalg.inv`` instead (which does not support pseudo-inverse), set this parameter to False.
 
         Returns
         -------
@@ -242,8 +262,8 @@ class MEstimator:
             Function that contains the estimating equations
         init : array
             Initial values for the optimizer
-        method : str
-            Method to use for the root finding procedure
+        method : str, function, callable
+            Method to use for the root finding procedure. Can be either a string or a callable object
         maxiter : int
             Maximum iterations to consider for the root finding procedure
         tolerance : float
@@ -274,6 +294,16 @@ class MEstimator:
             if opt.success == 0:
                 print("Root-finding failed to converge...")
                 raise RuntimeError(opt.message)
+        elif callable(method):
+            try:
+                psi = method(stacked_equations=stacked_equations,
+                             init=np.asarray(init))
+            except TypeError:
+                raise TypeError("The user-specified root-finding `solver` must be a function (or callable object) with "
+                                "the following keyword arguments: `stacked_equations`, `init`.")
+            if psi is None:
+                raise ValueError("The user-specified root-finding `solver` must return the solution to the "
+                                 "optimization")
         else:
             raise ValueError("The solver '" +  # ... otherwise throw ValueError
                              str(method) +
