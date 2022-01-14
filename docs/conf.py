@@ -21,13 +21,11 @@
 
 import os
 from configparser import RawConfigParser
+import delicatessen
 
 
 def get_version():
-    """Return package version from setup.cfg."""
-    config = RawConfigParser()
-    config.read(os.path.join('..', 'setup.cfg'))
-    return config.get('metadata', 'version')
+    return delicatessen.__version__
 
 
 # If your documentation needs a minimal Sphinx version, state it here.
