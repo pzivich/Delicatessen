@@ -1,22 +1,22 @@
 Custom Estimating Equations
 =====================================
 
-One of the key advantages of `delicatessen` is that it has a lot of flexibility in the estimating equations that can be
-specified. Basically, it will allow for any estimating equation to be passed to it (but not that the estimating
+One of the key advantages of ``delicatessen`` is that it has a lot of flexibility in the estimating equations that can
+be specified. Basically, it will allow for any estimating equation to be passed to it (but not that the estimating
 equation(s) *must* be unbiased for the theory behind M-estimation to hold). Here, I provide an overview and tips for
 how to build your own estimating equation.
 
 In general, it will be best if you find an explicit paper or book (most likely written by a statistician) that directly
 provides the estimating equation(s) to you. Deriving your own *unbiased* estimating equation may be a lot of effort
 and will require a statistical proof. This section does *not* address this part of M-estimation. Rather, this section
-provides information on how to construct an estimating equation within `delicatessen`. `delicatessen` assumes you are
-giving it a valid estimating equation.
+provides information on how to construct an estimating equation within ``delicatessen``. ``delicatessen`` assumes you
+are giving it a valid estimating equation.
 
 Building from scratch
 -------------------------------------
 
 First, we will go through the case of building an estimating equation completely from scratch. To do this, I will
-go through an example with linear regression. This is how I went about building the `ee_linear_regression`
+go through an example with linear regression. This is how I went about building the ``ee_linear_regression``
 functionality.
 
 First, we have the estimating equation (which is the score function in this case) provided in Boos & Stefanski (2013)
@@ -38,11 +38,11 @@ We will demonstrate using the following simulated data set
     d['Y'] = 5 + d['X'] + np.random.normal(size=n)
 
 
-First, we can build the estimating equation using a for-loop where each `i` piece will be stacked together. While this
+First, we can build the estimating equation using a for-loop where each ``i`` piece will be stacked together. While this
 for-loop approach will be slow, it is often a good strategy to implement this version first.
 
-Below calculates the estimating equation for each `i` in the for-loop. This function returns a stacked array of each
-`i` observation as a 3-by-n array. That array can be validly passed to the `MEstimator` for optimization and
+Below calculates the estimating equation for each ``i`` in the for-loop. This function returns a stacked array of each
+``i`` observation as a 3-by-n array. That array can be validly passed to the ``MEstimator`` for optimization and
 calculations.
 
 .. code::
@@ -77,8 +77,8 @@ for which the coefficients match the coefficients from a ordinary least squares 
 Here, we can further vectorize the estimating equation. In the vector-form, this code will run much faster and this
 is often the best approach to boosting speed in terms of run-time.
 
-With some careful experimentation, the following is a vectorized version. Remember that `delicatessen` is expecting a
-b-by-n array to be given by the `psi` function. Failure to provide this is a common mistake when building custom
+With some careful experimentation, the following is a vectorized version. Remember that ``delicatessen`` is expecting a
+b-by-n array to be given by the ``psi`` function. Failure to provide this is a common mistake when building custom
 estimating equations.
 
 .. code::
@@ -154,14 +154,14 @@ estimator
                           preds_reg))      # theta[3:] is for the regression coefficients
 
 
-This example demonstrates how estimating equations can easily be stacked together using `delicatessen`. Specifically,
+This example demonstrates how estimating equations can easily be stacked together using ``delicatessen``. Specifically,
 both built-in and user-specified functions can be specified together seamlessly. All it requires is specifying both in
 the estimating equation and returning a stacked array of the estimates.
 
 One important piece to note here is that the returned array should be in the *same* order as the theta's are input. As
-done here, all the `theta` values are the 3rd are for the propensity score model. Therefore, the propensity score model
-values are last in the returned stack. Returning the values in a different order than expected by theta is a common
-mistake and will lead to failed optimizations.
+done here, all the ``theta`` values are the 3rd are for the propensity score model. Therefore, the propensity score
+model values are last in the returned stack. Returning the values in a different order than expected by theta is a
+common mistake and will lead to failed optimizations.
 
 
 Common Mistakes
@@ -169,10 +169,11 @@ Common Mistakes
 
 Here is a list of common mistakes, most of which I have done myself.
 
-1. The `psi` function doesn't return a NumPy array.
-2. The `psi` function returns the wrong shape. Remember, it should be a b-by-n NumPy array!
-3. The `psi` function is summing over n. `delicatessen` needs to do the sum internally (for the bread), so do not sum over n!
-4. The `theta` values and `b` *must* be in the same order. If `theta[0]` is the mean, the 1st row of the returned
+1. The ``psi`` function doesn't return a NumPy array.
+2. The ``psi`` function returns the wrong shape. Remember, it should be a b-by-n NumPy array!
+3. The ``psi`` function is summing over n. ``delicatessen`` needs to do the sum internally (for the bread), so do not
+   sum over n!
+4. The ``theta`` values and ``b`` *must* be in the same order. If ``theta[0]`` is the mean, the 1st row of the returned
    array better be the mean!
 
 If you still have trouble, please open an issue on `GitHub<https://github.com/pzivich/Delicatessen/issues>`_. This will

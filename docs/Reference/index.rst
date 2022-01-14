@@ -1,11 +1,11 @@
 Reference
 ==========================
 
-This page links to the documentation for each functionality within `delicatessen`. *M-Estimator* contains documentation
-for the general M-Estimator procedure. *Estimating Equations* details the built-in estimating equations that come with
-`delicatessen`.
+This page links to the documentation for each functionality within ``delicatessen``. *M-Estimator* contains
+documentation for the general M-Estimator procedure. *Estimating Equations* details the built-in estimating equations
+that come with ``delicatessen``.
 
-For a more narrative-driven description of M-Estimation and how to use `delicatessen`, please see the side-bar.
+For a more narrative-driven description of M-Estimation and how to use ``delicatessen``, please see the side-bar.
 
 
 .. toctree::

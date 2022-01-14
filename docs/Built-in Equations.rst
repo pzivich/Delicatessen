@@ -1,22 +1,22 @@
 Built-in Estimating Equations
 '''''''''''''''''''''''''''''''''''''
 
-Here, we provide an overview of some of the built-in estimating equations with `delicatessen`. This documentation is
+Here, we provide an overview of some of the built-in estimating equations with ``delicatessen``. This documentation is
 split into four sections, corresponding to basic, regression, survival, and causal estimating equations.
 
 All built-in estimating equations need to be 'wrapped' inside a outer function. Below is an example of an outer
-function, `psi` for the generic estimating equation `ee` (`ee` does not exist but it a placeholder here).
+function, ``psi`` for the generic estimating equation ``ee`` (``ee`` does not exist but it a placeholder here).
 
 .. code::python
 
     def psi(theta):
         return ee(theta=theta, data=dat)
 
-Here, the generic `ee` takes two inputs `theta` and `data`. `theta` is the general theta vector that is present in
-all stacked estimating equations expected by `delicatessen`. `data` is an argument that takes an input source of data.
-The `dat` provided should be **in the local scope** of the .py file this function lives in.
+Here, the generic ``ee`` takes two inputs ``theta`` and ``data``. ``theta`` is the general theta vector that is present
+in all stacked estimating equations expected by ``delicatessen``. ``data`` is an argument that takes an input source
+of data. The ``dat`` provided should be **in the local scope** of the .py file this function lives in.
 
-After wrapped in an outer function, the function can be passed to `MEstimator`. See the examples below for further
+After wrapped in an outer function, the function can be passed to ``MEstimator``. See the examples below for further
 details and examples.
 
 Basic Equations
@@ -27,14 +27,14 @@ Some basic estimating equations for the mean and variance are provided.
 Mean
 ----------------------------
 
-The most basic is the estimating equation for the mean: `ee_mean`. To illustrate, consider we wanted to estimated the
+The most basic is the estimating equation for the mean: ``ee_mean``. To illustrate, consider we wanted to estimated the
 mean for the following data
 
 .. code::
 
     obs_vals = [1, 2, 1, 4, 1, 4, 2, 4, 2, 3]
 
-To use `ee_mean` with `MEstimator`, this function will be wrapped in an outer function. Below is an example
+To use ``ee_mean`` with ``MEstimator``, this function will be wrapped in an outer function. Below is an example
 
 .. code::
 
@@ -43,7 +43,7 @@ To use `ee_mean` with `MEstimator`, this function will be wrapped in an outer fu
     def psi(theta):
         return ee_mean(theta=theta, y=obs_vals)
 
-Note that `obs_vals` must be available in the scope of this defined function.
+Note that ``obs_vals`` must be available in the scope of this defined function.
 
 After creating the wrapper function, the M-Estimator can be called like the following
 
@@ -54,7 +54,7 @@ After creating the wrapper function, the M-Estimator can be called like the foll
     mestimation = MEstimator(stacked_equations=psi, init=[0, ])
     mestimation.estimate()
 
-Since `ee_mean` consists of a single parameter, only a single `init` value is provided.
+Since ``ee_mean`` consists of a single parameter, only a single ``init`` value is provided.
 
 Robust Mean
 ----------------------------
@@ -71,7 +71,7 @@ Rather than excluding the -10 and 12, we can use the robust mean proposed by Hub
 pre-specified level. Therefore, they still contribute information but only values up to the bound. In this example, a
 bound of -6,6 will be applied.
 
-The robust mean estimating equation is available in `ee_mean_robust`. Below is an example (including the wrapper
+The robust mean estimating equation is available in ``ee_mean_robust``. Below is an example (including the wrapper
 function and call).
 
 .. code::
@@ -116,10 +116,10 @@ The mean-variance estimating equation can be implemented as follows (remember th
     print("theta:     ", mestimation.theta)
     print("Var(theta):", mestimation.variance)
 
-*Note* the `init` here takes two values because the stacked estimating equations has a length of 2 (`theta` is b-by-1
-where b=2). The first value of `theta` is the mean and the second is the variance. Now, the variance output provides
-a 2-by-2 covariance matrix. The leading diagonal of that matrix are the variances (where the first is the estimated
-variance of the mean and the second is the estimated variance of the variance).
+*Note* the ``init`` here takes two values because the stacked estimating equations has a length of 2 (``theta`` is
+b-by-1 where b=2). The first value of ``theta`` is the mean and the second is the variance. Now, the variance output
+provides a 2-by-2 covariance matrix. The leading diagonal of that matrix are the variances (where the first is the
+estimated variance of the mean and the second is the estimated variance of the variance).
 
 Regression
 =============================
@@ -151,7 +151,7 @@ In this case, X and Z are the independent variables and Y is the dependent varia
 since we need to manually provide the intercept (this may be different from other formula-based packages that
 automatically add the intercept to the regression).
 
-For this data, we can now create the wrapper function for the `ee_linear_regression` estimating equations
+For this data, we can now create the wrapper function for the ``ee_linear_regression`` estimating equations
 
 .. code::
 
@@ -174,9 +174,9 @@ and their variance
     print("theta:     ", mestimation.theta)
     print("Var(theta):", mestimation.variance)
 
-Note that `X` is 3 covariates, meaning `init` needs 3 starting values. The linear regression done here should match
-the `statsmodels` generalized linear model with a robust variance estimate. Below is code demonstrating how to
-estimate the same quantities with `statsmodels.glm`.
+Note that ``X`` is 3 covariates, meaning ``init`` needs 3 starting values. The linear regression done here should match
+the ``statsmodels`` generalized linear model with a robust variance estimate. Below is code demonstrating how to
+estimate the same quantities with ``statsmodels.glm``.
 
 .. code::
 
@@ -187,7 +187,7 @@ estimate the same quantities with `statsmodels.glm`.
     print(np.asarray(glm.params))         # Point estimates
     print(np.asarray(glm.cov_params()))   # Covariance matrix
 
-While `statsmodels` likely runs faster, the benefit of M-estimation and `delicatessen` is that multiple estimating
+While ``statsmodels`` likely runs faster, the benefit of M-estimation and ``delicatessen`` is that multiple estimating
 equations can be stacked together (including multiple regression models). This advantage will become clearer in the
 causal section.
 
@@ -216,7 +216,7 @@ In this case, X and Z are the independent variables and Y is the dependent varia
 since we need to manually provide the intercept (this may be different from other formula-based packages that
 automatically add the intercept to the regression).
 
-For this data, we can now create the wrapper function for the `ee_logistic_regression` estimating equations
+For this data, we can now create the wrapper function for the ``ee_logistic_regression`` estimating equations
 
 .. code::
 
@@ -239,9 +239,9 @@ and their variance
     print("theta:     ", mestimation.theta)
     print("Var(theta):", mestimation.variance)
 
-Note that `X` is 3 covariates, meaning `init` needs 3 starting values. The logistic regression done here should match
-the `statsmodels` generalized linear model with a robust variance estimate. Below is code demonstrating how to
-estimate the same quantities with `statsmodels.glm`.
+Note that ``X`` is 3 covariates, meaning ``init`` needs 3 starting values. The logistic regression done here should
+match the ``statsmodels`` generalized linear model with a robust variance estimate. Below is code demonstrating how to
+estimate the same quantities with ``statsmodels.glm``.
 
 .. code::
 
@@ -253,7 +253,7 @@ estimate the same quantities with `statsmodels.glm`.
     print(np.asarray(glm.params))         # Point estimates
     print(np.asarray(glm.cov_params()))   # Covariance matrix
 
-While `statsmodels` likely runs faster, the benefit of M-estimation and `delicatessen` is that multiple estimating
+While ``statsmodels`` likely runs faster, the benefit of M-estimation and ``delicatessen`` is that multiple estimating
 equations can be stacked together (including multiple regression models). This advantage will become clearer in the
 causal section.
 
@@ -307,7 +307,7 @@ Again, we will wrap the built-in estimating equations inside a function.
     def psi(theta):
         return ee_gformula(theta, X=d[['C', 'A', 'W']], y=d['Y'], treat_index=1)
 
-The arguments for `ee_gformula` are the :math:`\theta` values, the covariates (including an intercept (C) and the
+The arguments for ``ee_gformula`` are the :math:`\theta` values, the covariates (including an intercept (C) and the
 treatment (A)), the outcome values (Y), and the column index for the treatment in X. Here, 1 designates the second
 column (python uses zero-indexing), which corresponds to 'A' in how the X data is formatted.
 
@@ -347,9 +347,9 @@ and the risk / mean under none-treated can be extracted by
     mestimation.theta[2]
     mestimation.variance[2, 2]
 
-The `ee_gformula` supports both binary and continuous outcomes. Inside the function, it automatically detects whether
+The ``ee_gformula`` supports both binary and continuous outcomes. Inside the function, it automatically detects whether
 the outcome data is binary. If the outcome data is not binary, then it defaults to using a linear regression model
-(but you can also force the use of a linear regression model for binary data by setting `force_continuous=True`
+(but you can also force the use of a linear regression model for binary data by setting ``force_continuous=True``
 
 To summarize, the key advantage of M-estimation here is that it *appropriately* estimates the variance. We do *not*
 need to bootstrap in this case (and more generally if the sample size is sufficiently large).
@@ -358,7 +358,7 @@ Inverse probability weighting
 -------------------------------------
 
 Rather than modeling the outcome, we can choose the inverse probability weighting (IPW) estimator, which models the
-probability of treatment. The estimating equations for the IPW estimator are also built-in to `delicatessen`.
+probability of treatment. The estimating equations for the IPW estimator are also built-in to ``delicatessen``.
 
 To load the estimating equations, we call
 
@@ -374,7 +374,7 @@ As with every built-in estimating equation, we will wrap it inside a function.
     def psi(theta):
         return ee_ipw(theta, X=d[['C', 'A', 'W']], y=d['Y'], treat_index=1)
 
-The arguments for `ee_ipw` are the :math:`\theta` values, the covariates (including an intercept (C) and the treatment
+The arguments for ``ee_ipw`` are the :math:`\theta` values, the covariates (including an intercept (C) and the treatment
 (A)), the outcome values (Y), and the column index for the treatment in X. Here, 1 designates the second column
 (python uses zero-indexing), which corresponds to 'A' in how the X data is formatted.
 
@@ -415,7 +415,7 @@ and the risk / mean under none-treated can be extracted by
     mestimation.theta[2]
     mestimation.variance[2, 2]
 
-The `ee_ipw` supports both binary and continuous outcomes automatically. Both of these variable types are handled in
+The ``ee_ipw`` supports both binary and continuous outcomes automatically. Both of these variable types are handled in
 the same way due to the form of the Horwitz-Thompson estimator.
 
 Unlike the GEE-trick for IPW (which provides a conservative estimator of the variance), the variance estimator here
@@ -435,7 +435,7 @@ and that outcome model does *not* support interaction terms. Here the AIPW is me
 more general use, the provided estimating equation should be adapted. But the built-in estimating equation will provide
 a basic structure for user's to build off of.
 
-The estimating equations for the AIPW estimator are also provided in `delicatessen`. To load the estimating equations,
+The estimating equations for the AIPW estimator are also provided in ``delicatessen``. To load the estimating equations,
 we call
 
 .. code::
@@ -450,16 +450,16 @@ As always, we will wrap the built-in estimating equation inside a function.
     def psi(theta):
         return ee_aipw(theta, X=d[['C', 'A', 'W']], y=d['Y'], treat_index=1)
 
-The arguments for `ee_aipw` are the :math:`\theta` values, the covariates (including an intercept (C) and the treatment
-(A)), the outcome values (Y), and the column index for the treatment in X. Here, 1 designates the second column
-(python uses zero-indexing), which corresponds to 'A' in how the X data is formatted.
+The arguments for ``ee_aipw`` are the :math:`\theta` values, the covariates (including an intercept (C) and the
+action (A)), the outcome values (Y), and the column index for the treatment in X. Here, 1 designates the second column
+(python uses zero-indexing), which corresponds to ``'A'`` in how the X data is formatted.
 
 Now we can call the M-estimator to solve for the values and the variance. Here, the initial values provided must be
 3+*b*+*b-1* (where *b* is the number of columns in X). This is because the AIPW estimating equations output the
 average treatment effect, risk under all-treated, risk under none-treated, and the outcome model coefficients, and
 the treatment model coefficients.
 
-As for starting values, it will likely be best practice to have the initial values set as  [0., 0.5, 0.5, ...] in
+As for starting values, it will likely be best practice to have the initial values set as ``[0., 0.5, 0.5, ...]`` in
 general. The regression initial values can also be pre-washed to speed up optimization.
 
 .. code::

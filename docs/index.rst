@@ -17,7 +17,7 @@ estimating equation takes the form of
 
      \sum_i^n \psi(Z_i, \theta) = 0
 
-where ``Z`` is independent observations (these need not be identically distributed). The parameter(s) of interest are
+where `Z` is independent observations (these need not be identically distributed). The parameter(s) of interest are
 the *b*-dimensional vector :math:`\theta`, and :math:`\psi` is a *b*-by-1 function that is known. A large number of
 consistent and asymptotically normal statistics can be put into the M-Estimation framework. Some examples include:
 mean, regression, delta method, and many others.
@@ -47,7 +47,7 @@ Therefore, we have a relatively simple way to calculate the variance for a large
 Additionally, this variance estimator is robust.
 
 While M-Estimation is a powerful tool, the derivatives and matrix algebra can quickly become unwieldy. This is where
-`delicatessen` comes in. `delicatessen` takes stacked estimating equations and data and works through all the necessary
+``delicatessen`` comes in. ``delicatessen`` takes stacked estimating equations and data and works through all the necessary
 calculations. Therefore, M-Estimation can be more widely adopted without needing to solve every derivative for your
 particular problem. We can let the computer do all that hard work of finding the roots and numerically approximating the
 derivatives for us.
@@ -68,15 +68,15 @@ Contents:
 Installation:
 -------------
 
-To install `delicatessen`, use the following command in terminal or command prompt
+To install `1delicatessen1`, use the following command in terminal or command prompt
 
 ``python -m pip install delicatessen``
 
-Only two dependencies are necessary for `delicatessen` (both of which you will likely have already installed): NumPy
+Only two dependencies are necessary for ``delicatessen`` (both of which you will likely have already installed): NumPy
 and SciPy.
 
-To replicate the tests in `tests/` you will need to install `statsmodels` and `pytest` (but this is not necessary for
-general use of the package).
+To replicate the tests in ``tests/`` you will need to install ``statsmodels`` and ``pytest`` (but this is not necessary
+for general use of the package).
 
 
 Code and Issue Tracker

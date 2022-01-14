@@ -27,7 +27,7 @@ To demonstrate the example, we will use some generic data for Y
     import numpy as np
     y = np.array([-2, 1, 3, 4, 1, 4, -5, 3, 6])
 
-For use with the M-estimator in `delicatessen`, we can program these estimating equations as
+For use with the M-estimator in ``delicatessen``, we can program these estimating equations as
 
 .. code::
 
@@ -43,7 +43,7 @@ After defining the stacked estimating equations, the M-estimator can be called
     mestimate = MEstimator(psi, init=[0, 1])
     mestimate.estimate()
 
-The M-estimator will solve for :math:`\theta` via a root finding procedure. For the sandwich variance, `delicatessen`
+The M-estimator will solve for :math:`\theta` via a root finding procedure. For the sandwich variance, ``delicatessen``
 uses a numerical approximation procedure for the derivative. This is different from the closed-form variance estimator
 provided in Chapter 7, but both should return the same answer (within computational error). The advantage of the
 numerical derivatives are that they can be done for arbitrary estimating equations.
@@ -58,7 +58,7 @@ For the ratio estimator, the following estimating equation is provided
 
     \psi_1(Y_i, X_i, \theta) = Y_i - \theta_1 \X_i
 
-For use with the M-estimator in `delicatessen`, we can program this estimating equation as
+For use with the M-estimator in ``delicatessen``, we can program this estimating equation as
 
 .. code::
 
@@ -104,12 +104,12 @@ Similarly, this can also be programmed via
     mestimate = MEstimator(psi, init=[0, 0, 1])
     mestimate.estimate()
 
-Here, there is a series of estimating equations. It is also important to note the use of `np.ones` in the third step.
-This ensures that `ratio` consists on *n* observations. Without multiplying by the array of ones, `ratio` would be a
-single value. However, `MEstimator` expects a 3-by-*n* array here. Multiplying the 3rd equation by an array of 1's
+Here, there is a series of estimating equations. It is also important to note the use of ``np.ones`` in the third step.
+This ensures that ``ratio`` consists on *n* observations. Without multiplying by the array of ones, ``ratio`` would be a
+single value. However, ``MEstimator`` expects a 3-by-*n* array here. Multiplying the 3rd equation by an array of 1's
 keeps the correct dimension and keeps the values.
 
-Also notice that these estimating equations require the use of 3 `init` values, unlike the other ratio estimator.
+Also notice that these estimating equations require the use of 3 ``init`` values, unlike the other ratio estimator.
 
 
 Delta Method (7.2.4)
@@ -126,7 +126,7 @@ their corresponding mean. The stacked estimating equations are
     \psi_4(Y_i, \theta) &= \log(\theta_2) - \theta_4 \\
 
 
-These equations can be expressed programmatically for `delicatessen` as
+These equations can be expressed programmatically for ``delicatessen`` as
 
 .. code::
 
@@ -136,7 +136,7 @@ These equations can be expressed programmatically for `delicatessen` as
                 np.ones(data.shape[0])*np.sqrt(theta[1]) - theta[2],
                 np.ones(data.shape[0])*np.log(theta[1]) - theta[3])
 
-Notice the use of the `np.ones` trick as done with the ratio estimating equations to ensure that the final equations are
+Notice the use of the ``np.ones`` trick as done with the ratio estimating equations to ensure that the final equations are
 the correct shapes.
 
 .. code::
@@ -144,7 +144,7 @@ the correct shapes.
     mestimate = MEstimator(psi, init=[0, 0, 1, 1])
     mestimate.estimate()
 
-Here, there are 4 stacked equations, so `init` must be provided 4 values.
+Here, there are 4 stacked equations, so ``init`` must be provided 4 values.
 
 
 Instrumental Variable (7.2.6)
@@ -168,7 +168,7 @@ To demonstrate the example, below is some generic simulated data
     data['W'] = data['X'] + np.random.normal(loc=0, size=n)
     data['T'] = -0.75 - 1*data['X'] + np.random.normal(loc=0, size=n)
 
-These estimating equations can be programmed for `delicatessen` as
+These estimating equations can be programmed for ``delicatessen`` as
 
 .. code::
 
@@ -189,7 +189,7 @@ estimating equations from before were further updated to
     \psi_3(Y_i, W_i, T_i, \theta) &= (Y - \theta_3 W)(\theta_2 - W) \\
     \psi_4(Y_i, W_i, T_i, \theta) &= (Y - \theta_4 W)(\theta_1 - T) \\
 
-Again, we can easily write these equations for `delicatessen`,
+Again, we can easily write these equations for ``delicatessen``,
 
 .. code::
 

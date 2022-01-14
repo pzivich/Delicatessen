@@ -1,7 +1,8 @@
 Estimating Equations
 =====================
-To ease use, `delicatessen` comes with several built-in estimating equation functionalities. These basic functionalities
-cover a variety of common use cases. Below is reference documentation for currently available estimating equations.
+To ease use, ``delicatessen`` comes with several built-in estimating equation functionalities. These basic
+functionalities cover a variety of common use cases. Below is reference documentation for currently available
+estimating equations.
 
 
 Basic
