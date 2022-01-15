@@ -154,7 +154,7 @@ class MEstimator:
         self.variance = None              # Covariance matrix for theta values (calculated later)
         self.asymptotic_variance = None   # Asymptotic covariance matrix for theta values (calculated later)
 
-    def estimate(self, solver='newton', maxiter=1000, tolerance=1e-9, dx=1e-9, allow_pinv=True):
+    def estimate(self, solver='newton', maxiter=1000, tolerance=1e-9, dx=1e-9, order=3, allow_pinv=True):
         """Function to carry out the point and variance estimation of theta. After this procedure, the point estimates
         (in ``theta``) and the covariance matrix (in ``variance``) can be extracted.
 
@@ -177,8 +177,11 @@ class MEstimator:
             this tolerance level (at this time). This argument is not used for user-specified solvers
         dx : float, optional
             Spacing to use to numerically approximate the partial derivatives of the bread matrix. Default is 1e-9,
-            which should work well for most applications. It is generally not recommended to increase dx, since some
+            which should work well for most applications. It is generally not recommended to have a large dx, since some
             large values can poorly approximate derivatives.
+        order : int, optional
+            Number of points to use to numerically approximate the partial derivative (must be an odd number). Default
+            is 3, which is the default for SciPy.
         allow_pinv : bool, optional
             The default is ``True`` which uses ``numpy.linalg.pinv`` to find the inverse (or pseudo-inverse if matrix is
             non-invertible) for the bread. This default option is more robust to the possible matrices. If you want
@@ -204,7 +207,8 @@ class MEstimator:
         # Step 2.1: baking the Bread
         self.bread = self._bread_matrix_(theta=self.theta,                           # Use inner function for bread
                                          stacked_equations=self.stacked_equations,
-                                         dx=dx) / self.n_obs                         # ... and divide by n
+                                         dx=dx,
+                                         order=order) / self.n_obs                         # ... and divide by n
 
         # Step 2.2: slicing the meat
         evald_theta = np.asarray(self.stacked_equations(theta=self.theta))  # Evaluating EE at the optim values of theta
@@ -314,7 +318,7 @@ class MEstimator:
         return psi                             # Return optimized theta array
 
     @staticmethod
-    def _bread_individual_(theta, variable_index, output_index, stacked_equations, dx):
+    def _bread_individual_(theta, variable_index, output_index, stacked_equations, dx, order):
         """Calculate the partial derivative for a cell of the bread matrix. Transforms the partial derivative by taking
         the negative sum.
 
@@ -330,6 +334,8 @@ class MEstimator:
             Function containing the estimating equations
         dx : float
             Spacing to use to numerically approximate the partial derivatives of the bread matrix.
+        order : int
+            Number of points to use to evaluate the derivative. Must be an odd number
 
         Returns
         -------
@@ -340,10 +346,11 @@ class MEstimator:
                                var=variable_index,   # ... index for the theta of interest
                                point=theta,          # ... point to evaluate the derivative at
                                output=output_index,  # ... index location to output
-                               dx=dx)                # ... spacing for derivative approximation
+                               dx=dx,                # ... spacing for derivative approximation
+                               order=order)          # ... number of evals for derivative
         return -1 * np.sum(d)                        # Calculate the bread for i,j
 
-    def _bread_matrix_(self, theta, stacked_equations, dx):
+    def _bread_matrix_(self, theta, stacked_equations, dx, order):
         """Evaluate the bread matrix by taking all partial derivatives of the thetas in the estimating equation.
 
         Parameters
@@ -354,6 +361,8 @@ class MEstimator:
             Function containing the estimating equations
         dx : float
             Spacing to use to numerically approximate the partial derivatives of the bread matrix.
+        order : int
+            Number of points to use to evaluate the derivative. Must be an odd number
 
         Returns
         -------
@@ -374,6 +383,7 @@ class MEstimator:
                                                 variable_index=i,
                                                 output_index=j,
                                                 stacked_equations=stacked_equations,
-                                                dx=dx)
+                                                dx=dx,
+                                                order=order)
                     bread_matrix[j, i] = b                       # ... update bread matrix value with new
             return bread_matrix                                  # Return completed bread matrix

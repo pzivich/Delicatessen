@@ -2,7 +2,7 @@ import numpy as np
 from scipy.misc import derivative
 
 
-def partial_derivative(func, var, point, output, dx):
+def partial_derivative(func, var, point, output, dx, order):
     """Calculate the partial derivatives for a given function
 
     Parameters
@@ -17,6 +17,8 @@ def partial_derivative(func, var, point, output, dx):
         Index of the variable to extract the partial derivative of.
     dx : float
         Spacing to use to numerically approximate the partial derivatives of the bread matrix.
+    order : int
+        Number of points to use to evaluate the derivative. Must be an odd number
 
     Returns
     -------
@@ -29,7 +31,7 @@ def partial_derivative(func, var, point, output, dx):
         args[var] = x
         return func(args)[output]
 
-    return derivative(wraps, point[var], dx=dx)
+    return derivative(wraps, point[var], dx=dx, order=order)
 
 
 def logit(prob):
