@@ -68,7 +68,7 @@ Contents:
 Installation:
 -------------
 
-To install `1delicatessen1`, use the following command in terminal or command prompt
+To install ``delicatessen``, use the following command in terminal or command prompt
 
 ``python -m pip install delicatessen``
 
@@ -82,10 +82,10 @@ for general use of the package).
 Code and Issue Tracker
 -----------------------------
 
-Available on Github `pzivich/Deli <https://github.com/pzivich/Delicatessen/>`_
-Please report bugs, issues, and feature requests there.
+Please report bugs, issues, or feature requests on GitHub
+at `pzivich/Delicatessen <https://github.com/pzivich/Delicatessen/>`_.
 
-Also feel free to contact me via email (gmail: zivich.5) or on Twitter (@PausalZ)
+Otherwise, you may contact us via email (gmail: zivich.5) or on Twitter (@PausalZ)
 
 References
 -----------------------------
