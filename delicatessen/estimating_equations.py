@@ -220,12 +220,79 @@ def ee_mean_variance(theta, y):
             (y - theta[0])**2 - theta[1])  # Estimating equation for variance
 
 
+def ee_positive_mean_deviation(theta, y):
+    """Default stacked estimating equations for the positive mean deviation. The estimating equations are
+
+    .. math::
+
+        \sum_i^n \psi_1(Y_i, \theta) = \sum_i^n 2(Y_i - \theta_2)I(Y_i > \theta_2) - \theta_1 = 0
+
+        \sum_i^n \psi_2(Y_i, \theta) = \sum_i^n 0.5 - I(Y_i \le - \theta_2) = 0
+
+    where the first estimating equation is for the positive mean difference, and the second estimating equation is for
+    the median.
+
+    Note
+    ----
+    All provided estimating equations are meant to be wrapped inside a user-specified function. Throughtout, these
+    user-defined functions are defined as `psi`.
+
+    Parameters
+    ----------
+    theta : vector
+        Theta in this case consists of two values. Therefore, initial values like the form of [0, 0] is recommended.
+    y : vector
+        1-dimensional vector of n observed values. No missing data should be included (missing data may cause unexpected
+        behavior when attempting to calculate the positive mean deviation).
+
+    Returns
+    -------
+    array :
+        Returns a 2-by-n NumPy array evaluated for the input theta and y
+
+    Examples
+    --------
+    Construction of a estimating equation(s) with `ee_positive_mean_deviation` should be done similar to the following
+
+    >>> from delicatessen import MEstimator
+    >>> from delicatessen.estimating_equations import ee_positive_mean_deviation
+
+    Some generic data to estimate the mean for
+
+    >>> y_dat = [1, 2, 4, 1, 2, 3, 1, 5, 2]
+
+    Defining psi, or the stacked estimating equations
+
+    >>> def psi(theta):
+    >>>     return ee_positive_mean_deviation(theta=theta, y=y_dat)
+
+    Calling the M-estimation procedure (note that `init` has 2 values now).
+
+    >>> mestimation = MEstimator(stacked_equations=psi, init=[0, 0, ])
+    >>> mestimation.estimate()
+
+    Inspecting the parameter estimates, the variance, and the asymptotic variance
+
+    >>> mestimation.theta
+    >>> mestimation.variance
+    >>> mestimation.asymptotic_variance
+
+    References
+    ----------
+    Boos DD, & Stefanski LA. (2013). M-estimation (estimating equations). In Essential Statistical Inference
+    (pp. 297-337). Springer, New York, NY.
+    """
+    return ((2 * (y - theta[1]) * (y > theta[1])) - theta[0],
+            1/2 - (y <= theta[1]), )
+
+
 #################################################################
 # Regression Estimating Equations
 
 
 def ee_linear_regression(theta, X, y, weights=None):
-    r"""Default stacked estimating equation for linear regression. The estimating equation is
+    r"""Default stacked estimating equation for linear regression without the homoscedastic assumption. The estimating
+    equation is
 
     .. math::
 
@@ -324,6 +391,116 @@ def ee_linear_regression(theta, X, y, weights=None):
     return w*((y -                            # Speedy matrix algebra for regression
                np.dot(X, beta))               # ... linear regression requires no transfomrations
                * X).T                         # ... multiply by coefficient and transpose for correct orientation
+
+
+def ee_robust_linear_regression(theta, X, y, k, weights=None):
+    """Default stacked estimating equation for robust linear regression. Specifically, robust linear regression is
+    robust to outlying observations of the outcome variable (``y``). The estimating equation is
+
+    .. math::
+
+        \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n \psi_k(Y_i - X_i^T \theta) X_i = 0
+
+    where k indicates the upper and lower bounds. Here, theta is a 1-by-b array, where b is the distinct covariates
+    included as part of X. For example, if X is a 3-by-n matrix, then theta will be a 1-by-3 array. The code is general
+    to allow for an arbitrary number of X's (as long as there is enough support in the data).
+
+    Note
+    ----
+    All provided estimating equations are meant to be wrapped inside a user-specified function. Throughtout, these
+    user-defined functions are defined as `psi`.
+
+    Here, theta corresponds to the coefficients in a robust linear regression model
+
+    Note
+    ----
+    For complex regression problems, the optimizer behind the scenes is not particularly robust (unlike functions
+    specializing in solely OLS). Therefore, optimization of OLS via a separate functionality can be done then those
+    estimated parameters are fed forward as the initial values (which should result in a more stable optimization).
+
+    Parameters
+    ----------
+    theta : vector
+        Theta in this case consists of b values. Therefore, initial values should consist of the same number as the
+        number of columns present. This can easily be accomplished generally by `[0, ] * X.shape[1]`.
+    X : vector
+        2-dimensional vector of n observed values for b variables. No missing data should be included (missing data
+        may cause unexpected behavior).
+    y : vector
+        1-dimensional vector of n observed values. No missing data should be included (missing data may cause unexpected
+        behavior).
+    k : int, float
+        Value to set the symmetric maximum upper and lower bounds on the difference between the observations and
+        predicted values
+    weights : vector, None, optional
+        1-dimensional vector of n weights. No missing weights should be included. Default is None, which assigns a
+        weight of 1 to all observations.
+
+    Returns
+    -------
+    array :
+        Returns a b-by-n NumPy array evaluated for the input theta and y
+
+    Examples
+    --------
+    Construction of a estimating equation(s) with `ee_robust_linear_regression` should be done similar to the following
+
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> from delicatessen import MEstimator
+    >>> from delicatessen.estimating_equations import ee_robust_linear_regression
+
+    Some generic data to estimate a robust linear regresion model
+
+    >>> n = 100
+    >>> data = pd.DataFrame()
+    >>> data['X'] = np.random.normal(size=n)
+    >>> data['Z'] = np.random.normal(size=n)
+    >>> data['Y'] = 0.5 + 2*data['X'] - 1*data['Z'] + np.random.normal(loc=0, scale=3, size=n)
+    >>> data['C'] = 1
+
+    Note that ``C`` here is set to all 1's. This will be the intercept in the regression.
+
+    Defining psi, or the stacked estimating equations
+
+    >>> def psi(theta):
+    >>>         return ee_robust_linear_regression(theta=theta, X=data[['C', 'X', 'Z']], y=data['Y'], k=3)
+
+
+    Calling the M-estimation procedure (note that `init` has 3 values now, since `X.shape[1]` is equal to 3).
+
+    >>> mestimation = MEstimator(stacked_equations=psi, init=[0., 0., 0.,])
+    >>> mestimation.estimate()
+
+    Inspecting the parameter estimates and the variance
+
+    >>> mestimation.theta
+    >>> mestimation.variance
+
+    References
+    ----------
+    Boos DD, & Stefanski LA. (2013). M-estimation (estimating equations). In Essential Statistical Inference
+    (pp. 297-337). Springer, New York, NY.
+    """
+    X = np.asarray(X)                       # Convert to NumPy array
+    y = np.asarray(y)[:, None]              # Convert to NumPy array and ensure correct shape for matrix algebra
+    beta = np.asarray(theta)[:, None]       # Convert to NumPy array and ensure correct shape for matrix algebra
+
+    # Allowing for a weighted linear model
+    if weights is None:                     # If weights is unspecified
+        w = np.ones(X.shape[0])                 # ... assign weight of 1 to all observations
+    else:                                   # Otherwise
+        w = np.asarray(weights)                 # ... set weights as input vector
+
+    # Generating predictions and applying Huber function for robust
+    preds = y - np.dot(X, beta)
+    preds_bound = np.asarray(preds)                               # Convert y to NumPy array
+    preds_bound = np.where(preds_bound > k, k, preds_bound)       # Apply the upper bound
+    preds_bound = np.where(preds_bound < -k, -k, preds_bound)     # Apply the lower bound
+
+    # Output b-by-n matrix
+    return w*(preds_bound            # ... linear regression requires no transformations
+              * X).T                 # ... multiply by coefficient and transpose for correct orientation
 
 
 def ee_logistic_regression(theta, X, y, weights=None):
