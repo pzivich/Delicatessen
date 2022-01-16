@@ -162,11 +162,12 @@ class MEstimator:
         ----------
         solver : str, function, callable, optional
             Method to use for the root finding procedure. Default is the secant method (``scipy.optimize.newton``).
-            Another built-in option is the Levenberg-Marquardt algorithm (``scipy.optimize.root(method='lm')``).
-            Finally, any generic root-finding algorithm can be used via a user-provided callable object (function).
-            The function should consist of two keyword arguments: ``stacked_equations``, and ``init``. Additionally,
-            the function should return only the optimized values. Please review the example in the documentation or on
-            ReadTheDocs for how to provide a custom root-finding algorithm.
+            Other built-in option is the Levenberg-Marquardt algorithm (``scipy.optimize.root(method='lm')``), and
+            a modification of the Powell hybrid method (``scipy.optimize.root(method='hybr')``). Finally, any generic
+            root-finding algorithm can be used via a user-provided callable object (function). The function should
+            consist of two keyword arguments: ``stacked_equations``, and ``init``. Additionally, the function should
+            return only the optimized values. Please review the example in the documentation or on ReadTheDocs for how
+            to provide a custom root-finding algorithm.
         maxiter : int, optional
             Maximum iterations to consider for the root finding procedure. Default is 1000 iterations. For complex
             estimating equations (without preceding optimization), this value may need to be increased. This argument
@@ -294,6 +295,16 @@ class MEstimator:
                        method=method,          # ... allow for valid root-finding methods
                        tol=tolerance,          # ... setting some tolerance values
                        options=options)        # ... options for the selected solver
+            psi = opt.x                        # Error handling if fails to converge
+            if opt.success == 0:
+                print("Root-finding failed to converge...")
+                raise RuntimeError(opt.message)
+        elif method in ['hybr', ]:
+            options = {"xtol": tolerance}
+            opt = root(stacked_equations,      # ... stacked equations to solve (should be written as sums)
+                       x0=np.asarray(init),    # ... initial values for solver
+                       method=method,          # ... allow for valid root-finding methods
+                       options=options)        # ... allow for options in hybrid
             psi = opt.x                        # Error handling if fails to converge
             if opt.success == 0:
                 print("Root-finding failed to converge...")
