@@ -12,3 +12,5 @@ $ python -m pip install delicatessen
 from .version import __version__
 
 from .mestimation import MEstimator
+
+from .data import load_shaq_free_throws
