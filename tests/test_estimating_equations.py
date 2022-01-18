@@ -96,15 +96,6 @@ class TestEstimatingEquations:
         data['Y'] = 0.5 + 2*data['X'] - 1*data['Z'] + np.random.normal(loc=0, size=n)
         data['C'] = 1
 
-        def psi_regression(theta):
-            x = np.asarray(data[['C', 'X', 'Z']])
-            y = np.asarray(data['Y'])[:, None]
-            beta = np.asarray(theta)[:, None]
-            return ((y - np.dot(x, beta)) * x).T
-
-        mcee = MEstimator(psi_regression, init=[0.1, 0.1, 0.1])
-        mcee.estimate()
-
         def psi_builtin_regression(theta):
             return ee_linear_regression(theta,
                                         X=data[['C', 'X', 'Z']],
@@ -113,14 +104,17 @@ class TestEstimatingEquations:
         mpee = MEstimator(psi_builtin_regression, init=[0.1, 0.1, 0.1])
         mpee.estimate()
 
+        # Statsmodels function equivalent
+        glm = smf.glm("Y ~ X + Z", data).fit(cov_type="HC1")
+
         # Checking mean estimate
-        npt.assert_allclose(mcee.theta,
-                            mpee.theta,
+        npt.assert_allclose(mpee.theta,
+                            np.asarray(glm.params),
                             atol=1e-6)
 
         # Checking variance estimates
-        npt.assert_allclose(mcee.variance,
-                            mpee.variance,
+        npt.assert_allclose(mpee.variance,
+                            np.asarray(glm.cov_params()),
                             atol=1e-6)
 
     def test_wls(self):
