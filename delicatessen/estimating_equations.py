@@ -614,6 +614,255 @@ def ee_logistic_regression(theta, X, y, weights=None):
               * X).T                              # ... multiply by coefficient and transpose for correct orientation
 
 
+def ee_4p_logistic(theta, X, y):
+    r"""Default stacked estimating equation estimating equations for the four parameter logistic model (4PL). 4PL is
+    often used for dose-response and bioassay analyses. The estimating equations are
+
+    .. math::
+
+        \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n (Y_i - expit(X_i^T \theta)) X_i = 0
+
+        \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n (Y_i - expit(X_i^T \theta)) X_i = 0
+
+        \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n (Y_i - expit(X_i^T \theta)) X_i = 0
+
+        \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n (Y_i - expit(X_i^T \theta)) X_i = 0
+
+    Here, theta is a 1-by-4 array, where 4 are the 4 parameters of the 4PL. The first theta corresponds to lower limit,
+    the second corresponds to the steepness of the curve, the third corresponds to the effective dose (ED50), and the
+    fourth corresponds to the upper limit.
+
+    Note
+    ----
+    All provided estimating equations are meant to be wrapped inside a user-specified function. Throughtout, these
+    user-defined functions are defined as `psi`.
+
+    Parameters
+    ----------
+    theta : vector
+        Theta in this case consists of 4 values. In general, starting values >0 are better choices for the 4PL model
+    X : vector
+        1-dimensional vector of n dose values. No missing data should be included (missing data may cause unexpected
+        behavior).
+    y : vector
+        1-dimensional vector of n response values. No missing data should be included (missing data may cause
+        unexpected behavior).
+
+    Returns
+    -------
+    array :
+        Returns a 4-by-n NumPy array evaluated for the input theta, y, X
+
+    Examples
+    --------
+    Construction of a estimating equation(s) with `ee_4p_logistic` should be done similar to the following
+
+    """
+    # Creating rho to cut down on typing
+    rho = (X / theta[1]) ** theta[2]
+
+    # Generalized 4PL model function for y-hat
+    fx = theta[0] + (theta[3] - theta[0]) / (1 + rho)
+
+    # Using a special implementatin of natural log here
+    nested_log = np.log(X / theta[1],             # ... to avoid dose=0 issues only take log
+                        where=0<X)                # ... where dose>0 (otherwise puts zero in place)
+
+    # Calculate the derivatives for the gradient
+    deriv = np.array((1 - 1/(1+rho),                                           # Gradient for lower limit
+                     (theta[3]-theta[0])*theta[2]/theta[1]*rho/(1+rho)**2,     # Gradient for steepness
+                     (theta[3] - theta[0]) * nested_log * rho / (1 + rho)**2,  # Gradient for ED50
+                     1 / (1 + rho)), )                                         # Gradient for upper limit
+
+    # Compute gradient and return for each i
+    return -2*(y-fx)*deriv
+
+
+def ee_3p_logistic(theta, X, y, lower):
+    r"""Default stacked estimating equation estimating equations for the three parameter logistic model (3PL). 3PL is
+    often used for dose-response and bioassay analyses. The estimating equations are
+
+    .. math::
+
+        \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n (Y_i - expit(X_i^T \theta)) X_i = 0
+
+        \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n (Y_i - expit(X_i^T \theta)) X_i = 0
+
+        \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n (Y_i - expit(X_i^T \theta)) X_i = 0
+
+    Here, theta is a 1-by-3 array, where 3 are the 3 parameters of the 3PL. The lower limit is specified by the user,
+    and thus is no longer estimated for the 3PL. The theta's now correspond to: steepness of the curve, effective dose
+    (ED50), and the upper limit.
+
+    Note
+    ----
+    All provided estimating equations are meant to be wrapped inside a user-specified function. Throughtout, these
+    user-defined functions are defined as `psi`.
+
+    Parameters
+    ----------
+    theta : vector
+        Theta in this case consists of 3 values. In general, starting values >0 are better choices for the 3PL model
+    X : vector
+        1-dimensional vector of n dose values. No missing data should be included (missing data may cause unexpected
+        behavior).
+    y : vector
+        1-dimensional vector of n response values. No missing data should be included (missing data may cause
+        unexpected behavior).
+    lower : int, float
+        Set value for the lower limit.
+
+    Returns
+    -------
+    array :
+        Returns a 3-by-n NumPy array evaluated for the input theta, y, X
+
+    Examples
+    --------
+    Construction of a estimating equation(s) with `ee_3p_logistic` should be done similar to the following
+
+    """
+    # Creating rho to cut down on typing
+    rho = (X / theta[0])**theta[1]
+
+    # Generalized 3PL model function for y-hat
+    fx = lower + (theta[2] - lower) / (1 + rho)
+
+    # Using a special implementatin of natural log here
+    nested_log = np.log(X / theta[0],             # ... to avoid dose=0 issues only take log
+                        where=0<X)                # ... where dose>0 (otherwise puts zero in place)
+
+    # Calculate the derivatives for the gradient
+    deriv = np.array(((theta[2]-lower)*theta[1]/theta[0]*rho/(1+rho)**2,     # Gradient for steepness
+                      (theta[2]-lower) * nested_log * rho / (1+rho)**2,      # Gradient for ED50
+                      1 / (1 + rho)), )                                      # Gradient for upper limit
+
+    # Compute gradient and return for each i
+    return -2*(y-fx)*deriv
+
+
+def ee_2p_logistic(theta, X, y, lower, upper):
+    r"""Default stacked estimating equation estimating equations for the two parameter logistic model (2PL). 2PL is
+    often used for dose-response and bioassay analyses. The estimating equations are
+
+    .. math::
+
+        \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n (Y_i - expit(X_i^T \theta)) X_i = 0
+
+        \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n (Y_i - expit(X_i^T \theta)) X_i = 0
+
+        \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n (Y_i - expit(X_i^T \theta)) X_i = 0
+
+    Here, theta is a 1-by-2 array, where 2 are the 2 parameters of the 2PL. The lower and upper limits are specified by
+    the user, and thus is no longer estimated for the 2PL. The theta's now correspond to: steepness of the curve, and
+    effective dose (ED50).
+
+    Note
+    ----
+    All provided estimating equations are meant to be wrapped inside a user-specified function. Throughtout, these
+    user-defined functions are defined as `psi`.
+
+    Parameters
+    ----------
+    theta : vector
+        Theta in this case consists of 2 values. In general, starting values >0 are better choices for the 3PL model
+    X : vector
+        1-dimensional vector of n dose values. No missing data should be included (missing data may cause unexpected
+        behavior).
+    y : vector
+        1-dimensional vector of n response values. No missing data should be included (missing data may cause
+        unexpected behavior).
+    lower : int, float
+        Set value for the lower limit.
+    upper : int, float
+        Set value for the upper limit.
+
+    Returns
+    -------
+    array :
+        Returns a 2-by-n NumPy array evaluated for the input theta, y, X
+
+    Examples
+    --------
+    Construction of a estimating equation(s) with `ee_2p_logistic` should be done similar to the following
+
+    """
+    # Creating rho to cut down on typing
+    rho = (X / theta[0])**theta[1]
+
+    # Generalized 3PL model function for y-hat
+    fx = lower + (upper - lower) / (1 + rho)
+
+    # Using a special implementatin of natural log here
+    nested_log = np.log(X / theta[0],             # ... to avoid dose=0 issues only take log
+                        where=0<X)                # ... where dose>0 (otherwise puts zero in place)
+
+    # Calculate the derivatives for the gradient
+    deriv = np.array(((upper-lower)*theta[1]/theta[0]*rho/(1+rho)**2,     # Gradient for steepness
+                      (upper-lower) * nested_log * rho / (1+rho)**2), )   # Gradient for ED50
+
+    # Compute gradient and return for each i
+    return -2*(y-fx)*deriv
+
+
+def ee_effective_dose_alpha(theta, y, alpha, steepness, ed50, lower, upper):
+    r"""Default stacked estimating equation to pair with the 4 parameter logistic model for estimation of the alpha
+    effective dose. The estimating equation is
+
+    .. math::
+
+        \psi(Y_i, \theta) = \beta_1 + \frac{\beta_4 - \beta_1}{1 + (\theta / \beta_2)^{\beta_3}} - \beta_4(1-\alpha) - \beta_1 \alpha
+
+    where theta is the ED(alpha), and the beta values are from a 4PL model (1: lower limit, 2: steepness, 3: ED(50), 4:
+    upper limit). When lower or upper limits are place, the corresponding beta's are replaced by constants. For proper
+    uncertainty estimation, this estimating equation should be stacked together with the correspond PL model.
+
+    Note
+    ----
+    This estimating equation is meant to be paired with the estimating equations for either the 4PL, 3PL, or 2PL models.
+
+    Parameters
+    ----------
+    theta : int, float
+        Theta value corresponding to the ED(alpha).
+    y : vector
+        1-dimensional vector of n response values, used to construct correct shape for output.
+    alpha : float
+        The effective dose level of interest, ED(alpha).
+    steepness : float
+        Estimated parameter for the steepness from the PL.
+    ed50 : float
+        Estimated parameter for the ED50, or ED(alpha=50), from the PL.
+    lower : int, float
+        Estimated parameter or pre-specified constant for the lower limit. This should be a pre-specified constant for
+        both the 3PL and 2PL.
+    upper : int, float
+        Estimated parameter or pre-specified constant for the lower limit. This should be a pre-specified constant for
+        the 2PL.
+
+    Returns
+    -------
+    array :
+        Returns a 1-by-n NumPy array evaluated for the input theta
+
+    Examples
+    --------
+    Construction of a estimating equations for ED25 with `ee_4p_logistic` should be done similar to the following
+
+    """
+    # Creating rho to cut down on typing
+    rho = (theta / steepness)**ed50            # Theta is the corresponds ED(alpha) value
+
+    # Calculating the predicted value for f(x,\theta), or y-hat
+    fx = lower + (upper - lower) / (1 + rho)
+
+    # Subtracting off (Upper*(1-alpha) + Lower*alpha) since theta should result in zeroing of quantity
+    ed_alpha = fx - upper*(1-alpha) - lower*alpha
+
+    # Returning constructed 1-by-ndarray for stacked estimating equations
+    return np.ones(y.shape[0])*ed_alpha
+
+
 #################################################################
 # Causal Inference (ATE) Estimating Equations
 
