@@ -348,4 +348,22 @@ class TestMEstimation:
                             np.var(y, ddof=0),
                             atol=1e-6)
 
+    def test_no_pderiv_overwrite(self):
+        """Test for error found in v0.1b2 (when the `dx` argument was added).
+        """
+        # Data set
+        y = np.array([5, 1, 2, 4, 2, 4, 5, 7, 11, 1, 6, 3, 4, 6])
+
+        def psi(theta):
+            return y - theta
+
+        estr1 = MEstimator(psi, init=[0, ])
+        estr1.estimate(dx=1e-9)
+
+        estr2 = MEstimator(psi, init=[0, ])
+        estr2.estimate(dx=10)
+
+        npt.assert_allclose(estr1.theta, estr2.theta)
+
+
 
