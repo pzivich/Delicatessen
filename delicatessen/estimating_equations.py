@@ -230,6 +230,12 @@ def ee_mean_variance(theta, y):
 def ee_percentile(theta, y, q):
     r"""Default stacked estimating equation for percentiles (or quantiles).
 
+    Note
+    ----
+    Due to this estimating equation being non-smooth, estimated percentile values may differ from the closed-form
+    definition of the percentile. In general, closed form solutions for percentiles will be preferred, but this
+    estimating equation is offered for completeness.
+
     .. math::
 
         \sum_i^n \psi_q(Y_i, \theta_q) = \sum_i^n q - I(Y_i \le \theta_q) = 0
@@ -259,7 +265,36 @@ def ee_percentile(theta, y, q):
 
     Examples
     --------
-    Construction of a estimating equation(s) with `ee_mean_variance` should be done similar to the following
+    Construction of a estimating equation(s) with `ee_percentile` should be done similar to the following
+
+    >>> from delicatessen import MEstimator
+    >>> from delicatessen.estimating_equations import ee_percentile
+
+    Some generic data to estimate the mean for
+
+    >>> np.random.seed(89041)
+    >>> y_dat = np.random.normal(size=100)
+
+    Defining psi, or the stacked estimating equations
+
+    >>> def psi(theta):
+    >>>     return ee_percentile(theta=theta, y=y_dat, q=0.5)
+
+    Calling the M-estimation procedure (note that `init` has 2 values now).
+
+    >>> mestimation = MEstimator(stacked_equations=psi, init=[0, ])
+    >>> mestimation.estimate(solver='hybr', tolerance=1e-3, dx=1, order=15)
+
+    Notice that we use a different solver, tolerance values, and parameters for numerically approximating the derivative
+    here. These changes generally work better for percentile optimizations since the estimating equation is non-smooth.
+    Furthermore, optimization is hard when only a few observations (<100) are available. In general, closed form
+    solutions for percentiles will be preferred.
+
+    >>> mestimation.theta
+
+    Then displays the estimated percentile / median. In this example, there is a difference between the closed form
+    solution (``-0.07978``) and M-Estimation (``-0.06022``). Again, this results from the non-smooth estimating
+    equation.
 
     References
     ----------
@@ -273,7 +308,7 @@ def ee_percentile(theta, y, q):
     y_array = np.asarray(y)
 
     # Output 1-by-n array of the estimating equations
-    return q - 1*(y_array <= theta[1])
+    return q - 1*(y_array <= theta)
 
 
 def ee_positive_mean_deviation(theta, y):
