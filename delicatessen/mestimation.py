@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.optimize import newton, root
 from scipy.misc import derivative
+from scipy.stats import norm
 
 from delicatessen.utilities import partial_derivative
 
@@ -216,19 +217,53 @@ class MEstimator:
         self.meat = np.dot(evald_theta, evald_theta.T) / self.n_obs         # Meat is a simple dot product of two arrays
 
         # Step 2.3: assembling the sandwich (variance)
-        if self.bread.ndim == 0:                        # NumPy's linalg throws an error if bread is a single value
-            bread_invert = 1 / self.bread               # ... so directly take inverse of the single value
-        else:                                           # otherwise bread must be a matrix
-            if allow_pinv:
-                bread_invert = np.linalg.pinv(self.bread)   # ... so find the inverse (or pseudo-inverse)
-            else:
-                bread_invert = np.linalg.inv(self.bread)    # ... so find the inverse (NOT pseudo-inverse)
+        if allow_pinv:                                  # re-worked to supports 1d theta
+            bread_invert = np.linalg.pinv(self.bread)   # ... so find the inverse (or pseudo-inverse)
+        else:
+            bread_invert = np.linalg.inv(self.bread)    # ... so find the inverse (NOT pseudo-inverse)
         # Two sets of matrix multiplication to get the sandwich variance
         sandwich = np.dot(np.dot(bread_invert, self.meat), bread_invert.T)
 
         # Step 3: updating storage for results
         self.asymptotic_variance = sandwich       # Asymptotic variance estimate requires division by n (done above)
         self.variance = sandwich / self.n_obs     # Variance estimate requires division by n^2
+
+    def confidence_intervals(self, alpha=0.05):
+        r"""Calculate Wald-type (1-:math:`\alpha`)% confidence intervals using the point estimates and the sandwich
+        variance. The formula for the confidence intervals are
+
+        .. math::
+
+            \hat{\theta} +/- Z_{\alpha / 2} \times \widehat{SE}(\hat{\theta})
+
+        Note
+        ----
+        The ``estimate()`` function must be called before the confidence intervals can be calculated.
+
+        Parameters
+        ----------
+        alpha : float, optional
+            The :math:`\alpha` level for the corresponding confidence intervals. Default is 0.05, which calculate the
+            95% confidence intervals. Notice that :math:`0<\alpha<1`.
+
+        Returns
+        -------
+        array :
+            b-by-2 array, where row 1 is the confidence intervals for :math:`\theta_1`, ..., and row b is the confidence
+            intervals for :math:`\theta_b`
+        """
+        if not 0 < alpha < 1:
+            raise ValueError("`alpha` must be 0 < a < 1")
+
+        # 'Looking up' via Z table
+        z_alpha = norm.ppf(1 - alpha / 2, loc=0, scale=1)   # Z_alpha value for CI
+
+        # Calculating confidence intervals
+        param_se = np.sqrt(np.diag(self.variance))          # Take the diagonal of the sandwich and then SQRT
+        lower_ci = self.theta - z_alpha * param_se          # Calculate lower CI
+        upper_ci = self.theta + z_alpha * param_se          # Calculate upper CI
+
+        return np.asarray([lower_ci, upper_ci]).T
 
     def _mestimation_answer_(self, theta):
         """Internal function to evaluate the sum of the estimating equations. The summation must be internally evaluated
@@ -385,7 +420,7 @@ class MEstimator:
         # Evaluate the bread matrix
         if val_range == 1:                                       # When only a single theta is present
             d = derivative(stacked_equations, theta, dx=dx)      # ... approximate the derivative
-            return -1 * np.sum(d)                                # ... then return negative sum
+            return np.array([[-1 * np.sum(d), ], ])              # ... then return negative sum as 2d array
         else:                                                    # Otherwise approximate the partial derivatives
             bread_matrix = np.empty((val_range, val_range))      # ... create empty matrix
             for i in range(val_range):                           # ... for each i in len(theta)

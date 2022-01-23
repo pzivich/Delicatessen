@@ -117,6 +117,11 @@ class TestEstimatingEquations:
                             np.asarray(glm.cov_params()),
                             atol=1e-6)
 
+        # Checking confidence interval estimates
+        npt.assert_allclose(mpee.confidence_intervals(),
+                            np.asarray(glm.conf_int()),
+                            atol=1e-6)
+
     def test_wls(self):
         """Tests weighted linear regression by-hand with a single estimating equation.
         """
@@ -153,15 +158,6 @@ class TestEstimatingEquations:
         data['Y'] = np.random.binomial(n=1, p=logistic.cdf(0.5 + 2*data['X'] - 1*data['Z']), size=n)
         data['C'] = 1
 
-        def psi_regression(theta):
-            x = np.asarray(data[['C', 'X', 'Z']])
-            y = np.asarray(data['Y'])[:, None]
-            beta = np.asarray(theta)[:, None]
-            return ((y - inverse_logit(np.dot(x, beta))) * x).T
-
-        mcee = MEstimator(psi_regression, init=[0., 0., 0.])
-        mcee.estimate()
-
         def psi_builtin_regression(theta):
             return ee_logistic_regression(theta,
                                           X=data[['C', 'X', 'Z']],
@@ -170,14 +166,22 @@ class TestEstimatingEquations:
         mpee = MEstimator(psi_builtin_regression, init=[0., 0., 0.])
         mpee.estimate()
 
+        # Comparing to statsmodels GLM (with robust covariance)
+        glm = smf.glm("Y ~ X + Z", data, family=sm.families.Binomial()).fit(cov_type="HC1")
+
         # Checking mean estimate
-        npt.assert_allclose(mcee.theta,
-                            mpee.theta,
+        npt.assert_allclose(mpee.theta,
+                            np.asarray(glm.params),
                             atol=1e-6)
 
         # Checking variance estimates
-        npt.assert_allclose(mcee.variance,
-                            mpee.variance,
+        npt.assert_allclose(mpee.variance,
+                            np.asarray(glm.cov_params()),
+                            atol=1e-6)
+
+        # Checking confidence interval estimates
+        npt.assert_allclose(mpee.confidence_intervals(),
+                            np.asarray(glm.conf_int()),
                             atol=1e-6)
 
     def test_weighted_logistic(self):
