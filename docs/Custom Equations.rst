@@ -6,11 +6,11 @@ be specified. Basically, it will allow for any estimating equation to be passed 
 equation(s) *must* be unbiased for the theory behind M-estimation to hold). Here, I provide an overview and tips for
 how to build your own estimating equation.
 
-In general, it will be best if you find an explicit paper or book (most likely written by a statistician) that directly
-provides the estimating equation(s) to you. Deriving your own *unbiased* estimating equation may be a lot of effort
-and will require a statistical proof. This section does *not* address this part of M-estimation. Rather, this section
-provides information on how to construct an estimating equation within ``delicatessen``. ``delicatessen`` assumes you
-are giving it a valid estimating equation.
+In general, it will be best if you find an explicit paper or book that directly provides the estimating equation(s) to
+you. Alternatively, if you can find the score function or gradient for a regression model, that is the corresponding
+estimating equation. This section does *not* address how to derive your own  estimating equation(s). Rather, this
+section provides information on how to construct an estimating equation within ``delicatessen``, as ``delicatessen``
+assumes you are giving it a valid estimating equation.
 
 Building from scratch
 -------------------------------------
@@ -19,7 +19,7 @@ First, we will go through the case of building an estimating equation completely
 go through an example with linear regression. This is how I went about building the ``ee_linear_regression``
 functionality.
 
-First, we have the estimating equation (which is the score function in this case) provided in Boos & Stefanski (2013)
+First, we have the estimating equation (which is the score function) provided in Boos & Stefanski (2013)
 
 .. math::
 
@@ -39,7 +39,8 @@ We will demonstrate using the following simulated data set
 
 
 First, we can build the estimating equation using a for-loop where each ``i`` piece will be stacked together. While this
-for-loop approach will be slow, it is often a good strategy to implement this version first.
+for-loop approach will be slow, it is often a good strategy to implement a for-loop version that is easier to debug
+first.
 
 Below calculates the estimating equation for each ``i`` in the for-loop. This function returns a stacked array of each
 ``i`` observation as a 3-by-n array. That array can be validly passed to the ``MEstimator`` for optimization and
@@ -73,13 +74,13 @@ We can then run this estimating equation with
     mest = MEstimator(psi, init=[0., 0., 0.])
     mest.estimate()
 
-for which the coefficients match the coefficients from a ordinary least squares model (variance estimates will differ).
-Here, we can further vectorize the estimating equation. In the vector-form, this code will run much faster and this
-is often the best approach to boosting speed in terms of run-time.
+for which the coefficients match the coefficients from a ordinary least squares model (variance estimates will differ,
+since most OLS software uses a different variance estimator). Here, we can further vectorize the estimating equation. In
+the vector-form, this code will run much faster.
 
 With some careful experimentation, the following is a vectorized version. Remember that ``delicatessen`` is expecting a
-b-by-n array to be given by the ``psi`` function. Failure to provide this is a common mistake when building custom
-estimating equations.
+3-by-n array to be given by the ``psi`` function in this example. Failure to provide this is a common mistake when
+building custom estimating equations.
 
 .. code::
 
@@ -92,8 +93,8 @@ estimating equations.
 
 As before, we can run this chunk of code. However, this is substantially faster. If we run both implementations on the
 same data set of 10,000 observations, the for-loop version took approximately 1.60 seconds and the vectorized version
-took 0.05 seconds (on my fairly new laptop). That is a large difference in run time! Vectorizing (even parts of an
-estimating equation) can help to improve run-times if you find the M-Estimation procedure taking too long.
+took 0.05 seconds (on my fairly new laptop). Vectorizing (even parts of an estimating equation) can help to improve
+run-times if you find the M-Estimation procedure taking too long.
 
 
 Building with basics

@@ -3,29 +3,22 @@
 Delicatessen
 =====================================
 
-``delicatessen`` is a one-stop shop for all your sandwich (variance) needs. This Python 3.6+ package supports a
-generalization of M-Estimation theory. ``delicatessen`` draws inspiration from the R library ``geex`` for generalized
-M-estimation (`details here <https://bsaul.github.io/geex/>`_) from Saul & Hudgens (2020).
+``delicatessen`` is a one-stop shop for all your sandwich (variance) needs. This Python 3.6+ library supports
+M-Estimation, which is a general statistical framework for estimating unknown parameters. If you are an R user, I
+highly recommend the R library ``geex`` (`Saul & Hudgens (2020) <https://bsaul.github.io/geex/>`_).
+``delicatessen`` supports a variety of pre-built estimating equations as well as custom, user-specified estimating
+equations.
 
-Here, we provide a brief overview of M-estimation theory. For a more detailed and formal introduction to M-estimation,
-I highly recommend chapter 7 of Boos & Stefanski (2013). M-estimation is a generalization of robust inference (here
-robust refers to allowing for misspecification of secondary assumptions does not invalidate inference) for
-likelihood-based methods to a general context. *M-estimators* are solutions to estimating equations, where a generic
-estimating equation takes the form of
-
-.. math::
-
-     \sum_i^n \psi(Z_i, \theta) = 0
-
-where `Z` is independent observations (these need not be identically distributed). The parameter(s) of interest are
-the *b*-dimensional vector :math:`\theta`, and :math:`\psi` is a *b*-by-1 function that is known. A large number of
-consistent and asymptotically normal statistics can be put into the M-Estimation framework. Some examples include:
-mean, regression, delta method, and many others.
-
-To apply the M-Estimator, we solve for :math:`\theta` given the data and stacked estimating equations. This is similar
-to other approaches, but M-estimation requires the equations take the form provided above. The key advantage of
-M-Estimators is the straightforward estimation of the variance following from this framework, under suitable regularity
-conditions (and whatever else is needed). Specifically, M-Estimation provides the following sandwich variance estimator:
+Here, we provide a brief overview of M-Estimation. For a more detailed and precise introduction, please refer to
+Stefanski & Boos (2002) or Boos & Stefanski (2013). M-Estimation was developed to study the large sample properties of
+robust statistics. However, many common large-sample statistics can be expressed with estimating equations, so
+M-Estimation provides a unified structure and a streamlined approach to estimation. Let the parameter of interest be
+the vector :math:`\theta = (\theta_1, \theta_2, ..., \theta_v)` and data is observed for :math:`n` independent units
+:math"`Z_1, Z_2, …, Z_n`. Then :math:`\theta` can often be expressed as the solution to the vector equation
+:math:`\sum_{i=1}^{n} \psi(Z_i,\theta) = 0` where :math:`\psi(\dot)` is a known :math:`v \times 1`-function that does
+not depend on observation :math:`i` or :math:`n`. To compute point estimates, the vector equation is solved using the
+:math:`n` units. M-Estimators further provides a convenient and automatic method of calculating large-sample variance
+estimators via the . The sandwich variance estimator is:
 
 .. math::
 
@@ -43,14 +36,21 @@ where the prime indicates the first derivative, and
 
     B_n(Y,\hat{\theta}) = n^{-1} \sum_i^n \psi(Y_i, \hat{\theta}) \psi(Y_i, \hat{\theta})^T
 
-Therefore, we have a relatively simple way to calculate the variance for a large class of different statistics.
-Additionally, this variance estimator is robust.
+A key advantage of the sandwich variance estimator is that it is less computationally demanding compared to other
+procedures, like bootstrapping.
 
-While M-Estimation is a powerful tool, the derivatives and matrix algebra can quickly become unwieldy. This is where
-``delicatessen`` comes in. ``delicatessen`` takes stacked estimating equations and data and works through all the necessary
-calculations. Therefore, M-Estimation can be more widely adopted without needing to solve every derivative for your
-particular problem. We can let the computer do all that hard work of finding the roots and numerically approximating the
-derivatives for us.
+While M-Estimation is a general approach, widespread application is hindered by the corresponding derivative and matrix
+calculations. For complex estimating equations, these calculations can be especially tedious. To circumvent these
+barriers, ``delicatessen`` automates the M-Estimator. We can let the computer do all that hard work of finding the
+roots and numerically approximating the derivatives for us.
+
+The following description is a high-level description of the process. The user provides their estimating equation(s) to
+the ``MEstimator`` class object. Next, the ``MEstimator`` object solves for :math:`\theta` using a root-finding
+algorithm. Root-finding algorithms implemented in SciPy, as well as user-provided root-finding algorithms, are
+supported. After successful completion of the root-finding step, the bread is computed by numerically approximating the
+partial derivatives and the filling is calculated via the requisite matrix multiplication using NumPy. Finally, the
+sandwich variance is computed.
+
 
 Contents:
 -------------------------------------
