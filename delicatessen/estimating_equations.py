@@ -17,13 +17,12 @@ def ee_mean(theta, y):
     All provided estimating equations are meant to be wrapped inside a user-specified function. Throughtout, these
     user-defined functions are defined as `psi`.
 
-
     Parameters
     ----------
-    theta : vector
+    theta : ndarray, list, vector
         Theta in the case of the mean consists of a single value. Therefore, an initial value like the form of
         [0, ] is recommended.
-    y : vector
+    y : ndarray, list, vector
         1-dimensional vector of n observed values. No missing data should be included (missing data may cause unexpected
         behavior when attempting to calculate the mean).
 
@@ -64,13 +63,16 @@ def ee_mean(theta, y):
     Boos DD, & Stefanski LA. (2013). M-estimation (estimating equations). In Essential Statistical Inference
     (pp. 297-337). Springer, New York, NY.
     """
-    # Output 1-by-n array
-    return np.asarray(y) - theta     # Estimating equation for the mean
+    # Convert input y values to NumPy array
+    y_array = np.asarray(y)
+
+    # Output 1-by-n array estimating equation for the mean
+    return y_array - theta
 
 
 def ee_mean_robust(theta, y, k):
-    r""" Default stacked estimating equation for robust mean (robust location) estimator. The estimating equation for
-    the robust mean is
+    r""" Default stacked estimating equation for robust mean (location) estimator. The estimating equation for the
+    robust mean is
 
     .. math::
 
@@ -83,7 +85,6 @@ def ee_mean_robust(theta, y, k):
     Since psi is non-differentiable at k or -k, it must be assumed that the mean is sufficiently far from k. Otherwise,
     difficulties might arise in the variance calculation.
 
-
     Note
     ----
     All provided estimating equations are meant to be wrapped inside a user-specified function. Throughtout, these
@@ -92,10 +93,10 @@ def ee_mean_robust(theta, y, k):
 
     Parameters
     ----------
-    theta : vector
+    theta : ndarray, list, vector
         Theta in the case of the robust mean consists of a single value. Therefore, an initial value like the form of
         [0, ] is recommended.
-    y : vector
+    y : ndarray, vector, list
         1-dimensional vector of n observed values. No missing data should be included (missing data may cause unexpected
         behavior when attempting to calculate the robust mean).
     k : int, float
@@ -141,12 +142,14 @@ def ee_mean_robust(theta, y, k):
     Huber PJ. (1992). Robust estimation of a location parameter. In Breakthroughs in statistics (pp. 492-518).
     Springer, New York, NY.
     """
-    var = np.asarray(y)                   # Convert y to NumPy array
-    var = np.where(var > k, k, var)       # Apply the upper bound
-    var = np.where(var < -k, -k, var)     # Apply the lower bound
+    # Convert input y values to NumPy array
+    y_array = np.asarray(y)
 
-    # Output 1-by-n array
-    return var - theta                    # Estimating equation for robust mean
+    # Bounding via np.clip
+    y_bound = np.clip(y_array, a_min=-k, a_max=k)
+
+    # Output 1-by-n array estimating equation for robust mean
+    return y_bound - theta
 
 
 def ee_mean_variance(theta, y):
@@ -170,9 +173,9 @@ def ee_mean_variance(theta, y):
 
     Parameters
     ----------
-    theta : vector
+    theta : ndarray, list, vector
         Theta in this case consists of two values. Therefore, initial values like the form of [0, 0] is recommended.
-    y : vector
+    y : ndarray, list, vector
         1-dimensional vector of n observed values. No missing data should be included (missing data may cause unexpected
         behavior when attempting to calculate the mean).
 
@@ -208,16 +211,69 @@ def ee_mean_variance(theta, y):
     >>> mestimation.variance
     >>> mestimation.asymptotic_variance
 
-    In this example, `mestimation.theta[1]` and `mestimation.asymptotic_variance[0][0]` are expected to be equal.
+    For this estimating equation, `mestimation.theta[1]` and `mestimation.asymptotic_variance[0][0]` are expected to
+    always be equal.
 
     References
     ----------
     Boos DD, & Stefanski LA. (2013). M-estimation (estimating equations). In Essential Statistical Inference
     (pp. 297-337). Springer, New York, NY.
     """
-    # Output 2-by-n matrix
-    return (y - theta[0],                  # Estimating equation for mean
-            (y - theta[0])**2 - theta[1])  # Estimating equation for variance
+    # Convert input y values to NumPy array
+    y_array = np.asarray(y)
+
+    # Output 2-by-n matrix of estimating equations
+    return (y_array - theta[0],                  # Estimating equation for mean
+            (y_array - theta[0])**2 - theta[1])  # Estimating equation for variance
+
+
+def ee_percentile(theta, y, q):
+    r"""Default stacked estimating equation for percentiles (or quantiles).
+
+    .. math::
+
+        \sum_i^n \psi_q(Y_i, \theta_q) = \sum_i^n q - I(Y_i \le \theta_q) = 0
+
+    Notice that this estimating equation is non-smooth. Therefore, optimization and numerically approximating
+    derivatives for this estimating equation are more difficult.
+
+    Note
+    ----
+    The optional parameters `MEstimator.estimate()` may benefit from the following changes `solver='hybr'`,
+    `tolerance=1e-5`, `dx=1`, and `order=15`. Try a few different values.
+
+    Parameters
+    ----------
+    theta : ndarray, list, vector
+        Theta in this case consists of two values. Therefore, initial values like the form of [0, 0] is recommended.
+    y : ndarray, list, vector
+        1-dimensional vector of n observed values. No missing data should be included (missing data may cause unexpected
+        behavior when attempting to calculate the mean).
+    q : float
+        Percentile to calculate. Must be (0, 1)
+
+    Returns
+    -------
+    array :
+        Returns a 1-by-n NumPy array evaluated for the input theta and y
+
+    Examples
+    --------
+    Construction of a estimating equation(s) with `ee_mean_variance` should be done similar to the following
+
+    References
+    ----------
+    Boos DD, & Stefanski LA. (2013). M-estimation (estimating equations). In Essential Statistical Inference
+    (pp. 297-337). Springer, New York, NY.
+    """
+    if q >= 1 or q <= 0:
+        raise ValueError("`q` must be (0, 1)")
+
+    # Convert input y values to NumPy array
+    y_array = np.asarray(y)
+
+    # Output 1-by-n array of the estimating equations
+    return q - 1*(y_array <= theta[1])
 
 
 def ee_positive_mean_deviation(theta, y):
@@ -239,9 +295,9 @@ def ee_positive_mean_deviation(theta, y):
 
     Parameters
     ----------
-    theta : vector
+    theta : ndarray, list, vector
         Theta in this case consists of two values. Therefore, initial values like the form of [0, 0] is recommended.
-    y : vector
+    y : ndarray, list, vector
         1-dimensional vector of n observed values. No missing data should be included (missing data may cause unexpected
         behavior when attempting to calculate the positive mean deviation).
 
@@ -282,8 +338,15 @@ def ee_positive_mean_deviation(theta, y):
     Boos DD, & Stefanski LA. (2013). M-estimation (estimating equations). In Essential Statistical Inference
     (pp. 297-337). Springer, New York, NY.
     """
-    return ((2 * (y - theta[1]) * (y > theta[1])) - theta[0],
-            1/2 - (y <= theta[1]), )
+    # Convert input y values to NumPy array
+    y_array = np.asarray(y)
+
+    # Calculating median with built-in estimating equation
+    median = ee_percentile(theta=theta[1], y=y_array, q=0.5)
+
+    # Output 2-by-n matrix of estimating equations
+    return ((2*(y_array - theta[1])*(y_array > theta[1])) - theta[0],   # Estimating equation for positive mean dev
+            median, )                                                   # Estimating equation for median
 
 
 #################################################################
@@ -307,7 +370,6 @@ def ee_linear_regression(theta, X, y, weights=None):
     All provided estimating equations are meant to be wrapped inside a user-specified function. Throughtout, these
     user-defined functions are defined as `psi`.
 
-
     Here, theta corresponds to the coefficients in a linear regression model
 
     Note
@@ -318,16 +380,16 @@ def ee_linear_regression(theta, X, y, weights=None):
 
     Parameters
     ----------
-    theta : vector
+    theta : ndarray, list, vector
         Theta in this case consists of b values. Therefore, initial values should consist of the same number as the
         number of columns present. This can easily be accomplished generally by `[0, ] * X.shape[1]`.
-    X : vector
+    X : ndarray, list, vector
         2-dimensional vector of n observed values for b variables. No missing data should be included (missing data
         may cause unexpected behavior).
-    y : vector
+    y : ndarray, list, vector
         1-dimensional vector of n observed values. No missing data should be included (missing data may cause unexpected
         behavior).
-    weights : vector, None, optional
+    weights : ndarray, list, vector, None, optional
         1-dimensional vector of n weights. No missing weights should be included. Default is None, which assigns a
         weight of 1 to all observations.
 
@@ -361,7 +423,6 @@ def ee_linear_regression(theta, X, y, weights=None):
     >>> def psi(theta):
     >>>         return ee_linear_regression(theta=theta, X=data[['C', 'X', 'Z']], y=data['Y'])
 
-
     Calling the M-estimation procedure (note that `init` has 3 values now, since `X.shape[1]` is equal to 3).
 
     >>> mestimation = MEstimator(stacked_equations=psi, init=[0., 0., 0.,])
@@ -388,9 +449,9 @@ def ee_linear_regression(theta, X, y, weights=None):
         w = np.asarray(weights)                 # ... set weights as input vector
 
     # Output b-by-n matrix
-    return w*((y -                            # Speedy matrix algebra for regression
-               np.dot(X, beta))               # ... linear regression requires no transfomrations
-               * X).T                         # ... multiply by coefficient and transpose for correct orientation
+    return w*((y -                   # Speedy matrix algebra for regression
+               np.dot(X, beta))      # ... linear regression requires no transformations
+              * X).T                 # ... multiply by coefficient and transpose for correct orientation
 
 
 def ee_robust_linear_regression(theta, X, y, k, weights=None):
@@ -420,19 +481,19 @@ def ee_robust_linear_regression(theta, X, y, k, weights=None):
 
     Parameters
     ----------
-    theta : vector
+    theta : ndarray, list, vector
         Theta in this case consists of b values. Therefore, initial values should consist of the same number as the
         number of columns present. This can easily be accomplished generally by `[0, ] * X.shape[1]`.
-    X : vector
+    X : ndarray, list, vector
         2-dimensional vector of n observed values for b variables. No missing data should be included (missing data
         may cause unexpected behavior).
-    y : vector
+    y : ndarray, list, vector
         1-dimensional vector of n observed values. No missing data should be included (missing data may cause unexpected
         behavior).
     k : int, float
         Value to set the symmetric maximum upper and lower bounds on the difference between the observations and
         predicted values
-    weights : vector, None, optional
+    weights : ndarray, list, vector, None, optional
         1-dimensional vector of n weights. No missing weights should be included. Default is None, which assigns a
         weight of 1 to all observations.
 
@@ -493,13 +554,10 @@ def ee_robust_linear_regression(theta, X, y, k, weights=None):
         w = np.asarray(weights)                 # ... set weights as input vector
 
     # Generating predictions and applying Huber function for robust
-    preds = y - np.dot(X, beta)
-    preds_bound = np.asarray(preds)                               # Convert y to NumPy array
-    preds_bound = np.where(preds_bound > k, k, preds_bound)       # Apply the upper bound
-    preds_bound = np.where(preds_bound < -k, -k, preds_bound)     # Apply the lower bound
+    preds = np.clip(y - np.dot(X, beta), -k, k)
 
     # Output b-by-n matrix
-    return w*(preds_bound            # ... linear regression requires no transformations
+    return w*(preds                  # ... linear regression requires no transformations
               * X).T                 # ... multiply by coefficient and transpose for correct orientation
 
 
@@ -538,16 +596,16 @@ def ee_logistic_regression(theta, X, y, weights=None):
 
     Parameters
     ----------
-    theta : vector
+    theta : ndarray, list, vector
         Theta in this case consists of b values. Therefore, initial values should consist of the same number as the
         number of columns present. This can easily be accomplished generally by `[0, ] * X.shape[1]`.
-    X : vector
+    X : ndarray, list, vector
         2-dimensional vector of n observed values for b variables. No missing data should be included (missing data
         may cause unexpected behavior).
-    y : vector
+    y : ndarray, list, vector
         1-dimensional vector of n observed values. The Y values should all be 0 or 1. No missing data should be
         included (missing data may cause unexpected behavior).
-    weights : vector, None, optional
+    weights : ndarray, list, vector, None, optional
         1-dimensional vector of n weights. No missing weights should be included. Default is None, which assigns a
         weight of 1 to all observations.
 
@@ -614,6 +672,10 @@ def ee_logistic_regression(theta, X, y, weights=None):
               * X).T                              # ... multiply by coefficient and transpose for correct orientation
 
 
+#################################################################
+# Dose-Response Estimating Equations
+
+
 def ee_4p_logistic(theta, X, y):
     r"""Default stacked estimating equation estimating equations for the four parameter logistic model (4PL). 4PL is
     often used for dose-response and bioassay analyses. The estimating equations are
@@ -639,12 +701,12 @@ def ee_4p_logistic(theta, X, y):
 
     Parameters
     ----------
-    theta : vector
+    theta : ndarray, list, vector
         Theta in this case consists of 4 values. In general, starting values >0 are better choices for the 4PL model
-    X : vector
+    X : ndarray, list, vector
         1-dimensional vector of n dose values. No missing data should be included (missing data may cause unexpected
         behavior).
-    y : vector
+    y : ndarray, list, vector
         1-dimensional vector of n response values. No missing data should be included (missing data may cause
         unexpected behavior).
 
@@ -666,7 +728,7 @@ def ee_4p_logistic(theta, X, y):
 
     # Using a special implementatin of natural log here
     nested_log = np.log(X / theta[1],             # ... to avoid dose=0 issues only take log
-                        where=0<X)                # ... where dose>0 (otherwise puts zero in place)
+                        where=0 < X)              # ... where dose>0 (otherwise puts zero in place)
 
     # Calculate the derivatives for the gradient
     deriv = np.array((1 - 1/(1+rho),                                           # Gradient for lower limit
@@ -701,12 +763,12 @@ def ee_3p_logistic(theta, X, y, lower):
 
     Parameters
     ----------
-    theta : vector
+    theta : ndarray, list, vector
         Theta in this case consists of 3 values. In general, starting values >0 are better choices for the 3PL model
-    X : vector
+    X : ndarray, list, vector
         1-dimensional vector of n dose values. No missing data should be included (missing data may cause unexpected
         behavior).
-    y : vector
+    y : ndarray, list, vector
         1-dimensional vector of n response values. No missing data should be included (missing data may cause
         unexpected behavior).
     lower : int, float
@@ -728,9 +790,9 @@ def ee_3p_logistic(theta, X, y, lower):
     # Generalized 3PL model function for y-hat
     fx = lower + (theta[2] - lower) / (1 + rho)
 
-    # Using a special implementatin of natural log here
+    # Using a special implementation of natural log here
     nested_log = np.log(X / theta[0],             # ... to avoid dose=0 issues only take log
-                        where=0<X)                # ... where dose>0 (otherwise puts zero in place)
+                        where=0 < X)              # ... where dose>0 (otherwise puts zero in place)
 
     # Calculate the derivatives for the gradient
     deriv = np.array(((theta[2]-lower)*theta[1]/theta[0]*rho/(1+rho)**2,     # Gradient for steepness
@@ -738,7 +800,7 @@ def ee_3p_logistic(theta, X, y, lower):
                       1 / (1 + rho)), )                                      # Gradient for upper limit
 
     # Compute gradient and return for each i
-    return -2*(y-fx)*deriv
+    return -2*(y - fx)*deriv
 
 
 def ee_2p_logistic(theta, X, y, lower, upper):
@@ -764,12 +826,12 @@ def ee_2p_logistic(theta, X, y, lower, upper):
 
     Parameters
     ----------
-    theta : vector
+    theta : ndarray, list, vector
         Theta in this case consists of 2 values. In general, starting values >0 are better choices for the 3PL model
-    X : vector
+    X : ndarray, list, vector
         1-dimensional vector of n dose values. No missing data should be included (missing data may cause unexpected
         behavior).
-    y : vector
+    y : ndarray, list, vector
         1-dimensional vector of n response values. No missing data should be included (missing data may cause
         unexpected behavior).
     lower : int, float
@@ -795,7 +857,7 @@ def ee_2p_logistic(theta, X, y, lower, upper):
 
     # Using a special implementatin of natural log here
     nested_log = np.log(X / theta[0],             # ... to avoid dose=0 issues only take log
-                        where=0<X)                # ... where dose>0 (otherwise puts zero in place)
+                        where=0 < X)              # ... where dose>0 (otherwise puts zero in place)
 
     # Calculate the derivatives for the gradient
     deriv = np.array(((upper-lower)*theta[1]/theta[0]*rho/(1+rho)**2,     # Gradient for steepness
@@ -811,7 +873,8 @@ def ee_effective_dose_alpha(theta, y, alpha, steepness, ed50, lower, upper):
 
     .. math::
 
-        \psi(Y_i, \theta) = \beta_1 + \frac{\beta_4 - \beta_1}{1 + (\theta / \beta_2)^{\beta_3}} - \beta_4(1-\alpha) - \beta_1 \alpha
+        \psi(Y_i, \theta) = \beta_1 + \frac{\beta_4 - \beta_1}{1 + (\theta / \beta_2)^{\beta_3}} - \beta_4(1-\alpha)
+        - \beta_1 \alpha
 
     where theta is the ED(alpha), and the beta values are from a 4PL model (1: lower limit, 2: steepness, 3: ED(50), 4:
     upper limit). When lower or upper limits are place, the corresponding beta's are replaced by constants. For proper
@@ -825,7 +888,7 @@ def ee_effective_dose_alpha(theta, y, alpha, steepness, ed50, lower, upper):
     ----------
     theta : int, float
         Theta value corresponding to the ED(alpha).
-    y : vector
+    y : ndarray, list, vector
         1-dimensional vector of n response values, used to construct correct shape for output.
     alpha : float
         The effective dose level of interest, ED(alpha).
@@ -860,7 +923,7 @@ def ee_effective_dose_alpha(theta, y, alpha, steepness, ed50, lower, upper):
     ed_alpha = fx - upper*(1-alpha) - lower*alpha
 
     # Returning constructed 1-by-ndarray for stacked estimating equations
-    return np.ones(y.shape[0])*ed_alpha
+    return np.ones(np.asarray(y).shape[0])*ed_alpha
 
 
 #################################################################
@@ -893,11 +956,7 @@ def ee_gformula(theta, X, y, treat_index, force_continuous=False):
 
         \sum_i^n \psi_1(Y_i, X_i, \theta_1) = \sum_i^n g(\hat{Y}_i) - \theta_1 = 0
 
-    .. math::
-
         \sum_i^n \psi_0(Y_i, X_i, \theta_2) = \sum_i^n g(\hat{Y}_i) - \theta_2 = 0
-
-    .. math::
 
         \sum_i^n \psi_0(Y_i, X_i, \theta_0) = \sum_i^n (\theta_1 - \theta_2) - \theta_0 = 0
 
@@ -911,7 +970,6 @@ def ee_gformula(theta, X, y, treat_index, force_continuous=False):
     ----
     All provided estimating equations are meant to be wrapped inside a user-specified function. Throughtout, these
     user-defined functions are defined as `psi`.
-
 
     Here, theta corresponds to a variety of different quantities. The *first* value in theta vector is the risk / mean
     difference (or average treatment effect), the *second* is the risk / mean had everyone been given treatment=0, the
@@ -928,12 +986,12 @@ def ee_gformula(theta, X, y, treat_index, force_continuous=False):
 
     Parameters
     ----------
-    theta : array, list
+    theta : ndarray, list, vector
         Array of parameters to estimate. For the Cox model, corresponds to the log hazard ratios
-    X : vector
+    X : ndarray, list, vector
         2-dimensional vector of n observed values for b variables. No missing data should be included (missing data
         may cause unexpected behavior).
-    y : vector
+    y : ndarray, list, vector
         1-dimensional vector of n observed values. The Y values should all be 0 or 1. No missing data should be
         included (missing data may cause unexpected behavior).
     treat_index : int
@@ -1071,11 +1129,7 @@ def ee_ipw(theta, X, y, treat_index):
 
         \sum_i^n \psi_1(Y_i, A_i, \pi_i, \theta_1) = \sum_i^n \frac{A_i \times Y_i}{\pi_i} - \theta_1 = 0
 
-    .. math::
-
         \sum_i^n \psi_0(Y_i, A_i, \pi_i, \theta_2) = \sum_i^n \frac{(1-A_i) \times Y_i}{1-\pi_i} - \theta_2 = 0
-
-    .. math::
 
         \sum_i^n \psi_d(Y_i, A_i, \pi_i, \theta_0) = \sum_i^n (\theta_1 - \theta_2) - \theta_0 = 0
 
@@ -1086,7 +1140,6 @@ def ee_ipw(theta, X, y, treat_index):
     ----
     All provided estimating equations are meant to be wrapped inside a user-specified function. Throughtout, these
     user-defined functions are defined as `psi`.
-
 
     Here, theta corresponds to a variety of different quantities. The *first* value in theta vector is the risk / mean
     difference (or average treatment effect), the *second* is the risk / mean had everyone been given treatment=0, the
@@ -1100,15 +1153,14 @@ def ee_ipw(theta, X, y, treat_index):
     functionality can be done then those estimated parameters are fed forward as the initial values (which should
     result in a more stable optimization).
 
-
     Parameters
     ----------
-    theta : array, list
+    theta : ndarray, list, vector
         Array of parameters to estimate. For the Cox model, corresponds to the log hazard ratios
-    X : vector
+    X : ndarray, list, vector
         2-dimensional vector of n observed values for b variables. No missing data should be included (missing data
         may cause unexpected behavior).
-    y : vector
+    y : ndarray, list, vector
         1-dimensional vector of n observed values. The Y values should all be 0 or 1. No missing data should be
         included (missing data may cause unexpected behavior).
     treat_index : int
@@ -1246,13 +1298,11 @@ def ee_aipw(theta, X, y, treat_index, force_continuous=False):
 
     .. math::
 
-        \sum_i^n \psi_1(Y_i, A_i, W_i, \pi_i, \theta_1) = \sum_i^n (\frac{A_i \times Y_i}{\pi_i} - \frac{\hat{Y^1}(A_i-\pi_i}{\pi_i}) - \theta_1 = 0
+        \sum_i^n \psi_1(Y_i, A_i, W_i, \pi_i, \theta_1) = \sum_i^n (\frac{A_i \times Y_i}{\pi_i} -
+        \frac{\hat{Y^1}(A_i-\pi_i}{\pi_i}) - \theta_1 = 0
 
-    .. math::
-
-        \sum_i^n \psi_0(Y_i, A_i, \pi_i, \theta_2) = \sum_i^n (\frac{(1-A_i) \times Y_i}{1-\pi_i} + \frac{\hat{Y^0}(A_i-\pi_i}{1-\pi_i})) - \theta_2 = 0
-
-    .. math::
+        \sum_i^n \psi_0(Y_i, A_i, \pi_i, \theta_2) = \sum_i^n (\frac{(1-A_i) \times Y_i}{1-\pi_i} +
+        \frac{\hat{Y^0}(A_i-\pi_i}{1-\pi_i})) - \theta_2 = 0
 
         \sum_i^n \psi_0(Y_i, A_i, \pi_i, \theta_0) = \sum_i^n (\theta_1 - \theta_2) - \theta_0 = 0
 
@@ -1265,7 +1315,6 @@ def ee_aipw(theta, X, y, treat_index, force_continuous=False):
     ----
     All provided estimating equations are meant to be wrapped inside a user-specified function. Throughtout, these
     user-defined functions are defined as `psi`.
-
 
     Here, theta corresponds to a variety of different quantities. The *first* value in theta vector is the risk / mean
     difference (or average treatment effect), the *second* is the risk / mean had everyone been given treatment=0, the
@@ -1280,15 +1329,14 @@ def ee_aipw(theta, X, y, treat_index, force_continuous=False):
     functionality can be done then those estimated parameters are fed forward as the initial values (which should
     result in a more stable optimization).
 
-
     Parameters
     ----------
-    theta : array, list
+    theta : ndarray, list, vector
         Array of parameters to estimate. For the Cox model, corresponds to the log hazard ratios
-    X : vector
+    X : ndarray, list, vector
         2-dimensional vector of n observed values for b variables. No missing data should be included (missing data
         may cause unexpected behavior).
-    y : vector
+    y : ndarray, list, vector
         1-dimensional vector of n observed values. The Y values should all be 0 or 1. No missing data should be
         included (missing data may cause unexpected behavior).
     treat_index : int
