@@ -2,19 +2,20 @@ Built-in Estimating Equations
 '''''''''''''''''''''''''''''''''''''
 
 Here, we provide an overview of some of the built-in estimating equations with ``delicatessen``. This documentation is
-split into four sections, corresponding to basic, regression, survival, and causal estimating equations.
+split into three sections, corresponding to basic, regression, and causal estimating equations.
 
-All built-in estimating equations need to be 'wrapped' inside a outer function. Below is an example of an outer
-function, ``psi`` for the generic estimating equation ``ee`` (``ee`` does not exist but it a placeholder here).
+All built-in estimating equations need to be 'wrapped' inside an outer function. Below is a generic example of an outer
+function, where ``psi`` is the wrapper function and ``ee`` is the generic estimating equation example (``ee`` does not
+exist but it a placeholder here).
 
-.. code::python
+.. code::
 
     def psi(theta):
-        return ee(theta=theta, data=dat)
+        return ee(theta=theta, data=data)
 
 Here, the generic ``ee`` takes two inputs ``theta`` and ``data``. ``theta`` is the general theta vector that is present
 in all stacked estimating equations expected by ``delicatessen``. ``data`` is an argument that takes an input source
-of data. The ``dat`` provided should be **in the local scope** of the .py file this function lives in.
+of data. The ``data`` provided should be **in the local scope** of the ``.py`` file this function lives in.
 
 After wrapped in an outer function, the function can be passed to ``MEstimator``. See the examples below for further
 details and examples.
@@ -22,19 +23,20 @@ details and examples.
 Basic Equations
 =============================
 
-Some basic estimating equations for the mean and variance are provided.
+Some basic estimating equations are provided.
 
 Mean
 ----------------------------
 
-The most basic is the estimating equation for the mean: ``ee_mean``. To illustrate, consider we wanted to estimated the
-mean for the following data
+The most basic available estimating equation is for the mean: ``ee_mean``. To illustrate, consider we wanted to
+estimated the mean for the following data
 
 .. code::
 
     obs_vals = [1, 2, 1, 4, 1, 4, 2, 4, 2, 3]
 
-To use ``ee_mean`` with ``MEstimator``, this function will be wrapped in an outer function. Below is an example
+To use ``ee_mean`` with ``MEstimator``, this function will be wrapped in an outer function. Below is an illustration of
+this wrapper function
 
 .. code::
 
@@ -51,17 +53,20 @@ After creating the wrapper function, the M-Estimator can be called like the foll
 
     from delicatessen import MEstimator
 
-    mestimation = MEstimator(stacked_equations=psi, init=[0, ])
-    mestimation.estimate()
+    estr = MEstimator(stacked_equations=psi, init=[0, ])
+    estr.estimate()
+
+    print(estr.theta)   # [2.4, ])
 
 Since ``ee_mean`` consists of a single parameter, only a single ``init`` value is provided.
 
 Robust Mean
 ----------------------------
 
-Sometimes extreme outliers are observed. The mean will be sensitive to these extreme outliers, but excluding them also
-seems like 'cheating'. Instead, a robust version of the mean could be considered. Consider the following generic data,
-where there are two extreme outliers
+Sometimes extreme observations, termed outliers, occur. The mean is generally sensitive to these outliers. A common
+approach to handling outliers is to exclude them. However, exclusion ignores all information contributed by outliers,
+and should only be done when outliers are a result of experimental error. Robust statistics have been proposed as
+middle ground, whereby outliers contribute to estimation but their influence is constrained.
 
 .. code::
 
@@ -71,8 +76,7 @@ Rather than excluding the -10 and 12, we can use the robust mean proposed by Hub
 pre-specified level. Therefore, they still contribute information but only values up to the bound. In this example, a
 bound of -6,6 will be applied.
 
-The robust mean estimating equation is available in ``ee_mean_robust``. Below is an example (including the wrapper
-function and call).
+The robust mean estimating equation is available in ``ee_mean_robust``.
 
 .. code::
 
@@ -82,13 +86,11 @@ function and call).
     def psi(theta):
         return ee_mean_robust(theta=theta, y=obs_vals, k=6)
 
-    mestimation = MEstimator(stacked_equations=psi, init=[0, ])
-    mestimation.estimate()
+    estr = MEstimator(stacked_equations=psi, init=[0, ])
+    estr.estimate()
 
-    print("Mean:    ", mestimation.theta)
-    print("Variance:", mestimation.variance)
+    print(estr.theta)  # [2.0, ]
 
-Therefore, the robust mean point and variance estimate are displayed.
 
 Mean and Variance
 ----------------------------
@@ -110,11 +112,10 @@ The mean-variance estimating equation can be implemented as follows (remember th
     def psi(theta):
         return ee_mean_variance(theta=theta, y=obs_vals)
 
-    mestimation = MEstimator(stacked_equations=psi, init=[0, 1, ])
-    mestimation.estimate()
+    estr = MEstimator(stacked_equations=psi, init=[0, 1, ])
+    estr.estimate()
 
-    print("theta:     ", mestimation.theta)
-    print("Var(theta):", mestimation.variance)
+    print(estr.theta)  # [2.4, 1.44]
 
 *Note* the ``init`` here takes two values because the stacked estimating equations has a length of 2 (``theta`` is
 b-by-1 where b=2). The first value of ``theta`` is the mean and the second is the variance. Now, the variance output
@@ -124,14 +125,12 @@ estimated variance of the mean and the second is the estimated variance of the v
 Regression
 =============================
 
-Several basic regression model estimating equations are provided.
+Several common regression models are provided as built-in estimating equations.
 
 Linear Regression
 ----------------------------
 
-The estimating equations for linear regression predict a continuous outcome as a function of provided covariates. The
-implementation of linear regression here is similar to ordinary least squares, but the variance here is robust.
-Specifically, the sandwich variance estimator of M-Estimation is robust.
+The estimating equations for linear regression predict a continuous outcome as a function of provided covariates.
 
 To demonstrate application, consider the following simulated data set
 
@@ -147,9 +146,9 @@ To demonstrate application, consider the following simulated data set
     data['Y'] = 0.5 + 2*data['X'] - 1*data['Z'] + np.random.normal(loc=0, size=n)
     data['C'] = 1
 
-In this case, X and Z are the independent variables and Y is the dependent variable. Here C is necessary as a column
-since we need to manually provide the intercept (this may be different from other formula-based packages that
-automatically add the intercept to the regression).
+In this case, ``X`` and ``Z`` are the independent variables and ``Y`` is the dependent variable. Here the column ``C``
+is created to be the intercept column, since the intercept needs to be manually provided (this may be different from
+other formula-based packages that automatically add the intercept to the regression).
 
 For this data, we can now create the wrapper function for the ``ee_linear_regression`` estimating equations
 
@@ -168,15 +167,15 @@ and their variance
 
 .. code::
 
-    mestimation = MEstimator(stacked_equations=psi, init=[0., 0., 0.])
-    mestimation.estimate()
+    estr = MEstimator(stacked_equations=psi, init=[0., 0., 0.])
+    estr.estimate()
 
-    print("theta:     ", mestimation.theta)
-    print("Var(theta):", mestimation.variance)
+    print(estr.theta)
+    print(estr.variance)
 
-Note that ``X`` is 3 covariates, meaning ``init`` needs 3 starting values. The linear regression done here should match
-the ``statsmodels`` generalized linear model with a robust variance estimate. Below is code demonstrating how to
-estimate the same quantities with ``statsmodels.glm``.
+Note that there are 3 independent variables, meaning ``init`` needs 3 starting values. The linear regression done here
+should match the ``statsmodels`` generalized linear model with a robust variance estimate. Below is code on how to
+compare to ``statsmodels.glm``.
 
 .. code::
 
@@ -194,10 +193,8 @@ causal section.
 Logistic Regression
 ----------------------------
 
-In the case of a binary dependent variable, logistic regression can instead be performed (no linear probability models
-here!).
-
-To demonstrate application, consider the following simulated data set
+In the case of a binary dependent variable, logistic regression can instead be performed. Consider the following
+simulated data set
 
 .. code::
 
@@ -212,9 +209,9 @@ To demonstrate application, consider the following simulated data set
     data['Y'] = np.random.binomial(n=1, p=logistic.cdf(0.5 + 2*data['X'] - 1*data['Z']), size=n)
     data['C'] = 1
 
-In this case, X and Z are the independent variables and Y is the dependent variable. Here C is necessary as a column
-since we need to manually provide the intercept (this may be different from other formula-based packages that
-automatically add the intercept to the regression).
+In this case, ``X`` and ``Z`` are the independent variables and ``Y`` is the dependent variable. Here the column ``C``
+is created to be the intercept column, since the intercept needs to be manually provided (this may be different from
+other formula-based packages that automatically add the intercept to the regression).
 
 For this data, we can now create the wrapper function for the ``ee_logistic_regression`` estimating equations
 
@@ -233,15 +230,15 @@ and their variance
 
 .. code::
 
-    mestimation = MEstimator(stacked_equations=psi, init=[0., 0., 0.])
-    mestimation.estimate()
+    estr = MEstimator(stacked_equations=psi, init=[0., 0., 0.])
+    estr.estimate()
 
-    print("theta:     ", mestimation.theta)
-    print("Var(theta):", mestimation.variance)
+    print(estr.theta)
+    print(estr.variance)
 
-Note that ``X`` is 3 covariates, meaning ``init`` needs 3 starting values. The logistic regression done here should
-match the ``statsmodels`` generalized linear model with a robust variance estimate. Below is code demonstrating how to
-estimate the same quantities with ``statsmodels.glm``.
+Note that there are 3 independent variables, meaning ``init`` needs 3 starting values. The logistic regression done here
+should match the ``statsmodels`` generalized linear model with a robust variance estimate. Below is code on how to
+compare to ``statsmodels.glm``.
 
 .. code::
 
@@ -258,6 +255,226 @@ equations can be stacked together (including multiple regression models). This a
 causal section.
 
 
+Dose-Response
+=============================
+
+Estimating equations for dose-response relationships are also included. The following examples use the data from
+Inderjit et al. (2002). This data can be loaded via
+
+.. code::
+
+    d = load_inderjit()   # Loading array of data
+    dose_data = d[:, 1]   # Dose data
+    resp_data = d[:, 0]   # Response data
+
+
+4-parameter Logistic
+----------------------------
+
+The 4-parameter logistic model (4PL) consists of parameters for the lower-limit of the response, the effective dose,
+steepness of the curve, and the upper-limit of the response.
+
+The wrapper function for the 4PL model should look like
+
+.. code::
+
+    from delicatessen import MEstimator
+    from delicatessen.estimating_equations import ee_4p_logistic
+
+    def psi(theta):
+        # Estimating equations for the 4PL model
+        return ee_4p_logistic(theta=theta, X=dose_data, y=resp_data)
+
+After creating the wrapper function, we can now call the M-Estimation procedure to estimate the coefficients for the
+4PL model and their variance
+
+.. code::
+
+    estr = MEstimator(psi, init=[np.min(resp_data),
+                                 (np.max(resp_data)+np.min(resp_data)) / 2,
+                                 (np.max(resp_data)+np.min(resp_data)) / 2,
+                                 np.max(resp_data)])
+    estr.estimate()
+
+    print(estr.theta)
+    print(estr.variance)
+
+When you use 4PL, you may notice convergence errors. This estimating equation can be hard to optimize since it has
+implicit bounds the root-finder isn't aware of. To avoid these issues, we can give the root-finder good starting values.
+
+First, the upper limit should *always* be greater than the lower limit. Second, the ED50 should be between the lower
+and upper limits. Third, the sign for the steepness depends on whether the response declines (positive) or the response
+increases (negative). Finally, some solvers may be better suited to the problem, so try a few different options. With
+decent initial values, I have found ``lm`` to be fairly reliable.
+
+For the 4PL, good general starting values I have found are the following. For the lower-bound, give the minimum response
+value as the initial. For ED50, give the mid-point between the maximum response and the minimum response. The initial
+value for steepness is more difficult. Ideally, we would give a starting value of zero, but that will fail in this
+4PL. Giving a larger starting value (between 2 to 8) works in this example. For the upper-bound, give the maximum
+response value as the initial.
+
+To summarize, be sure to examine your data (e.g., scatterplot). This will help to determine the initial starting values
+for the root-finding procedure. Otherwise, you may come across a convergence error.
+
+
+3-parameter Logistic
+----------------------------
+
+The 3-parameter logistic model (3PL) consists of parameters for the effective dose, steepness of the curve, and the
+upper-limit of the response. Here, the lower-limit is pre-specified and is no longer being estimated.
+
+The wrapper function for the 3PL model should look like
+
+.. code::
+
+    from delicatessen import MEstimator
+    from delicatessen.estimating_equations import ee_3p_logistic
+
+    def psi(theta):
+        # Estimating equations for the 3PL model
+        return ee_3p_logistic(theta=theta, X=dose_data, y=resp_data,
+                              lower=0)
+
+Since the shortest a root of a plant could be zero, a lower limit of zero makes sense here.
+
+After creating the wrapper function, we can now call the M-Estimation procedure to estimate the coefficients for the
+3PL model and their variance
+
+.. code::
+
+    estr = MEstimator(psi, init=[(np.max(resp_data)+np.min(resp_data)) / 2,
+                                 (np.max(resp_data)+np.min(resp_data)) / 2,
+                                 np.max(resp_data)])
+    estr.estimate(solver='lm')
+
+    print(estr.theta)
+    print(estr.variance)
+
+As before, you may notice convergence errors. This estimating equation can be hard to optimize since it has implicit
+bounds the root-finder isn't aware of. To avoid these issues, we can give the root-finder good starting values.
+
+For the 3PL, good general starting values I have found are the following. For ED50, give the mid-point between the
+maximum response and the minimum response. The initial value for steepness is more difficult. Ideally, we would give a
+starting value of zero, but that will fail in this 3PL. Giving a larger starting value (between 2 to 8) works in this
+example. For the upper-bound, give the maximum response value as the initial.
+
+To summarize, be sure to examine your data (e.g., scatterplot). This will help to determine the initial starting values
+for the root-finding procedure. Otherwise, you may come across a convergence error.
+
+2-parameter Logistic
+----------------------------
+
+The 2-parameter logistic model (2PL) consists of parameters for the effective dose, and steepness of the curve. Here,
+the lower-limit and upper-limit are pre-specified and no longer being estimated.
+
+The wrapper function for the 3PL model should look like
+
+.. code::
+
+    from delicatessen import MEstimator
+    from delicatessen.estimating_equations import ee_2p_logistic
+
+    def psi(theta):
+        # Estimating equations for the 2PL model
+        return ee_2p_logistic(theta=theta, X=dose_data, y=resp_data,
+                              lower=0, upper=8)
+
+While a lower-limit of zero makes sense in this example, the upper-limit of 8 is poorly motivated (and thus this should
+only be viewed as an example of the 2PL model and not how it should be applied in practice). Setting the limits as
+constants should be motivated by substantive knowledge of the problem.
+
+After creating the wrapper function, we can now call the M-Estimation procedure to estimate the coefficients for the
+2PL model and their variance
+
+.. code::
+
+    estr = MEstimator(psi, init=[(np.max(resp_data)+np.min(resp_data)) / 2,
+                                 (np.max(resp_data)+np.min(resp_data)) / 2])
+    estr.estimate(solver='lm')
+
+    print(estr.theta)
+    print(estr.variance)
+
+As before, you may notice convergence errors. This estimating equation can be hard to optimize since it has implicit
+bounds the root-finder isn't aware of. To avoid these issues, we can give the root-finder good starting values.
+
+For the 2PL, good general starting values I have found are the following. For ED50, give the mid-point between the
+maximum response and the minimum response. The initial value for steepness is more difficult. Ideally, we would give a
+starting value of zero, but that will fail in this 2PL.
+
+To summarize, be sure to examine your data (e.g., scatterplot). This will help to determine the initial starting values
+for the root-finding procedure. Otherwise, you may come across a convergence error.
+
+
+ED(:math:`\delta`)
+----------------------------
+
+In addition to the :math:`x`-parameter logistic models, an estimating equation to estimate a corresponding
+:math:`\delta` effective dose is available. Notice that this estimating equation should be stacked with one of the
+:math:`x`PL models. Here, we demonstrate with the 3PL model.
+
+Here, our interest is in the following effective doses: 0.05, 0.10, 0.20, 0.80. The wrapper function for the 3PL model
+and estimating equations for these effective doses are
+
+.. code::
+
+    def psi(theta):
+        lower_limit = 0
+
+        # Estimating equations for the 3PL model
+        pl3 = ee_3p_logistic(theta=theta, X=d[:, 1], y=d[:, 0],
+                             lower=lower_limit)
+
+        # Estimating equations for the effective concentrations
+        ed05 = ee_effective_dose_delta(theta[3], y=resp_data, delta=0.05,
+                                       steepness=theta[0], ed50=theta[1],
+                                       lower=lower_limit, upper=theta[2])
+        ed10 = ee_effective_dose_delta(theta[4], y=resp_data, delta=0.10,
+                                       steepness=theta[0], ed50=theta[1],
+                                       lower=lower_limit, upper=theta[2])
+        ed20 = ee_effective_dose_delta(theta[5], y=resp_data, delta=0.20,
+                                       steepness=theta[0], ed50=theta[1],
+                                       lower=lower_limit, upper=theta[2])
+        ed80 = ee_effective_dose_delta(theta[6], y=resp_data, delta=0.80,
+                                       steepness=theta[0], ed50=theta[1],
+                                       lower=lower_limit, upper=theta[2])
+
+        # Returning stacked estimating equations
+        return np.vstack((pl3,
+                          ed05,
+                          ed10,
+                          ed20,
+                          ed80))
+
+Notice that the estimating equations are stacked together in the order of the ``theta`` vector.
+
+
+# Optimization procedure
+mest = MEstimator(psi, init=[2, 1, 10, 1, 5])
+mest.estimate(solver='lm')
+
+After creating the wrapper function, we can now call the M-Estimation procedure to estimate the coefficients for the
+3PL model, the ED for the :math:`\delta` values, and their variance
+
+.. code::
+
+    midpoint = (np.max(resp_data)+np.min(resp_data)) / 2
+    estr = MEstimator(psi, init=[midpoint,
+                                 midpoint,
+                                 np.max(resp_data),
+                                 midpoint,
+                                 midpoint,
+                                 midpoint,
+                                 midpoint])
+    estr.estimate(solver='lm')
+    print(estr.theta)
+    print(estr.variance)
+
+Since the ED for :math:`\delta`'s are transformations of the other parameters, there starting values are less important
+(the root-finders are better at solving those equations). Again, we can make it easy on the solver by having the
+starting point for each being the mid-point of the response values.
+
+
 Causal Inference
 =============================
 
@@ -265,9 +482,9 @@ To demonstrate the utility of M-estimation, particularly how estimating equation
 still have an appropriate variance estimator, several causal inference estimators are provided here.
 
 It is recommended that you are familiar with causal inference (particularly the identification conditions of these
-estimators) before using this utility widely. Causal inference is a difficult endeavour, my dear user!
+estimators) before using this utility widely. Causal inference is a difficult endeavour, dear user!
 
-In the following examples, we will use the generic data example here, where W is a confounder of the A-Y relationship
+In the following examples, we will use the generic data example here, where W is confounding the A-Y relationship
 
 .. code::
 
@@ -307,9 +524,9 @@ Again, we will wrap the built-in estimating equations inside a function.
     def psi(theta):
         return ee_gformula(theta, X=d[['C', 'A', 'W']], y=d['Y'], treat_index=1)
 
-The arguments for ``ee_gformula`` are the :math:`\theta` values, the covariates (including an intercept (C) and the
-treatment (A)), the outcome values (Y), and the column index for the treatment in X. Here, 1 designates the second
-column (python uses zero-indexing), which corresponds to 'A' in how the X data is formatted.
+The arguments for ``ee_gformula`` are the :math:`\theta` values, the covariates (including an intercept (``C``) and the
+treatment (``A``)), the outcome values (``Y``), and the column index for the treatment in ``X``. Here, 1 designates the
+second column (python uses zero-indexing), which corresponds to ``A`` in how the ``X`` data is formatted.
 
 Now we can call the M-estimator to solve for the values and the variance. Here, the initial values provided must be
 3+*b* (where *b* is the number of columns in X). This is because the g-computation estimating equations output the
@@ -495,8 +712,8 @@ The variance estimator in this case will match the influence function estimator 
 for AIPW. See Boos & Stefanski (2013) for more detailed discussion on the relation between M-estimation and influence
 curves.
 
-Further Readings
-=============================
+References and Further Readings
+===============================
 Boos DD, & Stefanski LA. (2013). M-estimation (estimating equations). In Essential Statistical Inference
 (pp. 297-337). Springer, New York, NY.
 
@@ -506,5 +723,5 @@ effects. *American Journal of Epidemiology*, 173(7), 761-767.
 Huber PJ. (1992). Robust estimation of a location parameter. In Breakthroughs in statistics (pp. 492-518).
 Springer, New York, NY.
 
-Satten GA, & Datta S. (2001). The Kaplan–Meier estimator as an inverse-probability-of-censoring weighted average.
-*The American Statistician*, 55(3), 207-210.
+Inderjit, Streibig JC & Olofsdotter M. (2002). Joint action of phenolic acid mixtures and its significance in
+allelopathy research. *Physiol Plant* 114, 422–428.

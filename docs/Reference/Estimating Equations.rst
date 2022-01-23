@@ -28,6 +28,21 @@ Regression
 
   ee_linear_regression
   ee_logistic_regression
+  ee_robust_linear_regression
+
+
+Dose Response
+-------------------
+
+.. currentmodule:: delicatessen.estimating_equations
+
+.. autosummary::
+  :toctree: generated/
+
+  ee_4p_logistic
+  ee_3p_logistic
+  ee_2p_logistic
+  ee_effective_dose_alpha
 
 
 Causal Inference

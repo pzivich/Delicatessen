@@ -726,7 +726,7 @@ def ee_4p_logistic(theta, X, y):
         \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n (Y_i - expit(X_i^T \theta)) X_i = 0
 
     Here, theta is a 1-by-4 array, where 4 are the 4 parameters of the 4PL. The first theta corresponds to lower limit,
-    the second corresponds to the steepness of the curve, the third corresponds to the effective dose (ED50), and the
+    the second corresponds to the effective dose (ED50), the third corresponds to the steepness of the curve, and the
     fourth corresponds to the upper limit.
 
     Note
@@ -787,9 +787,9 @@ def ee_3p_logistic(theta, X, y, lower):
 
         \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n (Y_i - expit(X_i^T \theta)) X_i = 0
 
-    Here, theta is a 1-by-3 array, where 3 are the 3 parameters of the 3PL. The lower limit is specified by the user,
-    and thus is no longer estimated for the 3PL. The theta's now correspond to: steepness of the curve, effective dose
-    (ED50), and the upper limit.
+    Here, theta is a 1-by-3 array, where 3 are the 3 parameters of the 3PL. The first theta corresponds to the
+    effective dose (ED50), the second corresponds to the steepness of the curve, and the third corresponds to the upper
+    limit. The lower limit is pre-specified by the user (and is no longer estimated)
 
     Note
     ----
@@ -850,9 +850,9 @@ def ee_2p_logistic(theta, X, y, lower, upper):
 
         \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n (Y_i - expit(X_i^T \theta)) X_i = 0
 
-    Here, theta is a 1-by-2 array, where 2 are the 2 parameters of the 2PL. The lower and upper limits are specified by
-    the user, and thus is no longer estimated for the 2PL. The theta's now correspond to: steepness of the curve, and
-    effective dose (ED50).
+    Here, theta is a 1-by-2 array, where 2 are the 2 parameters of the 2PL. The first theta corresponds to the
+    effective dose (ED50), and the second corresponds to the steepness of the curve. Both the lower limit and upper
+    limit are pre-specified by the user (and no longer estimated).
 
     Note
     ----
@@ -902,18 +902,19 @@ def ee_2p_logistic(theta, X, y, lower, upper):
     return -2*(y-fx)*deriv
 
 
-def ee_effective_dose_alpha(theta, y, alpha, steepness, ed50, lower, upper):
-    r"""Default stacked estimating equation to pair with the 4 parameter logistic model for estimation of the alpha
-    effective dose. The estimating equation is
+def ee_effective_dose_delta(theta, y, delta, steepness, ed50, lower, upper):
+    r"""Default stacked estimating equation to pair with the 4 parameter logistic model for estimation of the
+    :math:`delta` effective dose. The estimating equation is
 
     .. math::
 
-        \psi(Y_i, \theta) = \beta_1 + \frac{\beta_4 - \beta_1}{1 + (\theta / \beta_2)^{\beta_3}} - \beta_4(1-\alpha)
-        - \beta_1 \alpha
+        \psi(Y_i, \theta) = \beta_1 + \frac{\beta_4 - \beta_1}{1 + (\theta / \beta_2)^{\beta_3}} - \beta_4(1-\delta)
+        - \beta_1 \delta
 
-    where theta is the ED(alpha), and the beta values are from a 4PL model (1: lower limit, 2: steepness, 3: ED(50), 4:
-    upper limit). When lower or upper limits are place, the corresponding beta's are replaced by constants. For proper
-    uncertainty estimation, this estimating equation should be stacked together with the correspond PL model.
+    where theta is the :math:`ED(\delta)`, and the beta values are from a 4PL model (1: lower limit, 2: steepness,
+    3: ED(50), 4: upper limit). When lower or upper limits are place, the corresponding beta's are replaced by
+    constants. For proper uncertainty estimation, this estimating equation should be stacked together with the
+    correspond PL model.
 
     Note
     ----
@@ -925,7 +926,7 @@ def ee_effective_dose_alpha(theta, y, alpha, steepness, ed50, lower, upper):
         Theta value corresponding to the ED(alpha).
     y : ndarray, list, vector
         1-dimensional vector of n response values, used to construct correct shape for output.
-    alpha : float
+    delta : float
         The effective dose level of interest, ED(alpha).
     steepness : float
         Estimated parameter for the steepness from the PL.
@@ -954,11 +955,11 @@ def ee_effective_dose_alpha(theta, y, alpha, steepness, ed50, lower, upper):
     # Calculating the predicted value for f(x,\theta), or y-hat
     fx = lower + (upper - lower) / (1 + rho)
 
-    # Subtracting off (Upper*(1-alpha) + Lower*alpha) since theta should result in zeroing of quantity
-    ed_alpha = fx - upper*(1-alpha) - lower*alpha
+    # Subtracting off (Upper*(1-delta) + Lower*delta) since theta should result in zeroing of quantity
+    ed_delta = fx - upper*(1-delta) - lower*delta
 
     # Returning constructed 1-by-ndarray for stacked estimating equations
-    return np.ones(np.asarray(y).shape[0])*ed_alpha
+    return np.ones(np.asarray(y).shape[0])*ed_delta
 
 
 #################################################################
