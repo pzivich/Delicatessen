@@ -410,12 +410,12 @@ class TestEstimatingEquationsCausal:
         return df
 
     def test_gformula(self, causal_data):
-        # M-estimation
         d1 = causal_data.copy()
         d1['A'] = 1
         d0 = causal_data.copy()
         d0['A'] = 0
 
+        # M-estimation
         def psi(theta):
             return ee_gformula(theta,
                                y=causal_data['Y'],
@@ -451,12 +451,12 @@ class TestEstimatingEquationsCausal:
                             atol=1e-6)
 
     def test_gcomp_bad_dimensions_error(self, causal_data):
-        # M-estimation
         d1 = causal_data.copy()
         d1['A'] = 1
         d0 = causal_data.copy()
         d0['A'] = 0
 
+        # M-estimation
         def psi(theta):
             return ee_gformula(theta,
                                y=causal_data['Y'],
@@ -484,7 +484,7 @@ class TestEstimatingEquationsCausal:
             return ee_ipw(theta,
                           y=causal_data['Y'],
                           A=causal_data['A'],
-                          X=causal_data[['C', 'W']])
+                          W=causal_data[['C', 'W']])
 
         mestimator = MEstimator(psi, init=[0., 0.5, 0.5, 0., 0.])
         mestimator.estimate(solver='lm')
@@ -517,7 +517,7 @@ class TestEstimatingEquationsCausal:
             return ee_ipw(theta,
                           y=causal_data['Y'],
                           A=causal_data['A'],
-                          X=causal_data[['C', 'W']],
+                          W=causal_data[['C', 'W']],
                           truncate=(0.1, 0.5))
 
         mestimator = MEstimator(psi, init=[0., 0.5, 0.5, 0., 0.])
@@ -552,7 +552,7 @@ class TestEstimatingEquationsCausal:
             return ee_ipw(theta,
                           y=causal_data['Y'],
                           A=causal_data['A'],
-                          X=causal_data[['C', 'W']],
+                          W=causal_data[['C', 'W']],
                           truncate=(0.99, 0.01))
 
         mestimator = MEstimator(psi, init=[0., 0.5, 0.5, 0., 0.])
@@ -560,12 +560,20 @@ class TestEstimatingEquationsCausal:
             mestimator.estimate()
 
     def test_aipw(self, causal_data):
+        d1 = causal_data.copy()
+        d1['A'] = 1
+        d0 = causal_data.copy()
+        d0['A'] = 0
+
         # M-estimation
         def psi_builtin_regression(theta):
             return ee_aipw(theta,
-                           X=causal_data[['C', 'A', 'W']],
                            y=causal_data['Y'],
-                           treat_index=1)
+                           A=causal_data['A'],
+                           W=causal_data[['C', 'W']],
+                           X=causal_data[['C', 'A', 'W']],
+                           X1=d1[['C', 'A', 'W']],
+                           X0=d0[['C', 'A', 'W']])
 
         mestimator = MEstimator(psi_builtin_regression, init=[0., 0.5, 0.5,   # Parameters of interest
                                                               0., 0., 0.,     # Outcome nuisance model
@@ -593,11 +601,11 @@ class TestEstimatingEquationsCausal:
         var_r0 = np.nanvar(ya0_star - np.mean(ya0_star), ddof=1) / causal_data.shape[0]
 
         # Checking logistic coefficients (nuisance model estimates)
-        npt.assert_allclose(mestimator.theta[3:6],
-                            np.asarray(y_m.params),
-                            atol=1e-6)
-        npt.assert_allclose(mestimator.theta[6:],
+        npt.assert_allclose(mestimator.theta[3:5],
                             np.asarray(pi_m.params),
+                            atol=1e-6)
+        npt.assert_allclose(mestimator.theta[5:],
+                            np.asarray(y_m.params),
                             atol=1e-6)
 
         # Checking mean estimates
