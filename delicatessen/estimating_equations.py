@@ -1146,7 +1146,7 @@ def ee_gformula(theta, y, X, X1, X0=None, force_continuous=False):
     >>> estr = MEstimator(psi, init=[0., 0.5, 0.5, 0., 0., 0., 0.])
     >>> estr.estimate(solver='lm')
 
-    Inspecting the parameter estimates, variance, and 95% confidence intervals
+    Inspecting the parameter estimates
 
     >>> estr.theta[0]    # causal mean difference of 1 versus 0
     >>> estr.theta[1]    # causal mean under X1
@@ -1157,6 +1157,9 @@ def ee_gformula(theta, y, X, X1, X0=None, force_continuous=False):
     ----------
     Snowden JM, Rose S, & Mortimer KM. (2011). Implementation of G-computation on a simulated data set: demonstration
     of a causal inference technique. American Journal of Epidemiology, 173(7), 731-738.
+
+    Hernán MA, & Robins JM. (2006). Estimating causal effects from epidemiological data.
+    *Journal of Epidemiology & Community Health*, 60(7), 578-586.
     """
     # Ensuring correct typing
     X = np.asarray(X)                # Convert to NumPy array
@@ -1211,32 +1214,39 @@ def ee_gformula(theta, y, X, X1, X0=None, force_continuous=False):
                           preds_reg))     # theta[3:] is for the regression coefficients
 
 
-def ee_ipw(theta, X, y, treat_index):
+def ee_ipw(theta, y, A, X, truncate=None):
     r"""Default stacked estimating equation for inverse probability weighting in the time-fixed setting. The
-    parameter(s) of interest is the average treatment effect, with potential interest in the underlying risk or mean
-    functions. For estimation of the weights (or propensity scores), a logistic model is used. Therefore, the first
-    estimating equation is
+    parameter of interest is the average causal effect. For estimation of the weights (or propensity scores), a
+    logistic model is used.
+
+    Note
+    ----
+    Unlike the g-formula, ``ee_ipw`` only focuses on the average causal effect (and also outputs the causal means for
+    ``A=1`` and ``A=0``. In other words, the implementation of IPW does not support generic action plans off-the-shelf,
+    unlike ``ee_gformula``.
+
+    The first estimating equation for the logistic regression model is
 
     .. math::
 
         \sum_i^n \psi_g(A_i, W_i, \theta) = \sum_i^n (A_i - expit(W_i^T \theta)) W_i = 0
 
-    where A is the treatment and W is the set of confounders. Both of these are processed from the input `X` and the
-    specified `treat_index`.
+    where A is the treatment and W is the set of confounders.
 
-    For the implementation of the inverse probability weighting estimator, stacked estimating equations are also used
-    for the risk / mean had everyone been given treatment=1, the risk / mean had everyone been given treatment=0, and
-    the risk / mean difference between those two risks. Respectively, those estimating equations look like
+    For the implementation of the inverse probability weighting estimator, stacked estimating equations are used
+    for the mean had everyone been set to ``A=1``, the mean had everyone been set to ``A=0``, and the mean difference
+    between the two causal means. The estimating equations are
 
     .. math::
+
+        \sum_i^n \psi_d(Y_i, A_i, \pi_i, \theta_0) = \sum_i^n (\theta_1 - \theta_2) - \theta_0 = 0
 
         \sum_i^n \psi_1(Y_i, A_i, \pi_i, \theta_1) = \sum_i^n \frac{A_i \times Y_i}{\pi_i} - \theta_1 = 0
 
         \sum_i^n \psi_0(Y_i, A_i, \pi_i, \theta_2) = \sum_i^n \frac{(1-A_i) \times Y_i}{1-\pi_i} - \theta_2 = 0
 
-        \sum_i^n \psi_d(Y_i, A_i, \pi_i, \theta_0) = \sum_i^n (\theta_1 - \theta_2) - \theta_0 = 0
 
-    Due to these 3 extra values, the length of the theta vector is b+3, where b is the number of parameters in the
+    Due to these 3 extra values, the length of the theta vector is 3+b, where b is the number of parameters in the
     regression model.
 
     Note
@@ -1244,30 +1254,29 @@ def ee_ipw(theta, X, y, treat_index):
     All provided estimating equations are meant to be wrapped inside a user-specified function. Throughtout, these
     user-defined functions are defined as `psi`.
 
-    Here, theta corresponds to a variety of different quantities. The *first* value in theta vector is the risk / mean
-    difference (or average treatment effect), the *second* is the risk / mean had everyone been given treatment=0, the
-    *third* is the risk / mean had everyone been given treatment=1. The remainder of the parameters correspond to the
-    logistic regression model coefficients, in the order input.
-
-    Note
-    ----
-    For complex regression problems, the optimizer behind the scenes is not particularly robust (unlike functions
-    specializing in solely regression models). Therefore, optimization of the regression model via a separate
-    functionality can be done then those estimated parameters are fed forward as the initial values (which should
-    result in a more stable optimization).
+    Here, theta corresponds to a variety of different quantities. The *first* value in theta vector is the mean
+    difference (or average causal effect), the *second* is the mean had everyone been set to ``A=1``, the *third* is the
+    mean had everyone been set to ``A=0``. The remainder of the parameters correspond to the logistic regression model
+    coefficients.
 
     Parameters
     ----------
     theta : ndarray, list, vector
         Array of parameters to estimate. For the Cox model, corresponds to the log hazard ratios
-    X : ndarray, list, vector
-        2-dimensional vector of n observed values for b variables. No missing data should be included (missing data
-        may cause unexpected behavior).
     y : ndarray, list, vector
-        1-dimensional vector of n observed values. The Y values should all be 0 or 1. No missing data should be
+        1-dimensional vector of n observed values. No missing data should be included (missing data may cause
+        unexpected behavior).
+    A : ndarray, list, vector
+        1-dimensional vector of n observed values. The A values should all be 0 or 1. No missing data should be
         included (missing data may cause unexpected behavior).
-    treat_index : int
-        Column index for the treatment vector.
+    X : ndarray, list, vector
+        2-dimensional vector of n observed values for b variables to model the probability of ``A`` with. No missing
+        data should be included (missing data may cause unexpected behavior).
+    truncate : None, list, set, optional
+        Bounds to truncate the estimated probabilities of ``A`` at. For example, estimated probabilities above 0.99 or
+        below 0.01 can be set to 0.99 or 0.01, respectively. This is done by specifying ``truncate=(0.01, 0.99)``. Note
+        this step is done via ``numpy.clip(.., a_min=truncate[0], a_max=truncate[1])``, so order is important. Default
+        is None, which applies to no truncation.
 
     Returns
     -------
@@ -1276,7 +1285,7 @@ def ee_ipw(theta, X, y, treat_index):
 
     Examples
     --------
-    Construction of a estimating equation(s) with `ee_ipw` should be done similar to the following
+    Construction of a estimating equation(s) with ``ee_ipw`` should be done similar to the following
 
     >>> import numpy as np
     >>> import pandas as pd
@@ -1294,68 +1303,65 @@ def ee_ipw(theta, X, y, treat_index):
     >>> d['Y'] = (1-d['A'])*d['Ya0'] + d['A']*d['Ya1']
     >>> d['C'] = 1
 
-    Defining psi, or the stacked estimating equations. Note that 'A' is the treatment of interest, so `treat_index` is
-    set to 1 (compared to input `X`).
+    Defining psi, or the stacked estimating equations. Note that 'A' is the action.
 
     >>> def psi(theta):
-    >>>     return ee_ipw(theta, X=d[['C', 'A', 'W']], y=d['Y'], treat_index=1)
+    >>>     return ee_ipw(theta, y=d['Y'], A=d['A'],
+    >>>                   X=d[['C', 'W']])
 
-    Calling the M-estimation procedure. Since `X` is 3-by-n here and g-formula has 3 additional parameters, the initial
-    values should be of length 3+3=6. In general, it will be best to start with [0., 0.5, 0.5, ...] as the initials for
-    the risk parameters. This will start the initial at the exact middle value for each of the first 3 parameters. For
-    the regression coefficients, those can be set as zero, or if there is difficulty in simultaneous optimization,
-    coefficient estimates from outside `MEstimator` can be provided as inputs.
+    Calling the M-estimation procedure. Since `X` is 2-by-n here and IPW has 3 additional parameters, the initial
+    values should be of length 3+2=5. In general, it will be best to start with [0., 0.5, 0.5, ...] as the initials when
+    ``Y`` is binary. Otherwise, starting with all 0. as initials is reasonable.
 
-    >>> mestimation = MEstimator(stacked_equations=psi, init=[0., 0.5, 0.5, 0., 0., 0.])
-    >>> mestimation.estimate()
+    >>> estr = MEstimator(stacked_equations=psi, init=[0., 0.5, 0.5, 0., 0.])
+    >>> estr.estimate(solver='lm')
 
-    Inspecting the parameter estimates and the variance
+    Inspecting the parameter estimates, variance, and 95% confidence intervals
 
-    >>> mestimation.theta
-    >>> mestimation.variance
+    >>> estr.theta
+    >>> estr.variance
+    >>> estr.confidence_intervals()
 
-    More specifically, the average treatment effect and its variance are
+    More specifically, the corresponding parameters are
 
-    >>> mestimation.theta[0]
-    >>> mestimation.variance[0, 0]
+    >>> estr.theta[0]    # causal mean difference of 1 versus 0
+    >>> estr.theta[1]    # causal mean under X1
+    >>> estr.theta[2]    # causal mean under X0
+    >>> estr.theta[3:]   # logistic regression coefficients
 
-    The risk / mean had all been given treatment=1
-
-    >>> mestimation.theta[1]
-    >>> mestimation.variance[1, 1]
-
-    The risk / mean had all been given treatment=0
-
-    >>> mestimation.theta[2]
-    >>> mestimation.variance[2, 2]
+    If you want to see how truncating the probabilities works, try repeating the above code but specifying
+    ``truncate=(0.1, 0.9)`` as an optional argument in ``ee_ipw``.
 
     References
     ----------
-    ... looking for a good one ...
+    Hernán MA, & Robins JM. (2006). Estimating causal effects from epidemiological data.
+    *Journal of Epidemiology & Community Health*, 60(7), 578-586.
+
+    Cole SR, & Hernán MA. (2008). Constructing inverse probability weights for marginal structural models.
+    *American Journal of Epidemiology*, 168(6), 656-664.
     """
     # Ensuring correct typing
     X = np.asarray(X)                            # Convert to NumPy array
+    A = np.asarray(A)                            # Convert to NumPy array
     y = np.asarray(y)                            # Convert to NumPy array
     beta = theta[3:]                             # Extracting out theta's for the regression model
 
-    # Splitting X into A,W (treatment, covariates)
-    W = np.delete(X, treat_index, axis=1)        # Extract all-but treatment col A
-    A = X[:, treat_index]                        # Extract treatment col A
-
     # Estimating propensity score
     preds_reg = ee_logistic_regression(theta=beta,    # Using logistic regression
-                                       X=W,           # Plug-in covariates for X
+                                       X=X,           # Plug-in covariates for X
                                        y=A)           # Plug-in treatment for Y
 
     # Estimating weights
-    pi = inverse_logit(np.dot(W, beta))          # Getting Pr(A|W) from model
+    pi = inverse_logit(np.dot(X, beta))          # Getting Pr(A|W) from model
+    if truncate is not None:                     # Truncating Pr(A|W) when requested
+        if truncate[0] > truncate[1]:
+            raise ValueError("truncate values must be specified in ascending order")
+        pi = np.clip(pi, a_min=truncate[0], a_max=truncate[1])
 
     # Calculating Y(a=1)
     ya1 = (A * y) / pi - theta[1]                # i's contribution is (AY) / \pi
-
     # Calculating Y(a=0)
     ya0 = ((1-A) * y) / (1-pi) - theta[2]        # i's contribution is ((1-A)Y) / (1-\pi)
-
     # Calculating Y(a=1) - Y(a=0)
     ate = np.ones(y.shape[0]) * (theta[1] - theta[2]) - theta[0]
 

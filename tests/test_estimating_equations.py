@@ -454,9 +454,9 @@ class TestEstimatingEquationsCausal:
         # M-estimation
         def psi(theta):
             return ee_ipw(theta,
-                          X=causal_data[['C', 'A', 'W']],
                           y=causal_data['Y'],
-                          treat_index=1)
+                          A=causal_data['A'],
+                          X=causal_data[['C', 'W']])
 
         mestimator = MEstimator(psi, init=[0., 0.5, 0.5, 0., 0.])
         mestimator.estimate(solver='lm')
