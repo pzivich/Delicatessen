@@ -7,9 +7,9 @@ from delicatessen.utilities import partial_derivative
 
 
 class MEstimator:
-    r"""Generalized M-Estimator for stacked estimating equations.
+    r"""M-Estimator for stacked estimating equations.
 
-    M-estimation, or loosely referred to as estimating equations, is a general approach to point and variance
+    M-Estimation, or loosely referred to as estimating equations, is a general approach to point and variance
     estimation that consists of defining an estimator as the solution to an estimating equation (but does not require
     the derivative of a log-likelihood function). M-estimators satisify the following constraint
 
@@ -90,14 +90,15 @@ class MEstimator:
 
     Calling the M-estimation procedure
 
-    >>> mestimation = MEstimator(stacked_equations=psi, init=[0, 0, ])
-    >>> mestimation.estimate()
+    >>> estr = MEstimator(stacked_equations=psi, init=[0, 0, ])
+    >>> estr.estimate()
 
-    Inspecting the parameter estimates, the variance, and the asymptotic variance
+    Inspecting the parameter estimates, the variance, 95% confidence intervals, and the asymptotic variance
 
-    >>> mestimation.theta
-    >>> mestimation.variance
-    >>> mestimation.asymptotic_variance
+    >>> estr.theta
+    >>> estr.variance
+    >>> estr.confidence_intervals()
+    >>> estr.asymptotic_variance
 
     Alternatively, a custom estimating equation can be specified. This is done by constructing a valid estimating
     equation for the ``MEstimator``. The ``MEstimator`` expects the `psi` function to return a b-by-n array, where b is
@@ -112,12 +113,11 @@ class MEstimator:
 
     The M-estimation procedure is called using the same approach as before
 
-    >>> mestimation = MEstimator(stacked_equations=psi, init=[0, 0, ])
-    >>> mestimation.estimate()
+    >>> estr = MEstimator(stacked_equations=psi, init=[0, 0, ])
+    >>> estr.estimate()
 
     Note that ``len(init)`` should be equal to b. So in this case, two initial values are provided.
 
-    # TODO provide custom root-finding example here.
     Finally, the M-Estimator can also be run with a user-provided root-finding algorithm. To specify a custom
     root-finder, a function must be created by the user that consists of two keyword arguments (``stacked_equations``,
     ``init``) and must return only the optimized values. The following is an example with SciPy's Levenberg-Marquardt
@@ -133,8 +133,8 @@ class MEstimator:
     The provided custom root-finder can then be implemented like the following (continuing with the estimating equation
     from the previous example):
 
-    >>> mestimation = MEstimator(stacked_equations=psi, init=[0, 0, ])
-    >>> mestimation.estimate(solver=custom_solver)
+    >>> estr = MEstimator(stacked_equations=psi, init=[0, 0, ])
+    >>> estr.estimate(solver=custom_solver)
 
     References
     ----------

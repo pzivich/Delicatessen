@@ -49,14 +49,14 @@ def ee_mean(theta, y):
 
     Calling the M-estimation procedure
 
-    >>> mestimation = MEstimator(stacked_equations=psi, init=[0, ])
-    >>> mestimation.estimate()
+    >>> estr = MEstimator(stacked_equations=psi, init=[0, ])
+    >>> estr.estimate()
 
     Inspecting the parameter estimates, the variance, and the asymptotic variance
 
-    >>> mestimation.theta
-    >>> mestimation.variance
-    >>> mestimation.asymptotic_variance
+    >>> estr.theta
+    >>> estr.variance
+    >>> estr.asymptotic_variance
 
     References
     ----------
@@ -125,14 +125,14 @@ def ee_mean_robust(theta, y, k):
 
     Calling the M-estimation procedure
 
-    >>> mestimation = MEstimator(stacked_equations=psi, init=[0, ])
-    >>> mestimation.estimate()
+    >>> estr = MEstimator(stacked_equations=psi, init=[0, ])
+    >>> estr.estimate()
 
     Inspecting the parameter estimates, the variance, and the asymptotic variance
 
-    >>> mestimation.theta
-    >>> mestimation.variance
-    >>> mestimation.asymptotic_variance
+    >>> estr.theta
+    >>> estr.variance
+    >>> estr.asymptotic_variance
 
     References
     ----------
@@ -202,14 +202,14 @@ def ee_mean_variance(theta, y):
 
     Calling the M-estimation procedure (note that `init` has 2 values now).
 
-    >>> mestimation = MEstimator(stacked_equations=psi, init=[0, 0, ])
-    >>> mestimation.estimate()
+    >>> estr = MEstimator(stacked_equations=psi, init=[0, 0, ])
+    >>> estr.estimate()
 
     Inspecting the parameter estimates, the variance, and the asymptotic variance
 
-    >>> mestimation.theta
-    >>> mestimation.variance
-    >>> mestimation.asymptotic_variance
+    >>> estr.theta
+    >>> estr.variance
+    >>> estr.asymptotic_variance
 
     For this estimating equation, `mestimation.theta[1]` and `mestimation.asymptotic_variance[0][0]` are expected to
     always be equal.
@@ -282,15 +282,15 @@ def ee_percentile(theta, y, q):
 
     Calling the M-estimation procedure (note that `init` has 2 values now).
 
-    >>> mestimation = MEstimator(stacked_equations=psi, init=[0, ])
-    >>> mestimation.estimate(solver='hybr', tolerance=1e-3, dx=1, order=15)
+    >>> estr = MEstimator(stacked_equations=psi, init=[0, ])
+    >>> estr.estimate(solver='hybr', tolerance=1e-3, dx=1, order=15)
 
     Notice that we use a different solver, tolerance values, and parameters for numerically approximating the derivative
     here. These changes generally work better for percentile optimizations since the estimating equation is non-smooth.
     Furthermore, optimization is hard when only a few observations (<100) are available. In general, closed form
     solutions for percentiles will be preferred.
 
-    >>> mestimation.theta
+    >>> estr.theta
 
     Then displays the estimated percentile / median. In this example, there is a difference between the closed form
     solution (``-0.07978``) and M-Estimation (``-0.06022``). Again, this results from the non-smooth estimating
@@ -359,14 +359,14 @@ def ee_positive_mean_deviation(theta, y):
 
     Calling the M-estimation procedure (note that `init` has 2 values now).
 
-    >>> mestimation = MEstimator(stacked_equations=psi, init=[0, 0, ])
-    >>> mestimation.estimate()
+    >>> estr = MEstimator(stacked_equations=psi, init=[0, 0, ])
+    >>> estr.estimate()
 
     Inspecting the parameter estimates, the variance, and the asymptotic variance
 
-    >>> mestimation.theta
-    >>> mestimation.variance
-    >>> mestimation.asymptotic_variance
+    >>> estr.theta
+    >>> estr.variance
+    >>> estr.asymptotic_variance
 
     References
     ----------
@@ -460,13 +460,14 @@ def ee_linear_regression(theta, X, y, weights=None):
 
     Calling the M-estimation procedure (note that `init` has 3 values now, since `X.shape[1]` is equal to 3).
 
-    >>> mestimation = MEstimator(stacked_equations=psi, init=[0., 0., 0.,])
-    >>> mestimation.estimate()
+    >>> estr = MEstimator(stacked_equations=psi, init=[0., 0., 0.,])
+    >>> estr.estimate()
 
-    Inspecting the parameter estimates and the variance
+    Inspecting the parameter estimates, variance, and confidence intervals
 
-    >>> mestimation.theta
-    >>> mestimation.variance
+    >>> estr.theta
+    >>> estr.variance
+    >>> estr.confidence_intervals()
 
     References
     ----------
@@ -565,13 +566,14 @@ def ee_robust_linear_regression(theta, X, y, k, weights=None):
 
     Calling the M-estimation procedure (note that `init` has 3 values now, since `X.shape[1]` is equal to 3).
 
-    >>> mestimation = MEstimator(stacked_equations=psi, init=[0., 0., 0.,])
-    >>> mestimation.estimate()
+    >>> estr = MEstimator(stacked_equations=psi, init=[0., 0., 0.,])
+    >>> estr.estimate()
 
-    Inspecting the parameter estimates and the variance
+    Inspecting the parameter estimates, variance, and confidence intervals
 
-    >>> mestimation.theta
-    >>> mestimation.variance
+    >>> estr.theta
+    >>> estr.variance
+    >>> estr.confidence_intervals()
 
     References
     ----------
@@ -678,13 +680,14 @@ def ee_logistic_regression(theta, X, y, weights=None):
 
     Calling the M-estimation procedure (note that `init` has 3 values now, since `X.shape[1]` is equal to 3).
 
-    >>> mestimation = MEstimator(stacked_equations=psi, init=[0., 0., 0.,])
-    >>> mestimation.estimate()
+    >>> estr = MEstimator(stacked_equations=psi, init=[0., 0., 0.,])
+    >>> estr.estimate()
 
-    Inspecting the parameter estimates and the variance
+    Inspecting the parameter estimates, variance, and confidence intervals
 
-    >>> mestimation.theta
-    >>> mestimation.variance
+    >>> estr.theta
+    >>> estr.variance
+    >>> estr.confidence_intervals()
 
     References
     ----------
