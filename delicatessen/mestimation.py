@@ -25,7 +25,7 @@ class MEstimator:
 
     M-Estimation consists of two broad step: point estimation and variance estimation. Point estimation is carried out
     by determining at which values of theta the given estimating equations are equal to zero. This is done via SciPy's
-    `newton` algorithm by default.
+    ``newton`` algorithm by default.
 
     For variance estimation, the sandwich asymptotic variance estimator is used, which consists of
 
@@ -65,8 +65,8 @@ class MEstimator:
     Parameters
     ----------
     stacked_equations : function, callable
-        Function that returns a b-by-n NumPy array of the estimating equations. See documentation for how to construct
-        a set of estimating equations.
+        Function that returns a b-by-n NumPy array of the estimating equations. See provided examples in the
+        documentation for how to construct a set of estimating equations.
     init : list, set, array
         Initial values to optimize for the function.
 
@@ -101,9 +101,9 @@ class MEstimator:
     >>> estr.asymptotic_variance
 
     Alternatively, a custom estimating equation can be specified. This is done by constructing a valid estimating
-    equation for the ``MEstimator``. The ``MEstimator`` expects the `psi` function to return a b-by-n array, where b is
-    the number of parameters (length of theta) and n is the total number of observations. Below is an example of the
-    mean and variance estimating equation from before
+    equation for the ``MEstimator``. The ``MEstimator`` expects the ``psi`` function to return a b-by-n array, where b
+    is the number of parameters (length of ``theta``) and n is the total number of observations. Below is an example
+    of the mean and variance estimating equation from before
 
     >>> def psi(theta):
     >>>     y = np.array(y_dat)
@@ -167,8 +167,8 @@ class MEstimator:
             a modification of the Powell hybrid method (``scipy.optimize.root(method='hybr')``). Finally, any generic
             root-finding algorithm can be used via a user-provided callable object (function). The function should
             consist of two keyword arguments: ``stacked_equations``, and ``init``. Additionally, the function should
-            return only the optimized values. Please review the example in the documentation or on ReadTheDocs for how
-            to provide a custom root-finding algorithm.
+            return only the optimized values. Please review the example in the documentation for how to provide a
+            custom root-finding algorithm.
         maxiter : int, optional
             Maximum iterations to consider for the root finding procedure. Default is 1000 iterations. For complex
             estimating equations (without preceding optimization), this value may need to be increased. This argument
@@ -179,15 +179,16 @@ class MEstimator:
             this tolerance level (at this time). This argument is not used for user-specified solvers
         dx : float, optional
             Spacing to use to numerically approximate the partial derivatives of the bread matrix. Default is 1e-9,
-            which should work well for most applications. It is generally not recommended to have a large dx, since some
-            large values can poorly approximate derivatives.
+            which should work well for most applications. It is generally not recommended to have a large ``dx``, since
+            some large values can poorly approximate derivatives. Otherwise, also increase ``order``.
         order : int, optional
             Number of points to use to numerically approximate the partial derivative (must be an odd number). Default
             is 3, which is the default for SciPy.
         allow_pinv : bool, optional
             The default is ``True`` which uses ``numpy.linalg.pinv`` to find the inverse (or pseudo-inverse if matrix is
             non-invertible) for the bread. This default option is more robust to the possible matrices. If you want
-            to use ``numpy.linalg.inv`` instead (which does not support pseudo-inverse), set this parameter to False.
+            to use ``numpy.linalg.inv`` instead (which does not support pseudo-inverse), set this parameter to
+            ``False``.
 
         Returns
         -------
@@ -229,8 +230,8 @@ class MEstimator:
         self.variance = sandwich / self.n_obs     # Variance estimate requires division by n^2
 
     def confidence_intervals(self, alpha=0.05):
-        r"""Calculate Wald-type (1-:math:`\alpha`)% confidence intervals using the point estimates and the sandwich
-        variance. The formula for the confidence intervals are
+        r"""Calculate Wald-type :math:`(1 - \alpha) \times 100`% confidence intervals using the point estimates and
+        the sandwich variance. The formula for the confidence intervals are
 
         .. math::
 
@@ -238,7 +239,7 @@ class MEstimator:
 
         Note
         ----
-        The ``estimate()`` function must be called before the confidence intervals can be calculated.
+        The ``.estimate()`` function must be called before the confidence intervals can be calculated.
 
         Parameters
         ----------

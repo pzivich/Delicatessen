@@ -103,19 +103,19 @@ Building with basics
 Instead of building everything from scratch, you can also piece together the built-in estimating equations with your
 own code. To demonstrate this, I will go through how I developed the code for inverse probability weighting.
 
-The inverse probability weighting estimator consists of four estimating equations: the propensity score model, the
-weighted mean for treatment, the weighted mean for no-treatment, and the difference between the weighted means. We
+The inverse probability weighting estimator consists of four estimating equations: the difference between the weighted
+means, the weighted mean under :math:`A=1`, the weighted mean under :math:`A=0`, and the propensity score model. We
 can write this as
 
 .. math::
 
-    \sum_i^n \psi_1(A_i, W_i, \theta) = \sum_i^n (A_i - expit(W_i^T \theta)) W_i = 0
+    \sum_i^n \psi_1(Y_i, A_i, \pi_i, \theta_0) = \sum_i^n (\theta_1 - \theta_2) - \theta_0 = 0
 
     \sum_i^n \psi_2(Y_i, A_i, \pi_i, \theta_1) = \sum_i^n \frac{A_i \times Y_i}{\pi_i} - \theta_1 = 0
 
     \sum_i^n \psi_3(Y_i, A_i, \pi_i, \theta_2) = \sum_i^n \frac{(1-A_i) \times Y_i}{1-\pi_i} - \theta_2 = 0
 
-    \sum_i^n \psi_4(Y_i, A_i, \pi_i, \theta_0) = \sum_i^n (\theta_1 - \theta_2) - \theta_0 = 0
+    \sum_i^n \psi_4(A_i, W_i, \alpha) = \sum_i^n (A_i - \text{expit}(W_i^T \alpha)) W_i = 0
 
 
 Rather than re-code the logistic regression model (to estimate the propensity scores), we will use the built-in
@@ -131,13 +131,13 @@ estimator
         y = np.asarray(y)
         beta = theta[3:]   # Extracting out theta's for the regression model
 
-        # Estimating propensity score
+        # Estimating propensity score using delicatessen
         preds_reg = ee_logistic_regression(theta=beta,    # Using logistic regression
                                            X=W,           # Plug-in covariates for X
                                            y=A)           # Plug-in treatment for Y
 
         # Estimating weights
-        pi = inverse_logit(np.dot(W, beta))          # Getting Pr(A|W) from model (using delicatessen.utilities)
+        pi = inverse_logit(np.dot(W, beta))          # Pr(A|W) using delicatessen.utilities
 
         # Calculating Y(a=1)
         ya1 = (A * y) / pi - theta[1]                # i's contribution is (AY) / \pi
@@ -177,5 +177,6 @@ Here is a list of common mistakes, most of which I have done myself.
 4. The ``theta`` values and ``b`` *must* be in the same order. If ``theta[0]`` is the mean, the 1st row of the returned
    array better be the mean!
 
-If you still have trouble, please open an issue on `GitHub<https://github.com/pzivich/Delicatessen/issues>`_. This will
-help me to add other common mistakes here and improve the documentation for custom estimating equations.
+If you still have trouble, please open an issue at
+`pzivich/Delicatessen <https://github.com/pzivich/Delicatessen/issues>`_. This will help me to add other common
+mistakes here and improve the documentation for custom estimating equations.

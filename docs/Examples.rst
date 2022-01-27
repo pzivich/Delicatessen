@@ -79,7 +79,7 @@ following estimating equation
 
 .. math::
 
-    \psi_1(Y_i, X_i, \theta) = Y_i - \theta_1 \X_i
+    \psi_1(Y_i, X_i, \theta) = Y_i - \theta_1 X_i
 
 
 We can translate the estimating equation from math into python as
@@ -192,8 +192,8 @@ The first set of estimating equations consider in Chapter 7 are
 
 .. math::
 
-    \psi_1(Y_i, W_i, T_i, \theta) &= \theta_1 - T \\
-    \psi_2(Y_i, W_i, T_i, \theta) &= (Y - \theta_2 W)(\theta_1 - T)
+    \psi_1(Y_i, W_i, T_i, \theta) &= \theta_1 - T_i \\
+    \psi_2(Y_i, W_i, T_i, \theta) &= (Y_i - \theta_2 W_i)(\theta_1 - T_i)
 
 To demonstrate the example, below is some generic simulated data in the described instrumental variable context
 
@@ -226,10 +226,10 @@ the estimating equations were updated to
 
 .. math::
 
-    \psi_1(Y_i, W_i, T_i, \theta) &= \theta_1 - T \\
-    \psi_2(Y_i, W_i, T_i, \theta) &= \theta_2 - W \\
-    \psi_3(Y_i, W_i, T_i, \theta) &= (Y - \theta_3 W)(\theta_2 - W) \\
-    \psi_4(Y_i, W_i, T_i, \theta) &= (Y - \theta_4 W)(\theta_1 - T)
+    \psi_1(Y_i, W_i, T_i, \theta) &= \theta_1 - T_i \\
+    \psi_2(Y_i, W_i, T_i, \theta) &= \theta_2 - W_i \\
+    \psi_3(Y_i, W_i, T_i, \theta) &= (Y_i - \theta_3 W_i)(\theta_2 - W_i) \\
+    \psi_4(Y_i, W_i, T_i, \theta) &= (Y_i - \theta_4 W_i)(\theta_1 - T_i)
 
 Again, we can easily translate these equations for ``delicatessen``,
 
@@ -265,7 +265,7 @@ For the robust mean, the estimating equation proposed by Huber (1964) is
 
 .. math::
 
-    \psi_k(Y_i, \theta) = g_k(Y_i) - theta_1
+    \psi_k(Y_i, \theta) = g_k(Y_i) - \theta_1
 
 where :math:`k` indicates the bound, such that if :math:`Y_i>k` then :math:`k`, or :math:`Y_i<-k` then :math:`-k`,
 otherwise :math:`Y_i`. Below is the estimating equation translated into code
@@ -305,8 +305,8 @@ derivatives. In the previous examples, we had smooth function that were both eas
 functions for derivatives. However, that is not the case for quantile estimation. So, we need to use some 'tricks' to
 help the procedure along.
 
-First, we are going to use the ``'hybr'`` method. I have found this method to be more reliable when attempting to find
-the roots. Often the ``'lm'`` and ``'newton'`` methods are particularly bad at exploring the space. Next, our estimating
+First, we are going to use the ``'hybr'`` method. we have found this method to be more reliable when attempting to find
+the roots. Often the ``'lm'`` and ``'newton'`` methods appear worse at exploring the space. Next, our estimating
 equations 'jump' in terms of their returned value (i.e., they are not smooth). This comes in to the ``tolerance``
 parameter. The tolerance determines whether the root-finding has converged. For many quantiles were aren't going to
 reach the strict tolerance values. So, we are going to weaken them (the algorithm will be considered as converged under

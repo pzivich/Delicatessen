@@ -15,7 +15,7 @@ def ee_mean(theta, y):
     Note
     ----
     All provided estimating equations are meant to be wrapped inside a user-specified function. Throughtout, these
-    user-defined functions are defined as `psi`.
+    user-defined functions are defined as ``psi``.
 
     Parameters
     ----------
@@ -33,7 +33,7 @@ def ee_mean(theta, y):
 
     Examples
     --------
-    Construction of a estimating equation(s) with `ee_mean` should be done similar to the following
+    Construction of a estimating equation(s) with ``ee_mean`` should be done similar to the following
 
     >>> from delicatessen import MEstimator
     >>> from delicatessen.estimating_equations import ee_mean
@@ -78,24 +78,23 @@ def ee_mean_robust(theta, y, k):
 
         \sum_i^n \psi(Y_i, \theta_1) = \sum_i^n Y^*_i - \theta_1 = 0
 
-    where Y* is bounded between k and -k.
+    where :math:`Y^*` is bounded between :math:`k` and :math:`-k`.
 
     Note
     ----
-    Since psi is non-differentiable at k or -k, it must be assumed that the mean is sufficiently far from k. Otherwise,
-    difficulties might arise in the variance calculation.
+    Since psi is non-differentiable at :math:`k` or :math:`-k`, it must be assumed that the mean is sufficiently far
+    from :math:`k`. Otherwise, difficulties might arise in the variance calculation.
 
     Note
     ----
     All provided estimating equations are meant to be wrapped inside a user-specified function. Throughtout, these
-    user-defined functions are defined as `psi`.
-
+    user-defined functions are defined as ``psi``.
 
     Parameters
     ----------
     theta : ndarray, list, vector
         Theta in the case of the robust mean consists of a single value. Therefore, an initial value like the form of
-        [0, ] is recommended.
+        ``[0, ]`` is recommended.
     y : ndarray, vector, list
         1-dimensional vector of n observed values. No missing data should be included (missing data may cause unexpected
         behavior when attempting to calculate the robust mean).
@@ -109,7 +108,7 @@ def ee_mean_robust(theta, y, k):
 
     Examples
     --------
-    Construction of a estimating equation(s) with `ee_mean_robust` should be done similar to the following
+    Construction of a estimating equation(s) with ``ee_mean_robust`` should be done similar to the following
 
     >>> from delicatessen import MEstimator
     >>> from delicatessen.estimating_equations import ee_mean_robust
@@ -162,13 +161,13 @@ def ee_mean_variance(theta, y):
 
         \sum_i^n \psi_2(Y_i, \theta_1) = \sum_i^n (Y_i - \theta_1)^2 - \theta_2 = 0
 
-    Unlike `ee_mean`, theta consists of 2 elements. The output covariance matrix will also provide estimates for each
+    Unlike ``ee_mean``, theta consists of 2 elements. The output covariance matrix will also provide estimates for each
     of the theta values.
 
     Note
     ----
     All provided estimating equations are meant to be wrapped inside a user-specified function. Throughtout, these
-    user-defined functions are defined as `psi`.
+    user-defined functions are defined as ``psi``.
 
 
     Parameters
@@ -186,7 +185,7 @@ def ee_mean_variance(theta, y):
 
     Examples
     --------
-    Construction of a estimating equation(s) with `ee_mean_variance` should be done similar to the following
+    Construction of a estimating equation(s) with ``ee_mean_variance`` should be done similar to the following
 
     >>> from delicatessen import MEstimator
     >>> from delicatessen.estimating_equations import ee_mean_variance
@@ -211,8 +210,8 @@ def ee_mean_variance(theta, y):
     >>> estr.variance
     >>> estr.asymptotic_variance
 
-    For this estimating equation, `mestimation.theta[1]` and `mestimation.asymptotic_variance[0][0]` are expected to
-    always be equal.
+    For this estimating equation, ``mestimation.theta[1]`` and ``mestimation.asymptotic_variance[0][0]`` are expected
+    to always be equal.
 
     References
     ----------
@@ -245,8 +244,8 @@ def ee_percentile(theta, y, q):
 
     Note
     ----
-    The optional parameters `MEstimator.estimate()` may benefit from the following changes `solver='hybr'`,
-    `tolerance=1e-5`, `dx=1`, and `order=15`. Try a few different values.
+    The following optional parameters ``MEstimator.estimate()`` may benefit from these changes ``solver='hybr'``,
+    ``dx=1``, ``order=15``, and increasing the ``tolerance``.
 
     Parameters
     ----------
@@ -265,7 +264,7 @@ def ee_percentile(theta, y, q):
 
     Examples
     --------
-    Construction of a estimating equation(s) with `ee_percentile` should be done similar to the following
+    Construction of a estimating equation(s) with ``ee_percentile`` should be done similar to the following
 
     >>> from delicatessen import MEstimator
     >>> from delicatessen.estimating_equations import ee_percentile
@@ -280,7 +279,7 @@ def ee_percentile(theta, y, q):
     >>> def psi(theta):
     >>>     return ee_percentile(theta=theta, y=y_dat, q=0.5)
 
-    Calling the M-estimation procedure (note that `init` has 2 values now).
+    Calling the M-estimation procedure (note that ``init`` has 2 values now).
 
     >>> estr = MEstimator(stacked_equations=psi, init=[0, ])
     >>> estr.estimate(solver='hybr', tolerance=1e-3, dx=1, order=15)
@@ -326,12 +325,13 @@ def ee_positive_mean_deviation(theta, y):
     Note
     ----
     All provided estimating equations are meant to be wrapped inside a user-specified function. Throughtout, these
-    user-defined functions are defined as `psi`.
+    user-defined functions are defined as ``psi``.
 
     Parameters
     ----------
     theta : ndarray, list, vector
-        Theta in this case consists of two values. Therefore, initial values like the form of [0, 0] is recommended.
+        Theta in this case consists of two values. Therefore, initial values like the form of ``[0, 0]`` are
+        recommended.
     y : ndarray, list, vector
         1-dimensional vector of n observed values. No missing data should be included (missing data may cause unexpected
         behavior when attempting to calculate the positive mean deviation).
@@ -343,7 +343,7 @@ def ee_positive_mean_deviation(theta, y):
 
     Examples
     --------
-    Construction of a estimating equation(s) with `ee_positive_mean_deviation` should be done similar to the following
+    Construction of a estimating equation(s) with ``ee_positive_mean_deviation`` should be done similar to the following
 
     >>> from delicatessen import MEstimator
     >>> from delicatessen.estimating_equations import ee_positive_mean_deviation
@@ -357,7 +357,7 @@ def ee_positive_mean_deviation(theta, y):
     >>> def psi(theta):
     >>>     return ee_positive_mean_deviation(theta=theta, y=y_dat)
 
-    Calling the M-estimation procedure (note that `init` has 2 values now).
+    Calling the M-estimation procedure (note that ``init`` has 2 values now).
 
     >>> estr = MEstimator(stacked_equations=psi, init=[0, 0, ])
     >>> estr.estimate()
@@ -403,7 +403,7 @@ def ee_linear_regression(theta, X, y, weights=None):
     Note
     ----
     All provided estimating equations are meant to be wrapped inside a user-specified function. Throughtout, these
-    user-defined functions are defined as `psi`.
+    user-defined functions are defined as ``psi``.
 
     Here, theta corresponds to the coefficients in a linear regression model
 
@@ -417,7 +417,7 @@ def ee_linear_regression(theta, X, y, weights=None):
     ----------
     theta : ndarray, list, vector
         Theta in this case consists of b values. Therefore, initial values should consist of the same number as the
-        number of columns present. This can easily be accomplished generally by `[0, ] * X.shape[1]`.
+        number of columns present. This can easily be accomplished generally by ``[0, ] * X.shape[1]``.
     X : ndarray, list, vector
         2-dimensional vector of n observed values for b variables. No missing data should be included (missing data
         may cause unexpected behavior).
@@ -435,7 +435,7 @@ def ee_linear_regression(theta, X, y, weights=None):
 
     Examples
     --------
-    Construction of a estimating equation(s) with `ee_linear_regression` should be done similar to the following
+    Construction of a estimating equation(s) with ``ee_linear_regression`` should be done similar to the following
 
     >>> import numpy as np
     >>> import pandas as pd
@@ -451,14 +451,14 @@ def ee_linear_regression(theta, X, y, weights=None):
     >>> data['Y'] = 0.5 + 2*data['X'] - 1*data['Z'] + np.random.normal(loc=0, size=n)
     >>> data['C'] = 1
 
-    Note that `C` here is set to all 1's. This will be the intercept in the regression.
+    Note that ``C`` here is set to all 1's. This will be the intercept in the regression.
 
     Defining psi, or the stacked estimating equations
 
     >>> def psi(theta):
     >>>         return ee_linear_regression(theta=theta, X=data[['C', 'X', 'Z']], y=data['Y'])
 
-    Calling the M-estimation procedure (note that `init` has 3 values now, since `X.shape[1]` is equal to 3).
+    Calling the M-estimation procedure (note that ``init`` has 3 values now, since ``X.shape[1] = 3``).
 
     >>> estr = MEstimator(stacked_equations=psi, init=[0., 0., 0.,])
     >>> estr.estimate()
@@ -505,7 +505,7 @@ def ee_robust_linear_regression(theta, X, y, k, weights=None):
     Note
     ----
     All provided estimating equations are meant to be wrapped inside a user-specified function. Throughtout, these
-    user-defined functions are defined as `psi`.
+    user-defined functions are defined as ``psi``.
 
     Here, theta corresponds to the coefficients in a robust linear regression model
 
@@ -519,7 +519,7 @@ def ee_robust_linear_regression(theta, X, y, k, weights=None):
     ----------
     theta : ndarray, list, vector
         Theta in this case consists of b values. Therefore, initial values should consist of the same number as the
-        number of columns present. This can easily be accomplished generally by `[0, ] * X.shape[1]`.
+        number of columns present. This can easily be accomplished generally by ``[0, ] * X.shape[1]``.
     X : ndarray, list, vector
         2-dimensional vector of n observed values for b variables. No missing data should be included (missing data
         may cause unexpected behavior).
@@ -540,7 +540,8 @@ def ee_robust_linear_regression(theta, X, y, k, weights=None):
 
     Examples
     --------
-    Construction of a estimating equation(s) with `ee_robust_linear_regression` should be done similar to the following
+    Construction of a estimating equation(s) with ``ee_robust_linear_regression`` should be done similar to the
+    following
 
     >>> import numpy as np
     >>> import pandas as pd
@@ -564,7 +565,7 @@ def ee_robust_linear_regression(theta, X, y, k, weights=None):
     >>>         return ee_robust_linear_regression(theta=theta, X=data[['C', 'X', 'Z']], y=data['Y'], k=3)
 
 
-    Calling the M-estimation procedure (note that `init` has 3 values now, since `X.shape[1]` is equal to 3).
+    Calling the M-estimation procedure (note that ``init`` has 3 values now, since ``X.shape[1] = 3``).
 
     >>> estr = MEstimator(stacked_equations=psi, init=[0., 0., 0.,])
     >>> estr.estimate()
@@ -618,8 +619,7 @@ def ee_logistic_regression(theta, X, y, weights=None):
     Note
     ----
     All provided estimating equations are meant to be wrapped inside a user-specified function. Throughtout, these
-    user-defined functions are defined as `psi`.
-
+    user-defined functions are defined as ``psi``.
 
     Here, theta corresponds to the coefficients in a logistic regression model, and therefore are the log-odds.
 
@@ -635,7 +635,7 @@ def ee_logistic_regression(theta, X, y, weights=None):
     ----------
     theta : ndarray, list, vector
         Theta in this case consists of b values. Therefore, initial values should consist of the same number as the
-        number of columns present. This can easily be accomplished generally by `[0, ] * X.shape[1]`.
+        number of columns present. This can easily be accomplished generally by ``[0, ] * X.shape[1]``.
     X : ndarray, list, vector
         2-dimensional vector of n observed values for b variables. No missing data should be included (missing data
         may cause unexpected behavior).
@@ -653,7 +653,7 @@ def ee_logistic_regression(theta, X, y, weights=None):
 
     Examples
     --------
-    Construction of a estimating equation(s) with `ee_logistic_regression` should be done similar to the following
+    Construction of a estimating equation(s) with ``ee_logistic_regression`` should be done similar to the following
 
     >>> import numpy as np
     >>> import pandas as pd
@@ -670,7 +670,7 @@ def ee_logistic_regression(theta, X, y, weights=None):
     >>> data['Y'] = np.random.binomial(n=1, p=logistic.cdf(0.5 + 2*data['X'] - 1*data['Z']), size=n)
     >>> data['C'] = 1
 
-    Note that `C` here is set to all 1's. This will be the intercept in the regression.
+    Note that ``C`` here is set to all 1's. This will be the intercept in the regression.
 
     Defining psi, or the stacked estimating equations
 
@@ -678,7 +678,7 @@ def ee_logistic_regression(theta, X, y, weights=None):
     >>>         return ee_logistic_regression(theta=theta, X=data[['C', 'X', 'Z']], y=data['Y'])
 
 
-    Calling the M-estimation procedure (note that `init` has 3 values now, since `X.shape[1]` is equal to 3).
+    Calling the M-estimation procedure (note that `init` has 3 values now, since ``X.shape[1] = 3``).
 
     >>> estr = MEstimator(stacked_equations=psi, init=[0., 0., 0.,])
     >>> estr.estimate()
@@ -735,12 +735,12 @@ def ee_4p_logistic(theta, X, y):
     Note
     ----
     All provided estimating equations are meant to be wrapped inside a user-specified function. Throughtout, these
-    user-defined functions are defined as `psi`.
+    user-defined functions are defined as ``psi``.
 
     Parameters
     ----------
     theta : ndarray, list, vector
-        Theta in this case consists of 4 values. In general, starting values >0 are better choices for the 4PL model
+        Theta in this case consists of 4 values. In general, starting values ``>0`` are better choices for the 4PL model
     X : ndarray, list, vector
         1-dimensional vector of n dose values. No missing data should be included (missing data may cause unexpected
         behavior).
@@ -755,7 +755,7 @@ def ee_4p_logistic(theta, X, y):
 
     Examples
     --------
-    Construction of a estimating equation(s) with `ee_4p_logistic` should be done similar to the following
+    Construction of a estimating equation(s) with ``ee_4p_logistic`` should be done similar to the following
 
     >>> from delicatessen import MEstimator
     >>> from delicatessen.data import load_inderjit
@@ -861,12 +861,12 @@ def ee_3p_logistic(theta, X, y, lower):
     Note
     ----
     All provided estimating equations are meant to be wrapped inside a user-specified function. Throughtout, these
-    user-defined functions are defined as `psi`.
+    user-defined functions are defined as ``psi``.
 
     Parameters
     ----------
     theta : ndarray, list, vector
-        Theta in this case consists of 3 values. In general, starting values >0 are better choices for the 3PL model
+        Theta in this case consists of 3 values. In general, starting values ``>0`` are better choices for the 3PL model
     X : ndarray, list, vector
         1-dimensional vector of n dose values. No missing data should be included (missing data may cause unexpected
         behavior).
@@ -883,7 +883,7 @@ def ee_3p_logistic(theta, X, y, lower):
 
     Examples
     --------
-    Construction of a estimating equation(s) with `ee_3p_logistic` should be done similar to the following
+    Construction of a estimating equation(s) with ``ee_3p_logistic`` should be done similar to the following
 
     >>> from delicatessen import MEstimator
     >>> from delicatessen.data import load_inderjit
@@ -988,7 +988,7 @@ def ee_2p_logistic(theta, X, y, lower, upper):
     Note
     ----
     All provided estimating equations are meant to be wrapped inside a user-specified function. Throughtout, these
-    user-defined functions are defined as `psi`.
+    user-defined functions are defined as ``psi``.
 
     Parameters
     ----------
@@ -1012,7 +1012,7 @@ def ee_2p_logistic(theta, X, y, lower, upper):
 
     Examples
     --------
-    Construction of a estimating equation(s) with `ee_2p_logistic` should be done similar to the following
+    Construction of a estimating equation(s) with ``ee_2p_logistic`` should be done similar to the following
 
     >>> from delicatessen import MEstimator
     >>> from delicatessen.data import load_inderjit
@@ -1138,7 +1138,7 @@ def ee_effective_dose_delta(theta, y, delta, steepness, ed50, lower, upper):
 
     Examples
     --------
-    Construction of a estimating equations for ED25 with `ee_3p_logistic` should be done similar to the following
+    Construction of a estimating equations for ED25 with ``ee_3p_logistic`` should be done similar to the following
 
     >>> from delicatessen import MEstimator
     >>> from delicatessen.data import load_inderjit
@@ -1277,7 +1277,7 @@ def ee_gformula(theta, y, X, X1, X0=None, force_continuous=False):
     Note
     ----
     All provided estimating equations are meant to be wrapped inside a user-specified function. Throughtout, these
-    user-defined functions are defined as `psi`.
+    user-defined functions are defined as ``psi``.
 
     See the examples below for how action plans are specified.
 
@@ -1311,7 +1311,7 @@ def ee_gformula(theta, y, X, X1, X0=None, force_continuous=False):
 
     Examples
     --------
-    Construction of a estimating equation(s) with `ee_gformula` should be done similar to the following
+    Construction of a estimating equation(s) with ``ee_gformula`` should be done similar to the following
 
     >>> import numpy as np
     >>> import pandas as pd
@@ -1404,7 +1404,7 @@ def ee_gformula(theta, y, X, X1, X0=None, force_continuous=False):
     References
     ----------
     Snowden JM, Rose S, & Mortimer KM. (2011). Implementation of G-computation on a simulated data set: demonstration
-    of a causal inference technique. American Journal of Epidemiology, 173(7), 731-738.
+    of a causal inference technique. *American Journal of Epidemiology*, 173(7), 731-738.
 
     Hernán MA, & Robins JM. (2006). Estimating causal effects from epidemiological data.
     *Journal of Epidemiology & Community Health*, 60(7), 578-586.
@@ -1500,7 +1500,7 @@ def ee_ipw(theta, y, A, W, truncate=None):
     Note
     ----
     All provided estimating equations are meant to be wrapped inside a user-specified function. Throughtout, these
-    user-defined functions are defined as `psi`.
+    user-defined functions are defined as ``psi``.
 
     Here, theta corresponds to a variety of different quantities. The *first* value in theta vector is the mean
     difference (or average causal effect), the *second* is the mean had everyone been set to ``A=1``, the *third* is the
@@ -1678,7 +1678,7 @@ def ee_aipw(theta, y, A, W, X, X1, X0, truncate=None, force_continuous=False):
     Note
     ----
     All provided estimating equations are meant to be wrapped inside a user-specified function. Throughtout, these
-    user-defined functions are defined as `psi`.
+    user-defined functions are defined as ``psi``.
 
     Here, theta corresponds to a variety of different quantities. The *first* value in theta vector is mean
     difference (or average causal effect), the *second* is the mean had everyone been given ``A=1``, the *third* is the
@@ -1748,7 +1748,7 @@ def ee_aipw(theta, y, A, W, X, X1, X0, truncate=None, force_continuous=False):
 
     Defining psi, or the stacked estimating equations. Note that ``A`` is the action of interest. First, we will apply
     some necessary data processing.  We will create an interaction term between ``A`` and ``W`` in the original data.
-    Then we will generate a copy of the data and update the values of ``A`` to be all ``1``, and then generate another
+    Then we will generate a copy of the data and update the values of ``A=1``, and then generate another
     copy but set ``A=0`` in that copy.
 
     >>> d['AW'] = d['A']*d['W']
@@ -1795,6 +1795,9 @@ def ee_aipw(theta, y, A, W, X, X1, X0, truncate=None, force_continuous=False):
 
     References
     ----------
+    Hernán MA, & Robins JM. (2006). Estimating causal effects from epidemiological data.
+    *Journal of Epidemiology & Community Health*, 60(7), 578-586.
+
     Funk MJ, Westreich D, Wiesen C, Stürmer T, Brookhart MA, & Davidian M. (2011). Doubly robust estimation of causal
     effects. *American Journal of Epidemiology*, 173(7), 761-767.
 

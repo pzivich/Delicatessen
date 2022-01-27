@@ -294,7 +294,7 @@ After creating the wrapper function, we can now call the M-Estimation procedure 
                                  (np.max(resp_data)+np.min(resp_data)) / 2,
                                  (np.max(resp_data)+np.min(resp_data)) / 2,
                                  np.max(resp_data)])
-    estr.estimate()
+    estr.estimate(solver='lm')
 
     print(estr.theta)
     print(estr.variance)
@@ -410,8 +410,8 @@ ED(:math:`\delta`)
 ----------------------------
 
 In addition to the :math:`x`-parameter logistic models, an estimating equation to estimate a corresponding
-:math:`\delta` effective dose is available. Notice that this estimating equation should be stacked with one of the
-:math:`x`PL models. Here, we demonstrate with the 3PL model.
+:math:`\delta` effective dose is available. Notice that this estimating equation should be stacked with one of
+the :math:`x`-PL models. Here, we demonstrate with the 3PL model.
 
 Here, our interest is in the following effective doses: 0.05, 0.10, 0.20, 0.80. The wrapper function for the 3PL model
 and estimating equations for these effective doses are
@@ -448,11 +448,6 @@ and estimating equations for these effective doses are
 
 Notice that the estimating equations are stacked together in the order of the ``theta`` vector.
 
-
-# Optimization procedure
-mest = MEstimator(psi, init=[2, 1, 10, 1, 5])
-mest.estimate(solver='lm')
-
 After creating the wrapper function, we can now call the M-Estimation procedure to estimate the coefficients for the
 3PL model, the ED for the :math:`\delta` values, and their variance
 
@@ -478,13 +473,17 @@ starting point for each being the mid-point of the response values.
 Causal Inference
 =============================
 
-To demonstrate the utility of M-estimation, particularly how estimating equations can be 'stacked' together, then
-still have an appropriate variance estimator, several causal inference estimators are provided here.
+This next section describes a the available estimators for the causal mean. These estimators all rely on specific
+identification conditions to be able to interpret the estimate of the mean (or mean difference) as an estimate of the
+causal mean. For information on these assumptions, I recommend this
+`paper<https://www.ncbi.nlm.nih.gov/labs/pmc/articles/PMC2652882/>`_ as a general introduction.
 
-It is recommended that you are familiar with causal inference (particularly the identification conditions of these
-estimators) before using this utility widely. Causal inference is a difficult endeavour, dear user!
+This section procedures that the identification conditions have been previously deliberated, and the causal mean is
+identified and is estimable (see this `paper<https://arxiv.org/abs/2108.11342>`_ or this
+`paper<https://arxiv.org/abs/1904.02826>`_ for more information on this concept).
 
-In the following examples, we will use the generic data example here, where W is confounding the A-Y relationship
+With that aside, let's proceed through the available estimators of the causal means. In the following examples, we will
+use the generic data example here, where :math:`Y(a)` is independent of :math:`A` conditional on :math:`W`:
 
 .. code::
 
@@ -497,7 +496,82 @@ In the following examples, we will use the generic data example here, where W is
     d['Y'] = (1-d['A'])*d['Ya0'] + d['A']*d['Ya1']
     d['C'] = 1
 
-Now to the examples
+
+Inverse probability weighting
+-------------------------------------
+
+First, we will examine the inverse probability weighting (IPW) estimator, which models the probability of :math:`A`.
+The IPW estimator in ``delicatessen`` consists of 4 different estimating equations. The *last* estimating equation is
+the logistic model used to estimate the probability of :math:`A`. The *third* and *second* estimating equations are
+the causal means :math:`E[Y(a=0)]` and :math:`E[Y(a=1)]`, respectively. The *first* estimating equation is the causal
+mean difference: :math:`E[Y(a=1)] - E[Y(a=0)]`.
+
+To load the estimating equations,
+
+.. code::
+
+    from delicatessen import MEstimators
+    from delicatessen.estimating_equations import ee_ipw
+
+The estimating equation is then wrapped inside our ``psi`` function
+
+.. code::
+
+    def psi(theta):
+        return ee_ipw(theta,                 # Parameters
+                      X=d[['C', 'A', 'W']],  # Covariates (including A)
+                      y=d['Y'],              # Outcome
+                      treat_index=1)         # Index of A in X
+
+The arguments for ``ee_ipw`` are the :math:`\theta` values, the covariates (with ``C`` as an intercept), the outcomes
+(``Y``), and the column index for the treatment in ``X``. Here, 1 designates the second column (python uses
+zero-indexing), which corresponds to ``A`` in how the X data is formatted.
+
+Now we can call the M-estimator to solve for the values and the variance. Here, the initial values provided must be
+3+*b* (where *b* is the number of columns in X *minus 1*). This is because the IPW estimating equations output the
+average treatment effect, risk under all-treated, risk under none-treated, and the logistic regression model
+coefficients. Since we are modeling the conditional probability of A, one column in X is excluded from the covariates.
+
+As for starting values, it will likely be best practice to have the initial values set as  [0., 0.5, 0.5, ...] in
+general. The regression initial values can also be pre-washed to speed up optimization.
+
+.. code::
+
+    mestimation = MEstimator(stacked_equations=psi, init=[0., 0.5, 0.5, 0., 0., 0.])
+    mestimation.estimate(solver='lm')
+
+Now the average treatment effect, as well as the variance, can be output. Here, a key advantage of M-estimation can be
+seen. The form of an M-estimator allows us to estimate the variance directly, while appropriately allowing for the
+uncertainty in the regression model parameters to be carried forward. M-estimation does this automatically for us.
+Essentially, we do not need to bootstrap or use the GEE-trick for IPW to estimate the variance!
+
+.. code::
+
+    mestimation.theta[0]
+    mestimation.variance[0, 0]
+
+Besides the average treatment effect, the risk / mean under all-treated can be extracted by
+
+.. code::
+
+    mestimation.theta[1]
+    mestimation.variance[1, 1]
+
+and the risk / mean under none-treated can be extracted by
+
+.. code::
+
+    mestimation.theta[2]
+    mestimation.variance[2, 2]
+
+The ``ee_ipw`` supports both binary and continuous outcomes automatically. Both of these variable types are handled in
+the same way due to the form of the Horwitz-Thompson estimator.
+
+Unlike the GEE-trick for IPW (which provides a conservative estimator of the variance), the variance estimator here
+is correct. This means it will be narrower than the GEE-trick. Therefore, this approach is generally preferred over
+the GEE-trick to calculating the variance for the IPW estimator. It is also much more computationally efficient than
+the bootstrap.
+
 
 G-computation
 ----------------------------
@@ -571,74 +645,6 @@ the outcome data is binary. If the outcome data is not binary, then it defaults 
 To summarize, the key advantage of M-estimation here is that it *appropriately* estimates the variance. We do *not*
 need to bootstrap in this case (and more generally if the sample size is sufficiently large).
 
-Inverse probability weighting
--------------------------------------
-
-Rather than modeling the outcome, we can choose the inverse probability weighting (IPW) estimator, which models the
-probability of treatment. The estimating equations for the IPW estimator are also built-in to ``delicatessen``.
-
-To load the estimating equations, we call
-
-.. code::
-
-    from delicatessen import MEstimators
-    from delicatessen.estimating_equations import ee_ipw
-
-As with every built-in estimating equation, we will wrap it inside a function.
-
-.. code::
-
-    def psi(theta):
-        return ee_ipw(theta, X=d[['C', 'A', 'W']], y=d['Y'], treat_index=1)
-
-The arguments for ``ee_ipw`` are the :math:`\theta` values, the covariates (including an intercept (C) and the treatment
-(A)), the outcome values (Y), and the column index for the treatment in X. Here, 1 designates the second column
-(python uses zero-indexing), which corresponds to 'A' in how the X data is formatted.
-
-Now we can call the M-estimator to solve for the values and the variance. Here, the initial values provided must be
-3+*b* (where *b* is the number of columns in X *minus 1*). This is because the IPW estimating equations output the
-average treatment effect, risk under all-treated, risk under none-treated, and the logistic regression model
-coefficients. Since we are modeling the conditional probability of A, one column in X is excluded from the covariates.
-
-As for starting values, it will likely be best practice to have the initial values set as  [0., 0.5, 0.5, ...] in
-general. The regression initial values can also be pre-washed to speed up optimization.
-
-.. code::
-
-    mestimation = MEstimator(stacked_equations=psi, init=[0., 0.5, 0.5, 0., 0., 0.])
-    mestimation.estimate(solver='lm')
-
-Now the average treatment effect, as well as the variance, can be output. Here, a key advantage of M-estimation can be
-seen. The form of an M-estimator allows us to estimate the variance directly, while appropriately allowing for the
-uncertainty in the regression model parameters to be carried forward. M-estimation does this automatically for us.
-Essentially, we do not need to bootstrap or use the GEE-trick for IPW to estimate the variance!
-
-.. code::
-
-    mestimation.theta[0]
-    mestimation.variance[0, 0]
-
-Besides the average treatment effect, the risk / mean under all-treated can be extracted by
-
-.. code::
-
-    mestimation.theta[1]
-    mestimation.variance[1, 1]
-
-and the risk / mean under none-treated can be extracted by
-
-.. code::
-
-    mestimation.theta[2]
-    mestimation.variance[2, 2]
-
-The ``ee_ipw`` supports both binary and continuous outcomes automatically. Both of these variable types are handled in
-the same way due to the form of the Horwitz-Thompson estimator.
-
-Unlike the GEE-trick for IPW (which provides a conservative estimator of the variance), the variance estimator here
-is correct. This means it will be narrower than the GEE-trick. Therefore, this approach is generally preferred over
-the GEE-trick to calculating the variance for the IPW estimator. It is also much more computationally efficient than
-the bootstrap.
 
 Augmented inverse probability weighting
 ----------------------------------------------
@@ -717,11 +723,20 @@ References and Further Readings
 Boos DD, & Stefanski LA. (2013). M-estimation (estimating equations). In Essential Statistical Inference
 (pp. 297-337). Springer, New York, NY.
 
+Cole SR, & Hernán MA. (2008). Constructing inverse probability weights for marginal structural models.
+*American Journal of Epidemiology*, 168(6), 656-664.
+
 Funk MJ, Westreich D, Wiesen C, Stürmer T, Brookhart MA, & Davidian M. (2011). Doubly robust estimation of causal
 effects. *American Journal of Epidemiology*, 173(7), 761-767.
+
+Hernán MA, & Robins JM. (2006). Estimating causal effects from epidemiological data.
+*Journal of Epidemiology & Community Health*, 60(7), 578-586.
 
 Huber PJ. (1992). Robust estimation of a location parameter. In Breakthroughs in statistics (pp. 492-518).
 Springer, New York, NY.
 
 Inderjit, Streibig JC & Olofsdotter M. (2002). Joint action of phenolic acid mixtures and its significance in
 allelopathy research. *Physiol Plant* 114, 422–428.
+
+Snowden JM, Rose S, & Mortimer KM. (2011). Implementation of G-computation on a simulated data set: demonstration
+of a causal inference technique. *American Journal of Epidemiology*, 173(7), 731-738.
