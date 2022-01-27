@@ -9,7 +9,7 @@ from scipy.stats import logistic
 from delicatessen import MEstimator
 from delicatessen.estimating_equations import (ee_mean, ee_mean_variance, ee_mean_robust,
                                                ee_linear_regression, ee_logistic_regression,
-                                               ee_2p_logistic, ee_3p_logistic, ee_4p_logistic, ee_effective_dose_alpha,
+                                               ee_2p_logistic, ee_3p_logistic, ee_4p_logistic, ee_effective_dose_delta,
                                                ee_gformula, ee_ipw, ee_aipw)
 from delicatessen.data import load_inderjit
 from delicatessen.utilities import inverse_logit
@@ -356,13 +356,13 @@ class TestEstimatingEquationsDoseResponse:
             lower_limit = 0
             pl3 = ee_3p_logistic(theta=theta, X=dose_data, y=resp_data,
                                  lower=lower_limit)
-            ed05 = ee_effective_dose_alpha(theta[3], y=resp_data, alpha=0.05,
+            ed05 = ee_effective_dose_delta(theta[3], y=resp_data, delta=0.05,
                                            steepness=theta[0], ed50=theta[1],
                                            lower=lower_limit, upper=theta[2])
-            ed10 = ee_effective_dose_alpha(theta[4], y=resp_data, alpha=0.10,
+            ed10 = ee_effective_dose_delta(theta[4], y=resp_data, delta=0.10,
                                            steepness=theta[0], ed50=theta[1],
                                            lower=lower_limit, upper=theta[2])
-            ed50 = ee_effective_dose_alpha(theta[5], y=resp_data, alpha=0.50,
+            ed50 = ee_effective_dose_delta(theta[5], y=resp_data, delta=0.50,
                                            steepness=theta[0], ed50=theta[1],
                                            lower=lower_limit, upper=theta[2])
             return np.vstack((pl3,
@@ -411,11 +411,17 @@ class TestEstimatingEquationsCausal:
 
     def test_gformula(self, causal_data):
         # M-estimation
+        d1 = causal_data.copy()
+        d1['A'] = 1
+        d0 = causal_data.copy()
+        d0['A'] = 0
+
         def psi(theta):
             return ee_gformula(theta,
-                               X=causal_data[['C', 'A', 'W']],
                                y=causal_data['Y'],
-                               treat_index=1)
+                               X=causal_data[['C', 'A', 'W']],
+                               X1=d1[['C', 'A', 'W']],
+                               X0=d0[['C', 'A', 'W']])
 
         mestimator = MEstimator(psi, init=[0., 0.5, 0.5, 0., 0., 0.])
         mestimator.estimate(solver='lm')

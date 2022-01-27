@@ -36,11 +36,11 @@ def partial_derivative(func, var, point, output, dx, order):
 
 
 def logit(prob):
-    """Logit transformation of probabilities. Input can be a single probability of array of probabilities
+    """Logistic transformation of probabilities. Returns log-odds
 
     Parameters
     ----------
-    prob : float, array
+    prob : float, ndarray
         A single probability or an array of probabilities
 
     Returns
@@ -51,11 +51,11 @@ def logit(prob):
 
 
 def inverse_logit(logodds):
-    """Inverse logit transformation. Returns probabilities
+    """Inverse logistic transformation. Returns probabilities
 
     Parameters
     ----------
-    logodds : float, array
+    logodds : float, ndarray
         A single log-odd or an array of log-odds
 
     Returns
@@ -63,3 +63,23 @@ def inverse_logit(logodds):
     inverse-logit transformed results (i.e. probabilities for log-odds)
     """
     return 1 / (1 + np.exp(-logodds))
+
+
+def identity(value):
+    """Identity transformation. Returns itself
+
+    Note
+    ----
+    This function doesn't actually apply any transformation. It is used for arbitrary function calls that apply
+    transformations, and this is called when no transformation is to be applied
+
+    Parameters
+    ----------
+    value : float, ndarray
+        A single value or an array of values
+
+    Returns
+    -------
+    value
+    """
+    return value

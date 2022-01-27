@@ -1,5 +1,5 @@
 import numpy as np
-from delicatessen.utilities import logit, inverse_logit
+from delicatessen.utilities import logit, inverse_logit, identity
 
 #################################################################
 # Basic Estimating Equations
@@ -966,10 +966,13 @@ def ee_effective_dose_delta(theta, y, delta, steepness, ed50, lower, upper):
 # Causal Inference (ATE) Estimating Equations
 
 
-def ee_gformula(theta, X, y, treat_index, force_continuous=False):
-    r"""Default stacked estimating equation for the parametric g-formula in the time-fixed setting. The parameter(s) of
-    interest is the average treatment effect, with potential interest in the underlying risk or mean functions. For
-    continuous Y, the linear regression estimating equation is
+def ee_gformula(theta, y, X, X1, X0=None, force_continuous=False):
+    r"""Default stacked estimating equation for parametric g-computation in the time-fixed setting. The parameter of
+    interest can either be the mean under a single interventions or plans on an action, or the mean difference between
+    two interventions or plans on an action. This is accomplished by providing the estimating equation the observed
+    data (``X``, ``y``), and the same data under the actions (``X1`` and optionally ``X0``).
+
+    For continuous Y, the linear regression estimating equation is
 
     .. math::
 
@@ -982,63 +985,81 @@ def ee_gformula(theta, X, y, treat_index, force_continuous=False):
         \sum_i^n \psi_m(Y_i, X_i, \theta) = \sum_i^n (Y_i - expit(X_i^T \theta)) X_i = 0
 
     By default, `ee_gformula` detects whether `y` is all binary (zero or one), and applies logistic regression if that
-    happens. See the parameters for more details.
+    is evaluated to be true. See the parameters for further details.
 
-    For the implementation of the g-formula, stacked estimating equations are also used for the risk / mean had
-    everyone been given treatment=1, the risk / mean had everyone been given treatment=0, and the risk / mean
-    difference between those two risks. Respectively, those estimating equations look like
+    There are two variations on the parameter of interest. The first could be the mean under a plan, where the plan sets
+    the values of action :math:`A` (e.g., exposure, treatment, vaccination, etc.). The estimating equation for this
+    causal mean is
 
     .. math::
 
         \sum_i^n \psi_1(Y_i, X_i, \theta_1) = \sum_i^n g(\hat{Y}_i) - \theta_1 = 0
 
-        \sum_i^n \psi_0(Y_i, X_i, \theta_2) = \sum_i^n g(\hat{Y}_i) - \theta_2 = 0
+    Here, the function :math:`g(.)` is a generic function. If linear regression was used, :math:`g(.)` is the identity
+    function. If logistic regression was used, :math:`g(.)` is the expit or inverse-logit function.
+
+    Note
+    ----
+    This variation includes :math:`1+b` parameters, where the first parameter is the causal mean, and the remainder are
+    the parameters for the regression model.
+
+    The alternative parameter of interest could be the mean difference between two plans. A common example of this would
+    be the average causal effect, where the plans are all-action-one versus all-action-zero. Therefore, the estimating
+    equations consist of the following three equations
+
+    .. math::
 
         \sum_i^n \psi_0(Y_i, X_i, \theta_0) = \sum_i^n (\theta_1 - \theta_2) - \theta_0 = 0
 
-    Here, the function g() is a generic function. If linear regression was used, g() is the identity function. If
-    logistic regression was used, g() is the expit or inverse-logit function.
+        \sum_i^n \psi_1(Y_i, X_i, \theta_1) = \sum_i^n g(\hat{Y}_i) - \theta_1 = 0
 
-    Due to these 3 extra values, the length of the theta vector is b+3, where b is the number of parameters in the
-    regression model.
+        \sum_i^n \psi_0(Y_i, X_i, \theta_2) = \sum_i^n g(\hat{Y}_i) - \theta_2 = 0
+
+
+    Note
+    ----
+    This variation includes :math:`3+b` parameters, where the first parameter is the causal mean difference, the second
+    is the causal mean under plan 1, the third is the causal mean under plan 0, and the remainder are the parameters
+    for the regression model.
+
+    The parameter of interest is designated by the user via whether the optional argument ``X0`` is left as ``None``
+    (which estimates the causal mean) or is given an array (which estimates the causal mean difference and the
+    corresponding causal means).
 
     Note
     ----
     All provided estimating equations are meant to be wrapped inside a user-specified function. Throughtout, these
     user-defined functions are defined as `psi`.
 
-    Here, theta corresponds to a variety of different quantities. The *first* value in theta vector is the risk / mean
-    difference (or average treatment effect), the *second* is the risk / mean had everyone been given treatment=0, the
-    *third* is the risk / mean had everyone been given treatment=1. The remainder of the parameters correspond to the
-    regression model coefficients, in the order input.
-
-    Note
-    ----
-    For complex regression problems, the optimizer behind the scenes is not particularly robust (unlike functions
-    specializing in solely regression models). Therefore, optimization of the regression model via a separate
-    functionality can be done then those estimated parameters are fed forward as the initial values (which should
-    result in a more stable optimization).
-
+    See the examples below for how action plans are specified.
 
     Parameters
     ----------
     theta : ndarray, list, vector
         Array of parameters to estimate. For the Cox model, corresponds to the log hazard ratios
-    X : ndarray, list, vector
-        2-dimensional vector of n observed values for b variables. No missing data should be included (missing data
-        may cause unexpected behavior).
     y : ndarray, list, vector
         1-dimensional vector of n observed values. The Y values should all be 0 or 1. No missing data should be
         included (missing data may cause unexpected behavior).
-    treat_index : int
-        Column index for the treatment vector.
+    X : ndarray, list, vector
+        2-dimensional vector of n observed values for b variables. No missing data should be included (missing data
+        may cause unexpected behavior).
+    X1 : ndarray, list, vector
+        2-dimensional vector of n observed values for b variables under the action plan. If the action is indicated by
+        ``A``, then ``X1`` will take the original data ``X`` and update the values of ``A`` to follow the deterministic
+        plan. No missing data should be included (missing data may cause unexpected behavior).
+    X0 : ndarray, list, vector, None, optional
+        2-dimensional vector of n observed values for b variables under the action plan. This second argument is
+        optional and should be specified if a causal mean difference between two action plans is of interest. If the
+        action is indicated by ``A``, then ``X0`` will take the original data ``X`` and update the values of ``A`` to
+        follow the deterministic reference plan. No missing data should be included (missing data may cause unexpected
+        behavior).
     force_continuous : bool, optional
         Option to force the use of linear regression despite detection of a binary variable.
 
     Returns
     -------
     array :
-        Returns a (3+b)-by-n NumPy array evaluated for the input theta and y
+        Returns a (1+b)-by-n NumPy array if ``X0=None``, or returns a (3+b)-by-n NumPy array if ``X0!=None``
 
     Examples
     --------
@@ -1060,40 +1081,77 @@ def ee_gformula(theta, X, y, treat_index, force_continuous=False):
     >>> d['Y'] = (1-d['A'])*d['Ya0'] + d['A']*d['Ya1']
     >>> d['C'] = 1
 
-    Defining psi, or the stacked estimating equations. Note that 'A' is the treatment of interest, so `treat_index` is
-    set to 1 (compared to input `X`).
+    In the first example, we will estimate the causal mean had everyone been set to ``A=1``. Therefore, the optional
+    argument ``X0`` is left as ``None``. Before creating the estimating equation, we need to do some data prep. First,
+    we will create an interaction term between ``A`` and ``W`` in the original data. Then we will generate a copy of
+    the data and update the values of ``A`` to be all ``1``.
+
+    >>> d['AW'] = d['A']*d['W']
+    >>> d1 = d.copy()
+    >>> d1['A'] = 1
+    >>> d1['AW'] = d1['A']*d1['W']
+
+    Having setup our data, we can now define the psi function.
 
     >>> def psi(theta):
-    >>>     return ee_gformula(theta, X=d[['C', 'A', 'W']], y=d['Y'], treat_index=1)
+    >>>     return ee_gformula(theta,
+    >>>                        y=d['Y'],
+    >>>                        X=d[['C', 'A', 'W', 'AW']],
+    >>>                        X1=d1[['C', 'A', 'W', 'AW']])
 
-    Calling the M-estimation procedure. Since `X` is 3-by-n here and g-formula has 3 additional parameters, the initial
-    values should be of length 3+3=6. In general, it will be best to start with [0., 0.5, 0.5, ...] as the initials for
-    the risk parameters. This will start the initial at the exact middle value for each of the first 3 parameters. For
-    the regression coefficients, those can be set as zero, or if there is difficulty in simultaneous optimization,
-    coefficient estimates from outside `MEstimator` can be provided as inputs.
+    Notice that ``y`` corresponds to the observed outcomes, ``X`` corresponds to the observed covariate data, and ``X1``
+    corresponds to the covariate data *under the action plan*.
 
-    >>> mestimation = MEstimator(stacked_equations=psi, init=[0., 0.5, 0.5, 0., 0., 0.])
-    >>> mestimation.estimate()
+    Now we can call the M-Estimation procedure. Since we are estimating the causal mean, and the regression parameters,
+    the length of the initial values needs to correspond with this. Our linear regression model consists of 4
+    coefficients, so we need 1+4=5 initial values. When the outcome is binary (like it is in this example), we can be
+    nice to the optimizer and give it a starting value of 0.5 for the causal mean (since 0.5 is in the middle of that
+    distribution). Below is the call to ``MEstimator``
 
-    Inspecting the parameter estimates and the variance
+    >>> estr = MEstimator(psi, init=[0.5, 0., 0., 0., 0.])
+    >>> estr.estimate(solver='lm')
 
-    >>> mestimation.theta
-    >>> mestimation.variance
+    Inspecting the parameter estimates, variance, and 95% confidence intervals
 
-    More specifically, the average treatment effect and its variance are
+    >>> estr.theta
+    >>> estr.variance
+    >>> estr.confidence_intervals()
 
-    >>> mestimation.theta[0]
-    >>> mestimation.variance[0, 0]
+    More specifically, the causal mean is
 
-    The risk / mean had all been given treatment=1
+    >>> estr.theta[0]
 
-    >>> mestimation.theta[1]
-    >>> mestimation.variance[1, 1]
+    Continuing from the previous example, let's say we wanted to estimate the average causal effect. Therefore, we want
+    to contrast two plans (all ``A=1`` versus all ``A=0``). As before, we need to create the reference data for ``X0``
 
-    The risk / mean had all been given treatment=0
+    >>> d0 = d.copy()
+    >>> d0['A'] = 0
+    >>> d0['AW'] = d0['A']*d0['W']
 
-    >>> mestimation.theta[2]
-    >>> mestimation.variance[2, 2]
+    Having setup our data, we can now define the psi function.
+
+    >>> def psi(theta):
+    >>>     return ee_gformula(theta,
+    >>>                        y=d['Y'],
+    >>>                        X=d[['C', 'A', 'W', 'AW']],
+    >>>                        X1=d1[['C', 'A', 'W', 'AW']],
+    >>>                        X0=d0[['C', 'A', 'W', 'AW']], )
+
+    Notice that ``y`` corresponds to the observed outcomes, ``X`` corresponds to the observed covariate data, ``X1``
+    corresponds to the covariate data under ``A=1``, and ``X0`` corresponds to the covariate data under ``A=0``. Here,
+    we need 3+4=7 starting values, since there are two additional parameters from the previous example. For the
+    difference, a starting value of 0 is generally a good choice. Since ``Y`` is binary, we again provide 0.5 as
+    starting values for the causal means
+
+    >>> estr = MEstimator(psi, init=[0., 0.5, 0.5, 0., 0., 0., 0.])
+    >>> estr.estimate(solver='lm')
+
+    Inspecting the parameter estimates, variance, and 95% confidence intervals
+
+    >>> estr.theta[0]    # causal mean difference of 1 versus 0
+    >>> estr.theta[1]    # causal mean under X1
+    >>> estr.theta[2]    # causal mean under X0
+    >>> estr.theta[3:]   # logistic regression coefficients
 
     References
     ----------
@@ -1101,47 +1159,56 @@ def ee_gformula(theta, X, y, treat_index, force_continuous=False):
     of a causal inference technique. American Journal of Epidemiology, 173(7), 731-738.
     """
     # Ensuring correct typing
-    X = np.asarray(X)                            # Convert to NumPy array
-    y = np.asarray(y)                            # Convert to NumPy array
-    beta = theta[3:]                       # Extracting out theta's for the regression model
+    X = np.asarray(X)                # Convert to NumPy array
+    y = np.asarray(y)                # Convert to NumPy array
+    X1 = np.asarray(X1)              # Convert to NumPy array
+
+    # Error checking for misaligned shapes
+    if X.shape != X1.shape:
+        raise ValueError("The dimensions of X and X1 must be the same.")
+
+    # Processing data depending on if two plans were specified
+    if X0 is None:                   # If no reference was specified
+        mu1 = theta[0]                  # ... only a single mean
+        beta = theta[1:]                # ... immediately followed by the regression parameters
+    else:                            # Otherwise difference and both plans are to be returned
+        X0 = np.asarray(X0)             # ... reference data to NumPy array
+        if X.shape != X1.shape:         # ... error checking for misaligned shapes
+            raise ValueError("The dimensions of X and X1 must be the same.")
+        mud = theta[0]                  # ... first parameter is mean difference
+        mu1 = theta[1]                  # ... second parameter is mean under X1
+        mu0 = theta[2]                  # ... third parameter is mean under X0
+        beta = theta[3:]                # ... remainder are for the regression model
 
     # Checking outcome variable type
     if np.isin(y, [0, 1]).all() and not force_continuous:
-        continuous = False
+        regression = ee_logistic_regression         # Use a logistic regression model
+        transform = inverse_logit                   # ... and need to inverse-logit transformation
     else:
-        continuous = True
+        regression = ee_linear_regression           # Use a linear regression model
+        transform = identity                        # ... and need to apply the identity (no) transformation
 
-    if continuous:
-        # Linear regression parameters
-        preds_reg = ee_linear_regression(theta=beta,
-                                         X=X,
-                                         y=y)
-        # Calculating Y(a=0)
-        X[:, treat_index] = 0
-        ya0 = np.dot(X, beta) - theta[2]
-        # Calculating Y(a=1)
-        X[:, treat_index] = 1
-        ya1 = np.dot(X, beta) - theta[1]
-    else:
-        # Logistic regression parameters
-        preds_reg = ee_logistic_regression(theta=beta,
-                                           X=X,
-                                           y=y)
-        # Calculating Y(a=0)
-        X[:, treat_index] = 0
-        ya0 = inverse_logit(np.dot(X, beta)) - theta[2]
-        # Calculating Y(a=1)
-        X[:, treat_index] = 1
-        ya1 = inverse_logit(np.dot(X, beta)) - theta[1]
+    # Estimating regression parameters
+    preds_reg = regression(theta=beta,              # beta coefficients
+                           X=X, y=y)                # along with observed X and observed y
 
-    # Calculating Y(a=1) - Y(a=0)
-    ate = np.ones(y.shape[0]) * (theta[1] - theta[2]) - theta[0]
+    # Calculating mean under X1
+    ya1 = transform(np.dot(X1, beta)) - mu1         # mean under X1
 
-    # Output (3+b)-by-n stacked array
-    return np.vstack((ate,            # theta[0] is for the ATE
-                      ya1[None, :],   # theta[1] is for R1
-                      ya0[None, :],   # theta[2] is for R0
-                      preds_reg))     # theta[3:] is for the regression coefficients
+    if X0 is None:                                  # if no X0, then nothing left to do
+        # Output (1+b)-by-n stacked array
+        return np.vstack((ya1[None, :],     # theta[0] is the mean under X1
+                          preds_reg))       # theta[1:] is the regression coefficients
+    else:                                           # if X0, then need to predict mean under X0 and difference
+        # Calculating mean under X0
+        ya0 = transform(np.dot(X0, beta)) - mu0
+        # Calculating mean difference between X1 and X0
+        ace = np.ones(y.shape[0])*(mu1 - mu0) - mud
+        # Output (3+b)-by-n stacked array
+        return np.vstack((ace,            # theta[0] is the mean difference between X1 and X0
+                          ya1[None, :],   # theta[1] is the mean under X1
+                          ya0[None, :],   # theta[2] is the mean under X0
+                          preds_reg))     # theta[3:] is for the regression coefficients
 
 
 def ee_ipw(theta, X, y, treat_index):
