@@ -450,6 +450,34 @@ class TestEstimatingEquationsCausal:
                             np.mean(ya0),
                             atol=1e-6)
 
+    def test_gcomp_bad_dimensions_error(self, causal_data):
+        # M-estimation
+        d1 = causal_data.copy()
+        d1['A'] = 1
+        d0 = causal_data.copy()
+        d0['A'] = 0
+
+        def psi(theta):
+            return ee_gformula(theta,
+                               y=causal_data['Y'],
+                               X=causal_data[['C', 'A', 'W']],
+                               X1=d1[['C', 'W']])
+
+        mestimator = MEstimator(psi, init=[0.5, 0., 0., 0.])
+        with pytest.raises(ValueError, match="The dimensions of X and X1"):
+            mestimator.estimate(solver='lm')
+
+        def psi(theta):
+            return ee_gformula(theta,
+                               y=causal_data['Y'],
+                               X=causal_data[['C', 'A', 'W']],
+                               X1=d1[['C', 'A', 'W']],
+                               X0=d0[['C', 'A']])
+
+        mestimator = MEstimator(psi, init=[0., 0.5, 0.5, 0., 0., 0.])
+        with pytest.raises(ValueError, match="The dimensions of X and X0"):
+            mestimator.estimate(solver='lm')
+
     def test_ipw(self, causal_data):
         # M-estimation
         def psi(theta):

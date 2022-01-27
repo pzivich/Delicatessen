@@ -1176,8 +1176,8 @@ def ee_gformula(theta, y, X, X1, X0=None, force_continuous=False):
         beta = theta[1:]                # ... immediately followed by the regression parameters
     else:                            # Otherwise difference and both plans are to be returned
         X0 = np.asarray(X0)             # ... reference data to NumPy array
-        if X.shape != X1.shape:         # ... error checking for misaligned shapes
-            raise ValueError("The dimensions of X and X1 must be the same.")
+        if X.shape != X0.shape:         # ... error checking for misaligned shapes
+            raise ValueError("The dimensions of X and X0 must be the same.")
         mud = theta[0]                  # ... first parameter is mean difference
         mu1 = theta[1]                  # ... second parameter is mean under X1
         mu0 = theta[2]                  # ... third parameter is mean under X0
