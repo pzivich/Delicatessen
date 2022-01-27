@@ -1230,7 +1230,7 @@ def ee_gformula(theta, y, X, X1, X0=None, force_continuous=False):
 
     .. math::
 
-        \sum_i^n \psi_m(Y_i, X_i, \theta) = \sum_i^n (Y_i - expit(X_i^T \theta)) X_i = 0
+        \sum_i^n \psi_m(Y_i, X_i, \beta) = \sum_i^n (Y_i - expit(X_i^T \beta)) X_i = 0
 
     By default, `ee_gformula` detects whether `y` is all binary (zero or one), and applies logistic regression if that
     is evaluated to be true. See the parameters for further details.
@@ -1477,7 +1477,7 @@ def ee_ipw(theta, y, A, W, truncate=None):
 
     .. math::
 
-        \sum_i^n \psi_g(A_i, W_i, \theta) = \sum_i^n (A_i - expit(W_i^T \theta)) W_i = 0
+        \sum_i^n \psi_g(A_i, W_i, \alpha) = \sum_i^n (A_i - expit(W_i^T \alpha)) W_i = 0
 
     where A is the treatment and W is the set of confounders.
 
@@ -1573,8 +1573,8 @@ def ee_ipw(theta, y, A, W, truncate=None):
     More specifically, the corresponding parameters are
 
     >>> estr.theta[0]    # causal mean difference of 1 versus 0
-    >>> estr.theta[1]    # causal mean under X1
-    >>> estr.theta[2]    # causal mean under X0
+    >>> estr.theta[1]    # causal mean under A=1
+    >>> estr.theta[2]    # causal mean under A=0
     >>> estr.theta[3:]   # logistic regression coefficients
 
     If you want to see how truncating the probabilities works, try repeating the above code but specifying
@@ -1635,7 +1635,7 @@ def ee_aipw(theta, y, A, W, X, X1, X0, truncate=None, force_continuous=False):
 
     .. math::
 
-        \sum_i^n \psi_g(A_i, W_i, \theta) = \sum_i^n (A_i - expit(W_i^T \theta)) W_i = 0
+        \sum_i^n \psi_g(A_i, W_i, \alpha) = \sum_i^n (A_i - expit(W_i^T \alpha)) W_i = 0
 
     where ``A`` is the treatment and ``W`` is the set of confounders.
 
@@ -1643,13 +1643,13 @@ def ee_aipw(theta, y, A, W, X, X1, X0, truncate=None, force_continuous=False):
 
     .. math::
 
-        \sum_i^n \psi_m(Y_i, X_i, \theta) = \sum_i^n (Y_i - X_i^T \theta) X_i = 0
+        \sum_i^n \psi_m(Y_i, X_i, \beta) = \sum_i^n (Y_i - X_i^T \beta) X_i = 0
 
     and for logistic regression, the estimating equation is
 
     .. math::
 
-        \sum_i^n \psi_m(Y_i, X_i, \theta) = \sum_i^n (Y_i - expit(X_i^T \theta)) X_i = 0
+        \sum_i^n \psi_m(Y_i, X_i, \beta) = \sum_i^n (Y_i - expit(X_i^T \beta)) X_i = 0
 
     By default, `ee_aipw` detects whether `y` is all binary (zero or one), and applies logistic regression if that
     happens. See the parameters for more details. Notice that ``X`` here should consists of both ``A`` and ``W`` (with
@@ -1788,8 +1788,8 @@ def ee_aipw(theta, y, A, W, X, X1, X0, truncate=None, force_continuous=False):
     More specifically, the corresponding parameters are
 
     >>> estr.theta[0]     # causal mean difference of 1 versus 0
-    >>> estr.theta[1]     # causal mean under X1
-    >>> estr.theta[2]     # causal mean under X0
+    >>> estr.theta[1]     # causal mean under A=1
+    >>> estr.theta[2]     # causal mean under A=0
     >>> estr.theta[3:5]   # propensity score regression coefficients
     >>> estr.theta[5:]    # outcome regression coefficients
 

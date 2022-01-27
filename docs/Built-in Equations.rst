@@ -483,7 +483,8 @@ identified and is estimable (see this `paper<https://arxiv.org/abs/2108.11342>`_
 `paper<https://arxiv.org/abs/1904.02826>`_ for more information on this concept).
 
 With that aside, let's proceed through the available estimators of the causal means. In the following examples, we will
-use the generic data example here, where :math:`Y(a)` is independent of :math:`A` conditional on :math:`W`:
+use the generic data example here, where :math:`Y(a)` is independent of :math:`A` conditional on :math:`W`. Below is
+a sample data set
 
 .. code::
 
@@ -496,15 +497,37 @@ use the generic data example here, where :math:`Y(a)` is independent of :math:`A
     d['Y'] = (1-d['A'])*d['Ya0'] + d['A']*d['Ya1']
     d['C'] = 1
 
+Here, we don't get to see the potential outcomes :math:`Y(a)`, but instead estimate the mean under different plans
+using the observed data, :math:`Y,A,W`.
 
 Inverse probability weighting
 -------------------------------------
 
-First, we will examine the inverse probability weighting (IPW) estimator, which models the probability of :math:`A`.
-The IPW estimator in ``delicatessen`` consists of 4 different estimating equations. The *last* estimating equation is
-the logistic model used to estimate the probability of :math:`A`. The *third* and *second* estimating equations are
-the causal means :math:`E[Y(a=0)]` and :math:`E[Y(a=1)]`, respectively. The *first* estimating equation is the causal
-mean difference: :math:`E[Y(a=1)] - E[Y(a=0)]`.
+First, we use the inverse probability weighting (IPW) estimator, which models the probability of :math:`A` conditional
+on :math:`W`. In general, the IPW estimator for the mean difference can be written as
+
+.. math::
+
+    \frac{1}{n} \sum_{i=1}^n \frac{Y_i A_i}{Pr(A_i = 1 | W_i; \hat{\alpha})} - \frac{1}{n}
+    \sum_{i=1}^n \frac{Y_i (1-A_i)}{Pr(A_i = 0 | W_i; \hat{\alpha})}
+
+In ``delicatessen``, the built-in IPW estimator consists of 4 estimating equations, with both binary and continuous
+outcomes supported by ``ee_ipw`` (since we are using the Horwitz-Thompson estimator). The stacked estimating equations
+are
+
+.. math::
+
+    \sum_i^n \psi_d(Y_i, A_i, \pi_i, \theta_0) = \sum_i^n (\theta_1 - \theta_2) - \theta_0 = 0
+
+    \sum_i^n \psi_1(Y_i, A_i, \pi_i, \theta_1) = \sum_i^n \frac{A_i \times Y_i}{\pi_i} - \theta_1 = 0
+
+    \sum_i^n \psi_0(Y_i, A_i, \pi_i, \theta_2) = \sum_i^n \frac{(1-A_i) \times Y_i}{1-\pi_i} - \theta_2 = 0
+
+    \sum_i^n \psi_g(A_i, W_i, \theta) = \sum_i^n (A_i - expit(W_i^T \alpha)) W_i = 0
+
+where :math:`\theta_1` is the average causal effect, :math:`\theta_2` is the mean under the plan where
+:math:`A=1` for everyone, :math:`\theta_3` is the mean under the plan where :math:`A=0` for everyone, and
+:math:`\alpha` is the parameters for the logistic model used to estimate the propensity scores.
 
 To load the estimating equations,
 
@@ -513,210 +536,313 @@ To load the estimating equations,
     from delicatessen import MEstimators
     from delicatessen.estimating_equations import ee_ipw
 
-The estimating equation is then wrapped inside our ``psi`` function
+The estimating equation is then wrapped inside the wrapper ``psi`` function. Notice that the estimating equation has
+4 non-optional inputs: the parameter values, the outcomes, the actions, and the covariates to model the propensity
+scores with.
 
 .. code::
 
     def psi(theta):
         return ee_ipw(theta,                 # Parameters
-                      X=d[['C', 'A', 'W']],  # Covariates (including A)
                       y=d['Y'],              # Outcome
-                      treat_index=1)         # Index of A in X
+                      A=d['A'],              # Action (exposure, treatment, etc.)
+                      W=d[['C', 'W']])       # Covariates for PS model
 
-The arguments for ``ee_ipw`` are the :math:`\theta` values, the covariates (with ``C`` as an intercept), the outcomes
-(``Y``), and the column index for the treatment in ``X``. Here, 1 designates the second column (python uses
-zero-indexing), which corresponds to ``A`` in how the X data is formatted.
+Note that we add an intercept to the logistic model by adding a column of 1's via ``d['C']``.
 
-Now we can call the M-estimator to solve for the values and the variance. Here, the initial values provided must be
-3+*b* (where *b* is the number of columns in X *minus 1*). This is because the IPW estimating equations output the
-average treatment effect, risk under all-treated, risk under none-treated, and the logistic regression model
-coefficients. Since we are modeling the conditional probability of A, one column in X is excluded from the covariates.
+Here, the initial values provided must be 3+*b* (where *b* is the number of columns in W). For binary
+outcomes, it will likely be best practice to have the initial values set as ``[0., 0.5, 0.5, ...]``. followed by b
+``0.``'s. For continuous outcomes, all ``0.`` can be used instead. Furthermore, a logistic model for the propensity
+scores could be optimized outside of ``delicatessen`` and those (pre-washed) regression estimates can be passed as
+initial values to speed up optimization.
 
-As for starting values, it will likely be best practice to have the initial values set as  [0., 0.5, 0.5, ...] in
-general. The regression initial values can also be pre-washed to speed up optimization.
-
-.. code::
-
-    mestimation = MEstimator(stacked_equations=psi, init=[0., 0.5, 0.5, 0., 0., 0.])
-    mestimation.estimate(solver='lm')
-
-Now the average treatment effect, as well as the variance, can be output. Here, a key advantage of M-estimation can be
-seen. The form of an M-estimator allows us to estimate the variance directly, while appropriately allowing for the
-uncertainty in the regression model parameters to be carried forward. M-estimation does this automatically for us.
-Essentially, we do not need to bootstrap or use the GEE-trick for IPW to estimate the variance!
+Now we can call the M-estimator to solve for the values and the variance.
 
 .. code::
 
-    mestimation.theta[0]
-    mestimation.variance[0, 0]
+    estr = MEstimator(psi, init=[0., 0.5, 0.5, 0., 0.])
+    estr.estimate(solver='lm')
 
-Besides the average treatment effect, the risk / mean under all-treated can be extracted by
-
-.. code::
-
-    mestimation.theta[1]
-    mestimation.variance[1, 1]
-
-and the risk / mean under none-treated can be extracted by
+After successful optimization, we can inspect the estimated values.
 
 .. code::
 
-    mestimation.theta[2]
-    mestimation.variance[2, 2]
+    estr.theta[0]    # causal mean difference of 1 versus 0
+    estr.theta[1]    # causal mean under X1
+    estr.theta[2]    # causal mean under X0
+    estr.theta[3:]   # logistic regression coefficients
 
-The ``ee_ipw`` supports both binary and continuous outcomes automatically. Both of these variable types are handled in
-the same way due to the form of the Horwitz-Thompson estimator.
+The variance and Wald-type confidence intervals can also be output via
 
-Unlike the GEE-trick for IPW (which provides a conservative estimator of the variance), the variance estimator here
-is correct. This means it will be narrower than the GEE-trick. Therefore, this approach is generally preferred over
-the GEE-trick to calculating the variance for the IPW estimator. It is also much more computationally efficient than
-the bootstrap.
+.. code::
+
+    estr.variance
+    estr.confidence_intervals()
+
+The IPW estimators demonstrates a key advantage of M-Estimation. The stacked estimating equations means that the
+sandwich variance correctly incorporates the uncertainty in estimation of the propensity scores into the parameter(s)
+of interest (e.g., average causal effect). Therefore, we do not have to rely on the nonparametric bootstrap
+(computationally cumbersome) or the GEE-trick (conservative estimate of the variance for the average causal effect).
 
 
 G-computation
 ----------------------------
 
-First, is g-computation. The built-in estimating equations for g-computation calculate the average treatment effect,
-risk / mean under all-treated, and the risk / mean under none-treated.
+Second, we use g-computation, which models :math:`Y` conditional on :math:`A` and :math:`W`. In general, g-computation
+for the mean difference can be written as
 
-*A limitation*: the g-computation, as implemented in the built-in estimating equation only uses a single outcome model
-and that outcome model does *not* support interaction terms. Here the g-computation is meant as a basic example. For
-more general use, the provided estimating equation should be adapted. But the built-in estimating equation will provide
-a basic structure for user's to build off of.
+.. math::
 
-To load the estimating equations, we call
+    \frac{1}{n} \sum_{i=1}^n m_1(W_i; \hat{\beta}) - \frac{1}{n} \sum_{i=1}^n m_0(W_i; \hat{\beta})
+
+where :math:`m_a(W_i; \hat{\beta}) = E[Y_i|A_i=a,W_i; \hat{\beta}]`. In ``delicatessen``, the built-in g-computation
+consists of either 2 estimating equations or 4 estimating equations, with both binary and continuous outcomes supported.
+The 2 stacked estimating equations are
+
+.. math::
+
+    \sum_i^n \psi_1(Y_i, X_i, \theta_1) = \sum_i^n g(\hat{Y}_i^a) - \theta_1 = 0
+
+    \sum_i^n \psi_m(Y_i, X_i, \theta) = \sum_i^n (Y_i - \text{expit}(X_i^T \theta)) X_i = 0
+
+
+where :math:`\theta_1` is the mean under the action :math:`a`, and :math:`\beta` is the parameters for the regression
+model used to estimate the outcomes. Notice that the g-computation procedure supports generic deterministic plans
+(e.g., set :math:`A=1` for all, set :math:`A=0` for all, set :math:`A=1` if :math:`W=1` otherwise :math:`A=0`, etc.).
+These plans are more general than those allowed by either the built-in IPW or built-in AIPW estimating equations.
+
+The 4 stacked estimating equations instead compare the mean difference between two action plans. The estimating
+equations are
+
+.. math::
+
+    \sum_i^n \psi_1(Y_i, X_i, \theta_1) = \sum_i^n (\theta_2 - \theta_3) - \theta_1 = 0
+
+    \sum_i^n \psi_1(Y_i, X_i, \theta_2) = \sum_i^n g(\hat{Y}_i^a) - \theta_2 = 0
+
+    \sum_i^n \psi_1(Y_i, X_i, \theta_3) = \sum_i^n g(\hat{Y}_i^a) - \theta_3 = 0
+
+    \sum_i^n \psi_m(Y_i, X_i, \theta) = \sum_i^n (Y_i - \text{expit}(X_i^T \theta)) X_i = 0
+
+
+where :math:`\theta_1` is the average causal effect, :math:`\theta_2` is the mean under the first plan, :math:`\theta_3`
+is the mean under the second, and :math:`\beta` is the parameters for the regression model used to predict the
+outcomes.
+
+To load the estimating equations,
 
 .. code::
 
     from delicatessen import MEstimators
     from delicatessen.estimating_equations import ee_gformula
 
-Again, we will wrap the built-in estimating equations inside a function.
+The estimating equation is then wrapped inside the wrapper ``psi`` function. In the first example, we focus on
+estimating the average causal effect. Notice that for ``ee_gformula`` some additional data prep is necessary.
+Specifically, we need to create a copy of the data set where ``A`` is set to the value our plan dictates
+(e.g., ``A=1``). Below is code that does this step and creates the wrapper function
 
 .. code::
+
+    # Creating data under the plans
+    d1 = d.copy()
+    d1['A'] = 1
+    d0 = d.copy()
+    d0['A'] = 0
+
+    # Creating interaction terms
+    d['AxW'] = d['A'] * d['W']
+    d1['AxW'] = d1['A'] * d1['W']
+    d0['AxW'] = d0['A'] * d0['W']
 
     def psi(theta):
-        return ee_gformula(theta, X=d[['C', 'A', 'W']], y=d['Y'], treat_index=1)
+        return ee_gformula(theta,                        # Parameters
+                           y=d['Y'],                     # Outcome
+                           X=d[['C', 'A', 'W', 'AxW']],  # Observed
+                           X=d1[['C', 'A', 'W', 'AxW']], # Plan 1
+                           X=d0[['C', 'A', 'W', 'AxW']]) # Plan 2
 
-The arguments for ``ee_gformula`` are the :math:`\theta` values, the covariates (including an intercept (``C``) and the
-treatment (``A``)), the outcome values (``Y``), and the column index for the treatment in ``X``. Here, 1 designates the
-second column (python uses zero-indexing), which corresponds to ``A`` in how the ``X`` data is formatted.
+Note that we add an intercept to the outcome model by adding a column of 1's via ``d['C']``.
 
-Now we can call the M-estimator to solve for the values and the variance. Here, the initial values provided must be
-3+*b* (where *b* is the number of columns in X). This is because the g-computation estimating equations output the
-average treatment effect, risk under all-treated, risk under none-treated, and the regression model coefficients.
+Here, the initial values provided must be 3+*b* (where *b* is the number of columns in X). For binary
+outcomes, it will likely be best practice to have the initial values set as ``[0., 0.5, 0.5, ...]``. followed by b
+``0.``'s. For continuous outcomes, all ``0.`` can be used instead. Furthermore, a regression model for the outcomes
+could be optimized outside of ``delicatessen`` and those (pre-washed) regression estimates can be passed as
+initial values to speed up optimization.
 
-As for starting values, it will likely be best practice to have the initial values set as  [0., 0.5, 0.5, ...] in
-general. The regression initial values can also be pre-washed to speed up optimization.
-
-.. code::
-
-    mestimation = MEstimator(stacked_equations=psi, init=[0., 0.5, 0.5, 0., 0., 0.])
-    mestimation.estimate(solver='lm')
-
-Now the average treatment effect, as well as the variance, can be output. Here, a key advantage of M-estimation can be
-seen. The form of an M-estimator allows us to estimate the variance directly, while appropriately allowing for the
-uncertainty in the regression model parameters to be carried forward. M-estimation does this automatically for us.
-Essentially, we do not need to bootstrap to estimate the variance!
+Now we can call the M-estimator to solve for the values and the variance.
 
 .. code::
 
-    mestimation.theta[0]
-    mestimation.variance[0, 0]
+    estr = MEstimator(psi, init=[0., 0.5, 0.5, 0., 0., 0., 0.])
+    estr.estimate(solver='lm')
 
-Besides the average treatment effect, the risk / mean under all-treated can be extracted by
-
-.. code::
-
-    mestimation.theta[1]
-    mestimation.variance[1, 1]
-
-and the risk / mean under none-treated can be extracted by
+After successful optimization, we can inspect the estimated values.
 
 .. code::
 
-    mestimation.theta[2]
-    mestimation.variance[2, 2]
+    estr.theta[0]    # causal mean difference of 1 versus 0
+    estr.theta[1]    # causal mean under X1
+    estr.theta[2]    # causal mean under X0
+    estr.theta[3:]   # regression coefficients
 
-The ``ee_gformula`` supports both binary and continuous outcomes. Inside the function, it automatically detects whether
-the outcome data is binary. If the outcome data is not binary, then it defaults to using a linear regression model
-(but you can also force the use of a linear regression model for binary data by setting ``force_continuous=True``
+The variance and Wald-type confidence intervals can also be output via
 
-To summarize, the key advantage of M-estimation here is that it *appropriately* estimates the variance. We do *not*
-need to bootstrap in this case (and more generally if the sample size is sufficiently large).
+.. code::
+
+    estr.variance
+    estr.confidence_intervals()
+
+Again, a key advantage of M-Estimation is demonstrated here. The stacked estimating equations means that the
+sandwich variance correctly incorporates the uncertainty in estimation of the outcome model into the parameter(s)
+of interest (e.g., average causal effect). Therefore, we do not have to rely on the nonparametric bootstrap
+(computationally cumbersome).
+
+As a second example, we now demonstrate the flexbility of ``ee_gformula`` to estimate other plans. Here, we estimate
+the causal mean under the plan where only those with :math:`W=1` have :math:`A=1`. As before, we need to generate
+this distribution of covariates and wrap the built-in estimating equations.
+
+.. code::
+
+    # Creating data under the plans
+    da = d.copy()
+    da['A'] = np.where(da['W'] == 1, 1, 0)
+
+    # Creating interaction terms
+    d['AxW'] = d['A'] * d['W']
+    da['AxW'] = da['A'] * da['W']
+
+    def psi(theta):
+        return ee_gformula(theta,                        # Parameters
+                           y=d['Y'],                     # Outcome
+                           X=d[['C', 'A', 'W', 'AxW']],  # Observed
+                           X=da[['C', 'A', 'W', 'AxW']]) # Plan
+
+Now we can call the M-estimator to solve for the values and the variance.
+
+.. code::
+
+    estr = MEstimator(psi, init=[0., 0.5, 0.5, 0., 0., 0., 0.])
+    estr.estimate(solver='lm')
+
+After successful optimization, we can inspect the estimated values.
+
+.. code::
+
+    estr.theta[0]    # causal mean under X1
+    estr.theta[1:]   # regression coefficients
 
 
 Augmented inverse probability weighting
 ----------------------------------------------
 
-Before, we model the outcome and treatment models separately. Now, we will consider the augmented inverse probability
-weighting (AIPW) model, which incorporates both the treatment and outcome models. AIPW is a semi-parametric
-doubly-robust estimator for the average treatment effect. For a basic overview, see Funk et al. (2011).
+Finally, we use the augmented inverse probability weighting (AIPW) esitmator, which incorporates both a model for
+:math:`Y` conditional on :math:`A` and :math:`W`, and a model for :math:`A` conditional on :math:`W`. The AIPW estimator
+for the mean difference can be written as
 
-*A limitation*: as with g-computation, the built-in AIPW estimating equation only uses a single outcome model
-and that outcome model does *not* support interaction terms. Here the AIPW is meant as a basic example. For
-more general use, the provided estimating equation should be adapted. But the built-in estimating equation will provide
-a basic structure for user's to build off of.
+.. math::
 
-The estimating equations for the AIPW estimator are also provided in ``delicatessen``. To load the estimating equations,
-we call
+    \frac{1}{n} \sum_{i=1}^n \frac{A_i \times Y_i}{\pi_i} - \frac{m_1(W_i; \hat{\beta})(A_i-\pi_i}{\pi_i} -
+    \frac{1}{n} \sum_{i=1}^n \frac{(1-A_i) \times Y_i}{1-\pi_i} + \frac{m_0(W_i; \hat{\beta})(A_i-\pi_i}{1-\pi_i}
+
+
+where :math:`m_a(W_i; \hat{\beta}) = E[Y_i|A_i=a,W_i; \hat{\beta}]`, and
+:math:`\pi_i = Pr(A_i = 1 | W_i; \hat{\alpha})`. In ``delicatessen``, the built-in AIPW estimator consists of 5
+estimating equations, with both binary and continuous outcomes supported. Similar to IPW (and unlike g-computation),
+the built-in AIPW estimator only supports the average causal effect as the parameter of interest.
+
+The stacked estimating equations are
+
+.. math::
+
+    \sum_i^n \psi_0(Y_i, A_i, \pi_i, \theta_0) = \sum_i^n (\theta_1 - \theta_2) - \theta_0 = 0
+
+    \sum_i^n \psi_1(Y_i, A_i, W_i, \pi_i, \theta_1) = \sum_i^n (\frac{A_i \times Y_i}{\pi_i} -
+    \frac{\hat{Y^1}(A_i-\pi_i}{\pi_i}) - \theta_1 = 0
+
+    \sum_i^n \psi_0(Y_i, A_i, \pi_i, \theta_2) = \sum_i^n (\frac{(1-A_i) \times Y_i}{1-\pi_i} +
+    \frac{\hat{Y^0}(A_i-\pi_i}{1-\pi_i})) - \theta_2 = 0
+
+    \sum_i^n \psi_g(A_i, W_i, \alpha) = \sum_i^n (A_i - expit(W_i^T \alpha)) W_i = 0
+
+    \sum_i^n \psi_m(Y_i, X_i, \beta) = \sum_i^n (Y_i - X_i^T \beta) X_i = 0
+
+where :math:`\theta_1` is the average causal effect, :math:`\theta_2` is the mean under the first plan, :math:`\theta_3`
+is the mean under the second, :math:`\alpha` is the parameters for the propensity score logistic model, and
+:math:`\beta` is the parameters for the regression model used to predict the outcomes. For binary outcomes, the final
+estimating equation is replaced with the logistic model analog.
+
+To load the estimating equations,
 
 .. code::
 
     from delicatessen import MEstimators
     from delicatessen.estimating_equations import ee_aipw
 
-As always, we will wrap the built-in estimating equation inside a function.
+The estimating equation is then wrapped inside the wrapper ``psi`` function. Like ``ee_gformula``, ``ee_aipw`` requires
+some additional data prep. Specifically, we need to create a copy of the data set where :math:`A=1` for everyone and another
+copy where :math:`A=0` for everyone. Below is code that does this step and creates the wrapper function
 
 .. code::
+
+    # Creating data under the plans
+    d1 = d.copy()
+    d1['A'] = 1
+    d0 = d.copy()
+    d0['A'] = 0
+
+    # Creating interaction terms
+    d['AxW'] = d['A'] * d['W']
+    d1['AxW'] = d1['A'] * d1['W']
+    d0['AxW'] = d0['A'] * d0['W']
 
     def psi(theta):
-        return ee_aipw(theta, X=d[['C', 'A', 'W']], y=d['Y'], treat_index=1)
+        return ee_gformula(theta,                        # Parameters
+                           y=d['Y'],                     # Outcome
+                           A=d['A'],                     # Action
+                           W=d[['C', 'W']],              # PS model
+                           X=d[['C', 'A', 'W', 'AxW']],  # Outcome model
+                           X=d1[['C', 'A', 'W', 'AxW']], # Plan A=1
+                           X=d0[['C', 'A', 'W', 'AxW']]) # Plan A=0
 
-The arguments for ``ee_aipw`` are the :math:`\theta` values, the covariates (including an intercept (C) and the
-action (A)), the outcome values (Y), and the column index for the treatment in X. Here, 1 designates the second column
-(python uses zero-indexing), which corresponds to ``'A'`` in how the X data is formatted.
+Note that we add an intercept to the outcome model by adding a column of 1's via ``d['C']``.
 
-Now we can call the M-estimator to solve for the values and the variance. Here, the initial values provided must be
-3+*b*+*b-1* (where *b* is the number of columns in X). This is because the AIPW estimating equations output the
-average treatment effect, risk under all-treated, risk under none-treated, and the outcome model coefficients, and
-the treatment model coefficients.
+Here, the initial values provided must be 3+*b*+*c* (where *b* is the number of columns in W and *c* is the number of
+columns in X). For binary outcomes, it will likely be best practice to have the initial values set as
+``[0., 0.5, 0.5, ...]``. followed by b ``0.``'s. For continuous outcomes, all ``0.`` can be used instead. Furthermore,
+a regression models could be optimized outside of ``delicatessen`` and those (pre-washed) regression estimates can be
+passed as initial values to speed up optimization.
 
-As for starting values, it will likely be best practice to have the initial values set as ``[0., 0.5, 0.5, ...]`` in
-general. The regression initial values can also be pre-washed to speed up optimization.
-
-.. code::
-
-    mestimation = MEstimator(stacked_equations=psi, init=[0., 0.5, 0.5, 0., 0., 0.])
-    mestimation.estimate(solver='lm')
-
-Now the average treatment effect, as well as the variance, can be output. Here, a key advantage of M-estimation can be
-seen. The form of an M-estimator allows us to estimate the variance directly, while appropriately allowing for the
-uncertainty in the regression model parameters to be carried forward. M-estimation does this automatically for us.
-Essentially, we do not need to bootstrap or use the GEE-trick for IPW to estimate the variance!
+Now we can call the M-estimator to solve for the values and the variance.
 
 .. code::
 
-    mestimation.theta[0]
-    mestimation.variance[0, 0]
+    estr = MEstimator(psi, init=[0., 0.5, 0.5,
+                                 0., 0.,
+                                 0., 0., 0., 0.])
+    estr.estimate(solver='lm')
 
-Besides the average treatment effect, the risk / mean under all-treated can be extracted by
-
-.. code::
-
-    mestimation.theta[1]
-    mestimation.variance[1, 1]
-
-and the risk / mean under none-treated can be extracted by
+After successful optimization, we can inspect the estimated values.
 
 .. code::
 
-    mestimation.theta[2]
-    mestimation.variance[2, 2]
+    estr.theta[0]     # causal mean difference of 1 versus 0
+    estr.theta[1]     # causal mean under A=1
+    estr.theta[2]     # causal mean under A=0
+    estr.theta[3:5]   # propensity score regression coefficients
+    estr.theta[5:]    # outcome regression coefficients
 
-The variance estimator in this case will match the influence function estimator of the variance that is commonly used
-for AIPW. See Boos & Stefanski (2013) for more detailed discussion on the relation between M-estimation and influence
-curves.
+The variance and Wald-type confidence intervals can also be output via
+
+.. code::
+
+    estr.variance
+    estr.confidence_intervals()
+
+Here, the M-Estimation sandwich variance is the same as the influence-curve-based variance estimator. Either of these
+approaches correctly incorporates the uncertainty in estimation of the outcome model into the parameter(s) of interest
+(e.g., average causal effect). Therefore, we do not have to rely on the nonparametric bootstrap (computationally
+cumbersome).
+
 
 References and Further Readings
 ===============================
