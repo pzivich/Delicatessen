@@ -483,6 +483,54 @@ class TestEstimatingEquationsCausal:
                             np.mean(ya0),
                             atol=1e-6)
 
+    def test_ipw_truncate(self, causal_data):
+        # M-estimation
+        def psi(theta):
+            return ee_ipw(theta,
+                          y=causal_data['Y'],
+                          A=causal_data['A'],
+                          X=causal_data[['C', 'W']],
+                          truncate=(0.1, 0.5))
+
+        mestimator = MEstimator(psi, init=[0., 0.5, 0.5, 0., 0.])
+        mestimator.estimate(solver='lm')
+
+        # By-hand IPW estimator with statsmodels
+        glm = sm.GLM(causal_data['A'], causal_data[['C', 'W']],
+                     family=sm.families.Binomial()).fit()
+        pi = glm.predict()
+        pi = np.clip(pi, 0.1, 0.5)
+        ya1 = causal_data['A'] * causal_data['Y'] / pi
+        ya0 = (1-causal_data['A']) * causal_data['Y'] / (1-pi)
+
+        # Checking logistic coefficients (nuisance model estimates)
+        npt.assert_allclose(mestimator.theta[3:],
+                            np.asarray(glm.params),
+                            atol=1e-6)
+        # Checking mean estimates
+        npt.assert_allclose(mestimator.theta[0],
+                            np.mean(ya1) - np.mean(ya0),
+                            atol=1e-6)
+        npt.assert_allclose(mestimator.theta[1],
+                            np.mean(ya1),
+                            atol=1e-6)
+        npt.assert_allclose(mestimator.theta[2],
+                            np.mean(ya0),
+                            atol=1e-6)
+
+    def test_ipw_truncate_error(self, causal_data):
+        # M-estimation
+        def psi(theta):
+            return ee_ipw(theta,
+                          y=causal_data['Y'],
+                          A=causal_data['A'],
+                          X=causal_data[['C', 'W']],
+                          truncate=(0.99, 0.01))
+
+        mestimator = MEstimator(psi, init=[0., 0.5, 0.5, 0., 0.])
+        with pytest.raises(ValueError, match="truncate values"):
+            mestimator.estimate()
+
     def test_aipw(self, causal_data):
         # M-estimation
         def psi_builtin_regression(theta):
