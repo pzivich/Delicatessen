@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
 import pandas as pd
-from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import LinearRegression, HuberRegressor
 from delicatessen import MEstimator
 
 epsilon = 1.0E-6
@@ -201,27 +201,36 @@ class TestMEstimationExamples:
         assert estr.theta[1] - coef[1] < epsilon
         assert estr.theta[2] - coef[2] < epsilon
 
-    def test_combination(self):
+    # Using Huber regression currently - seems to be issue with extraneous results such as
+    # extremely large estimated beta values
+    # Seems to lead to results that are equal to LR, not RobR
+    def test_robust_regression(self):
         n = 1000
-        y_loc = 10
-        x_loc = 5
+        k = 2
         data = pd.DataFrame()
-        data['Y'] = np.random.normal(loc=y_loc, scale=2, size=n)
-        data['X'] = np.random.normal(loc=x_loc, scale=1, size=n)
+        data['X'] = np.random.normal(size=n)
+        data['Z'] = np.random.normal(size=n)
+        data['Y'] = 0.5 + 5 * data['X'] - 2 * data['Z'] + np.random.normal(loc=0, size=n)
+        data['C'] = 1
 
-        def psi(theta):
-            mean_y = data['Y'] - theta[0]
-            mean_x = data['X'] - theta[1]
-            ratio = np.ones(data.shape[0]) * (theta[0] - theta[1] * theta[2])
-            vary = (data['Y'] - theta[0]) ** 2 - theta[3]
-            varx = (data['X'] - theta[1]) ** 2 - theta[4]
-            return mean_y, mean_x, ratio, vary, varx
+        x = np.asarray(data[['C', 'X', 'Z']])
+        y = np.asarray(data['Y'])[:, None]
 
-        mestimate = MEstimator(psi, init=[0, 0, 1, 1, 1])
-        mestimate.estimate()
+        def psi_robust_regression(theta):
+            beta = np.asarray(theta)[:, None]
+            preds = np.asarray(y - np.dot(x, beta))
+            preds = np.clip(preds, a_min=-k, a_max=k)
 
-        assert mestimate.theta[0] - data['Y'].mean() < epsilon
-        assert mestimate.theta[1] - data['X'].mean() < epsilon
-        assert mestimate.theta[2] - data['Y'].mean() / data['X'].mean() < epsilon
-        assert mestimate.theta[3] - data['Y'].var() < epsilon
-        assert mestimate.theta[4] - data['X'].var() < epsilon
+            return (preds * x).T
+
+        estr = MEstimator(psi_robust_regression, init=[0., 0., 0., ])
+        estr.estimate(solver='hybr')
+
+        model = HuberRegressor(epsilon=k).fit(x, y)
+        coef = model.coef_
+
+        m1 = LinearRegression().fit(x, y)
+
+        assert estr.theta[0] - coef[0] < 0.3
+        assert estr.theta[1] - coef[1] < 1e-3
+        assert estr.theta[2] - coef[2] < 1e-3
