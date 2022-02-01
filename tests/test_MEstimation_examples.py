@@ -1,6 +1,7 @@
 import pytest
 import numpy as np
 import pandas as pd
+from sklearn.linear_model import LinearRegression
 from delicatessen import MEstimator
 
 epsilon = 1.0E-6
@@ -147,13 +148,33 @@ class TestMEstimationExamples:
 
         estr = MEstimator(psi_quantile, init=[0., 0., 0., ])
         estr.estimate(solver='hybr',
+                      tolerance=1e-4,
+                      dx=1,
+                      order=9)
+
+        assert estr.theta[0] - qs[0] < 1e-2
+        assert estr.theta[1] - qs[1] < 1e-2
+        assert estr.theta[2] - qs[2] < 1e-2
+
+    def test_positive_mean_deviation(self):
+        n = 1000
+        y = np.random.normal(size=n)
+
+        md = (abs(y - y.mean())).sum() / n
+
+        def psi_deviation(theta):
+            pmd = 2 * (y - theta[1]) * (y > theta[1]) - theta[0]
+            med = 0.5 - (y <= theta[1])
+            return pmd, med
+
+        estr = MEstimator(psi_deviation, init=[0., 0., ])
+        estr.estimate(solver='hybr',
                       tolerance=1e-3,
                       dx=1,
                       order=9)
 
-        assert estr.theta[0] - qs[0] < epsilon
-        assert estr.theta[1] - qs[1] < epsilon
-        assert estr.theta[2] - qs[2] < epsilon
+        assert estr.theta[0] - md < 0.1
+        assert estr.theta[1] - np.median(y) < 0.1
 
     def test_linear_regression(self):
         n = 1000
@@ -163,42 +184,22 @@ class TestMEstimationExamples:
         data['Y'] = 0.5 + 5 * data['X'] - 2 * data['Z'] + np.random.normal(loc=0, size=n)
         data['C'] = 1
 
-        def psi_regression_loop(theta):
-            x = np.asarray(data[['C', 'X', 'Z']])
-            y = np.asarray(data['Y'])
+        x = np.asarray(data[['C', 'X', 'Z']])
+        y = np.asarray(data['Y'])[:, None]
+
+        model = LinearRegression().fit(x, y)
+        coef = model.coef_[0]
+
+        def psi_regression(theta):
             beta = np.asarray(theta)[:, None]
-            n = x.shape[0]
+            return ((y - np.dot(x, beta)) * x).T
 
-            # Place to store resulting estimate values
-            est_vals = []
+        estr = MEstimator(psi_regression, init=[0., 0., 0., ])
+        estr.estimate()
 
-            for i in range(n):
-                v_i = (y[i] - np.dot(x[i], beta)) * x[i]
-                est_vals.append(v_i)
-
-            return np.asarray(est_vals).T
-
-        def psi_regression_vector(theta):
-            x = np.asarray(data[['C', 'X', 'Z']])
-            y = np.asarray(data['Y'])
-            beta = np.asarray(theta)[:, None]
-
-            dot = np.dot(x, beta)
-            yval = y - dot
-            xtim = yval.dot(x)
-            return xtim.T
-
-        mestimator1 = MEstimator(psi_regression_loop, init=[0.1, 0.1, 0.1])
-        mestimator1.estimate()
-        mestimator2 = MEstimator(psi_regression_vector, init=[0.1, 0.1, 0.1])
-        mestimator2.estimate()
-
-        assert mestimator1.theta[0] - mestimator2.theta[0] < epsilon
-        assert mestimator1.theta[1] - mestimator2.theta[1] < epsilon
-        assert mestimator1.theta[2] - mestimator2.theta[2] < epsilon
-
-    def test_gee(self):
-        pass
+        assert estr.theta[0] - model.intercept_[0] < epsilon
+        assert estr.theta[1] - coef[1] < epsilon
+        assert estr.theta[2] - coef[2] < epsilon
 
     def test_combination(self):
         n = 1000
