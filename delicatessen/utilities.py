@@ -26,11 +26,7 @@ def partial_derivative(func, var, point, output, dx, order):
     float
         Partial derivative at the variable at a particular points
     """
-<<<<<<< HEAD
-    args = copy(point[:])    # Copy is needed here to prevent over-writing (not sure why SciPy overwrites if not)
-=======
-    args = copy(point[:])
->>>>>>> origin/v0.1
+    args = copy(point[:])  # Copy is needed here to prevent over-writing (not sure why SciPy overwrites if not)
 
     def wraps(x):
         args[var] = x
