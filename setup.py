@@ -1,8 +1,9 @@
-"""Delicatessen is a one-stop shop for all your sandwich (variance) needs. Specifically, `delicatessen` implements a general API
-for M-estimation. Estimating equations are both pre-built and can be custom-made. For help on creating custom
-estimating equations, be sure to check out the ReadTheDocs documentation.
+"""Delicatessen is a one-stop shop for all your sandwich (variance) needs. `delicatessen` implements a general API for
+the generalized calculus of M-estimation. Both pre-built and custom, user-specified estimating equations are compatible
+with the M-Estimator. For an introduction to M-Estimation, using `delicatessen`, and building your own estimating
+equations, see the documentation at https://deli.readthedocs.io/en/latest/ .
 
-To install the delicatessen library, use the following command
+To install the `delicatessen`, use the following command
 
 $ python -m pip install delicatessen
 

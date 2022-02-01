@@ -1,7 +1,7 @@
 Reference
 ==========================
 
-This page links to the documentation for each functionality within ``delicatessen``. *M-Estimator* contains
+Documentation for all available functions and arguments for those functions are provided here. *M-Estimator* contains
 documentation for the general M-Estimator procedure. *Estimating Equations* details the built-in estimating equations
 that come with ``delicatessen``.
 

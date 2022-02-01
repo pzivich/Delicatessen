@@ -1,9 +1,11 @@
 Examples
 =====================================
 
-Here, I will go through a variety of examples (using custom estimating equations, rather than the built-in options).
-These examples follow Chapter 7 of Boos & Stefanski. If you have the book (or access to it), then reading along with
-each section may be helpful. To make it easier, I also provide the section heading from Chapter 7.
+Here, we will implement some of the examples described in Chapter 7 of Boos & Stefanski (2013). If you have the book
+(or access to it), then reading along with each section may be helpful. To make it easier, I also provide the section
+heading from Chapter 7. Finally, we will code each of the estimating equations by-hand (rather than using the built-in
+options).
+
 
 Boos DD, & Stefanski LA. (2013). M-estimation (estimating equations). In Essential Statistical Inference
 (pp. 297-337). Springer, New York, NY.
@@ -12,22 +14,34 @@ Boos DD, & Stefanski LA. (2013). M-estimation (estimating equations). In Essenti
 Sample Mean (7.2.2)
 -------------------------------
 
-First, we demonstrate a simple estimating equation for the mean and variance (stacked together). The estimating
-equations are
+First, we demonstrate a simple estimating equation for the mean and variance. The estimating equations are
 
 .. math::
 
     \psi_1(Y_i, \theta) &= Y_i - \theta_1 \\
     \psi_2(Y_i, \theta) &= (Y_i - \theta_1)^2 - \theta_2
 
-To demonstrate the example, we will use some generic data for Y
+To demonstrate the example, we will use some generic data for :\math:`Y`. Below is an example data set that will be
+used up to Section 7.2.6:
 
 .. code::
 
     import numpy as np
-    y = np.array([-2, 1, 3, 4, 1, 4, -5, 3, 6])
 
-For use with the M-estimator in ``delicatessen``, we can program these estimating equations as
+    np.random.seed(80950841)
+
+    n = 200
+    data = pd.DataFrame()
+    data['Y'] = np.random.normal(loc=10, scale=2, size=n)
+    data['X'] = np.random.normal(loc=5, size=n)
+    data['C'] = 1
+
+    # Subsetting the data for 7.2.2
+    y = np.asarray(data['Y'])
+
+
+For use with the M-estimator in ``delicatessen``, we need to write the Python analog of the estimating equation math.
+Below is one way we can do this. Notice that the shape of the returned array in 2-by-n.
 
 .. code::
 
@@ -36,53 +50,62 @@ For use with the M-estimator in ``delicatessen``, we can program these estimatin
         vari = (y-theta[0])**2 - theta[1]   # \psi_2 from above
         return mean, vari
 
-After defining the stacked estimating equations, the M-estimator can be called
+Once we have written up our stacked estimating equations, ``MEstimator`` can be called to solve for :math:`\theta` and
+the sandwich variance. We can do that via
 
 .. code::
 
-    mestimate = MEstimator(psi, init=[0, 1])
-    mestimate.estimate()
+    from delicatessen import MEstimator
 
-The M-estimator will solve for :math:`\theta` via a root finding procedure. For the sandwich variance, ``delicatessen``
-uses a numerical approximation procedure for the derivative. This is different from the closed-form variance estimator
-provided in Chapter 7, but both should return the same answer (within computational error). The advantage of the
-numerical derivatives are that they can be done for arbitrary estimating equations.
+    estr = MEstimator(psi, init=[0, 1])
+    estr.estimate()
+
+    print(estr.theta)                # [10.163  4.112]
+    print(estr.asymptotic_variance)  # [[ 4.112, -1.674], [-1.674, 36.164]]
+
+
+The M-Estimator solves for :math:`\theta` via a root finding procedure given the initial values in ``init``. Since the
+variance must be >0, we provide a positive initial value. For the sandwich variance, ``delicatessen`` uses a numerical
+approximation procedure for the derivative. This is different from the closed-form variance estimator provided in
+Chapter 7, but both should return the same answer (within computational error). The advantage of the numerical
+derivatives are that they can be done for arbitrary estimating equations.
 
 
 Ratio (7.2.3)
 -------------------------------
 
-For the ratio estimator, the following estimating equation is provided
+Now consider if we wanted to estimate the ratio between two means. For estimation of a ratio, we can consider the
+following estimating equation
 
 .. math::
 
-    \psi_1(Y_i, X_i, \theta) = Y_i - \theta_1 \X_i
+    \psi_1(Y_i, X_i, \theta) = Y_i - \theta_1 X_i
 
-For use with the M-estimator in ``delicatessen``, we can program this estimating equation as
+
+We can translate the estimating equation from math into python as
 
 .. code::
-
-    import numpy as np
-    import pandas as pd
-
-    n = 200
-    data = pd.DataFrame()
-    data['Y'] = np.random.normal(loc=10, scale=2, size=n)
-    data['X'] = np.random.normal(loc=5, size=n)
 
     def psi(theta):
-        return data['Y'] - data['X']*theta
+        return data['Y'] - data['X']*theta  # \psi_1 from above
 
-As before, we can solve the estimating equation by
+
+Now, we can pass this estimating equation and data to `MEstimator`
 
 .. code::
 
-    mestimate = MEstimator(psi, init=[1, ])
-    mestimate.estimate()
+    estr = MEstimator(psi, init=[1, ])
+    estr.estimate()
 
-As you may notice, only a single initial value is provided (since only a single array is being returned).
+    print(estr.theta)                # [2.082]
+    print(estr.asymptotic_variance)  # 0.338
 
-The chapter also provides an alternative series of estimating equations for the ratio.
+As you may notice, only a single initial value is provided (since only a single array is being returned). Furthermore,
+we provide an initial value >0 since we are estimating a ratio.
+
+There is another set of stacked estimating equations we can consider for the ratio. Specifically, we can estimate each
+of the means and then take the ratio of those means (rather than doing everything simultaneously). Below is this
+alternative set of estimating equations
 
 .. math::
 
@@ -91,58 +114,69 @@ The chapter also provides an alternative series of estimating equations for the 
     \psi_3(Y_i, X_i, \theta) &= \theta_1 - \theta_2 \times \theta_3
 
 
-Similarly, this can also be programmed via
+Translating this to an estimating equation in Python
 
 .. code::
 
     def psi(theta):
-        mean_y = data['Y'] - theta[0]
-        mean_x = data['X'] - theta[1]
-        ratio = np.ones(data.shape[0]) * (theta[0] - theta[1]*theta[2])
+        mean_y = data['Y'] - theta[0]        # \psi_1 from above
+        mean_x = data['X'] - theta[1]        # \psi_2 from above
+        ratio = (np.ones(data.shape[0]) *    # \psi_3 from above
+                 (theta[0] - theta[1]*theta[2]))
         return mean_y, mean_x, ratio
 
-    mestimate = MEstimator(psi, init=[0, 0, 1])
-    mestimate.estimate()
+    estr = MEstimator(psi, init=[0, 0, 1])
+    estr.estimate()
 
-Here, there is a series of estimating equations. It is also important to note the use of ``np.ones`` in the third step.
-This ensures that ``ratio`` consists on *n* observations. Without multiplying by the array of ones, ``ratio`` would be a
-single value. However, ``MEstimator`` expects a 3-by-*n* array here. Multiplying the 3rd equation by an array of 1's
-keeps the correct dimension and keeps the values.
+    print(estr.theta)  # [10.163,  4.880,  2.082]
 
-Also notice that these estimating equations require the use of 3 ``init`` values, unlike the other ratio estimator.
+Here, we used a trick to make sure the dimension of ``ratio`` stays as :math:`n`, we use ``np.ones``. Without
+multiplying by the array of ones, ``ratio`` would be a single value. However, ``MEstimator`` expects a
+:math:`3 \times n` array. Multiplying the 3rd equation by an array of 1's keeps the correct dimension.
+
+Also notice this form requires the use of 3 ``init`` values, unlike the other ratio estimator. As before, the ratio
+initial value is set >0 to be nice to the root-finder.
 
 
 Delta Method (7.2.4)
 -------------------------------
 
-The delta method can also be cast as an M-estimation problem. The chapter demonstrates two transformations of Y and
-their corresponding mean. The stacked estimating equations are
+The delta method has been used in a variety of contexts, including estimating the variance for transformations of
+parameters. Instead of separately estimating the parameters, transforming the parameters, and then using the delta
+method to estiamte the variance of the transformed parameters; we can apply the transformation in an estimating
+equation and automatically estimate the variance for the transformed parameter(s) via the sandwich variance. To do this,
+we stack the estimating equation for the transformation into our set of estimating equations. Below is the
+mean-variance estimating equations stacked with two transformations of the variance
 
 .. math::
 
     \psi_1(Y_i, \theta) &= Y_i - \theta_1 \\
     \psi_2(Y_i, \theta) &= (Y_i - \theta_1)^2 - \theta_2 \\
     \psi_3(Y_i, \theta) &= \sqrt{\theta_2} - \theta_3 \\
-    \psi_4(Y_i, \theta) &= \log(\theta_2) - \theta_4 \\
+    \psi_4(Y_i, \theta) &= \log(\theta_2) - \theta_4
 
 
-These equations can be expressed programmatically for ``delicatessen`` as
+These equations can be expressed programmatically as
 
 .. code::
 
     def psi_delta(theta):
-        return (data['Y'] - theta[0],
-                (data['Y'] - theta[0])**2 - theta[1],
-                np.ones(data.shape[0])*np.sqrt(theta[1]) - theta[2],
-                np.ones(data.shape[0])*np.log(theta[1]) - theta[3])
+        mean = data['Y'] - theta[0]                           # \psi_1 from above
+        variance = (data['Y'] - theta[0])**2 - theta[1]       # \psi_2 from above
+        sqrt_var = (np.ones(data.shape[0])*np.sqrt(theta[1])  # \psi_3 from above
+                    - theta[2])
+        log_var = (np.ones(data.shape[0])*np.log(theta[1])    # \psi_4 from above
+                   - theta[3])
+        return (mean, variance, sqrt_var, log_var)
 
-Notice the use of the ``np.ones`` trick as done with the ratio estimating equations to ensure that the final equations are
-the correct shapes.
+Notice the use of the ``np.ones`` trick again to ensure that the final equations are the correct shapes.
 
 .. code::
 
-    mestimate = MEstimator(psi, init=[0, 0, 1, 1])
-    mestimate.estimate()
+    estr = MEstimator(psi, init=[0, 1, 1, 1])
+    estr.estimate()
+
+    print(estr.theta)  # [10.163, 4.112, 2.028, 1.414]
 
 Here, there are 4 stacked equations, so ``init`` must be provided 4 values.
 
@@ -150,25 +184,31 @@ Here, there are 4 stacked equations, so ``init`` must be provided 4 values.
 Instrumental Variable (7.2.6)
 -------------------------------
 
-The first set of estimating equations for the instrumental variable analysis are
+As a further example, consider the following instrumental variable approach to correcting for measurement error of a
+variable. Here, :math:`Y` is the outcome of interest, :math:`X` is the true, unmeasured variable, :math:`W` is the
+possibly mismeasured variables, and :math:`T` is the instrument for :math:`X`.
+
+The first set of estimating equations consider in Chapter 7 are
 
 .. math::
 
-    \psi_1(Y_i, W_i, T_i, \theta) &= \theta_1 - T \\
-    \psi_2(Y_i, W_i, T_i, \theta) &= (Y - \theta_2 W)(\theta_1 - T) \\
+    \psi_1(Y_i, W_i, T_i, \theta) &= \theta_1 - T_i \\
+    \psi_2(Y_i, W_i, T_i, \theta) &= (Y_i - \theta_2 W_i)(\theta_1 - T_i)
 
-To demonstrate the example, below is some generic simulated data
+To demonstrate the example, below is some generic simulated data in the described instrumental variable context
 
 .. code::
 
+    np.random.seed(809421)
     n = 500
+
     data = pd.DataFrame()
     data['X'] = np.random.normal(size=n)
     data['Y'] = 0.5 + 2*data['X'] + np.random.normal(loc=0, size=n)
     data['W'] = data['X'] + np.random.normal(loc=0, size=n)
     data['T'] = -0.75 - 1*data['X'] + np.random.normal(loc=0, size=n)
 
-These estimating equations can be programmed for ``delicatessen`` as
+The previous estimating equations can be translated as
 
 .. code::
 
@@ -176,20 +216,22 @@ These estimating equations can be programmed for ``delicatessen`` as
         return (theta[0] - data['T'],
                 (data['Y'] - data['W']*theta[1])*(theta[0] - data['T']))
 
-    mestimate = MEstimator(psi, init=[0.1, 0.1, ])
-    mestimate.estimate()
+    estr = MEstimator(psi, init=[0.1, 0.1, ])
+    estr.estimate()
 
-As mentioned in the chapter, certain joint distributions may be of interest. To capture those distributions, the
-estimating equations from before were further updated to
+    print(estr.theta)  # [-0.777,  1.769,]
+
+As mentioned in the chapter, certain joint distributions may be of interest. To capture these additional distributions,
+the estimating equations were updated to
 
 .. math::
 
-    \psi_1(Y_i, W_i, T_i, \theta) &= \theta_1 - T \\
-    \psi_2(Y_i, W_i, T_i, \theta) &= \theta_2 - W \\
-    \psi_3(Y_i, W_i, T_i, \theta) &= (Y - \theta_3 W)(\theta_2 - W) \\
-    \psi_4(Y_i, W_i, T_i, \theta) &= (Y - \theta_4 W)(\theta_1 - T) \\
+    \psi_1(Y_i, W_i, T_i, \theta) &= \theta_1 - T_i \\
+    \psi_2(Y_i, W_i, T_i, \theta) &= \theta_2 - W_i \\
+    \psi_3(Y_i, W_i, T_i, \theta) &= (Y_i - \theta_3 W_i)(\theta_2 - W_i) \\
+    \psi_4(Y_i, W_i, T_i, \theta) &= (Y_i - \theta_4 W_i)(\theta_1 - T_i)
 
-Again, we can easily write these equations for ``delicatessen``,
+Again, we can easily translate these equations for ``delicatessen``,
 
 .. code::
 
@@ -200,40 +242,151 @@ Again, we can easily write these equations for ``delicatessen``,
                 (data['Y'] - data['W']*theta[3])*(theta[0] - data['T'])
                 )
 
-    mestimator = MEstimator(psi, init=[0.1, 0.1, 0.1, 0.1])
-    mestimator.estimate()
+    estr = MEstimator(psi, init=[0.1, 0.1, 0.1, 0.1])
+    estr.estimate()
 
-This example further demonstrates the flexibility of M-estimation by stacking together estimating equations.
+    print(estr.theta)  # [-0.777, 0.005, 0.964, 1.769]
+
+This example demonstrates the flexbility of M-Estimation through the ability to stack estimating equations together.
 
 
 Robust Location (7.4.1)
 -------------------------------
 
-For robust location estimation, the estimating equation is
-
-.. math::
-
-    \psi_k(Y_i, \theta) = Y^k_i - theta_1
-
-where *k* indicates the upper and lower bound, and Y superscript *k* is the bounded values of Y.
-
-Below is the estimating equation in Python
+To begin, we generate some generic data used for this example and several of the following
 
 .. code::
 
-    import numpy as np
-    var = np.array([1, -10, 2, 1, 4, 1, 4, 2, 4, 2, 3, 12])
+    np.random.seed(7841)
+    y = np.random.normal(size=250)
+    n = y.shape[0]
 
-    def psi(theta):
-        var = np.where(var > k, k, var)       # Apply the upper bound
-        var = np.where(var < -k, -k, var)     # Apply the lower bound
-        return var - theta                    # Estimating equation for robust mean
+For the robust mean, the estimating equation proposed by Huber (1964) is
 
-    mestimator = MEstimator(psi, init=[0., ])
-    mestimator.estimate()
+.. math::
 
-Notice that the estimating equation here is not smooth. Specifically, there is a jump at *k*. Therefore, this will only
-work for values of theta that are differentiable (i.e., the true mean can't be at *k*).
+    \psi_k(Y_i, \theta) = g_k(Y_i) - \theta_1
+
+where :math:`k` indicates the bound, such that if :math:`Y_i>k` then :math:`k`, or :math:`Y_i<-k` then :math:`-k`,
+otherwise :math:`Y_i`. Below is the estimating equation translated into code
+
+.. code::
+
+    def psi_robust_mean(theta):
+        k = 3                          # Bound value
+        yr = np.where(y > k, k, y)     # Applying upper bound
+        yr = np.where(y < -k, -k, y)   # Applying lower bound
+        return yr - theta
+
+
+    estr = MEstimator(psi_robust_mean, init=[0.])
+    estr.estimate()
+
+    print(estr.theta)  # [-0.0126]
+
+Notice that the estimating equation here is not smooth. Specifically, there is a jump at :math:`k`. Therefore, this
+estimator only behaves correctly when the values of :math:`\theta` are differentiable (i.e., the true mean can't be
+at :math:`k` or :math:`-k`).
+
+
+Quantile Estimation (7.4.2)
+-------------------------------
+
+Despite the sandwich variance needing the function to be smooth at :math:`\theta` (so it is differentiable),
+M-Estimation can also be used with non-smooth function. For example, the estimating equations for the sample quantile
+is
+
+.. math::
+
+    \psi_q(Y_i, \theta) = q - I(Y_i \le \theta)
+
+It is this section, that we need to talk about different root-finding methods, and numerically approximating
+derivatives. In the previous examples, we had smooth function that were both easy to find the roots of and had smooth
+functions for derivatives. However, that is not the case for quantile estimation. So, we need to use some 'tricks' to
+help the procedure along.
+
+First, we are going to use the ``'hybr'`` method. we have found this method to be more reliable when attempting to find
+the roots. Often the ``'lm'`` and ``'newton'`` methods appear worse at exploring the space. Next, our estimating
+equations 'jump' in terms of their returned value (i.e., they are not smooth). This comes in to the ``tolerance``
+parameter. The tolerance determines whether the root-finding has converged. For many quantiles were aren't going to
+reach the strict tolerance values. So, we are going to weaken them (the algorithm will be considered as converged under
+a weaker condition). If this is not changed, then a non-convergence error will come back.
+
+Now we can talk about numerically approximating the derivatives. Numerical approximations roughly work by calculating
+the slope of a line from two points on either side of value (akin to the definition of a derivative you may remember
+from math class). For smooth functions, we can choose these points 'close' to the true value. However, this is not the
+case for non-smooth functions. For non-smooth functions the derivative can be poorly approximated when relying on points
+'too close' to the value. We can address this issue by increasing the ``dx`` parameter. However, large ``dx`` parameters
+can also lead to poor approximations. Therefore, we will also increase the ``order`` parameter, which controls the
+number of points to use (note: it must be odd).
+
+Now, that we have these tricks, we are ready to find the 25th, 50th, and 75th percentiles using M-Estimation. The
+estimating equations are
+
+.. code::
+
+    def psi_quantile(theta):
+        return (0.25 - 1*(y <= theta[0]),
+                0.50 - 1*(y <= theta[1]),
+                0.75 - 1*(y <= theta[2]),)
+
+
+    estr = MEstimator(psi_quantile, init=[0., 0., 0.])
+    estr.estimate(solver='hybr',   # Selecting the hybr method
+                  tolerance=1e-3,  # Increasing the tolerance
+                  dx=1,            # Increasing distance for numerical approx
+                  order=9)         # Increasing the number of points for numerical approx
+
+    print(estr.theta)  # [-0.597  0.048  0.740]
+
+We can compare these values to
+
+.. code::
+
+    np.quantile(y, q=[0.25, 0.50, 0.75])  # [-0.592, 0.047, 0.740]
+
+You'll notice that there is a slight difference. This difference is a result of the non-smooth function. Values 'close'
+to these points will not improve the zero finding in the estimating equations. That was why we decreased the tolerance
+originally. So, there may be a slight discrepancy between the closed-form solution and M-Estimation.
+
+For non-smooth functions, it is good practice to check against some closed form for the estimating equations.
+
+
+Positive Mean Deviation (7.4.3)
+-------------------------------
+
+For another non-smooth estimating equation(s), we can talk about the positive mean deviation. The estimating equations
+are
+
+.. math::
+
+    \psi_1 = 2(Y_i - \theta_2) I(Y_i > \theta_2) - \theta_1 \\
+    \psi_2 = 0.5 - I(Y_i \le \theta_2)
+
+where :math:`\theta_1` is the positive mean deviation and :math:`\theta_2` is the median.
+
+The estimating equations can be translated into code by
+
+.. code::
+
+    def psi_deviation(theta):
+        return ((2 * (y - theta[1]) * (y > theta[1])) - theta[0],
+                1/2 - (y <= theta[1]), )
+
+As before, we will use the ``'hybr'`` method along with the updated parameters
+
+.. code::
+
+    estr = MEstimator(psi_deviation, init=[0., 0., ])
+    estr.estimate(solver='hybr',   # Selecting the hybr method
+                  tolerance=1e-3,  # Increasing the tolerance
+                  dx=1,            # Increasing distance for numerical approx
+                  order=9)         # Increasing the number of points for numerical approx
+
+    print(estr.theta)  # [0.803 0.042]
+
+If we had used the closed-form definition, we would have ended up with (0.798, 0.047). These values are close, and
+again due to the non-smooth nature of the estimating equations.
 
 
 Linear Regression (7.5.1)
@@ -245,14 +398,12 @@ For linear regression, the estimating equation is
 
     \psi(X_i, Y_i \beta) = (Y_i - X_i^T \beta) X_i
 
-Here, we present the vectorized version first. Notice that the vectorized version will generally be faster than a
-for-loop implementation. However, it is easy to make a mistake with a vectorized version, so I generally recommend
-creating a for-loop version first (and then creating a vectorized version if that for-loop is too slow).
 
-With some generic data,
+For the following examples, the following generic simulated data is used
 
 .. code::
 
+    np.random.seed(5555)
     n = 500
     data = pd.DataFrame()
     data['X'] = np.random.normal(size=n)
@@ -260,7 +411,11 @@ With some generic data,
     data['Y'] = 0.5 + 2*data['X'] - 1*data['Z'] + np.random.normal(loc=0, size=n)
     data['C'] = 1
 
-The estimating equation and M-estimation procedure is then called by
+As with all the preceding estimating equations, there are multiple ways to code these. Since linear regression involes
+some careful matrix manipulations for the programmed estimating equations to return the correct format for
+``delicatessen``, we highlight two variations here.
+
+First, we present a vectorized version first.
 
 .. code::
 
@@ -270,10 +425,13 @@ The estimating equation and M-estimation procedure is then called by
         beta = np.asarray(theta)[:, None]
         return ((y - np.dot(x, beta)) * x).T
 
-    mestimator = MEstimator(psi_regression, init=[0.1, 0.1, 0.1])
-    mestimator.estimate()
+    estr = MEstimator(psi_regression, init=[0., 0., 0.])
+    estr.estimate()
 
-As mentioned, a for-loop version can also be used. Below is an example of the for-loop version for regression
+    print(estr.theta)  # [0.477, 2.123, -0.852]
+
+For the second approach, a for-loop variation is used instead. Below is the for-loop equivalent for the estimating
+equations
 
 .. code::
 
@@ -296,8 +454,52 @@ As mentioned, a for-loop version can also be used. Below is an example of the fo
         return np.asarray(est_vals).T
 
 
-GEE (7.5.6)
+While these two approaches give the same answer, vectorized versions will generally be faster than for-loop variations
+(but may be less 'human readable'). For example, the vectorized version has a runtime of 0.037 seconds and the for-loop
+version has a runtime of 0.166 seconds (4.5x slower) on my laptop. Having said that, it is easy to make a mistake with
+a vectorized version. I would generally recommend creating a for-loop version first (and then creating a vectorized
+version if that for-loop is too slow for your purposes).
+
+
+Robust Regression (7.5.4)
 -------------------------------
 
-... to be added ...
+The next example is robust regression, where the standard linear regression model is made robust to outliers.
+Essentially, we use the robust mean formula from before but now apply it to the error terms of the regression model.
+The estimating equations are
+
+.. math::
+
+    \psi(X_i, Y_i \beta) = g_k(Y_i - X_i^T \beta) X_i
+
+where :math:`k` indicates the bound, such that if :math:`Y_i>k` then :math:`k`, or :math:`Y_i<-k` then :math:`-k`,
+otherwise :math:`Y_i`.
+
+Taking the previous vectorized version of the linear regression model and building in the :math:`g_k()` function,
+
+.. code::
+
+    def psi_regression(theta):
+        X = np.asarray(data[['C', 'X', 'Z']])
+        y = np.asarray(data['Y'])[:, None]
+        beta = np.asarray(theta)[:, None]
+        k = 2
+
+        # Generating predictions and applying Huber function for robust
+        preds = np.asarray(y - np.dot(X, beta))
+        preds = np.where(preds > k, k, preds)       # Apply the upper bound
+        preds = np.where(preds < -k, -k, preds)     # Apply the lower bound
+
+        # Output b-by-n matrix
+        return (preds * X).T
+
+
+    estr = MEstimator(psi_regression, init=[0., 0., 0.])
+    estr.estimate()
+
+    print(estr.theta)  # [0.491, 2.05, -0.795]
+
+You'll notice that the coefficients have changed slightly here. That is because we have reduced the extent of outliers
+on the estimation of the linear regression parameters (however, our simulated data mechanism doesn't really result in
+major outliers, so the change is small here).
 

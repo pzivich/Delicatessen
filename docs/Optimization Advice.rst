@@ -55,11 +55,18 @@ By default, ``delicatessen`` uses the secant method available in ``scipy.optimiz
 also supports algorithms in ``scipy.optimize.root``. I personally have had the most success with the 'secant' in, but
 I have also seen the 'lm' optimization method perform well (some internal tests check with lm as well).
 
+Non-smooth equations
+--------------------
+As mentioned in the examples, non-smooth estimating equations (e.g., percentiles, positive mean deviation, etc.) can be
+difficult to optimize. In these cases, I have found ``solver='hybr'`` and increasing the tolerance (to the same order
+as :math:`n`) help. Also be sure to update the numerical approximation values for the derivative (try something like
+``dx=10, order=15``).
+
 A warning
 -------------------
 
-Before ending this section, I want to emphasize that reducing the ``tolerance`` is not really advised. While it may
-allow the optimization routine to succeed, it only allows the 'error' of the optimization to be greater. Therefore,
-the optimization will stop 'further' from the best values. Do **not** use this approach to getting ``delicatessen`` to
-succeed in the optimization unless you are absolutely sure that the new ``tolerance`` is within acceptable limits for
-your problem. The default is `1e-9`.
+Before ending this section, I want to emphasize that reducing the ``tolerance`` is not really advised (unless you are
+in a specific scenario of a non-smooth function!). While it may allow the optimization routine to succeed, it only
+allows the 'error' of the optimization to be greater. Therefore, the optimization will stop 'further' from the best
+values. Do **not** use this approach to getting ``delicatessen`` to succeed in the optimization unless you are
+absolutely sure that the new ``tolerance`` is within acceptable limits for your problem. The default is `1e-9`.
