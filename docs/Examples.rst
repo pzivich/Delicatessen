@@ -396,7 +396,7 @@ For linear regression, the estimating equation is
 
 .. math::
 
-    \psi(X_i, Y_i \beta) = (Y_i - X_i^T \beta) X_i
+    \psi(X_i, Y_i, \beta) = (Y_i - X_i^T \beta) X_i
 
 
 For the following examples, the following generic simulated data is used
