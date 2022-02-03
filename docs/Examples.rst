@@ -56,7 +56,7 @@ For the ratio estimator, the following estimating equation is provided
 
 .. math::
 
-    \psi_1(Y_i, X_i, \theta) = Y_i - \theta_1 \X_i
+    \psi_1(Y_i, X_i, \theta) = Y_i - \theta_1 X_i
 
 For use with the M-estimator in ``delicatessen``, we can program this estimating equation as
 
@@ -154,8 +154,8 @@ The first set of estimating equations for the instrumental variable analysis are
 
 .. math::
 
-    \psi_1(Y_i, W_i, T_i, \theta) &= \theta_1 - T \\
-    \psi_2(Y_i, W_i, T_i, \theta) &= (Y - \theta_2 W)(\theta_1 - T) \\
+    \psi_1(Y_i, W_i, T_i, \theta) &= \theta_1 - T_i \\
+    \psi_2(Y_i, W_i, T_i, \theta) &= (Y_i - \theta_2 W_i)(\theta_1 - T_i) \\
 
 To demonstrate the example, below is some generic simulated data
 
@@ -184,10 +184,10 @@ estimating equations from before were further updated to
 
 .. math::
 
-    \psi_1(Y_i, W_i, T_i, \theta) &= \theta_1 - T \\
-    \psi_2(Y_i, W_i, T_i, \theta) &= \theta_2 - W \\
-    \psi_3(Y_i, W_i, T_i, \theta) &= (Y - \theta_3 W)(\theta_2 - W) \\
-    \psi_4(Y_i, W_i, T_i, \theta) &= (Y - \theta_4 W)(\theta_1 - T) \\
+    \psi_1(Y_i, W_i, T_i, \theta) &= \theta_1 - T_i \\
+    \psi_2(Y_i, W_i, T_i, \theta) &= \theta_2 - W_i \\
+    \psi_3(Y_i, W_i, T_i, \theta) &= (Y_i - \theta_3 W_i)(\theta_2 - W_i) \\
+    \psi_4(Y_i, W_i, T_i, \theta) &= (Y_i - \theta_4 W_i)(\theta_1 - T_i) \\
 
 Again, we can easily write these equations for ``delicatessen``,
 
