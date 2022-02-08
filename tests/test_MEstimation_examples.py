@@ -3,6 +3,8 @@ import numpy as np
 import pandas as pd
 from sklearn.linear_model import LinearRegression, HuberRegressor
 from delicatessen import MEstimator
+from delicatessen.estimating_equations import ee_mean, ee_mean_variance, ee_percentile, ee_positive_mean_deviation, \
+    ee_linear_regression, ee_robust_linear_regression
 
 epsilon = 1.0E-6
 
@@ -22,6 +24,17 @@ class TestMEstimationExamples:
 
         assert mestimate.theta[0] - np.mean(y) < epsilon
         assert mestimate.theta[1] - np.var(y) < epsilon
+
+        # Test relative to built-in equation
+        mest = MEstimator(lambda theta: ee_mean(theta=theta, y=y), init=[0, ])
+        mest.estimate()
+
+        me = MEstimator(lambda theta: ee_mean_variance(theta, y), init=[0, 1])
+        me.estimate()
+
+        assert mestimate.theta[0] - mest.theta[0] < epsilon
+        assert mestimate.theta[0] - me.theta[0] < epsilon
+        assert mestimate.theta[1] - me.theta[1] < epsilon
 
     # Ratio 7.2.3 --> typo in equation?
     # Y_i - \theta_1 X_i
@@ -133,7 +146,7 @@ class TestMEstimationExamples:
         assert estr.theta[0] - yhl.mean() < epsilon
 
     def test_quantile_estimation(self):
-        n = 1000
+        n = 20000
         y = np.random.normal(size=n)
 
         # Use numpy to find quantiles
@@ -152,12 +165,33 @@ class TestMEstimationExamples:
                       dx=1,
                       order=9)
 
+        # Verify using built-in equations
+        mest25 = MEstimator(lambda theta: ee_percentile(theta=theta, y=y, q=0.25), init=[-0.1, ])
+        mest50 = MEstimator(lambda theta: ee_percentile(theta=theta, y=y, q=0.50), init=[0., ])
+        mest75 = MEstimator(lambda theta: ee_percentile(theta=theta, y=y, q=0.75), init=[0.1, ])
+        mest25.estimate(solver='hybr',
+                        tolerance=1e-3,
+                        dx=1,
+                        order=15)
+        mest50.estimate(solver='hybr',
+                        tolerance=1e-3,
+                        dx=1,
+                        order=15)
+        mest75.estimate(solver='hybr',
+                        tolerance=1e-3,
+                        dx=1,
+                        order=15)
+
+        assert estr.theta[0] - mest25.theta[0] < 1e-2
+        assert estr.theta[1] - mest50.theta[0] < 1e-2
+        assert estr.theta[2] - mest75.theta[0] < 1e-2
+
         assert estr.theta[0] - qs[0] < 1e-2
         assert estr.theta[1] - qs[1] < 1e-2
         assert estr.theta[2] - qs[2] < 1e-2
 
     def test_positive_mean_deviation(self):
-        n = 1000
+        n = 10000
         y = np.random.normal(size=n)
 
         md = (abs(y - y.mean())).sum() / n
@@ -175,6 +209,13 @@ class TestMEstimationExamples:
 
         assert estr.theta[0] - md < 0.1
         assert estr.theta[1] - np.median(y) < 0.1
+
+        # Test built-in equations
+        mest = MEstimator(lambda theta: ee_positive_mean_deviation(theta, y), init=[0., 0., ])
+        mest.estimate()
+
+        assert estr.theta[0] - mest.theta[0] < 0.1
+        assert estr.theta[1] - mest.theta[1] < 0.1
 
     def test_linear_regression(self):
         n = 1000
@@ -200,6 +241,15 @@ class TestMEstimationExamples:
         assert estr.theta[0] - model.intercept_[0] < epsilon
         assert estr.theta[1] - coef[1] < epsilon
         assert estr.theta[2] - coef[2] < epsilon
+
+        # Test built-in equations
+        mest = MEstimator(lambda theta: ee_linear_regression(theta, X=data[['C', 'X', 'Z']], y=data['Y']),
+                          init=[0., 0., 0., ])
+        mest.estimate()
+
+        assert estr.theta[0] - mest.theta[0] < epsilon
+        assert estr.theta[1] - mest.theta[1] < epsilon
+        assert estr.theta[2] - mest.theta[2] < epsilon
 
     # Using Huber regression currently - seems to be issue with extraneous results such as
     # extremely large estimated beta values
@@ -232,5 +282,14 @@ class TestMEstimationExamples:
         m1 = LinearRegression().fit(x, y)
 
         assert estr.theta[0] - coef[0] < 0.3
-        assert estr.theta[1] - coef[1] < 1e-3
-        assert estr.theta[2] - coef[2] < 1e-3
+        assert estr.theta[1] - coef[1] < 1e-2
+        assert estr.theta[2] - coef[2] < 1e-2
+
+        # Test built-in equations
+        mest = MEstimator(lambda theta: ee_robust_linear_regression(theta, X=data[['C', 'X', 'Z']], y=data['Y'], k=2),
+                          init=[0., 0., 0., ])
+        mest.estimate(solver='hybr')
+
+        assert estr.theta[0] - mest.theta[0] < epsilon
+        assert estr.theta[1] - mest.theta[1] < epsilon
+        assert estr.theta[2] - mest.theta[2] < epsilon
