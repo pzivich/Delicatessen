@@ -4,4 +4,4 @@ builddir/
 build/
 dist/
 .idea/
-
+.ipynb_checkpoints/
