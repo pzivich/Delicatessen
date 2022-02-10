@@ -15,6 +15,8 @@ from delicatessen.estimating_equations import (ee_mean, ee_mean_variance, ee_mea
 from delicatessen.data import load_inderjit
 from delicatessen.utilities import inverse_logit
 
+np.random.seed(236461)
+
 
 class TestEstimatingEquationsBase:
 

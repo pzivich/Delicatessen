@@ -7,6 +7,7 @@ from delicatessen.estimating_equations import ee_mean, ee_mean_variance, ee_perc
     ee_linear_regression, ee_robust_linear_regression
 
 epsilon = 1.0E-6
+np.random.seed(236461)
 
 
 class TestMEstimationExamples:

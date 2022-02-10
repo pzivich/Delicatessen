@@ -11,6 +11,8 @@ from delicatessen import MEstimator
 from delicatessen.utilities import inverse_logit
 
 
+np.random.seed(236461)
+
 class TestMEstimation:
 
     def test_error_rootfinder1(self):
