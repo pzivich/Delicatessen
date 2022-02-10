@@ -2,9 +2,10 @@
 
 # Delicatessen
 
+![tests](https://github.com/pzivich/Delicatessen/actions/workflows/python-package.yml/badge.svg)
 [![version](https://badge.fury.io/py/delicatessen.svg)](https://badge.fury.io/py/delicatessen)
 [![docs](https://readthedocs.org/projects/deli/badge/?version=latest)](https://deli.readthedocs.io/en/latest/?badge=latest)
-![tests](https://github.com/pzivich/Delicatessen/actions/workflows/python-package.yml/badge.svg)
+[![Downloads](https://pepy.tech/badge/delicatessen/month)](https://pepy.tech/project/delicatessen)
 
 The one-stop sandwich (variance) shop in Python. `delicatessen` is a Python 3.6+ library for the generalized calculus 
 of M-estimation. 
