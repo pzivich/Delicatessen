@@ -63,7 +63,7 @@ copyright = '2021, Paul Zivich'
 version = get_version()
 release = version
 latex_documents = [('index', 'deli_documentation.tex', 'Delicatessen Documentation',
-                    'Paul Zivich', 'manual'), ]
+                    'Paul Zivich, Mark Klose', 'manual'), ]
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = "sphinx"
