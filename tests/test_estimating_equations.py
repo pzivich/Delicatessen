@@ -5,15 +5,18 @@ import pandas as pd
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
 from scipy.stats import logistic
+from sklearn.linear_model import Ridge
 
 from delicatessen import MEstimator
 from delicatessen.estimating_equations import (ee_mean, ee_mean_variance, ee_mean_robust,
-                                               ee_linear_regression, ee_logistic_regression,
+                                               ee_linear_regression, ee_logistic_regression, ee_ridge_linear_regression,
+                                               ee_2p_logistic, ee_3p_logistic, ee_4p_logistic, ee_effective_dose_delta,
                                                ee_gformula, ee_ipw, ee_aipw)
+from delicatessen.data import load_inderjit
 from delicatessen.utilities import inverse_logit
 
 
-class TestEstimatingEquations:
+class TestEstimatingEquationsBase:
 
     def test_mean(self):
         """Tests mean with the built-in estimating equation.
@@ -86,6 +89,9 @@ class TestEstimatingEquations:
                             mpee.asymptotic_variance,
                             atol=1e-6)
 
+
+class TestEstimatingEquationsRegression:
+
     def test_ols(self):
         """Tests linear regression with the built-in estimating equation.
         """
@@ -96,15 +102,6 @@ class TestEstimatingEquations:
         data['Y'] = 0.5 + 2*data['X'] - 1*data['Z'] + np.random.normal(loc=0, size=n)
         data['C'] = 1
 
-        def psi_regression(theta):
-            x = np.asarray(data[['C', 'X', 'Z']])
-            y = np.asarray(data['Y'])[:, None]
-            beta = np.asarray(theta)[:, None]
-            return ((y - np.dot(x, beta)) * x).T
-
-        mcee = MEstimator(psi_regression, init=[0.1, 0.1, 0.1])
-        mcee.estimate()
-
         def psi_builtin_regression(theta):
             return ee_linear_regression(theta,
                                         X=data[['C', 'X', 'Z']],
@@ -113,14 +110,22 @@ class TestEstimatingEquations:
         mpee = MEstimator(psi_builtin_regression, init=[0.1, 0.1, 0.1])
         mpee.estimate()
 
+        # Statsmodels function equivalent
+        glm = smf.glm("Y ~ X + Z", data).fit(cov_type="HC1")
+
         # Checking mean estimate
-        npt.assert_allclose(mcee.theta,
-                            mpee.theta,
+        npt.assert_allclose(mpee.theta,
+                            np.asarray(glm.params),
                             atol=1e-6)
 
         # Checking variance estimates
-        npt.assert_allclose(mcee.variance,
-                            mpee.variance,
+        npt.assert_allclose(mpee.variance,
+                            np.asarray(glm.cov_params()),
+                            atol=1e-6)
+
+        # Checking confidence interval estimates
+        npt.assert_allclose(mpee.confidence_intervals(),
+                            np.asarray(glm.conf_int()),
                             atol=1e-6)
 
     def test_wls(self):
@@ -151,6 +156,83 @@ class TestEstimatingEquations:
                             np.asarray(glm.params),
                             atol=1e-6)
 
+    def test_ridge_ols(self):
+        """Tests the ridge (L2) variation of the linear regression built-in estimating equation
+        """
+        n = 1000
+        data = pd.DataFrame()
+        data['x1'] = np.random.normal(size=n)
+        data['x2'] = data['x1'] + np.random.normal(scale=0.1, size=n)
+        data['c'] = 1
+        data['y'] = 5 + data['x1'] + np.random.normal(size=n)
+        Xvals = np.asarray(data[['c', 'x1', 'x2']])
+        yvals = np.asarray(data['y'])
+
+        # Penalty of 0.5
+        def psi(theta):
+            return ee_ridge_linear_regression(theta, X=Xvals, y=yvals, penalty=0.5, weights=None)
+
+        estr = MEstimator(psi, init=[5, 1, 1])
+        estr.estimate(solver='lm')
+        ridge_skl = Ridge(alpha=.5, fit_intercept=False).fit(X=Xvals, y=yvals)
+
+        # Checking mean estimate
+        npt.assert_allclose(estr.theta,
+                            np.asarray(ridge_skl.coef_),
+                            atol=1e-6)
+
+        # Penalty of 5.0
+        def psi(theta):
+            return ee_ridge_linear_regression(theta, X=Xvals, y=yvals, penalty=5.0, weights=None)
+
+        estr = MEstimator(psi, init=[5, 1, 1])
+        estr.estimate(solver='lm')
+        ridge_skl = Ridge(alpha=5.0, fit_intercept=False).fit(X=Xvals, y=yvals)
+
+        # Checking mean estimate
+        npt.assert_allclose(estr.theta,
+                            np.asarray(ridge_skl.coef_),
+                            atol=1e-6)
+
+    def test_ridge_wls(self):
+        """Tests the ridge (L2) variation of the weighted linear regression built-in estimating equation
+        """
+        n = 1000
+        data = pd.DataFrame()
+        data['x1'] = np.random.normal(size=n)
+        data['x2'] = data['x1'] + np.random.normal(scale=0.1, size=n)
+        data['c'] = 1
+        data['y'] = 5 + data['x1'] + np.random.normal(size=n)
+        Xvals = np.asarray(data[['c', 'x1', 'x2']])
+        yvals = np.asarray(data['y'])
+        weights = np.random.uniform(0.1, 2.5, size=n)
+
+        # Penalty of 0.5
+        def psi(theta):
+            return ee_ridge_linear_regression(theta, X=Xvals, y=yvals, penalty=0.5, weights=weights)
+
+        estr = MEstimator(psi, init=[5, 1, 1])
+        estr.estimate(solver='lm')
+        ridge_skl = Ridge(alpha=.5, fit_intercept=False).fit(X=Xvals, y=yvals, sample_weight=weights)
+
+        # Checking mean estimate
+        npt.assert_allclose(estr.theta,
+                            np.asarray(ridge_skl.coef_),
+                            atol=1e-6)
+
+        # Penalty of 5.0
+        def psi(theta):
+            return ee_ridge_linear_regression(theta, X=Xvals, y=yvals, penalty=5.0, weights=weights)
+
+        estr = MEstimator(psi, init=[5, 1, 1])
+        estr.estimate(solver='lm')
+        ridge_skl = Ridge(alpha=5.0, fit_intercept=False).fit(X=Xvals, y=yvals, sample_weight=weights)
+
+        # Checking mean estimate
+        npt.assert_allclose(estr.theta,
+                            np.asarray(ridge_skl.coef_),
+                            atol=1e-6)
+
     def test_logitic(self):
         n = 500
         data = pd.DataFrame()
@@ -158,15 +240,6 @@ class TestEstimatingEquations:
         data['Z'] = np.random.normal(size=n)
         data['Y'] = np.random.binomial(n=1, p=logistic.cdf(0.5 + 2*data['X'] - 1*data['Z']), size=n)
         data['C'] = 1
-
-        def psi_regression(theta):
-            x = np.asarray(data[['C', 'X', 'Z']])
-            y = np.asarray(data['Y'])[:, None]
-            beta = np.asarray(theta)[:, None]
-            return ((y - inverse_logit(np.dot(x, beta))) * x).T
-
-        mcee = MEstimator(psi_regression, init=[0., 0., 0.])
-        mcee.estimate()
 
         def psi_builtin_regression(theta):
             return ee_logistic_regression(theta,
@@ -176,14 +249,22 @@ class TestEstimatingEquations:
         mpee = MEstimator(psi_builtin_regression, init=[0., 0., 0.])
         mpee.estimate()
 
+        # Comparing to statsmodels GLM (with robust covariance)
+        glm = smf.glm("Y ~ X + Z", data, family=sm.families.Binomial()).fit(cov_type="HC1")
+
         # Checking mean estimate
-        npt.assert_allclose(mcee.theta,
-                            mpee.theta,
+        npt.assert_allclose(mpee.theta,
+                            np.asarray(glm.params),
                             atol=1e-6)
 
         # Checking variance estimates
-        npt.assert_allclose(mcee.variance,
-                            mpee.variance,
+        npt.assert_allclose(mpee.variance,
+                            np.asarray(glm.cov_params()),
+                            atol=1e-6)
+
+        # Checking confidence interval estimates
+        npt.assert_allclose(mpee.confidence_intervals(),
+                            np.asarray(glm.conf_int()),
                             atol=1e-6)
 
     def test_weighted_logistic(self):
@@ -214,6 +295,180 @@ class TestEstimatingEquations:
                             np.asarray(glm.params),
                             atol=1e-6)
 
+
+class TestEstimatingEquationsDoseResponse:
+
+    def test_4pl(self):
+        """Test the 4 parameter log-logistic model using Inderjit et al. (2002)
+
+        Compares against R's drc library:
+
+        library(drc)
+        library(sandwich)
+        library(lmtest)
+
+        data(ryegrass)
+        rgll4 = drm(rootl ~ conc, data=ryegrass, fct=LL.4())
+        coeftest(rgll4, vcov=sandwich)
+        """
+        d = load_inderjit()
+        dose_data = d[:, 1]
+        resp_data = d[:, 0]
+
+        def psi(theta):
+            return ee_4p_logistic(theta=theta, X=dose_data, y=resp_data)
+
+        # Optimization procedure
+        mestimator = MEstimator(psi, init=[0, 2, 1, 10])
+        mestimator.estimate(solver='lm')
+
+        # R optimization from Ritz et al.
+        comparison_theta = np.asarray([0.48141, 3.05795, 2.98222, 7.79296])
+        comparison_var = np.asarray([0.12779, 0.26741, 0.47438, 0.15311])
+
+        # Checking mean estimate
+        npt.assert_allclose(mestimator.theta,
+                            comparison_theta,
+                            atol=1e-5)
+
+        # Checking variance estimate
+        npt.assert_allclose(np.diag(mestimator.variance)**0.5,
+                            comparison_var,
+                            atol=1e-4)
+
+    def test_3pl(self):
+        """Test the 3 parameter log-logistic model using Inderjit et al. (2002)
+
+        Compares against R's drc library:
+
+        library(drc)
+        library(sandwich)
+        library(lmtest)
+
+        data(ryegrass)
+        rgll3 = drm(rootl ~ conc, data=ryegrass, fct=LL.3())
+        coeftest(rgll3, vcov=sandwich)
+        """
+        d = load_inderjit()
+        dose_data = d[:, 1]
+        resp_data = d[:, 0]
+
+        def psi(theta):
+            return ee_3p_logistic(theta=theta, X=dose_data, y=resp_data,
+                                  lower=0)
+
+        # Optimization procedure
+        mestimator = MEstimator(psi, init=[2, 1, 10])
+        mestimator.estimate(solver='lm')
+
+        # R optimization from Ritz et al.
+        comparison_theta = np.asarray([3.26336, 2.47033, 7.85543])
+        comparison_var = np.asarray([0.26572, 0.29238, 0.15397])
+
+        # Checking mean estimate
+        npt.assert_allclose(mestimator.theta,
+                            comparison_theta,
+                            atol=1e-5)
+
+        # Checking variance estimate
+        npt.assert_allclose(np.diag(mestimator.variance)**0.5,
+                            comparison_var,
+                            atol=1e-5)
+
+    def test_2pl(self):
+        """Test the 2 parameter log-logistic model using Inderjit et al. (2002)
+
+        Compares against R's drc library:
+
+        library(drc)
+        library(sandwich)
+        library(lmtest)
+
+        data(ryegrass)
+        rgll2 = drm(rootl ~ conc, data=ryegrass, fct=LL.2(upper=8))
+        coeftest(rgll2, vcov=sandwich)
+        """
+        d = load_inderjit()
+        dose_data = d[:, 1]
+        resp_data = d[:, 0]
+
+        def psi(theta):
+            return ee_2p_logistic(theta=theta, X=dose_data, y=resp_data,
+                                  lower=0, upper=8)
+
+        # Optimization procedure
+        mestimator = MEstimator(psi, init=[2, 1])
+        mestimator.estimate(solver='lm')
+
+        # R optimization from Ritz et al.
+        comparison_theta = np.asarray([3.19946, 2.38220])
+        comparison_var = np.asarray([0.24290, 0.27937])
+
+        # Checking mean estimate
+        npt.assert_allclose(mestimator.theta,
+                            comparison_theta,
+                            atol=1e-5)
+
+        # Checking variance estimate
+        npt.assert_allclose(np.diag(mestimator.variance)**0.5,
+                            comparison_var,
+                            atol=1e-5)
+
+    def test_3pl_ed_delta(self):
+        """Test the ED(alpha) calculation with the 3 parameter log-logistic model using Inderjit et al. (2002)
+
+        Compares against R's drc library:
+
+        library(drc)
+        library(sandwich)
+
+        data(ryegrass)
+        rgll3 = drm(rootl ~ conc, data=ryegrass, fct=LL.3())
+        ED(rgll3, c(5, 10, 50), interval='delta', vcov=sandwich)
+        """
+        d = load_inderjit()
+        dose_data = d[:, 1]
+        resp_data = d[:, 0]
+
+        def psi(theta):
+            lower_limit = 0
+            pl3 = ee_3p_logistic(theta=theta, X=dose_data, y=resp_data,
+                                 lower=lower_limit)
+            ed05 = ee_effective_dose_delta(theta[3], y=resp_data, delta=0.05,
+                                           steepness=theta[0], ed50=theta[1],
+                                           lower=lower_limit, upper=theta[2])
+            ed10 = ee_effective_dose_delta(theta[4], y=resp_data, delta=0.10,
+                                           steepness=theta[0], ed50=theta[1],
+                                           lower=lower_limit, upper=theta[2])
+            ed50 = ee_effective_dose_delta(theta[5], y=resp_data, delta=0.50,
+                                           steepness=theta[0], ed50=theta[1],
+                                           lower=lower_limit, upper=theta[2])
+            return np.vstack((pl3,
+                              ed05,
+                              ed10,
+                              ed50))
+
+        # Optimization procedure
+        mestimator = MEstimator(psi, init=[2, 1, 10, 1, 1, 2])
+        mestimator.estimate(solver='lm')
+
+        # R optimization from Ritz et al.
+        comparison_theta = np.asarray([0.99088, 1.34086, 3.26336])
+        comparison_var = np.asarray([0.12397, 0.13134, 0.26572])
+
+        # Checking mean estimate
+        npt.assert_allclose(mestimator.theta[-3:],
+                            comparison_theta,
+                            atol=1e-5)
+
+        # Checking variance estimate
+        npt.assert_allclose(np.diag(mestimator.variance)[-3:]**0.5,
+                            comparison_var,
+                            atol=1e-5)
+
+
+class TestEstimatingEquationsCausal:
+
     @pytest.fixture
     def causal_data(self):
         np.random.seed(1205811)
@@ -233,12 +488,18 @@ class TestEstimatingEquations:
         return df
 
     def test_gformula(self, causal_data):
+        d1 = causal_data.copy()
+        d1['A'] = 1
+        d0 = causal_data.copy()
+        d0['A'] = 0
+
         # M-estimation
         def psi(theta):
             return ee_gformula(theta,
-                               X=causal_data[['C', 'A', 'W']],
                                y=causal_data['Y'],
-                               treat_index=1)
+                               X=causal_data[['C', 'A', 'W']],
+                               X1=d1[['C', 'A', 'W']],
+                               X0=d0[['C', 'A', 'W']])
 
         mestimator = MEstimator(psi, init=[0., 0.5, 0.5, 0., 0., 0.])
         mestimator.estimate(solver='lm')
@@ -267,13 +528,41 @@ class TestEstimatingEquations:
                             np.mean(ya0),
                             atol=1e-6)
 
+    def test_gcomp_bad_dimensions_error(self, causal_data):
+        d1 = causal_data.copy()
+        d1['A'] = 1
+        d0 = causal_data.copy()
+        d0['A'] = 0
+
+        # M-estimation
+        def psi(theta):
+            return ee_gformula(theta,
+                               y=causal_data['Y'],
+                               X=causal_data[['C', 'A', 'W']],
+                               X1=d1[['C', 'W']])
+
+        mestimator = MEstimator(psi, init=[0.5, 0., 0., 0.])
+        with pytest.raises(ValueError, match="The dimensions of X and X1"):
+            mestimator.estimate(solver='lm')
+
+        def psi(theta):
+            return ee_gformula(theta,
+                               y=causal_data['Y'],
+                               X=causal_data[['C', 'A', 'W']],
+                               X1=d1[['C', 'A', 'W']],
+                               X0=d0[['C', 'A']])
+
+        mestimator = MEstimator(psi, init=[0., 0.5, 0.5, 0., 0., 0.])
+        with pytest.raises(ValueError, match="The dimensions of X and X0"):
+            mestimator.estimate(solver='lm')
+
     def test_ipw(self, causal_data):
         # M-estimation
         def psi(theta):
             return ee_ipw(theta,
-                          X=causal_data[['C', 'A', 'W']],
                           y=causal_data['Y'],
-                          treat_index=1)
+                          A=causal_data['A'],
+                          W=causal_data[['C', 'W']])
 
         mestimator = MEstimator(psi, init=[0., 0.5, 0.5, 0., 0.])
         mestimator.estimate(solver='lm')
@@ -300,13 +589,69 @@ class TestEstimatingEquations:
                             np.mean(ya0),
                             atol=1e-6)
 
+    def test_ipw_truncate(self, causal_data):
+        # M-estimation
+        def psi(theta):
+            return ee_ipw(theta,
+                          y=causal_data['Y'],
+                          A=causal_data['A'],
+                          W=causal_data[['C', 'W']],
+                          truncate=(0.1, 0.5))
+
+        mestimator = MEstimator(psi, init=[0., 0.5, 0.5, 0., 0.])
+        mestimator.estimate(solver='lm')
+
+        # By-hand IPW estimator with statsmodels
+        glm = sm.GLM(causal_data['A'], causal_data[['C', 'W']],
+                     family=sm.families.Binomial()).fit()
+        pi = glm.predict()
+        pi = np.clip(pi, 0.1, 0.5)
+        ya1 = causal_data['A'] * causal_data['Y'] / pi
+        ya0 = (1-causal_data['A']) * causal_data['Y'] / (1-pi)
+
+        # Checking logistic coefficients (nuisance model estimates)
+        npt.assert_allclose(mestimator.theta[3:],
+                            np.asarray(glm.params),
+                            atol=1e-6)
+        # Checking mean estimates
+        npt.assert_allclose(mestimator.theta[0],
+                            np.mean(ya1) - np.mean(ya0),
+                            atol=1e-6)
+        npt.assert_allclose(mestimator.theta[1],
+                            np.mean(ya1),
+                            atol=1e-6)
+        npt.assert_allclose(mestimator.theta[2],
+                            np.mean(ya0),
+                            atol=1e-6)
+
+    def test_ipw_truncate_error(self, causal_data):
+        # M-estimation
+        def psi(theta):
+            return ee_ipw(theta,
+                          y=causal_data['Y'],
+                          A=causal_data['A'],
+                          W=causal_data[['C', 'W']],
+                          truncate=(0.99, 0.01))
+
+        mestimator = MEstimator(psi, init=[0., 0.5, 0.5, 0., 0.])
+        with pytest.raises(ValueError, match="truncate values"):
+            mestimator.estimate()
+
     def test_aipw(self, causal_data):
+        d1 = causal_data.copy()
+        d1['A'] = 1
+        d0 = causal_data.copy()
+        d0['A'] = 0
+
         # M-estimation
         def psi_builtin_regression(theta):
             return ee_aipw(theta,
-                           X=causal_data[['C', 'A', 'W']],
                            y=causal_data['Y'],
-                           treat_index=1)
+                           A=causal_data['A'],
+                           W=causal_data[['C', 'W']],
+                           X=causal_data[['C', 'A', 'W']],
+                           X1=d1[['C', 'A', 'W']],
+                           X0=d0[['C', 'A', 'W']])
 
         mestimator = MEstimator(psi_builtin_regression, init=[0., 0.5, 0.5,   # Parameters of interest
                                                               0., 0., 0.,     # Outcome nuisance model
@@ -334,11 +679,11 @@ class TestEstimatingEquations:
         var_r0 = np.nanvar(ya0_star - np.mean(ya0_star), ddof=1) / causal_data.shape[0]
 
         # Checking logistic coefficients (nuisance model estimates)
-        npt.assert_allclose(mestimator.theta[3:6],
-                            np.asarray(y_m.params),
-                            atol=1e-6)
-        npt.assert_allclose(mestimator.theta[6:],
+        npt.assert_allclose(mestimator.theta[3:5],
                             np.asarray(pi_m.params),
+                            atol=1e-6)
+        npt.assert_allclose(mestimator.theta[5:],
+                            np.asarray(y_m.params),
                             atol=1e-6)
 
         # Checking mean estimates

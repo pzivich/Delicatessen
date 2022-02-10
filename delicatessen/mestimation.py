@@ -1,14 +1,15 @@
 import numpy as np
 from scipy.optimize import newton, root
 from scipy.misc import derivative
+from scipy.stats import norm
 
 from delicatessen.utilities import partial_derivative
 
 
 class MEstimator:
-    r"""Generalized M-Estimator for stacked estimating equations.
+    r"""M-Estimator for stacked estimating equations.
 
-    M-estimation, or loosely referred to as estimating equations, is a general approach to point and variance
+    M-Estimation, or loosely referred to as estimating equations, is a general approach to point and variance
     estimation that consists of defining an estimator as the solution to an estimating equation (but does not require
     the derivative of a log-likelihood function). M-estimators satisify the following constraint
 
@@ -24,7 +25,7 @@ class MEstimator:
 
     M-Estimation consists of two broad step: point estimation and variance estimation. Point estimation is carried out
     by determining at which values of theta the given estimating equations are equal to zero. This is done via SciPy's
-    `newton` algorithm by default.
+    ``newton`` algorithm by default.
 
     For variance estimation, the sandwich asymptotic variance estimator is used, which consists of
 
@@ -64,8 +65,8 @@ class MEstimator:
     Parameters
     ----------
     stacked_equations : function, callable
-        Function that returns a b-by-n NumPy array of the estimating equations. See documentation for how to construct
-        a set of estimating equations.
+        Function that returns a b-by-n NumPy array of the estimating equations. See provided examples in the
+        documentation for how to construct a set of estimating equations.
     init : list, set, array
         Initial values to optimize for the function.
 
@@ -89,19 +90,20 @@ class MEstimator:
 
     Calling the M-estimation procedure
 
-    >>> mestimation = MEstimator(stacked_equations=psi, init=[0, 0, ])
-    >>> mestimation.estimate()
+    >>> estr = MEstimator(stacked_equations=psi, init=[0, 0, ])
+    >>> estr.estimate()
 
-    Inspecting the parameter estimates, the variance, and the asymptotic variance
+    Inspecting the parameter estimates, the variance, 95% confidence intervals, and the asymptotic variance
 
-    >>> mestimation.theta
-    >>> mestimation.variance
-    >>> mestimation.asymptotic_variance
+    >>> estr.theta
+    >>> estr.variance
+    >>> estr.confidence_intervals()
+    >>> estr.asymptotic_variance
 
     Alternatively, a custom estimating equation can be specified. This is done by constructing a valid estimating
-    equation for the ``MEstimator``. The ``MEstimator`` expects the `psi` function to return a b-by-n array, where b is
-    the number of parameters (length of theta) and n is the total number of observations. Below is an example of the
-    mean and variance estimating equation from before
+    equation for the ``MEstimator``. The ``MEstimator`` expects the ``psi`` function to return a b-by-n array, where b
+    is the number of parameters (length of ``theta``) and n is the total number of observations. Below is an example
+    of the mean and variance estimating equation from before
 
     >>> def psi(theta):
     >>>     y = np.array(y_dat)
@@ -111,12 +113,11 @@ class MEstimator:
 
     The M-estimation procedure is called using the same approach as before
 
-    >>> mestimation = MEstimator(stacked_equations=psi, init=[0, 0, ])
-    >>> mestimation.estimate()
+    >>> estr = MEstimator(stacked_equations=psi, init=[0, 0, ])
+    >>> estr.estimate()
 
     Note that ``len(init)`` should be equal to b. So in this case, two initial values are provided.
 
-    # TODO provide custom root-finding example here.
     Finally, the M-Estimator can also be run with a user-provided root-finding algorithm. To specify a custom
     root-finder, a function must be created by the user that consists of two keyword arguments (``stacked_equations``,
     ``init``) and must return only the optimized values. The following is an example with SciPy's Levenberg-Marquardt
@@ -132,8 +133,8 @@ class MEstimator:
     The provided custom root-finder can then be implemented like the following (continuing with the estimating equation
     from the previous example):
 
-    >>> mestimation = MEstimator(stacked_equations=psi, init=[0, 0, ])
-    >>> mestimation.estimate(solver=custom_solver)
+    >>> estr = MEstimator(stacked_equations=psi, init=[0, 0, ])
+    >>> estr.estimate(solver=custom_solver)
 
     References
     ----------
@@ -162,11 +163,12 @@ class MEstimator:
         ----------
         solver : str, function, callable, optional
             Method to use for the root finding procedure. Default is the secant method (``scipy.optimize.newton``).
-            Another built-in option is the Levenberg-Marquardt algorithm (``scipy.optimize.root(method='lm')``).
-            Finally, any generic root-finding algorithm can be used via a user-provided callable object (function).
-            The function should consist of two keyword arguments: ``stacked_equations``, and ``init``. Additionally,
-            the function should return only the optimized values. Please review the example in the documentation or on
-            ReadTheDocs for how to provide a custom root-finding algorithm.
+            Other built-in option is the Levenberg-Marquardt algorithm (``scipy.optimize.root(method='lm')``), and
+            a modification of the Powell hybrid method (``scipy.optimize.root(method='hybr')``). Finally, any generic
+            root-finding algorithm can be used via a user-provided callable object (function). The function should
+            consist of two keyword arguments: ``stacked_equations``, and ``init``. Additionally, the function should
+            return only the optimized values. Please review the example in the documentation for how to provide a
+            custom root-finding algorithm.
         maxiter : int, optional
             Maximum iterations to consider for the root finding procedure. Default is 1000 iterations. For complex
             estimating equations (without preceding optimization), this value may need to be increased. This argument
@@ -177,15 +179,16 @@ class MEstimator:
             this tolerance level (at this time). This argument is not used for user-specified solvers
         dx : float, optional
             Spacing to use to numerically approximate the partial derivatives of the bread matrix. Default is 1e-9,
-            which should work well for most applications. It is generally not recommended to have a large dx, since some
-            large values can poorly approximate derivatives.
+            which should work well for most applications. It is generally not recommended to have a large ``dx``, since
+            some large values can poorly approximate derivatives. Otherwise, also increase ``order``.
         order : int, optional
             Number of points to use to numerically approximate the partial derivative (must be an odd number). Default
             is 3, which is the default for SciPy.
         allow_pinv : bool, optional
             The default is ``True`` which uses ``numpy.linalg.pinv`` to find the inverse (or pseudo-inverse if matrix is
             non-invertible) for the bread. This default option is more robust to the possible matrices. If you want
-            to use ``numpy.linalg.inv`` instead (which does not support pseudo-inverse), set this parameter to False.
+            to use ``numpy.linalg.inv`` instead (which does not support pseudo-inverse), set this parameter to
+            ``False``.
 
         Returns
         -------
@@ -215,19 +218,53 @@ class MEstimator:
         self.meat = np.dot(evald_theta, evald_theta.T) / self.n_obs         # Meat is a simple dot product of two arrays
 
         # Step 2.3: assembling the sandwich (variance)
-        if self.bread.ndim == 0:                        # NumPy's linalg throws an error if bread is a single value
-            bread_invert = 1 / self.bread               # ... so directly take inverse of the single value
-        else:                                           # otherwise bread must be a matrix
-            if allow_pinv:
-                bread_invert = np.linalg.pinv(self.bread)   # ... so find the inverse (or pseudo-inverse)
-            else:
-                bread_invert = np.linalg.inv(self.bread)    # ... so find the inverse (NOT pseudo-inverse)
+        if allow_pinv:                                  # re-worked to supports 1d theta
+            bread_invert = np.linalg.pinv(self.bread)   # ... so find the inverse (or pseudo-inverse)
+        else:
+            bread_invert = np.linalg.inv(self.bread)    # ... so find the inverse (NOT pseudo-inverse)
         # Two sets of matrix multiplication to get the sandwich variance
         sandwich = np.dot(np.dot(bread_invert, self.meat), bread_invert.T)
 
         # Step 3: updating storage for results
         self.asymptotic_variance = sandwich       # Asymptotic variance estimate requires division by n (done above)
         self.variance = sandwich / self.n_obs     # Variance estimate requires division by n^2
+
+    def confidence_intervals(self, alpha=0.05):
+        r"""Calculate Wald-type :math:`(1 - \alpha) \times 100`% confidence intervals using the point estimates and
+        the sandwich variance. The formula for the confidence intervals are
+
+        .. math::
+
+            \hat{\theta} +/- Z_{\alpha / 2} \times \widehat{SE}(\hat{\theta})
+
+        Note
+        ----
+        The ``.estimate()`` function must be called before the confidence intervals can be calculated.
+
+        Parameters
+        ----------
+        alpha : float, optional
+            The :math:`\alpha` level for the corresponding confidence intervals. Default is 0.05, which calculate the
+            95% confidence intervals. Notice that :math:`0<\alpha<1`.
+
+        Returns
+        -------
+        array :
+            b-by-2 array, where row 1 is the confidence intervals for :math:`\theta_1`, ..., and row b is the confidence
+            intervals for :math:`\theta_b`
+        """
+        if not 0 < alpha < 1:
+            raise ValueError("`alpha` must be 0 < a < 1")
+
+        # 'Looking up' via Z table
+        z_alpha = norm.ppf(1 - alpha / 2, loc=0, scale=1)   # Z_alpha value for CI
+
+        # Calculating confidence intervals
+        param_se = np.sqrt(np.diag(self.variance))          # Take the diagonal of the sandwich and then SQRT
+        lower_ci = self.theta - z_alpha * param_se          # Calculate lower CI
+        upper_ci = self.theta + z_alpha * param_se          # Calculate upper CI
+
+        return np.asarray([lower_ci, upper_ci]).T
 
     def _mestimation_answer_(self, theta):
         """Internal function to evaluate the sum of the estimating equations. The summation must be internally evaluated
@@ -294,6 +331,16 @@ class MEstimator:
                        method=method,          # ... allow for valid root-finding methods
                        tol=tolerance,          # ... setting some tolerance values
                        options=options)        # ... options for the selected solver
+            psi = opt.x                        # Error handling if fails to converge
+            if opt.success == 0:
+                print("Root-finding failed to converge...")
+                raise RuntimeError(opt.message)
+        elif method in ['hybr', ]:
+            options = {"xtol": tolerance}
+            opt = root(stacked_equations,      # ... stacked equations to solve (should be written as sums)
+                       x0=np.asarray(init),    # ... initial values for solver
+                       method=method,          # ... allow for valid root-finding methods
+                       options=options)        # ... allow for options in hybrid
             psi = opt.x                        # Error handling if fails to converge
             if opt.success == 0:
                 print("Root-finding failed to converge...")
@@ -374,7 +421,7 @@ class MEstimator:
         # Evaluate the bread matrix
         if val_range == 1:                                       # When only a single theta is present
             d = derivative(stacked_equations, theta, dx=dx)      # ... approximate the derivative
-            return -1 * np.sum(d)                                # ... then return negative sum
+            return np.array([[-1 * np.sum(d), ], ])              # ... then return negative sum as 2d array
         else:                                                    # Otherwise approximate the partial derivatives
             bread_matrix = np.empty((val_range, val_range))      # ... create empty matrix
             for i in range(val_range):                           # ... for each i in len(theta)
