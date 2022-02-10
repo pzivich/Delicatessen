@@ -5,10 +5,11 @@ import pandas as pd
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
 from scipy.stats import logistic
+from sklearn.linear_model import Ridge
 
 from delicatessen import MEstimator
 from delicatessen.estimating_equations import (ee_mean, ee_mean_variance, ee_mean_robust,
-                                               ee_linear_regression, ee_logistic_regression,
+                                               ee_linear_regression, ee_logistic_regression, ee_ridge_linear_regression,
                                                ee_2p_logistic, ee_3p_logistic, ee_4p_logistic, ee_effective_dose_delta,
                                                ee_gformula, ee_ipw, ee_aipw)
 from delicatessen.data import load_inderjit
@@ -153,6 +154,83 @@ class TestEstimatingEquationsRegression:
         # Checking mean estimate
         npt.assert_allclose(mestimator.theta,
                             np.asarray(glm.params),
+                            atol=1e-6)
+
+    def test_ridge_ols(self):
+        """Tests the ridge (L2) variation of the linear regression built-in estimating equation
+        """
+        n = 1000
+        data = pd.DataFrame()
+        data['x1'] = np.random.normal(size=n)
+        data['x2'] = data['x1'] + np.random.normal(scale=0.1, size=n)
+        data['c'] = 1
+        data['y'] = 5 + data['x1'] + np.random.normal(size=n)
+        Xvals = np.asarray(data[['c', 'x1', 'x2']])
+        yvals = np.asarray(data['y'])
+
+        # Penalty of 0.5
+        def psi(theta):
+            return ee_ridge_linear_regression(theta, X=Xvals, y=yvals, penalty=0.5, weights=None)
+
+        estr = MEstimator(psi, init=[5, 1, 1])
+        estr.estimate(solver='lm')
+        ridge_skl = Ridge(alpha=.5, fit_intercept=False).fit(X=Xvals, y=yvals)
+
+        # Checking mean estimate
+        npt.assert_allclose(estr.theta,
+                            np.asarray(ridge_skl.coef_),
+                            atol=1e-6)
+
+        # Penalty of 5.0
+        def psi(theta):
+            return ee_ridge_linear_regression(theta, X=Xvals, y=yvals, penalty=5.0, weights=None)
+
+        estr = MEstimator(psi, init=[5, 1, 1])
+        estr.estimate(solver='lm')
+        ridge_skl = Ridge(alpha=5.0, fit_intercept=False).fit(X=Xvals, y=yvals)
+
+        # Checking mean estimate
+        npt.assert_allclose(estr.theta,
+                            np.asarray(ridge_skl.coef_),
+                            atol=1e-6)
+
+    def test_ridge_wls(self):
+        """Tests the ridge (L2) variation of the weighted linear regression built-in estimating equation
+        """
+        n = 1000
+        data = pd.DataFrame()
+        data['x1'] = np.random.normal(size=n)
+        data['x2'] = data['x1'] + np.random.normal(scale=0.1, size=n)
+        data['c'] = 1
+        data['y'] = 5 + data['x1'] + np.random.normal(size=n)
+        Xvals = np.asarray(data[['c', 'x1', 'x2']])
+        yvals = np.asarray(data['y'])
+        weights = np.random.uniform(0.1, 2.5, size=n)
+
+        # Penalty of 0.5
+        def psi(theta):
+            return ee_ridge_linear_regression(theta, X=Xvals, y=yvals, penalty=0.5, weights=weights)
+
+        estr = MEstimator(psi, init=[5, 1, 1])
+        estr.estimate(solver='lm')
+        ridge_skl = Ridge(alpha=.5, fit_intercept=False).fit(X=Xvals, y=yvals, sample_weight=weights)
+
+        # Checking mean estimate
+        npt.assert_allclose(estr.theta,
+                            np.asarray(ridge_skl.coef_),
+                            atol=1e-6)
+
+        # Penalty of 5.0
+        def psi(theta):
+            return ee_ridge_linear_regression(theta, X=Xvals, y=yvals, penalty=5.0, weights=weights)
+
+        estr = MEstimator(psi, init=[5, 1, 1])
+        estr.estimate(solver='lm')
+        ridge_skl = Ridge(alpha=5.0, fit_intercept=False).fit(X=Xvals, y=yvals, sample_weight=weights)
+
+        # Checking mean estimate
+        npt.assert_allclose(estr.theta,
+                            np.asarray(ridge_skl.coef_),
                             atol=1e-6)
 
     def test_logitic(self):
