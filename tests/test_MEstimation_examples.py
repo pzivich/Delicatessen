@@ -243,7 +243,7 @@ class TestMEstimationExamples:
         assert estr.theta[2] - coef[2] < epsilon
 
         # Test built-in equations
-        mest = MEstimator(lambda theta: ee_linear_regression(theta, X=data[['C', 'X', 'Z']], y=data['Y']),
+        mest = MEstimator(lambda theta: ee_linear_regression(theta=theta, X=data[['C', 'X', 'Z']], y=data['Y']),
                           init=[0., 0., 0., ])
         mest.estimate()
 
@@ -279,8 +279,6 @@ class TestMEstimationExamples:
         model = HuberRegressor(epsilon=k).fit(x, y)
         coef = model.coef_
 
-        m1 = LinearRegression().fit(x, y)
-
         assert estr.theta[0] - coef[0] < 0.3
         assert estr.theta[1] - coef[1] < 1e-2
         assert estr.theta[2] - coef[2] < 1e-2
@@ -293,3 +291,38 @@ class TestMEstimationExamples:
         assert estr.theta[0] - mest.theta[0] < epsilon
         assert estr.theta[1] - mest.theta[1] < epsilon
         assert estr.theta[2] - mest.theta[2] < epsilon
+
+    # Specifically for testing whether one-lined lambda functions for built-in estimating equations throw errors.
+    def test_lambda_oneliners(self):
+        n = 10000
+        data = pd.DataFrame()
+        data['X'] = np.random.normal(size=n)
+        data['Z'] = np.random.normal(size=n)
+        data['Y'] = 0.5 + 5 * data['X'] - 2 * data['Z'] + np.random.normal(loc=0, size=n)
+        data['C'] = 1
+
+        x = np.asarray(data[['C', 'X', 'Z']])
+        y = np.asarray(data['Y'])[:, None]
+
+        # Use sklearn LinearRegression to confirm accuracy
+        model = LinearRegression().fit(x, y)
+        coef = model.coef_[0]
+
+        # Initializing MEstimator should work, but actually estimating should throw error.
+        # Guarantees that lambda function given must have variable "theta" not anything else.
+        mest = MEstimator(lambda t: ee_linear_regression(theta=t, X=data[['C', 'X', 'Z']], y=data['Y']),
+                          init=[0., 0., 0., ])
+        with pytest.raises(TypeError) as e_info:
+            mest.estimate()
+
+        # Initialize with valid lambda function
+        mest = MEstimator(lambda theta: ee_linear_regression(theta=theta, X=data[['C', 'X', 'Z']], y=data['Y']),
+                          init=[0., 0., 0., ])
+        try:
+            mest.estimate()
+        except:
+            pytest.fail("Linear regression should not throw error")
+
+        assert mest.theta[0] - model.intercept_[0] < epsilon
+        assert mest.theta[1] - coef[1] < epsilon
+        assert mest.theta[2] - coef[2] < epsilon
