@@ -476,11 +476,11 @@ Causal Inference
 This next section describes a the available estimators for the causal mean. These estimators all rely on specific
 identification conditions to be able to interpret the estimate of the mean (or mean difference) as an estimate of the
 causal mean. For information on these assumptions, I recommend this
-`paper<https://www.ncbi.nlm.nih.gov/labs/pmc/articles/PMC2652882/>`_ as a general introduction.
+`paper <https://www.ncbi.nlm.nih.gov/labs/pmc/articles/PMC2652882/>`_ as a general introduction.
 
 This section procedures that the identification conditions have been previously deliberated, and the causal mean is
-identified and is estimable (see this `paper<https://arxiv.org/abs/2108.11342>`_ or this
-`paper<https://arxiv.org/abs/1904.02826>`_ for more information on this concept).
+identified and is estimable (see this `paper <https://arxiv.org/abs/2108.11342>`_ or this
+`paper <https://arxiv.org/abs/1904.02826>`_ for more information on this concept).
 
 With that aside, let's proceed through the available estimators of the causal means. In the following examples, we will
 use the generic data example here, where :math:`Y(a)` is independent of :math:`A` conditional on :math:`W`. Below is
