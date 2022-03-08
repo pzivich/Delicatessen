@@ -14,6 +14,9 @@ from setuptools import setup
 exec(compile(open('delicatessen/version.py').read(),
              'delicatessen/version.py', 'exec'))
 
+with open("README.md") as f:
+    descript = f.read()
+
 
 setup(name='delicatessen',
       version=__version__,
@@ -35,4 +38,6 @@ setup(name='delicatessen',
       install_requires=['numpy',
                         'scipy',
                         ],
+      long_description=descript,
+      long_description_content_type="text/markdown",
       )
