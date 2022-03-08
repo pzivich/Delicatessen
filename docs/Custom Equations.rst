@@ -164,6 +164,97 @@ done here, all the ``theta`` values are the 3rd are for the propensity score mod
 model values are last in the returned stack. Returning the values in a different order than expected by theta is a
 common mistake and will lead to failed optimizations.
 
+Handling ``np.nan``
+-------------------------------------
+
+Sometimes, ``np.nan`` will be necessary to include in your data set. However, ``delicatessen`` does not naturally
+handle ``np.nan``. In fact, ``delicatessen`` will fail to optimize the provided estimating equations when there are
+``np.nan``'s present (this is by design). The following discusses how ``np.nan`` can be handled appropriately in the
+estimating equations.
+
+In the first case, we will consider handling ``np.nan`` with a built-in estimating equation. When trying to fit a
+regression model where there are ``np.nan``'s present, the estimating equation missing values must be manually set to
+zero. This can be done via the ``numpy.nan_to_num`` function. Below is an example using the built-in logistic
+regression estimating equations:
+
+.. code::
+
+    import numpy as np
+    import pandas as pd
+    from delicatessen import MEstimator
+    from delicatessen.estimating_equations import ee_logistic_regression
+
+    d = pd.DataFrame()
+    d['X'] = np.random.normal(size=100)
+    y = np.random.binomial(n=1, p=0.5 + 0.01 * d['X'], size=100)
+    d['y'] = np.where(np.random.binomial(n=1, p=0.9, size=100), y, np.nan)
+    d['C'] = 1
+
+    X = np.asarray(d[['C', 'X']])
+    y = np.asarray(d['y'])
+
+
+    def psi(theta):
+        # Estimating logistic model values
+        a_model = ee_logistic_regression(theta,
+                                         X=X, y=y)
+        # Setting
+        a_model = np.nan_to_num(a_model, copy=False, nan=0.)
+        return a_model
+
+
+    mest = MEstimator(psi, init=[0, 0, ])
+    mest.estimate()
+
+If the ``numpy.nan_to_num`` function had not been included, the optimized points would have been ``nan``.
+
+As a second example, we will consider estimating the mean with missing data and correcting for informative missing
+by inverse probability weighting. To reduce random error, this example uses 10,000 observations. Here, we must set
+nan's to be zero's prior to subtracting off the mean. This is shown below:
+
+.. code::
+
+    import numpy as np
+    import pandas as pd
+    from scipy.stats import logistic
+    from delicatessen import MEstimator
+    from delicatessen.estimating_equations import ee_logistic_regression
+    from delicatessen.utilities import inverse_logit
+
+    # Generating data
+    d = pd.DataFrame()
+    d['X'] = np.random.normal(size=100000)
+    y = 5 + d['X'] + np.random.normal(size=100000)
+    d['y'] = np.where(np.random.binomial(n=1, p=logistic.cdf(1 + d['X']), size=100000), y, np.nan)
+    d['C'] = 1
+
+    X = np.asarray(d[['C', 'X']])
+    y = np.asarray(d['y'])
+    r = np.asarray(np.where(d['y'].isna(), 0, 1))
+
+
+    def psi(theta):
+        # Estimating logistic model values
+        a_model = ee_logistic_regression(theta[1:],
+                                         X=X, y=r)
+        pi = inverse_logit(np.dot(X, theta[1:]))
+
+        y_w = np.where(r, y / pi, 0) - theta[0]  # nan-to-zero then subtract off
+        return np.vstack((y_w[None, :],
+                          a_model))
+
+    mest = MEstimator(psi, init=[0, 0, 0])
+    mest.estimate()
+
+This will result in an estimate close to the truth (5). If we were to instead use ``np.where(r, y/pi - theta[0], 0)``,
+then the wrong answer will be returned. When in doubt about the form to use (and where the subtraction should go), go
+back to the formula. Here, the IPW mean is
+
+.. math::
+
+    \sum_{i=1}^{n} \left( \frac{I(R_i=1) Y_i}{\Pr(R_i=1 | X_i)} - \theta \right) = 0
+
+As seen with the indicator function, observations where :math:`Y` is missing should contribute a zero *minus theta*.
 
 Common Mistakes
 -------------------------------------
