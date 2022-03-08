@@ -10,13 +10,26 @@ from scipy.optimize import root
 from delicatessen import MEstimator
 from delicatessen.utilities import inverse_logit
 
-
 np.random.seed(236461)
+
 
 class TestMEstimation:
 
+    def test_error_nan(self):
+        """Checks for an error when estimating equations return a NaN at the init values
+        """
+        # Data set
+        y = np.array([5, 1, 2, 4, 2, 4, 5, 7, 11, 1, 6, 3, 4, np.nan])
+
+        def psi(theta):
+            return y - theta
+
+        mestimator = MEstimator(psi, init=[0, ])
+        with pytest.raises(ValueError, match="at least one np.nan"):
+            mestimator.estimate()
+
     def test_error_rootfinder1(self):
-        """Checks the an error when an invalid root finder is provided
+        """Checks for an error when an invalid root finder is provided
         """
         # Data set
         y = np.array([5, 1, 2, 4, 2, 4, 5, 7, 11, 1, 6, 3, 4, 6])

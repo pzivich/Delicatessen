@@ -194,8 +194,19 @@ class MEstimator:
         -------
         None
         """
+        # Evaluate stacked estimating equations at init
+        vals_at_init = self.stacked_equations(theta=self.init)
+
+        # Check to see if any np.nan's occur with the initial values
+        if np.isnan(np.sum(vals_at_init)):
+            raise ValueError("When evaluated at the initial values, the estimating equation(s) return at least one "
+                             "np.nan. As delicatessen does not natively handle missing data, please ensure the "
+                             "provided estimating equations handle any np.nan values correctly. For details on how to "
+                             "handle np.nan's appropriately see documentation at: "
+                             "https://deli.readthedocs.io/en/latest/Custom%20Equations.html#handling-np-nan")
+
         # Trick to get the number of observations from the estimating equations
-        self.n_obs = np.asarray(self.stacked_equations(theta=self.init)  # ... convert output to an array
+        self.n_obs = np.asarray(vals_at_init                             # ... convert output to an array
                                 ).T.shape[0]                             # ... transpose so N is always the 1st element
 
         # Step 1: solving the M-estimator stacked equations
