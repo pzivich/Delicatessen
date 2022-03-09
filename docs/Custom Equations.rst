@@ -271,3 +271,7 @@ Here is a list of common mistakes, most of which I have done myself.
 If you still have trouble, please open an issue at
 `pzivich/Delicatessen <https://github.com/pzivich/Delicatessen/issues>`_. This will help me to add other common
 mistakes here and improve the documentation for custom estimating equations.
+
+Additional Examples
+-------------------------------
+Additional examples are provided `here<https://github.com/pzivich/Delicatessen/tree/main/tutorials>`_.

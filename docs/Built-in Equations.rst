@@ -843,6 +843,9 @@ approaches correctly incorporates the uncertainty in estimation of the outcome m
 (e.g., average causal effect). Therefore, we do not have to rely on the nonparametric bootstrap (computationally
 cumbersome).
 
+Additional Examples
+-------------------------------
+Additional examples are provided `here<https://github.com/pzivich/Delicatessen/tree/main/tutorials>`_.
 
 References and Further Readings
 ===============================

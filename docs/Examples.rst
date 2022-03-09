@@ -502,3 +502,7 @@ Taking the previous vectorized version of the linear regression model and buildi
 You'll notice that the coefficients have changed slightly here. That is because we have reduced the extent of outliers
 on the estimation of the linear regression parameters (however, our simulated data mechanism doesn't really result in
 major outliers, so the change is small here).
+
+Additional Examples
+-------------------------------
+Additional examples are provided `here<https://github.com/pzivich/Delicatessen/tree/main/tutorials>`_.
