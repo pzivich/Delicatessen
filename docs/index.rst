@@ -45,6 +45,8 @@ the ``MEstimator`` class object. Next, the ``MEstimator`` object solves for :mat
 algorithm. After successful completion of the root-finding step, the bread is computed by numerically approximating the
 partial derivatives and the filling is calculated. Finally, the sandwich variance is computed.
 
+If you use ``delicatessen``, please consider citing our following pre-print: Zivich PN, Klose M, Cole SR, Edwards JK,
+& Shook-Sa BE. (2022). Delicatessen: M-Estimation in Python. *arXiv:2203.11300* [stat.ME]
 
 Installation:
 -------------

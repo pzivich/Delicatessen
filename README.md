@@ -8,7 +8,10 @@
 [![Downloads](https://pepy.tech/badge/delicatessen/month)](https://pepy.tech/project/delicatessen)
 
 The one-stop sandwich (variance) shop in Python. `delicatessen` is a Python 3.6+ library for the generalized calculus 
-of M-estimation. 
+of M-estimation.
+
+**Citation**: Zivich PN, Klose M, Cole SR, Edwards JK, & Shook-Sa BE. (2022). Delicatessen: M-Estimation in Python.
+*arXiv:2203.11300* [stat.ME]
 
 ## M-Estimation and Estimating Equations
 
