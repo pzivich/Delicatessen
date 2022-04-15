@@ -87,6 +87,10 @@ Otherwise, you may contact us via email (gmail: zivich.5) or on Twitter (@Pausal
 
 References
 -----------------------------
+
+Zivich PN, Klose M, Cole SR, Edwards JK, & Shook-Sa BE. (2022). Delicatessen: M-Estimation in Python.
+*arXiv preprint arXiv:2203.11300*.
+
 Stefanski LA, & Boos DD. (2002). The calculus of M-estimation. *The American Statistician*, 56(1), 29-38.
 
 Boos DD, & Stefanski LA. (2013). M-estimation (estimating equations). In Essential Statistical Inference

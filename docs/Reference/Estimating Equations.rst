@@ -42,7 +42,7 @@ Dose Response
   ee_4p_logistic
   ee_3p_logistic
   ee_2p_logistic
-  ee_effective_dose_alpha
+  ee_effective_dose_delta
 
 
 Causal Inference
