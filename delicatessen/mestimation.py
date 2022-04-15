@@ -443,5 +443,6 @@ class MEstimator:
                                                 stacked_equations=stacked_equations,
                                                 dx=dx,
                                                 order=order)
+                    # TODO potential consideration: can eval sum then derivative (right now deriv then sum). maybe fast?
                     bread_matrix[j, i] = b                       # ... update bread matrix value with new
             return bread_matrix                                  # Return completed bread matrix
