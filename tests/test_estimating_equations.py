@@ -4,12 +4,13 @@ import numpy.testing as npt
 import pandas as pd
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
-from scipy.stats import logistic
+from scipy.stats import logistic, poisson
 from sklearn.linear_model import Ridge
 
 from delicatessen import MEstimator
 from delicatessen.estimating_equations import (ee_mean, ee_mean_variance, ee_mean_robust,
                                                ee_linear_regression, ee_logistic_regression, ee_ridge_linear_regression,
+                                               ee_poisson_regression,
                                                ee_2p_logistic, ee_3p_logistic, ee_4p_logistic, ee_effective_dose_delta,
                                                ee_gformula, ee_ipw, ee_aipw)
 from delicatessen.data import load_inderjit
@@ -291,6 +292,70 @@ class TestEstimatingEquationsRegression:
 
         # Comparing to statsmodels GLM (with robust covariance)
         glm = smf.glm("Y ~ X + Z", data, freq_weights=data['w'], family=sm.families.Binomial()).fit(cov_type="HC1")
+
+        # Checking mean estimate
+        npt.assert_allclose(mestimator.theta,
+                            np.asarray(glm.params),
+                            atol=1e-6)
+
+    def test_poisson(self):
+        """Tests Poisson regression by-hand with a single estimating equation.
+        """
+        n = 500
+        data = pd.DataFrame()
+        data['X'] = np.random.normal(size=n)
+        data['Z'] = np.random.normal(size=n)
+        data['Y'] = np.random.poisson(lam=10.5 + 2*data['X'] - 1*data['Z'], size=n)
+        data['C'] = 1
+
+        def psi_regression(theta):
+            return ee_poisson_regression(theta,
+                                         X=data[['C', 'X', 'Z']],
+                                         y=data['Y'])
+
+        mestimator = MEstimator(psi_regression, init=[0., 0., 0.])
+        mestimator.estimate()
+
+        # Comparing to statsmodels GLM (with robust covariance)
+        glm = smf.glm("Y ~ X + Z", data, family=sm.families.Poisson()).fit(cov_type="HC1")
+
+        # Checking mean estimate
+        npt.assert_allclose(mestimator.theta,
+                            np.asarray(glm.params),
+                            atol=1e-6)
+
+        # Checking variance estimates
+        npt.assert_allclose(mestimator.variance,
+                            np.asarray(glm.cov_params()),
+                            atol=1e-6)
+
+        # Checking confidence interval estimates
+        npt.assert_allclose(mestimator.confidence_intervals(),
+                            np.asarray(glm.conf_int()),
+                            atol=1e-6)
+
+    def test_weighted_poisson(self):
+        """Tests weighted Poisson regression by-hand with a single estimating equation.
+        """
+        n = 500
+        data = pd.DataFrame()
+        data['X'] = np.random.normal(size=n)
+        data['Z'] = np.random.normal(size=n)
+        data['Y'] = np.random.poisson(lam=10.5 + 2*data['X'] - 1*data['Z'], size=n)
+        data['C'] = 1
+        data['w'] = np.random.uniform(1, 3, size=n)
+
+        def psi_regression(theta):
+            return ee_poisson_regression(theta,
+                                         X=data[['C', 'X', 'Z']],
+                                         y=data['Y'],
+                                         weights=data['w'])
+
+        mestimator = MEstimator(psi_regression, init=[0., 0., 0.])
+        mestimator.estimate()
+
+        # Comparing to statsmodels GLM (with robust covariance)
+        glm = smf.glm("Y ~ X + Z", data, freq_weights=data['w'], family=sm.families.Poisson()).fit(cov_type="HC1")
 
         # Checking mean estimate
         npt.assert_allclose(mestimator.theta,
