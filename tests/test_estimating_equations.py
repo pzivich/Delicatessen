@@ -152,11 +152,23 @@ class TestEstimatingEquationsRegression:
         mestimator.estimate()
 
         # Comparing to statsmodels GLM (with robust covariance)
-        glm = smf.glm("Y ~ X + Z", data, freq_weights=data['w']).fit(cov_type="HC1")
+        glm = smf.glm("Y ~ X + Z", data, freq_weights=data['w']).fit(cov_type="cluster",
+                                                                     cov_kwds={"groups": data.index,
+                                                                               "use_correction": False})
 
         # Checking mean estimate
         npt.assert_allclose(mestimator.theta,
                             np.asarray(glm.params),
+                            atol=1e-6)
+
+        # Checking variance estimates
+        npt.assert_allclose(mestimator.variance,
+                            np.asarray(glm.cov_params()),
+                            atol=1e-6)
+
+        # Checking confidence interval estimates
+        npt.assert_allclose(mestimator.confidence_intervals(),
+                            np.asarray(glm.conf_int()),
                             atol=1e-6)
 
     def test_ridge_ols(self):
@@ -291,11 +303,24 @@ class TestEstimatingEquationsRegression:
         mestimator.estimate()
 
         # Comparing to statsmodels GLM (with robust covariance)
-        glm = smf.glm("Y ~ X + Z", data, freq_weights=data['w'], family=sm.families.Binomial()).fit(cov_type="HC1")
+        glm = smf.glm("Y ~ X + Z", data, freq_weights=data['w'],
+                      family=sm.families.Binomial()).fit(cov_type="cluster",
+                                                         cov_kwds={"groups": data.index,
+                                                                   "use_correction": False})
 
         # Checking mean estimate
         npt.assert_allclose(mestimator.theta,
                             np.asarray(glm.params),
+                            atol=1e-6)
+
+        # Checking variance estimates
+        npt.assert_allclose(mestimator.variance,
+                            np.asarray(glm.cov_params()),
+                            atol=1e-6)
+
+        # Checking confidence interval estimates
+        npt.assert_allclose(mestimator.confidence_intervals(),
+                            np.asarray(glm.conf_int()),
                             atol=1e-6)
 
     def test_poisson(self):
@@ -357,11 +382,24 @@ class TestEstimatingEquationsRegression:
         mestimator.estimate(solver='lm')
 
         # Comparing to statsmodels GLM (with robust covariance)
-        glm = smf.glm("Y ~ X + Z", data, freq_weights=data['w'], family=sm.families.Poisson()).fit(cov_type="HC1")
+        glm = smf.glm("Y ~ X + Z", data, freq_weights=data['w'],
+                      family=sm.families.Poisson()).fit(cov_type="cluster",
+                                                        cov_kwds={"groups": data.index,
+                                                                  "use_correction": False})
 
         # Checking mean estimate
         npt.assert_allclose(mestimator.theta,
                             np.asarray(glm.params),
+                            atol=1e-6)
+
+        # Checking variance estimates
+        npt.assert_allclose(mestimator.variance,
+                            np.asarray(glm.cov_params()),
+                            atol=1e-6)
+
+        # Checking confidence interval estimates
+        npt.assert_allclose(mestimator.confidence_intervals(),
+                            np.asarray(glm.conf_int()),
                             atol=1e-6)
 
 
