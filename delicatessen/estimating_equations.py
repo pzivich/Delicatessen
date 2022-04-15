@@ -808,20 +808,85 @@ def ee_logistic_regression(theta, X, y, weights=None):
     Boos DD, & Stefanski LA. (2013). M-estimation (estimating equations). In Essential Statistical Inference
     (pp. 297-337). Springer, New York, NY.
     """
-    X = np.asarray(X)                      # Convert to NumPy array
-    y = np.asarray(y)[:, None]             # Convert to NumPy array and ensure correct shape for matrix algebra
-    beta = np.asarray(theta)[:, None]      # Convert to NumPy array and ensure correct shape for matrix algebra
+    X = np.asarray(X)                             # Convert to NumPy array
+    y = np.asarray(y)[:, None]                    # Convert to NumPy array and ensure correct shape for matrix algebra
+    beta = np.asarray(theta)[:, None]             # Convert to NumPy array and ensure correct shape for matrix algebra
 
-    # Allowing for a weighted linear model
-    if weights is None:                     # If weights is unspecified
-        w = np.ones(X.shape[0])                 # ... assign weight of 1 to all observations
-    else:                                   # Otherwise
-        w = np.asarray(weights)                 # ... set weights as input vector
+    # Allowing for a weighted logistic model
+    if weights is None:                           # If weights is unspecified
+        w = np.ones(X.shape[0])                   # ... assign weight of 1 to all observations
+    else:                                         # Otherwise
+        w = np.asarray(weights)                   # ... set weights as input vector
 
     # Output b-by-n matrix
     return w*((y -                                # Speedy matrix algebra for regression
                inverse_logit(np.dot(X, beta)))    # ... inverse-logit transformation of predictions
-              * X).T                              # ... multiply by coefficient and transpose for correct orientation
+              * X).T                              # ... multiply by covariates and transpose for correct orientation
+
+
+def ee_poisson_regression(theta, X, y, weights=None):
+    r"""Default stacked estimating equation for Poisson regression. The estimating equation is
+
+    .. math::
+
+        \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n (Y_i - \exp(X_i^T \theta)) X_i = 0
+
+    Here, theta is a 1-by-b array, where b is the distinct covariates included as part of X. For example, if X is a
+    3-by-n matrix, then theta will be a 1-by-3 array. The code is general to allow for an arbitrary number of X's (as
+    long as there is enough support in the data).
+
+    Note
+    ----
+    All provided estimating equations are meant to be wrapped inside a user-specified function. Throughtout, these
+    user-defined functions are defined as ``psi``.
+
+    Note
+    ----
+    For complex regression problems, the optimizer behind the scenes is not particularly robust (unlike functions
+    specializing in solely logistic regression). Therefore, optimization of logistic regression via a separate
+    functionality can be done then those estimated parameters are fed forward as the initial values (which should
+    result in a more stable optimization).
+
+    Parameters
+    ----------
+    theta : ndarray, list, vector
+        Theta in this case consists of b values. Therefore, initial values should consist of the same number as the
+        number of columns present. This can easily be accomplished generally by ``[0, ] * X.shape[1]``.
+    X : ndarray, list, vector
+        2-dimensional vector of n observed values for b variables. No missing data should be included (missing data
+        may cause unexpected behavior).
+    y : ndarray, list, vector
+        1-dimensional vector of n observed values. The Y values should all be 0 or 1. No missing data should be
+        included (missing data may cause unexpected behavior).
+    weights : ndarray, list, vector, None, optional
+        1-dimensional vector of n weights. No missing weights should be included. Default is None, which assigns a
+        weight of 1 to all observations.
+
+    Returns
+    -------
+    array :
+        Returns a b-by-n NumPy array evaluated for the input theta and y
+
+    Examples
+    --------
+
+    References
+    ----------
+    """
+    X = np.asarray(X)                           # Convert to NumPy array
+    y = np.asarray(y)[:, None]                  # Convert to NumPy array and ensure correct shape for matrix algebra
+    beta = np.asarray(theta)[:, None]           # Convert to NumPy array and ensure correct shape for matrix algebra
+
+    # Allowing for a weighted Poisson model
+    if weights is None:                         # If weights is unspecified
+        w = np.ones(X.shape[0])                 # ... assign weight of 1 to all observations
+    else:                                       # Otherwise
+        w = np.asarray(weights)                 # ... set weights as input vector
+
+    # Output b-by-n matrix
+    return w*((y                                # Speedy matrix algebra for regression
+              - np.exp(np.dot(X, beta)))        # ... exp transformation of predictions
+              * X).T                            # ... multiply by covariates and transpose for correct orientation
 
 
 #################################################################
