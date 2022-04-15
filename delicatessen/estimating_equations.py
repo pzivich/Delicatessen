@@ -825,6 +825,361 @@ def ee_logistic_regression(theta, X, y, weights=None):
 
 
 #################################################################
+# Survival Estimating Equations
+
+
+def ee_aft_weibull(theta, X, t, delta, weights=None):
+    r"""Default stacked estimating equation for accelerated failure time (AFT) model with a Weibull distribution. The
+    estimating equation is
+
+    .. math::
+
+        \psi(T_i,X_i,\delta_i; \lambda) = \frac{\delta_i}{\lambda} -  t_i^{\gamma} \exp(\beta X_i) \\
+        \psi(T_i,X_i,\delta_i; \beta) = \delta_i X_i - (\lambda  t_i^{\gamma} \exp(\beta X_i))X_i \\
+        \psi(T_i,X_i,\delta_i; \gamma) = \frac{\delta_i}{\gamma} + \delta_i \log(t) - \lambda t_i^{\gamma}
+        \exp(\beta X_i) \log(t)
+
+    Here, the Weibull-AFT actually consists of the following parameters: :math:`\mu, \beta, \sigma`. The above
+    estimating equations use the proportional hazards form of the Weibull model. For the Weibull AFT, notice the
+    following relation between the coefficients: :math:`\lambda = - \mu \gamma`,
+    :math:`\beta_{PH} = - \beta_{AFT} \gamma`, and :math:`\gamma = \exp(\sigma)`.
+
+    Here, :math:`\theta` is a 1-by-(2+b) array, where b is the distinct covariates included as part of X. For example,
+    if X is a 3-by-n matrix, then theta will be a 1-by-5 array. The code is general to allow for an arbitrary number of
+    X's (as long as there is enough support in the data).
+
+    Note
+    ----
+    All provided estimating equations are meant to be wrapped inside a user-specified function. Throughtout, these
+    user-defined functions are defined as ``psi``.
+
+    Parameters
+    ----------
+    theta : ndarray, list, vector
+        theta consists of 1+b+1 values. Therefore, initial values should consist of the same number as the number of
+        columns present in ``X`` plus 2. This can easily be accomplished generally by
+        ``[0, ] + [0, ] * X.shape[1] + [0, ]``.
+    X : ndarray, list, vector
+        2-dimensional vector of n observed values for b variables. No missing data should be included (missing data
+        may cause unexpected behavior).
+    t : ndarray, list, vector
+        1-dimensional vector of n observed times. Note that times can either be events (indicated by :math:`\delta_i=1`)
+        or censored (indicated by :math:`\delta_i=0`). No missing data should be included (missing data may cause
+        unexpected behavior).
+    delta : ndarray, list, vector
+        1-dimensional vector of n values indicating whether the time was an event or censoring. No missing data should
+        be included (missing data may cause unexpected behavior).
+    weights : ndarray, list, vector, None, optional
+        1-dimensional vector of n weights. No missing weights should be included. Default is None, which assigns a
+        weight of 1 to all observations.
+
+    Returns
+    -------
+    array :
+        Returns a b-by-n NumPy array evaluated for the input theta. The first element of theta corresponds to the scale
+        parameter, the last element corresponds to the shape parameter, and the middle parameters correspond to the
+        model coefficients.
+
+    Examples
+    --------
+    Construction of a estimating equation(s) with ``ee_aft_weibull`` should be done similar to the following
+
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> from delicatessen import MEstimator
+    >>> from delicatessen.estimating_equations import ee_aft_weibull
+
+    Some generic survival data to estimate a Weibull AFT regresion model
+
+    >>> n = 100
+    >>> data = pd.DataFrame()
+    >>> data['X'] = np.random.binomial(n=1, p=0.5, size=n)
+    >>> data['W'] = np.random.binomial(n=1, p=0.5, size=n)
+    >>> data['T'] = (1/1.25 + 1/np.exp(0.5)*data['X'])*np.random.weibull(a=0.75, size=n)
+    >>> data['C'] = np.random.weibull(a=1, size=n)
+    >>> data['C'] = np.where(data['C'] > 10, 10, data['C'])
+    >>> data['delta'] = np.where(data['T'] < data['C'], 1, 0)
+    >>> data['t'] = np.where(data['delta'] == 1, data['T'], data['C'])
+    >>> d_obs = data[['X', 'W', 't', 'delta']].copy()
+
+    Defining psi, or the stacked estimating equations
+
+    >>> def psi(theta):
+    >>>         return ee_aft_weibull(theta=theta, X=d_obs[['C', 'X', 'Z']],
+    >>>                               t=d_obs['t'], delta=d_obs['delta'])
+
+    Calling the M-estimation procedure (note that `init` has 2+2 values now, since ``X.shape[1] = 2``).
+
+    >>> estr = MEstimator(stacked_equations=psi, init=[0., 0., 0., 0.])
+    >>> estr.estimate(solver='lm')
+
+    Inspecting the parameter estimates, variance, and confidence intervals
+
+    >>> estr.theta
+    >>> estr.variance
+    >>> estr.confidence_intervals()
+
+    Inspecting parameter the specific parameter estimates
+
+    >>> estr.theta[0]     # log(mu)    (scale)
+    >>> estr.theta[1:-1]  # log(beta)  (scale coefficients)
+    >>> estr.theta[-1]    # log(sigma) (shape)
+
+    References
+    ----------
+    Collett D. (2015). Parametric proportional hazards models In: Modelling survival data in medical research.
+    CRC press. pg171-220
+
+    Collett D. (2015). Accelerated failure time and other parametric models. In: Modelling survival data in medical
+    research. CRC press. pg171-220
+    """
+    # TODO expand sigma to allow for coefficients too!
+    X = np.asarray(X)                          # Convert to NumPy array
+    t = np.asarray(t)[:, None]                 # Convert to NumPy array and ensure correct shape for matrix algebra
+    delta = np.asarray(delta)[:, None]         # Convert to NumPy array and ensure correct shape for matrix algebra
+    beta_dim = X.shape[1]
+
+    # Extract coefficients
+    sigma = np.exp(theta[-1])                  # exponential so as to be nice to optimizer
+    mu = np.exp(-1 * theta[0] * sigma)         # exponential so as to be nice to optimizer, and apply PH->AFT transform
+    beta = (-1 * sigma *                       # exponential so as to be nice to optimizer, and apply PH->AFT transform
+            np.asarray(theta[1:beta_dim+1])[:, None])
+    #   Rationale: I apply some transformations for the AFT model. These transformations are to go from the proportional
+    #       hazards form of the Weibull model to the AFT form of the Weibull model. Explicitly,
+    #           lambda = exp(-mu * sigma)
+    #           beta   = -alpha * sigma
+    #           gamma  = exp(sigma)
+    #       I used the proportional hazards form because the log-likelihood has written out on page 200 of Collett's
+    #       "Modeling Survival Data in Medical Research" (3ed). I then solved for the derivative, which gives the
+    #       3 contributions to the score function (which is also the estimating equations here).
+
+    # Allowing for a weighted Weibull-AFT model
+    if weights is None:                         # If weights is unspecified
+        w = np.ones(X.shape[0])                 # ... assign weight of 1 to all observations
+    else:                                       # Otherwise
+        w = np.asarray(weights)                 # ... set weights as input vector
+
+    # Intermediate calculations (evaluated once to optimize run-time)
+    exp_coefs = np.exp(np.dot(X, beta))         # Calculates the exponential of coefficients
+    log_t = np.log(t)                           # Calculates natural log of the time contribution
+
+    # Estimating equations
+    contribution_1 = w*(delta/mu                               # Estimating equation: mu
+                        - exp_coefs*(t**sigma)).T
+    contribution_2 = w*((delta                                 # Estimating equation: beta
+                         - mu*(t**sigma)*exp_coefs)*X).T
+    contribution_3 = w*(delta/sigma                            # Estimating equation: sigma
+                        + delta*log_t
+                        - mu*(t**sigma)*exp_coefs*log_t).T
+
+    # Output b-by-n matrix
+    return np.vstack((contribution_1,      # mu contribution
+                      contribution_2,      # beta contribution
+                      contribution_3))     # sigma contribution
+
+
+def ee_aft_weibull_measure(theta, times, X, measure, mu, beta, sigma):
+    r"""Default stacked estimating equation to calculate a survival measure (survival, density, risk, hazard,
+    cumulative hazard) given a specific covariate pattern and coefficients from a Weibull accelerated failure time
+    (AFT) model. The estimating equation for the survival function at time :math:`t` is
+
+    .. math::
+
+        \psi_S(T_i,X_i,\delta_i; \theta, \mu, \beta, \sigma) = \exp(-1 \lambda_i t^{\gamma}) - \theta
+
+    and the estimating equation for the hazard function at time :math:`t` is
+
+    .. math::
+
+        \psi_h(T_i,X_i,\delta_i; \theta, \mu, \beta, \sigma) = \lambda_i \gamma t^{\gamma - 1} - \theta
+
+    where
+
+    .. math::
+
+        \gamma = \exp(\sigma) \\
+        \lambda_i = \exp(-1 (\mu + X \beta) * \gamma)
+
+    For the other measures, we take advantage of the following known transformation behind survival meaures
+
+    .. math::
+
+        F(t) = 1 - S(t) \\
+        H(t) = -\log(S(t)) \\
+        f(t) = h(t) S(t)
+
+    Note
+    ----
+    For proper uncertainty estimation, this estimating equation is meant to be stacked together with the corresponding
+    Weibull AFT model.
+
+    Parameters
+    ----------
+    theta : ndarray, list, vector
+        theta consists of t values. The initial values should consist of the same number of elements as provided in the
+        ``times`` argument.
+    times : int, float, ndarray, list, vector
+        A single time or 1-dimensional collection of times to calculate the measure at. The number of provided times
+        should consist of the same number of elements as provided in the ``theta`` argument.
+    X : ndarray, list, vector
+        2-dimensional vector of n observed values for b variables. No missing data should be included (missing data
+        may cause unexpected behavior).
+    measure : str
+        Measure to calculate. Options include survival (``'survival'``), density (``'density'``), risk or the cumulative
+        density (``'risk'``), hazard (``'hazard'``), or cumulative hazard (``'cumulative_hazard'``).
+    mu : float, int
+        The estimated scale parameter from the Weibull AFT. From ``ee_aft_weibull``, will be the first element.
+    beta :
+        The estimated scale coefficients from the Weibull AFT. From ``ee_aft_weibull``, will be the middle element(s).
+    sigma :
+        The estimated shape parameter from the Weibull AFT. From ``ee_aft_weibull``, will be the last element.
+
+    Returns
+    -------
+    array :
+        Returns a 1-by-n NumPy array evaluated for the input theta
+
+    Examples
+    --------
+    Construction of a estimating equations for :math:`S(t=5)` with ``ee_aft_weibull_measure`` should be done similar to
+    the following
+
+    >>> from delicatessen import MEstimator
+    >>> from delicatessen.estimating_equations import ee_aft_weibull, ee_aft_weibull_measure
+
+    For demonstration, we will generated generic survival data
+
+    >>> n = 100
+    >>> data = pd.DataFrame()
+    >>> data['X'] = np.random.binomial(n=1, p=0.5, size=n)
+    >>> data['W'] = np.random.binomial(n=1, p=0.5, size=n)
+    >>> data['T'] = (1/1.25 + 1/np.exp(0.5)*data['X'])*np.random.weibull(a=0.75, size=n)
+    >>> data['C'] = np.random.weibull(a=1, size=n)
+    >>> data['C'] = np.where(data['C'] > 10, 10, data['C'])
+    >>> data['delta'] = np.where(data['T'] < data['C'], 1, 0)
+    >>> data['t'] = np.where(data['delta'] == 1, data['T'], data['C'])
+    >>> d_obs = data[['X', 'W', 't', 'delta']].copy()
+
+    Our interest will be in the survival among those with :math:`X=1,W=1`. Therefore, we will generate a copy of the
+    data and set the values in that copy (to keep the dimension the same across both estimating equations).
+
+    >>> d_coef = d_obs.copy()
+    >>> d_coef['X'] = 1
+    >>> d_coef['W'] = 1
+
+    Defining psi, or the stacked estimating equations
+
+    >>> def psi(theta):
+    >>>     aft = ee_aft_weibull(theta=theta[0:4],
+    >>>                     t=d_obs['t'], delta=d_obs['delta'], X=d_obs[['X', 'W']])
+    >>>     pred_surv_t = ee_aft_weibull_measure(theta=theta[4], X=d_coef[['X', 'W']],
+    >>>                                          times=5, measure='survival',
+    >>>                                          mu=theta[0], beta=theta[1:3], sigma=theta[3])
+    >>>     return np.vstack((aft, pred_surv_t))
+
+    Calling the M-estimation procedure (note that `init` has 2+2+1 values now, since ``X.shape[1] = 2`` and we are
+    calculating the survival at time 5).
+
+    >>> estr = MEstimator(stacked_equations=psi, init=[0., 0., 0., 0., 0.5])
+    >>> estr.estimate(solver='lm')
+
+    Inspecting the estimate, variance, and confidence intervals for :math:`S(t=5)`
+
+    >>> estr.theta[-1]                      # \hat{S}(t)
+    >>> estr.variance[-1, -1]               # \hat{Var}(\hat{S}(t))
+    >>> estr.confidence_intervals()[-1, :]  # 95% CI for S(t)
+
+    Next, we will consider evaluating the survival function at multiple time points (so we can easily create a plot of
+    the survival function and the corresponding confidence intervals)
+
+    Note
+    ----
+    When calculate the survival (or other measures) at many time points, it is generally best to optimize the Weibull
+    AFT coefficients in a separate model, then use the pre-washed coefficients in another M-estimator with the many
+    time points. This helps the optimizer to converge faster in number of iterations and total run-time.
+
+    To make everything easier, we will generate a list of uniformly spaced values between the start and end points of
+    our desired survival function. We will also generate initial values of the same length (to help the optimizer, we
+    also start our starting values from near one and end near zero).
+
+    >>> resolution = 50
+    >>> time_spacing = list(np.linspace(0.01, 8, resolution))
+    >>> fast_inits = list(np.log(np.linspace(0.99, 0.01, resolution)))
+
+    Defining psi, or the stacked estimating equations
+
+    >>> def psi(theta):
+    >>>     aft = ee_aft_weibull(theta=theta[0:4],
+    >>>                     t=d_obs['t'], delta=d_obs['delta'], X=d_obs[['X', 'W']])
+    >>>     pred_surv_t = ee_aft_weibull_measure(theta=theta[4:], X=d_coef[['X', 'W']],
+    >>>                                          times=5, measure='survival',
+    >>>                                          mu=theta[0], beta=theta[1:3], sigma=theta[3])
+    >>>     return np.vstack((aft, pred_surv_t))
+
+    Calling the M-estimation procedure. As stated in the note above, we use the pre-washed covariates to help the
+    optimizer (since the resolution means we are estimating 50 different parameters).
+
+    >>> estr = MEstimator(psi, init=list(mest.theta) + fast_inits)
+    >>> estr.estimate(solver="lm")
+
+    To plot the survival curves, we could do the following:
+
+    >>> import matplotlib.pyplot as plt
+    >>> ci = estr.confidence_intervals()[4:, :]  # Extracting relevant CI
+    >>> plt.fill_between(time_spacing, ci[:, 0], ci[:, 1], alpha=0.2)
+    >>> plt.plot(time_spacing, estr.theta[4:], '-')
+    >>> plt.show()
+
+    References
+    ----------
+    Collett D. (2015). Accelerated failure time and other parametric models. In: Modelling survival data in medical
+    research. CRC press. pg171-220
+    """
+    X = np.asarray(X)                      # Convert to NumPy array
+
+    # Extract coefficients
+    gamma = np.exp(sigma)                                # exponential to convert to regular sigma
+    beta = np.asarray(beta)[:, None]                     # Pulling out the coefficients
+    lambd = np.exp(-1 * (mu + np.dot(X, beta)) * gamma)  # Calculating lambda
+
+    def calculate_metric(time, theta_t):
+        # Intermediate calculations
+        survival_t = np.exp(-1 * lambd * time**gamma)   # Survival calculation from parameters
+        hazard_t = lambd * gamma * time**(gamma-1)      # hazard calculation from parameters
+
+        # Calculating specific measures
+        if measure == "survival":
+            metric = survival_t                       # S(t) = S(t)
+        elif measure == "risk":
+            metric = 1 - survival_t                   # F(t) = 1 - S(t)
+        elif measure == "cumulative_hazard":
+            metric = -1 * np.log(survival_t)          # H(t) = -log(S(t))
+        elif measure == "hazard":
+            metric = hazard_t                         # h(t) = h(t)
+        elif measure == "density":
+            metric = hazard_t * survival_t            # f(t) = h(t) * S(t)
+        else:
+            raise ValueError("The measure '"
+                             + str(measure)
+                             + "' is not supported. Please select one of the following: "
+                               "survival, density, risk, hazard, cumulative_hazard.")
+        return (metric - theta_t).T                   # Calculate difference from theta, and do transpose for vstack
+
+    # Logic to allow for either a single time or multiple times
+    if type(times) is int or type(times) is float:               # For single time,
+        return calculate_metric(time=times, theta_t=theta)       # ... calculate the transformation and return
+    else:                                                        # For multiple time points,
+        if len(theta) != len(times):                             # ... check length is the same (to prevent errors)
+            raise ValueError("There is a mismatch between the number of "
+                             "`theta`'s and the number of `times` provided.")
+        stacked_time_evals = []                                  # ... empty list for stacking the equations
+        for t, thet in zip(times, theta):                        # ... loop through each theta and each time
+            metric_t = calculate_metric(time=t, theta_t=thet)    # ... ... calculate the transformation
+            stacked_time_evals.append(metric_t)                  # ... ... stack transformation into storage
+        return np.vstack(stacked_time_evals)                     # ... return a vstack of the equations
+
+
+#################################################################
 # Dose-Response Estimating Equations
 
 
