@@ -301,6 +301,7 @@ class TestEstimatingEquationsRegression:
     def test_poisson(self):
         """Tests Poisson regression by-hand with a single estimating equation.
         """
+        np.random.seed(20212345)
         n = 500
         data = pd.DataFrame()
         data['X'] = np.random.normal(size=n)
@@ -314,7 +315,7 @@ class TestEstimatingEquationsRegression:
                                          y=data['Y'])
 
         mestimator = MEstimator(psi_regression, init=[0., 0., 0.])
-        mestimator.estimate()
+        mestimator.estimate(solver='lm')
 
         # Comparing to statsmodels GLM (with robust covariance)
         glm = smf.glm("Y ~ X + Z", data, family=sm.families.Poisson()).fit(cov_type="HC1")
@@ -337,6 +338,7 @@ class TestEstimatingEquationsRegression:
     def test_weighted_poisson(self):
         """Tests weighted Poisson regression by-hand with a single estimating equation.
         """
+        np.random.seed(1234)
         n = 500
         data = pd.DataFrame()
         data['X'] = np.random.normal(size=n)
@@ -352,7 +354,7 @@ class TestEstimatingEquationsRegression:
                                          weights=data['w'])
 
         mestimator = MEstimator(psi_regression, init=[0., 0., 0.])
-        mestimator.estimate()
+        mestimator.estimate(solver='lm')
 
         # Comparing to statsmodels GLM (with robust covariance)
         glm = smf.glm("Y ~ X + Z", data, freq_weights=data['w'], family=sm.families.Poisson()).fit(cov_type="HC1")
