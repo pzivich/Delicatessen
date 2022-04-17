@@ -6,11 +6,13 @@ import statsmodels.api as sm
 import statsmodels.formula.api as smf
 from scipy.stats import logistic, poisson
 from sklearn.linear_model import Ridge
+from lifelines import WeibullAFTFitter
 
 from delicatessen import MEstimator
 from delicatessen.estimating_equations import (ee_mean, ee_mean_variance, ee_mean_robust,
                                                ee_linear_regression, ee_logistic_regression, ee_ridge_linear_regression,
                                                ee_poisson_regression,
+                                               ee_aft_weibull, ee_aft_weibull_measure,
                                                ee_2p_logistic, ee_3p_logistic, ee_4p_logistic, ee_effective_dose_delta,
                                                ee_gformula, ee_ipw, ee_aipw)
 from delicatessen.data import load_inderjit
@@ -401,6 +403,234 @@ class TestEstimatingEquationsRegression:
         npt.assert_allclose(mestimator.confidence_intervals(),
                             np.asarray(glm.conf_int()),
                             atol=1e-6)
+
+
+class TestEstimatingEquationsSurvival:
+
+    @pytest.fixture
+    def data(self):
+        np.random.seed(131313131)
+        n = 200
+        d = pd.DataFrame()
+        d['X'] = np.random.binomial(n=1, p=0.5, size=n)
+        d['W'] = np.random.binomial(n=1, p=0.5, size=n)
+        d['T'] = (1 / 1.25 + 1 / np.exp(0.5) * d['X']) * np.random.weibull(a=0.75, size=n)
+        d['C'] = np.random.weibull(a=1, size=n)
+        d['C'] = np.where(d['C'] > 10, 10, d['C'])
+
+        d['delta'] = np.where(d['T'] < d['C'], 1, 0)
+        d['t'] = np.where(d['delta'] == 1, d['T'], d['C'])
+        d['weight'] = np.random.uniform(1, 5, size=n)
+        return d
+
+    def test_weibull_aft(self, data):
+        """Tests Weibull AFT estimating equation to lifelines.
+        """
+        def psi(theta):
+            return ee_aft_weibull(theta=theta,
+                                  t=data['t'], delta=data['delta'], X=data[['X', 'W']])
+
+        # M-estimator with built-in Weibull AFT
+        mestimator = MEstimator(psi, init=[0., 0., 0., 0.])
+        mestimator.estimate(solver="lm")
+
+        # Weibull AFT from lifelines for comparison
+        waft = WeibullAFTFitter()
+        waft.fit(data[['X', 'W', 't', 'delta']], 't', 'delta',
+                 ancillary=False, robust=True)
+        results = np.asarray(waft.summary[['coef', 'se(coef)', 'coef lower 95%', 'coef upper 95%']])
+        results = results[[2, 1, 0, 3], :]
+
+        # Checking mean estimate
+        npt.assert_allclose(mestimator.theta,
+                            np.asarray(results[:, 0]),
+                            atol=1e-5)
+
+        # Checking variance estimates
+        npt.assert_allclose(np.sqrt(np.diag(mestimator.variance)),
+                            np.asarray(results[:, 1]),
+                            atol=1e-6)
+
+        # Checking confidence interval estimates
+        npt.assert_allclose(mestimator.confidence_intervals(),
+                            np.asarray(results[:, 2:]),
+                            atol=1e-5)
+
+    def test_weighted_weibull_aft(self, data):
+        """Tests weighted Weibull AFT estimating equation to lifelines.
+        """
+        def psi(theta):
+            return ee_aft_weibull(theta=theta, weights=data['weight'],
+                                  t=data['t'], delta=data['delta'], X=data[['X', 'W']])
+
+        # M-estimator with built-in Weibull AFT
+        mestimator = MEstimator(psi, init=[0., 0., 0., 0.])
+        mestimator.estimate(solver="lm")
+
+        # Weibull AFT from lifelines for comparison
+        waft = WeibullAFTFitter()
+        waft.fit(data[['X', 'W', 't', 'delta', 'weight']], 't', 'delta',
+                 weights_col='weight', ancillary=False, robust=True)
+        results = np.asarray(waft.summary[['coef', 'se(coef)', 'coef lower 95%', 'coef upper 95%']])
+        results = results[[2, 1, 0, 3], :]
+
+        # Checking mean estimate
+        npt.assert_allclose(mestimator.theta,
+                            np.asarray(results[:, 0]),
+                            atol=1e-5)
+
+        # No variance check, since lifelines uses a different estimator
+
+    def test_weibull_aft_survival(self, data):
+        """Tests predicted survival at several time points for Weibull AFT estimating equation to lifelines.
+        """
+        # Times to evaluate and covariate pattern to examine
+        times_to_eval = [1, 1.25, 3, 5]
+        dta = data.copy()
+        dta['X'] = 1
+        dta['W'] = 1
+
+        def psi(theta):
+            aft = ee_aft_weibull(theta=theta[0:4], t=data['t'], delta=data['delta'], X=data[['X', 'W']])
+            pred_surv_t = ee_aft_weibull_measure(theta=theta[4:], X=dta[['X', 'W']],
+                                                 times=times_to_eval, measure='survival',
+                                                 mu=theta[0], beta=theta[1:3], sigma=theta[3])
+            return np.vstack((aft, pred_surv_t))
+
+        # M-estimator with built-in Weibull AFT
+        mestimator = MEstimator(psi, init=[0., 0., 0., 0., ] + [0.5, ]*len(times_to_eval))
+        mestimator.estimate(solver="lm")
+
+        # Predictions from Weibull AFT from lifelines for comparison
+        waft = WeibullAFTFitter()
+        waft.fit(data[['X', 'W', 't', 'delta']], 't', 'delta', ancillary=False, robust=True)
+        preds = waft.predict_survival_function(dta.iloc[0], times=times_to_eval)
+
+        # Checking mean estimate
+        npt.assert_allclose(mestimator.theta[4:],
+                            np.asarray(preds).T[0],
+                            atol=1e-5)
+
+    def test_weibull_aft_risk(self, data):
+        """Tests predicted risk at several time points for Weibull AFT estimating equation to lifelines.
+        """
+        # Times to evaluate and covariate pattern to examine
+        times_to_eval = [1, 1.25, 3, 5]
+        dta = data.copy()
+        dta['X'] = 1
+        dta['W'] = 1
+
+        def psi(theta):
+            aft = ee_aft_weibull(theta=theta[0:4], t=data['t'], delta=data['delta'], X=data[['X', 'W']])
+            pred_surv_t = ee_aft_weibull_measure(theta=theta[4:], X=dta[['X', 'W']],
+                                                 times=times_to_eval, measure='risk',
+                                                 mu=theta[0], beta=theta[1:3], sigma=theta[3])
+            return np.vstack((aft, pred_surv_t))
+
+        # M-estimator with built-in Weibull AFT
+        mestimator = MEstimator(psi, init=[0., 0., 0., 0., ] + [0.5, ]*len(times_to_eval))
+        mestimator.estimate(solver="lm")
+
+        # Predictions from Weibull AFT from lifelines for comparison
+        waft = WeibullAFTFitter()
+        waft.fit(data[['X', 'W', 't', 'delta']], 't', 'delta', ancillary=False, robust=True)
+        preds = 1 - waft.predict_survival_function(dta.iloc[0], times=times_to_eval)
+
+        # Checking mean estimate
+        npt.assert_allclose(mestimator.theta[4:],
+                            np.asarray(preds).T[0],
+                            atol=1e-5)
+
+    def test_weibull_aft_density(self, data):
+        """Tests predicted density at several time points for Weibull AFT estimating equation to lifelines.
+        """
+        # Times to evaluate and covariate pattern to examine
+        times_to_eval = [1, 1.25, 3, 5]
+        dta = data.copy()
+        dta['X'] = 1
+        dta['W'] = 1
+
+        def psi(theta):
+            aft = ee_aft_weibull(theta=theta[0:4], t=data['t'], delta=data['delta'], X=data[['X', 'W']])
+            pred_surv_t = ee_aft_weibull_measure(theta=theta[4:], X=dta[['X', 'W']],
+                                                 times=times_to_eval, measure='density',
+                                                 mu=theta[0], beta=theta[1:3], sigma=theta[3])
+            return np.vstack((aft, pred_surv_t))
+
+        # M-estimator with built-in Weibull AFT
+        mestimator = MEstimator(psi, init=[0., 0., 0., 0., ] + [0.5, ]*len(times_to_eval))
+        mestimator.estimate(solver="lm")
+
+        # Predictions from Weibull AFT from lifelines for comparison
+        waft = WeibullAFTFitter()
+        waft.fit(data[['X', 'W', 't', 'delta']], 't', 'delta', ancillary=False, robust=True)
+        preds = (waft.predict_survival_function(dta.iloc[0], times=times_to_eval)
+                 * waft.predict_hazard(dta.iloc[0], times=times_to_eval))
+
+        # Checking mean estimate
+        npt.assert_allclose(mestimator.theta[4:],
+                            np.asarray(preds).T[0],
+                            atol=1e-5)
+
+    def test_weibull_aft_hazard(self, data):
+        """Tests predicted hazard at several time points for Weibull AFT estimating equation to lifelines.
+        """
+        # Times to evaluate and covariate pattern to examine
+        times_to_eval = [1, 1.25, 3, 5]
+        dta = data.copy()
+        dta['X'] = 1
+        dta['W'] = 1
+
+        def psi(theta):
+            aft = ee_aft_weibull(theta=theta[0:4], t=data['t'], delta=data['delta'], X=data[['X', 'W']])
+            pred_surv_t = ee_aft_weibull_measure(theta=theta[4:], X=dta[['X', 'W']],
+                                                 times=times_to_eval, measure='hazard',
+                                                 mu=theta[0], beta=theta[1:3], sigma=theta[3])
+            return np.vstack((aft, pred_surv_t))
+
+        # M-estimator with built-in Weibull AFT
+        mestimator = MEstimator(psi, init=[0., 0., 0., 0., ] + [0.5, ]*len(times_to_eval))
+        mestimator.estimate(solver="lm")
+
+        # Predictions from Weibull AFT from lifelines for comparison
+        waft = WeibullAFTFitter()
+        waft.fit(data[['X', 'W', 't', 'delta']], 't', 'delta', ancillary=False, robust=True)
+        preds = waft.predict_hazard(dta.iloc[0], times=times_to_eval)
+
+        # Checking mean estimate
+        npt.assert_allclose(mestimator.theta[4:],
+                            np.asarray(preds).T[0],
+                            atol=1e-5)
+
+    def test_weibull_aft_cumulative_hazard(self, data):
+        """Tests predicted cumulative hazard at several time points for Weibull AFT estimating equation to lifelines.
+        """
+        # Times to evaluate and covariate pattern to examine
+        times_to_eval = [1, 1.25, 3, 5]
+        dta = data.copy()
+        dta['X'] = 1
+        dta['W'] = 1
+
+        def psi(theta):
+            aft = ee_aft_weibull(theta=theta[0:4], t=data['t'], delta=data['delta'], X=data[['X', 'W']])
+            pred_surv_t = ee_aft_weibull_measure(theta=theta[4:], X=dta[['X', 'W']],
+                                                 times=times_to_eval, measure='cumulative_hazard',
+                                                 mu=theta[0], beta=theta[1:3], sigma=theta[3])
+            return np.vstack((aft, pred_surv_t))
+
+        # M-estimator with built-in Weibull AFT
+        mestimator = MEstimator(psi, init=[0., 0., 0., 0., ] + [0.5, ]*len(times_to_eval))
+        mestimator.estimate(solver="lm")
+
+        # Predictions from Weibull AFT from lifelines for comparison
+        waft = WeibullAFTFitter()
+        waft.fit(data[['X', 'W', 't', 'delta']], 't', 'delta', ancillary=False, robust=True)
+        preds = waft.predict_cumulative_hazard(dta.iloc[0], times=times_to_eval)
+
+        # Checking mean estimate
+        npt.assert_allclose(mestimator.theta[4:],
+                            np.asarray(preds).T[0],
+                            atol=1e-4)
 
 
 class TestEstimatingEquationsDoseResponse:
