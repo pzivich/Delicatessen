@@ -6,17 +6,21 @@ import statsmodels.api as sm
 import statsmodels.formula.api as smf
 from scipy.stats import logistic, poisson
 from sklearn.linear_model import Ridge
-from lifelines import WeibullAFTFitter
+from lifelines import ExponentialFitter, WeibullFitter, WeibullAFTFitter
 
 from delicatessen import MEstimator
 from delicatessen.estimating_equations import (ee_mean, ee_mean_variance, ee_mean_robust,
+                                               # Regression models
                                                ee_linear_regression, ee_logistic_regression, ee_ridge_linear_regression,
                                                ee_poisson_regression,
-                                               ee_aft_weibull, ee_aft_weibull_measure,
+                                               # Survival models
+                                               ee_exponential_model, ee_exponential_measure, ee_weibull_model,
+                                               ee_weibull_measure, ee_aft_weibull, ee_aft_weibull_measure,
+                                               # Dose-Response
                                                ee_2p_logistic, ee_3p_logistic, ee_4p_logistic, ee_effective_dose_delta,
+                                               # Causal inference
                                                ee_gformula, ee_ipw, ee_aipw)
 from delicatessen.data import load_inderjit
-from delicatessen.utilities import inverse_logit
 
 np.random.seed(236461)
 
@@ -408,6 +412,18 @@ class TestEstimatingEquationsRegression:
 class TestEstimatingEquationsSurvival:
 
     @pytest.fixture
+    def surv_data(self):
+        np.random.seed(1123211)
+        n = 200
+        d = pd.DataFrame()
+        d['C'] = np.random.weibull(a=1, size=n)
+        d['C'] = np.where(d['C'] > 5, 5, d['C'])
+        d['T'] = 0.8 * np.random.weibull(a=0.75, size=n)
+        d['delta'] = np.where(d['T'] < d['C'], 1, 0)
+        d['t'] = np.where(d['delta'] == 1, d['T'], d['C'])
+        return np.asarray(d['t']), np.asarray(d['delta'])
+
+    @pytest.fixture
     def data(self):
         np.random.seed(131313131)
         n = 200
@@ -422,6 +438,323 @@ class TestEstimatingEquationsSurvival:
         d['t'] = np.where(d['delta'] == 1, d['T'], d['C'])
         d['weight'] = np.random.uniform(1, 5, size=n)
         return d
+
+    def test_exponential_model(self, surv_data):
+        """Tests exponential model estimating equation to lifelines.
+        """
+        times, events = surv_data
+
+        def psi(theta):
+            return ee_exponential_model(theta=theta[0],
+                                        t=times, delta=events)
+
+        mestimator = MEstimator(psi, init=[1.])
+        mestimator.estimate(solver="lm")
+
+        exf = ExponentialFitter()
+        exf.fit(times, events)
+        results = np.asarray(exf.summary[['coef', 'se(coef)', 'coef lower 95%', 'coef upper 95%']])
+
+        # Checking mean estimate
+        npt.assert_allclose(1 / mestimator.theta[0],
+                            np.asarray(results[0, 0]),
+                            atol=1e-5)
+
+        # No robust variance for lifeline's ExponentialFitter, so not checking against
+        # Checking variance estimates
+        # npt.assert_allclose(np.sqrt(np.diag(mestimator.variance)),
+        #                     np.asarray(results[0, 1]),
+        #                     atol=1e-6)
+
+        # Checking confidence interval estimates
+        # npt.assert_allclose(mestimator.confidence_intervals(),
+        #                     np.asarray(results[0, 2:]),
+        #                     atol=1e-5)
+
+    def test_exponential_survival(self, surv_data):
+        """Tests exponential measures estimating equation to lifelines.
+        """
+        times, events = surv_data
+
+        def psi(theta):
+            ee_exp = ee_exponential_model(theta=theta[0],
+                                          t=times, delta=events)
+            ee_surv = ee_exponential_measure(theta[1:], scale=theta[0],
+                                             times=[0.5, 1, 2, 3], n=times.shape[0],
+                                             measure="survival")
+            return np.vstack((ee_exp, ee_surv))
+
+        mestimator = MEstimator(psi, init=[1., 0.5, 0.5, 0.5, 0.5])
+        mestimator.estimate(solver="lm")
+
+        exf = ExponentialFitter()
+        exf.fit(times, events)
+        results = np.asarray(exf.survival_function_at_times(times=[0.5, 1, 2, 3]))
+
+        # Checking mean estimate
+        npt.assert_allclose(mestimator.theta[1:],
+                            results,
+                            atol=1e-5)
+
+    def test_exponential_risk(self, surv_data):
+        """Tests exponential measures estimating equation to lifelines.
+        """
+        times, events = surv_data
+
+        def psi(theta):
+            ee_exp = ee_exponential_model(theta=theta[0],
+                                          t=times, delta=events)
+            ee_surv = ee_exponential_measure(theta[1:], scale=theta[0],
+                                             times=[0.5, 1, 2, 3], n=times.shape[0],
+                                             measure="risk")
+            return np.vstack((ee_exp, ee_surv))
+
+        mestimator = MEstimator(psi, init=[1., 0.5, 0.5, 0.5, 0.5])
+        mestimator.estimate(solver="lm")
+
+        exf = ExponentialFitter()
+        exf.fit(times, events)
+        results = exf.cumulative_density_at_times(times=[0.5, 1, 2, 3])
+
+        # Checking mean estimate
+        npt.assert_allclose(mestimator.theta[1:],
+                            results,
+                            atol=1e-5)
+
+    def test_exponential_hazard(self, surv_data):
+        """Tests exponential measures estimating equation to lifelines.
+        """
+        times, events = surv_data
+
+        def psi(theta):
+            ee_exp = ee_exponential_model(theta=theta[0],
+                                          t=times, delta=events)
+            ee_surv = ee_exponential_measure(theta[1:], scale=theta[0],
+                                             times=[0.5, 1, 2, 3], n=times.shape[0],
+                                             measure="hazard")
+            return np.vstack((ee_exp, ee_surv))
+
+        mestimator = MEstimator(psi, init=[1., 0.5, 0.5, 0.5, 0.5])
+        mestimator.estimate(solver="lm")
+
+        exf = ExponentialFitter()
+        exf.fit(times, events)
+        results = np.asarray(exf.summary['coef'])[0]
+
+        # Checking mean estimate
+        npt.assert_allclose(mestimator.theta[1:],
+                            [1/results]*4,
+                            atol=1e-5)
+
+    def test_exponential_cumulative_hazard(self, surv_data):
+        """Tests exponential measures estimating equation to lifelines.
+        """
+        times, events = surv_data
+
+        def psi(theta):
+            ee_exp = ee_exponential_model(theta=theta[0],
+                                          t=times, delta=events)
+            ee_surv = ee_exponential_measure(theta[1:], scale=theta[0],
+                                             times=[0.5, 1, 2, 3], n=times.shape[0],
+                                             measure="cumulative_hazard")
+            return np.vstack((ee_exp, ee_surv))
+
+        mestimator = MEstimator(psi, init=[1., 0.5, 0.5, 0.5, 0.5])
+        mestimator.estimate(solver="lm")
+
+        exf = ExponentialFitter()
+        exf.fit(times, events)
+        results = exf.cumulative_hazard_at_times(times=[0.5, 1, 2, 3])
+
+        # Checking mean estimate
+        npt.assert_allclose(mestimator.theta[1:],
+                            results,
+                            atol=1e-5)
+
+    def test_exponential_density(self, surv_data):
+        """Tests exponential measures estimating equation to lifelines.
+        """
+        times, events = surv_data
+
+        def psi(theta):
+            ee_exp = ee_exponential_model(theta=theta[0],
+                                          t=times, delta=events)
+            ee_surv = ee_exponential_measure(theta[1:], scale=theta[0],
+                                             times=[0.5, 1, 2, 3], n=times.shape[0],
+                                             measure="density")
+            return np.vstack((ee_exp, ee_surv))
+
+        mestimator = MEstimator(psi, init=[1., 0.5, 0.5, 0.5, 0.5])
+        mestimator.estimate(solver="lm")
+
+        # NOTICE: lifelines fails here (some problem with the derivative), so skipping comparison
+        #   the density measure is still covered by the Weibull density prediction (so not a testing coverage problem)
+        # exf = ExponentialFitter()
+        # exf.fit(times, events)
+        # results = exf.density_at_times(times=[0.5, 1, 2, 3])
+        #
+        # # Checking mean estimate
+        # npt.assert_allclose(mestimator.theta[1:],
+        #                     results,
+        #                     atol=1e-5)
+        pass
+
+    def test_weibull_model(self, surv_data):
+        """Tests Weibull model estimating equation to lifelines.
+        """
+        times, events = surv_data
+
+        def psi(theta):
+            return ee_weibull_model(theta=theta,
+                                    t=times, delta=events)
+
+        mestimator = MEstimator(psi, init=[1., 1.])
+        mestimator.estimate(solver="lm")
+
+        wbf = WeibullFitter()
+        wbf.fit(times, events)
+        results = np.asarray(wbf.summary[['coef', 'se(coef)', 'coef lower 95%', 'coef upper 95%']])
+
+        # Checking mean estimate
+        npt.assert_allclose([(1 / mestimator.theta[0])**(1/mestimator.theta[1]), mestimator.theta[1]],
+                            np.asarray(results[:, 0]),
+                            atol=1e-4)
+
+        # No robust variance for lifeline's WeibullFitter, so not checking against
+        # Checking variance estimates
+        # npt.assert_allclose(np.sqrt(np.diag(mestimator.variance)),
+        #                     np.asarray(results[0, 1]),
+        #                     atol=1e-6)
+
+        # Checking confidence interval estimates
+        # npt.assert_allclose(mestimator.confidence_intervals(),
+        #                     np.asarray(results[0, 2:]),
+        #                     atol=1e-5)
+
+    def test_weibull_survival(self, surv_data):
+        """Tests Weibull measures estimating equation to lifelines.
+        """
+        times, events = surv_data
+
+        def psi(theta):
+            ee_wbl = ee_weibull_model(theta=theta[0:2],
+                                      t=times, delta=events)
+            ee_surv = ee_weibull_measure(theta[2:], scale=theta[0], shape=theta[1],
+                                         times=[0.5, 1, 2, 3], n=times.shape[0],
+                                         measure="survival")
+            return np.vstack((ee_wbl, ee_surv))
+
+        mestimator = MEstimator(psi, init=[1., 1., 0.5, 0.5, 0.5, 0.5])
+        mestimator.estimate(solver="lm")
+
+        wbf = WeibullFitter()
+        wbf.fit(times, events)
+        results = np.asarray(wbf.survival_function_at_times(times=[0.5, 1, 2, 3]))
+
+        # Checking mean estimate
+        npt.assert_allclose(mestimator.theta[2:],
+                            results,
+                            atol=1e-5)
+
+    def test_weibull_risk(self, surv_data):
+        """Tests Weibull measures estimating equation to lifelines.
+        """
+        times, events = surv_data
+
+        def psi(theta):
+            ee_wbl = ee_weibull_model(theta=theta[0:2],
+                                      t=times, delta=events)
+            ee_surv = ee_weibull_measure(theta[2:], scale=theta[0], shape=theta[1],
+                                         times=[0.5, 1, 2, 3], n=times.shape[0],
+                                         measure="risk")
+            return np.vstack((ee_wbl, ee_surv))
+
+        mestimator = MEstimator(psi, init=[1., 1., 0.5, 0.5, 0.5, 0.5])
+        mestimator.estimate(solver="lm")
+
+        wbf = WeibullFitter()
+        wbf.fit(times, events)
+        results = np.asarray(wbf.cumulative_density_at_times(times=[0.5, 1, 2, 3]))
+
+        # Checking mean estimate
+        npt.assert_allclose(mestimator.theta[2:],
+                            results,
+                            atol=1e-5)
+
+    def test_weibull_hazard(self, surv_data):
+        """Tests Weibull measures estimating equation to lifelines.
+        """
+        times, events = surv_data
+
+        def psi(theta):
+            ee_wbl = ee_weibull_model(theta=theta[0:2],
+                                      t=times, delta=events)
+            ee_surv = ee_weibull_measure(theta[2:], scale=theta[0], shape=theta[1],
+                                         times=[0.5, 1, 2, 3], n=times.shape[0],
+                                         measure="hazard")
+            return np.vstack((ee_wbl, ee_surv))
+
+        mestimator = MEstimator(psi, init=[1., 1., 0.5, 0.5, 0.5, 0.5])
+        mestimator.estimate(solver="lm")
+
+        wbf = WeibullFitter()
+        wbf.fit(times, events)
+        results = np.asarray(wbf.hazard_at_times(times=[0.5, 1, 2, 3]))
+
+        # Checking mean estimate
+        npt.assert_allclose(mestimator.theta[2:],
+                            results,
+                            atol=1e-4)
+
+    def test_weibull_cumulative_hazard(self, surv_data):
+        """Tests Weibull measures estimating equation to lifelines.
+        """
+        times, events = surv_data
+
+        def psi(theta):
+            ee_wbl = ee_weibull_model(theta=theta[0:2],
+                                      t=times, delta=events)
+            ee_surv = ee_weibull_measure(theta[2:], scale=theta[0], shape=theta[1],
+                                         times=[0.5, 1, 2, 3], n=times.shape[0],
+                                         measure="cumulative_hazard")
+            return np.vstack((ee_wbl, ee_surv))
+
+        mestimator = MEstimator(psi, init=[1., 1., 0.5, 0.5, 0.5, 0.5])
+        mestimator.estimate(solver="lm")
+
+        wbf = WeibullFitter()
+        wbf.fit(times, events)
+        results = np.asarray(wbf.cumulative_hazard_at_times(times=[0.5, 1, 2, 3]))
+
+        # Checking mean estimate
+        npt.assert_allclose(mestimator.theta[2:],
+                            results,
+                            atol=1e-4)
+
+    def test_weibull_density(self, surv_data):
+        """Tests Weibull measures estimating equation to lifelines.
+        """
+        times, events = surv_data
+
+        def psi(theta):
+            ee_wbl = ee_weibull_model(theta=theta[0:2],
+                                      t=times, delta=events)
+            ee_surv = ee_weibull_measure(theta[2:], scale=theta[0], shape=theta[1],
+                                         times=[0.5, 1, 2, 3], n=times.shape[0],
+                                         measure="density")
+            return np.vstack((ee_wbl, ee_surv))
+
+        mestimator = MEstimator(psi, init=[1., 1., 0.5, 0.5, 0.5, 0.5])
+        mestimator.estimate(solver="lm")
+
+        wbf = WeibullFitter()
+        wbf.fit(times, events)
+        results = np.asarray(wbf.density_at_times(times=[0.5, 1, 2, 3]))
+
+        # Checking mean estimate
+        npt.assert_allclose(mestimator.theta[2:],
+                            results,
+                            atol=1e-5)
 
     def test_weibull_aft(self, data):
         """Tests Weibull AFT estimating equation to lifelines.
