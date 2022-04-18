@@ -14,6 +14,7 @@
    .. autosummary::
    
       ~MEstimator.__init__
+      ~MEstimator.confidence_intervals
       ~MEstimator.estimate
    
    
