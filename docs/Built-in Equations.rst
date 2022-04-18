@@ -255,6 +255,292 @@ equations can be stacked together (including multiple regression models). This a
 causal section.
 
 
+Survival
+=============================
+Estimating equations for parametric survival models are available in v0.3+. Currently available are: exponential and
+weibull models, and accelerated failure time models (AFT). As commonly done in survival analysis, we can imagine that
+each person has two unique times: their event time (:math:`T_i`) and their censoring time (:math:`C_i`). However, we
+(the researcher) are only able to observe whichever one of those times occurs first. Therefore the observable data is
+:math:`t_i = min(T_i, C_i)` and :math:`\delta_i = I(t_i = T_i)`.
+
+For the basic survival models, we will use the following generated data set. In accordance with the description above,
+each person is assigned two possible times and then we generate the observed data (``t`` and ``delta`` here).
+
+.. code::
+
+    import numpy as np
+    import pandas as pd
+
+    n = 100
+    d = pd.DataFrame()
+    d['C'] = np.random.weibull(a=1, size=n)
+    d['C'] = np.where(d['C'] > 5, 5, d['C'])
+    d['T'] = 0.8 * np.random.weibull(a=0.75, size=n)
+    d['delta'] = np.where(d['T'] < d['C'], 1, 0)
+    d['t'] = np.where(d['delta'] == 1, d['T'], d['C'])
+
+For an introduction to survival analysis, I would recommend Collett D. (2015). "Modelling survival data in medical
+research".
+
+Exponential
+-----------------------------
+The exponential model is a one-parameter model, that stipulates the hazard of the event of interest is constant. While
+often too restrictive of an assumption for widespread use, we demonstrate application here.
+
+The wrapper function for the exponential model should look like
+
+.. code::
+
+    from delicatessen import MEstimator
+    from delicatessen.estimating_equations import ee_exponential_model, ee_exponential_measure
+
+    def psi(theta):
+        # Estimating equations for the exponential model
+        return ee_exponential_model(theta=theta, t=d['t'], delta=d['delta'])
+
+After creating the wrapper function, we can now call the M-Estimation procedure to estimate the parameter for the
+exponential model
+
+.. code::
+
+    estr = MEstimator(psi, init=[1., ])
+    estr.estimate(solver='lm')
+
+    print(estr.theta)
+    print(estr.variance)
+
+Here, the parameter for the exponential model should be non-negative (the optimizer does not know this), so a positive
+value should be given to help the root-finding procedure along.
+
+While the parameter for the exponential model may be of interest, we are often more interested in the one of the
+functions over time. For example, we may want to plot the estimated survival function over time. ``delicatessen``
+provides a function to estimate the survival (or other measures like density, risk, hazard, cumulative hazard) at
+provided time points.
+
+Below is how we could further generate a plot of the survival function from the estimated exponential model
+
+.. code::
+
+    import matplotlib.pyplot as plt
+
+    resolution = 50
+    time_spacing = list(np.linspace(0.01, 5, resolution))
+    fast_inits = [0.5, ]*resolution
+
+    def psi(theta):
+        ee_exp = ee_exponential_model(theta=theta[0],
+                                      t=times, delta=events)
+        ee_surv = ee_exponential_measure(theta[1:], scale=theta[0],
+                                         times=time_spacing, n=times.shape[0],
+                                         measure="survival")
+        return np.vstack((ee_exp, ee_surv))
+
+    estr = MEstimator(psi, init=[1., ] + fast_inits)
+    estr.estimate(solver="lm")
+
+    # Creating plot of survival times
+    ci = mestr.confidence_intervals()[1:, :]  # Extracting relevant CI
+    plt.fill_between(time_spacing, ci[:, 0], ci[:, 1], alpha=0.2)
+    plt.plot(time_spacing, mestr.theta[1:], '-')
+    plt.show()
+
+
+Here, we set the ``resolution`` to be 50. The resolution determines how many points along the survival function we are
+evaluating (and thus determines how 'smooth' our plot will appear). As this involves the root-finding of multiple
+values, it is important to help the root-finder along by providing good starting values. Since survival is bounded
+between [0,1], we have all the initial values for those start at 0.5 (the middle). Furthermore, we could also consider
+pre-washing the exponential model parameter (i.e., use the solution from the previous estimating equation).
+
+
+Weibull
+-----------------------------
+The Weibull model is a generalization of the exponential model to two-parameters. Therefore, we now allow for the hazard
+to vary over time (it can increase or decrease monotonically). While this assumption is also quite restrictive, it may
+be more useful.
+
+The wrapper function for the Weibull model should look like
+
+.. code::
+
+    from delicatessen import MEstimator
+    from delicatessen.estimating_equations import ee_weibull_model, ee_weibull_measure
+
+    def psi(theta):
+        # Estimating equations for the Weibull model
+        return ee_weibull_model(theta=theta, t=d['t'], delta=d['delta'])
+
+After creating the wrapper function, we can now call the M-Estimation procedure to estimate the parameters for the
+Weibull model
+
+.. code::
+
+    estr = MEstimator(psi, init=[1., 1.])
+    estr.estimate(solver='lm')
+
+    print(estr.theta)
+    print(estr.variance)
+
+Here, the parameters for the Weibull model should be non-negative (the optimizer does not know this), so a positive
+value should be given to help the root-finding procedure along.
+
+While the parameters for the Weibull model may be of interest, we are often more interested in the one of the
+functions over time. For example, we may want to plot the estimated survival function over time. ``delicatessen``
+provides a function to estimate the survival (or other measures like density, risk, hazard, cumulative hazard) at
+provided time points.
+
+Below is how we could further generate a plot of the survival function from the estimated Weibull model
+
+.. code::
+
+    import matplotlib.pyplot as plt
+
+    resolution = 50
+    time_spacing = list(np.linspace(0.01, 5, resolution))
+    fast_inits = [0.5, ]*resolution
+
+    def psi(theta):
+        ee_wbf = ee_weibull_model(theta=theta[0:2],
+                                  t=times, delta=events)
+        ee_surv = ee_weibull_measure(theta[2:], scale=theta[0], shape=theta[1],
+                                     times=time_spacing, n=times.shape[0],
+                                     measure="survival")
+        return np.vstack((ee_wbf, ee_surv))
+
+    estr = MEstimator(psi, init=[1., 1., ] + fast_inits)
+    estr.estimate(solver="lm")
+
+    # Creating plot of survival times
+    ci = mestr.confidence_intervals()[2:, :]  # Extracting relevant CI
+    plt.fill_between(time_spacing, ci[:, 0], ci[:, 1], alpha=0.2)
+    plt.plot(time_spacing, mestr.theta[2:], '-')
+    plt.show()
+
+
+Here, we set the ``resolution`` to be 50. The resolution determines how many points along the survival function we are
+evaluating (and thus determines how 'smooth' our plot will appear). As this involves the root-finding of multiple
+values, it is important to help the root-finder along by providing good starting values. Since survival is bounded
+between [0,1], we have all the initial values for those start at 0.5 (the middle). Furthermore, we could also consider
+pre-washing the Weibull model parameter (i.e., use the solution from the previous estimating equation).
+
+
+Accelerated Failure Time
+-----------------------------
+Currently, only an AFT model with a Weibull (Weibull-AFT) is available for use. Plans are to add support for other
+AFT. Unlike the previous exponential and Weibull models, the AFT models can further include covariates, where the effect
+of a covariate is interpreted as an 'acceleration' factor. In the two sample case, the AFT can be thought of as the
+following
+
+.. math::
+
+    S_1 (t) = S_0 (t / \sigma)
+
+where :math:`\sigma^{-1} > 0` and is interpreted as the acceleration factor. One way to describe is that the risk of
+the event in group 1 at :math:`t=1` is equivalent to group 0  at :math:`t=\sigma^{-1}`. Alternatively, you can interpret
+the the AFT coefficient as the ratio of the mean survival times comparing group 1 to group 0. While involving parametric
+assumptions, the AFT models have the advantage of providing a single summary measure (compared to nonparametric methods,
+like Kaplan-Meier) but also being relatively easy to interpret (compared to semiparametric Cox models).
+
+For the following examples, we generate some additional survival data with baseline covariates
+
+.. code::
+
+    n = 200
+    d = pd.DataFrame()
+    d['X'] = np.random.binomial(n=1, p=0.5, size=n)
+    d['W'] = np.random.binomial(n=1, p=0.5, size=n)
+    d['T'] = (1 / 1.25 + 1 / np.exp(0.5) * d['X']) * np.random.weibull(a=0.75, size=n)
+    d['C'] = np.random.weibull(a=1, size=n)
+    d['C'] = np.where(d['C'] > 10, 10, d['C'])
+    d['delta'] = np.where(d['T'] < d['C'], 1, 0)
+    d['t'] = np.where(d['delta'] == 1, d['T'], d['C'])
+
+There are variations on the AFT model. These variations place parametric assumptions on the error distribution.
+
+Weibull AFT
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+The Weibull AFT assumes that errors follow a Weibull distribution. Therefore, the Weibull AFT consists of a shape and
+scale parameter (like the Weibull model from before) but not it further includes parameters for each covariate included
+in the AFT model.
+
+The wrapper function for the Weibull AFT model should look like
+
+.. code::
+
+    from delicatessen import MEstimator
+    from delicatessen.estimating_equations import ee_aft_weibull, ee_aft_weibull_measure
+
+    def psi(theta):
+        # Estimating equations for the Weibull AFT model
+        return ee_aft_weibull(theta=theta,
+                              t=d['t'], delta=d['delta'],
+                              X=d[['X', 'W']])
+
+After creating the wrapper function, we can now call the M-Estimation procedure to estimate the parameters for the
+Weibull model
+
+.. code::
+
+    estr = MEstimator(psi, init=[0., 0., 0., 0.])
+    estr.estimate(solver='lm')
+
+    print(estr.theta)
+    print(estr.variance)
+
+Unlike the previous models, the Weibull AFT model parameters are log-transformed. Therefore, starting values of zero
+can be input for the root-finding procedure.
+
+Here, ``theta[0]`` is the log-transformed intercept term for the shape parameter, and ``theta[-1]`` is the
+log-transformed scale parameter. The middle terms (``theta[1:3]`` in this case) corresponds to the acceleration factors
+for the covariates as the input order in ``X``. Therefore, ``theta[1]`` is the acceleration factor for ``'X'`` and
+``theta[2]`` is the acceleration factor for ``'W'``.
+
+While the parameters for the Weibull model may be of interest, we are often more interested in the one of the
+functions over time. For example, we may want to plot the estimated survival function over time. ``delicatessen``
+provides a function to estimate the survival (or other measures like density, risk, hazard, cumulative hazard) at
+provided time points.
+
+Below is how we could further generate a plot of the survival function from the estimated Weibull AFT model. Unlike the
+other survival models, we also need to specify the covariate pattern of interest. Here, we will generate the survival
+function when both :math:`X=1` and :math:`W=1`
+
+.. code::
+
+    import matplotlib.pyplot as plt
+
+    resolution = 50
+    time_spacing = list(np.linspace(0.01, 5, resolution))
+    fast_inits = [0.5, ]*resolution
+    dc = d.copy()
+    dc['X'] = 1
+    dc['W'] = 1
+
+    def psi(theta):
+        ee_aft = ee_aft_weibull(theta=theta,
+                                t=d['t'], delta=d['delta'],
+                                X=d[['X', 'W']])
+        pred_surv_t = ee_aft_weibull_measure(theta=theta[4:], X=dc[['X', 'W']],
+                                             times=time_spacing, measure='survival',
+                                             mu=theta[0], beta=theta[1:3], sigma=theta[3])
+        return np.vstack((ee_aft, pred_surv_t))
+
+    estr = MEstimator(psi, init=[0., 0., 0., 0., ] + fast_inits)
+    estr.estimate(solver="lm")
+
+    # Creating plot of survival times
+    ci = mestr.confidence_intervals()[4:, :]  # Extracting relevant CI
+    plt.fill_between(time_spacing, ci[:, 0], ci[:, 1], alpha=0.2)
+    plt.plot(time_spacing, mestr.theta[4:], '-')
+    plt.show()
+
+Here, we set the ``resolution`` to be 50. The resolution determines how many points along the survival function we are
+evaluating (and thus determines how 'smooth' our plot will appear).
+
+As this involves the root-finding of multiple values, it is important to help the root-finder along by providing good
+starting values. Since survival is bounded between [0,1], we have all the initial values for those start at 0.5 (the
+middle). Furthermore, models like Weibull AFT should be used with pre-washing the AFT model parameters (i.e., use the
+solution from the previous estimating equation).
+
+
 Dose-Response
 =============================
 

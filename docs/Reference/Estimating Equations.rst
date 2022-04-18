@@ -31,6 +31,22 @@ Regression
   ee_robust_linear_regression
 
 
+Survival
+-------------------
+
+.. currentmodule:: delicatessen.estimating_equations
+
+.. autosummary::
+  :toctree: generated/
+
+  ee_exponential_model
+  ee_exponential_measure
+  ee_weibull_model
+  ee_weibull_measure
+  ee_aft_weibull
+  ee_aft_weibull_measure
+
+
 Dose Response
 -------------------
 
