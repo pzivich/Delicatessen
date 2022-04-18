@@ -901,7 +901,7 @@ def ee_exponential_model(theta, t, delta):
 
     .. math::
 
-        \psi(t_i,\delta_i; \theta) = \frac{\delta_i}{\theta} -  t_i
+        \psi(t_i,\delta_i; \lambda) = \frac{\delta_i}{\lambda} -  t_i
 
     Here, :math:`\theta` is a single parameter that corresponds to the scale parameter for the exponential distribution.
     The hazard from the Weibull model is parameterized as the following
@@ -1086,13 +1086,13 @@ def ee_exponential_measure(theta, times, n, measure, scale):
 
     .. math::
 
-        \psi_S(t,\delta_i; \theta, \lambda, \sigma) = \exp(- \lambda t) - \theta
+        \psi_S(t,\delta_i; \theta, \lambda) = \exp(- \lambda t) - \theta
 
     and the estimating equation for the hazard function at time :math:`t` is
 
     .. math::
 
-        \psi_h(t; \theta, \mu, \beta, \sigma) = \lambda - \theta
+        \psi_h(t; \theta, \mu, \lambda) = \lambda - \theta
 
     For the other measures, we take advantage of the following transformation between survival measures
 
@@ -1180,6 +1180,7 @@ def ee_exponential_measure(theta, times, n, measure, scale):
     exponential coefficients in a separate model, then use the pre-washed coefficients in another M-estimator with the
     many time points. This helps the optimizer to converge faster in number of iterations and total run-time.
 
+
     To make everything easier, we will generate a list of uniformly spaced values between the start and end points of
     our desired survival function. We will also generate initial values of the same length (to help the optimizer, we
     also start our starting values from near one and end near zero).
@@ -1230,13 +1231,13 @@ def ee_weibull_measure(theta, times, n, measure, scale, shape):
 
     .. math::
 
-        \psi_S(t; \theta, \lambda, \sigma) = \exp(- \lambda t^{\gamma}) - \theta
+        \psi_S(t; \theta, \lambda, \gamma) = \exp(- \lambda t^{\gamma}) - \theta
 
     and the estimating equation for the hazard function at time :math:`t` is
 
     .. math::
 
-        \psi_h(t; \theta, \mu, \beta, \sigma) = \lambda \gamma t^{\gamma - 1} - \theta
+        \psi_h(t; \theta, \mu, \beta, \gamma) = \lambda \gamma t^{\gamma - 1} - \theta
 
     For the other measures, we take advantage of the following transformation between survival measures
 
@@ -1327,6 +1328,7 @@ def ee_weibull_measure(theta, times, n, measure, scale, shape):
     coefficients in a separate model, then use the pre-washed coefficients in another M-estimator with the many
     time points. This helps the optimizer to converge faster in number of iterations and total run-time.
 
+
     To make everything easier, we will generate a list of uniformly spaced values between the start and end points of
     our desired survival function. We will also generate initial values of the same length (to help the optimizer, we
     also start our starting values from near one and end near zero).
@@ -1410,10 +1412,10 @@ def ee_aft_weibull(theta, X, t, delta, weights=None):
 
     .. math::
 
-        \psi(t_i,X_i,\delta_i; \lambda) = \frac{\delta_i}{\lambda} -  t_i^{\gamma} \exp(\beta X_i) \\
-        \psi(t_i,X_i,\delta_i; \beta) = \delta_i X_i - (\lambda  t_i^{\gamma} \exp(\beta X_i))X_i \\
-        \psi(t_i,X_i,\delta_i; \gamma) = \frac{\delta_i}{\gamma} + \delta_i \log(t) - \lambda t_i^{\gamma}
-        \exp(\beta X_i) \log(t)
+        \psi(t_i,X_i,\delta_i; \lambda, \beta, \gamma) = \frac{\delta_i}{\lambda} -  t_i^{\gamma} \exp(\beta X_i) \\
+        \psi(t_i,X_i,\delta_i; \lambda, \beta, \gamma) = \delta_i X_i - (\lambda  t_i^{\gamma} \exp(\beta X_i))X_i \\
+        \psi(t_i,X_i,\delta_i; \lambda, \beta, \gamma) = \frac{\delta_i}{\gamma} + \delta_i \log(t) - \lambda
+        t_i^{\gamma} \exp(\beta X_i) \log(t)
 
     Here, the Weibull-AFT actually consists of the following parameters: :math:`\mu, \beta, \sigma`. The above
     estimating equations use the proportional hazards form of the Weibull model. For the Weibull AFT, notice the
@@ -1677,6 +1679,7 @@ def ee_aft_weibull_measure(theta, times, X, measure, mu, beta, sigma):
     When calculate the survival (or other measures) at many time points, it is generally best to optimize the Weibull
     AFT coefficients in a separate model, then use the pre-washed coefficients in another M-estimator with the many
     time points. This helps the optimizer to converge faster in number of iterations and total run-time.
+
 
     To make everything easier, we will generate a list of uniformly spaced values between the start and end points of
     our desired survival function. We will also generate initial values of the same length (to help the optimizer, we
