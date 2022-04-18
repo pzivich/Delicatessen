@@ -1355,7 +1355,7 @@ def ee_weibull_measure(theta, times, n, measure, scale, shape):
 
     >>> import matplotlib.pyplot as plt
     >>> ci = mestr.confidence_intervals()[2:, :]  # Extracting relevant CI
-    >>> plt.fill_between(time_spacing, ci[:, 0], ci[:, 2], alpha=0.2)
+    >>> plt.fill_between(time_spacing, ci[:, 0], ci[:, 1], alpha=0.2)
     >>> plt.plot(time_spacing, mestr.theta[2:], '-')
     >>> plt.show()
 
