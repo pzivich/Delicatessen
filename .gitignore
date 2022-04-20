@@ -5,3 +5,4 @@ build/
 dist/
 .idea/
 .ipynb_checkpoints/
+examples/data/
