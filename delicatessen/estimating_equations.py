@@ -1187,7 +1187,7 @@ def ee_exponential_measure(theta, times, n, measure, scale):
 
     >>> resolution = 50
     >>> time_spacing = list(np.linspace(0.01, 5, resolution))
-    >>> fast_inits = list(np.log(np.linspace(0.99, 0.01, resolution)))
+    >>> fast_inits = list(np.linspace(0.99, 0.01, resolution))
 
     Defining psi, or the stacked estimating equations
 
@@ -1335,7 +1335,7 @@ def ee_weibull_measure(theta, times, n, measure, scale, shape):
 
     >>> resolution = 50
     >>> time_spacing = list(np.linspace(0.01, 5, resolution))
-    >>> fast_inits = list(np.log(np.linspace(0.99, 0.01, resolution)))
+    >>> fast_inits = list(np.linspace(0.99, 0.01, resolution))
 
     Defining psi, or the stacked estimating equations
 
@@ -1687,7 +1687,7 @@ def ee_aft_weibull_measure(theta, times, X, measure, mu, beta, sigma):
 
     >>> resolution = 50
     >>> time_spacing = list(np.linspace(0.01, 8, resolution))
-    >>> fast_inits = list(np.log(np.linspace(0.99, 0.01, resolution)))
+    >>> fast_inits = list(np.linspace(0.99, 0.01, resolution))
 
     Defining psi, or the stacked estimating equations
 
