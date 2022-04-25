@@ -28,6 +28,7 @@ Regression
 
   ee_linear_regression
   ee_logistic_regression
+  ee_poisson_regression
   ee_robust_linear_regression
 
 
