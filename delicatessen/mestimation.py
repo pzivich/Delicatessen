@@ -195,19 +195,37 @@ class MEstimator:
         None
         """
         # Evaluate stacked estimating equations at init
-        vals_at_init = self.stacked_equations(theta=self.init)
+        vals_at_init = self.stacked_equations(theta=self.init)    # Calculating the initial values
+        vals_at_init = np.asarray(vals_at_init                    # Convert output to an array (in case it isn't)
+                                  ).T                             # ... transpose so N is always the 1st element
 
-        # Check to see if any np.nan's occur with the initial values
-        if np.isnan(np.sum(vals_at_init)):
-            raise ValueError("When evaluated at the initial values, the estimating equation(s) return at least one "
+        # Error checking before running procedure
+        if np.isnan(np.sum(vals_at_init)):         # Check to see if any np.nan's occur with the initial values
+            raise ValueError("When evaluated at the initial values, the `stacked_equations` return at least one "
                              "np.nan. As delicatessen does not natively handle missing data, please ensure the "
                              "provided estimating equations handle any np.nan values correctly. For details on how to "
                              "handle np.nan's appropriately see documentation at: "
                              "https://deli.readthedocs.io/en/latest/Custom%20Equations.html#handling-np-nan")
 
-        # Trick to get the number of observations from the estimating equations
-        self.n_obs = np.asarray(vals_at_init                             # ... convert output to an array
-                                ).T.shape[0]                             # ... transpose so N is always the 1st element
+        if vals_at_init.ndim == 1 and np.asarray(self.init).shape[0] == 1:     # Checks to ensure dimensions align
+            pass             # starting line is to work-around if inits=[0, ]. Otherwise breaks the first else-if
+        elif vals_at_init.ndim == 1 and np.asarray(self.init).shape[0] != 1:
+            raise ValueError("The number of initial values and the number of rows returned by `stacked_equations` "
+                             "should be equal but there are " + str(np.asarray(self.init).shape[0]) + " initial values "
+                             "and the `stacked_equations` function returns " + str(1) + " row.")
+        elif np.asarray(self.init).shape[0] != vals_at_init.shape[1]:
+            raise ValueError("The number of initial values and the number of rows returned by `stacked_equations` "
+                             "should be equal but there are " + str(np.asarray(self.init).shape[0]) + " initial values "
+                             "and the `stacked_equations` function returns " + str(vals_at_init.shape[1])
+                             + " row(s).")
+        elif vals_at_init.ndim > 2:
+            raise ValueError("A 2-dimensional array is expected, but the `stacked_equations` returns a "
+                             + str(vals_at_init.ndim) + "-dimensional array.")
+        else:
+            pass
+
+        # Trick to get the number of observations from the estimating equations (transposed above)
+        self.n_obs = vals_at_init.shape[0]
 
         # Step 1: solving the M-estimator stacked equations
         self.theta = self._solve_coefficients_(stacked_equations=self._mestimation_answer_,  # Give the EE's
