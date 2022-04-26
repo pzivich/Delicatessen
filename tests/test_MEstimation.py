@@ -101,6 +101,18 @@ class TestMEstimation:
         with pytest.raises(ValueError, match="initial values and the number of rows returned by `stacked_equations`"):
             mestimator.estimate()
 
+    def test_error_bad_inits3(self):
+        # Data set
+        y = np.array([5, 1, 2, 4, 2, 4, 5, 7, 11, 1, 6, 3, 4, 6])
+
+        def psi(theta):
+            return np.asarray((y - theta[0],
+                               y**2 - theta[1]))
+
+        mestimator = MEstimator(psi, init=[0, ])
+        with pytest.raises(IndexError):
+            mestimator.estimate()
+
     def test_error_dimensions(self):
         # Data set
         y = np.array([5, 1, 2, 4, 2, 4, 5, 7, 11, 1, 6, 3, 4, 6])
