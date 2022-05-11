@@ -40,7 +40,7 @@ estimating equations and how to use them.
 
 ### Installing:
 
-You can install via `python -m pip install delicateseen`
+You can install via `python -m pip install delicatessen`
 
 ### Dependencies:
 
