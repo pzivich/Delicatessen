@@ -23,6 +23,7 @@ setup(name='delicatessen',
       description='Generalized M-Estimation',
       keywords='m-estimation sandwich-variance estimating-equations',
       packages=['delicatessen',
+                'delicatessen.estimating_equations'
                 ],
       include_package_data=True,
       license='MIT',
