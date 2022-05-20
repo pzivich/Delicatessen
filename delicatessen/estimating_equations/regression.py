@@ -1,5 +1,6 @@
 import warnings
 import numpy as np
+
 from delicatessen.utilities import logit, inverse_logit, identity
 
 #################################################################
@@ -116,12 +117,8 @@ def ee_regression(theta, X, y, model, weights=None):
     Boos DD, & Stefanski LA. (2013). M-estimation (estimating equations). In Essential Statistical Inference
     (pp. 297-337). Springer, New York, NY.
     """
-    # Variable preparation
-    X = np.asarray(X)                       # Convert to NumPy array
-    y = np.asarray(y)[:, None]              # Convert to NumPy array and ensure correct shape for matrix algebra
-    beta = np.asarray(theta)[:, None]       # Convert to NumPy array and ensure correct shape for matrix algebra
-    if isinstance(model, str):              # If string, convert to lower-case for internal handling
-        model = model.lower()
+    # Preparation of input shapes and object types
+    X, y, beta = _prep_inputs_(X=X, y=y, theta=theta, penalty=None)
 
     # Determining transformation function to use for the regression model
     transform = _model_transform_(model=model)   # Looking up corresponding transformation
@@ -430,6 +427,9 @@ def ee_robust_regression(theta, X, y, model, k, weights=None):
     y : ndarray, list, vector
         1-dimensional vector of n observed values. No missing data should be included (missing data may cause unexpected
         behavior).
+    model : str
+        Type of regression model to estimate. Options are ``'linear'`` (linear regression), ``'logistic'`` (logistic
+        regression), and ``'poisson'`` (Poisson regression).
     k : int, float
         Value to set the symmetric maximum upper and lower bounds on the difference between the observations and
         predicted values
@@ -485,11 +485,8 @@ def ee_robust_regression(theta, X, y, model, k, weights=None):
     Boos DD, & Stefanski LA. (2013). M-estimation (estimating equations). In Essential Statistical Inference
     (pp. 297-337). Springer, New York, NY.
     """
-    X = np.asarray(X)                       # Convert to NumPy array
-    y = np.asarray(y)[:, None]              # Convert to NumPy array and ensure correct shape for matrix algebra
-    beta = np.asarray(theta)[:, None]       # Convert to NumPy array and ensure correct shape for matrix algebra
-    if isinstance(model, str):              # If string, convert to lower-case for internal handling
-        model = model.lower()
+    # Preparation of input shapes and object types
+    X, y, beta = _prep_inputs_(X=X, y=y, theta=theta, penalty=None)
 
     # Allowing for a weighted linear model
     w = _generate_weights_(weights=weights, n_obs=X.shape[0])
@@ -593,9 +590,8 @@ def ee_robust_linear_regression(theta, X, y, k, weights=None):
     Boos DD, & Stefanski LA. (2013). M-estimation (estimating equations). In Essential Statistical Inference
     (pp. 297-337). Springer, New York, NY.
     """
-    X = np.asarray(X)                       # Convert to NumPy array
-    y = np.asarray(y)[:, None]              # Convert to NumPy array and ensure correct shape for matrix algebra
-    beta = np.asarray(theta)[:, None]       # Convert to NumPy array and ensure correct shape for matrix algebra
+    # Preparation of input shapes and object types
+    X, y, beta = _prep_inputs_(X=X, y=y, theta=theta, penalty=None)
 
     # Allowing for a weighted linear model
     w = _generate_weights_(weights=weights, n_obs=X.shape[0])
@@ -702,12 +698,8 @@ def ee_ridge_regression(theta, y, X, model, penalty, weights=None):
 
     Fu WJ. (2003). Penalized estimating equations. Biometrics, 59(1), 126-132.
     """
-    X = np.asarray(X)                       # Convert to NumPy array
-    y = np.asarray(y)[:, None]              # Convert to NumPy array and ensure correct shape for matrix algebra
-    penalty = np.asarray(penalty)           # Convert to NumPy array
-    beta = np.asarray(theta)[:, None]       # Convert to NumPy array and ensure correct shape for matrix algebra
-    if isinstance(model, str):              # If string, convert to lower-case for internal handling
-        model = model.lower()
+    # Preparation of input shapes and object types
+    X, y, beta, penalty = _prep_inputs_(X=X, y=y, theta=theta, penalty=penalty)
 
     # Determining transformation function to use for the regression model
     transform = _model_transform_(model=model)      # Looking up corresponding transformation
@@ -727,6 +719,32 @@ def ee_ridge_regression(theta, y, X, model, penalty, weights=None):
 # Utility functions for regression equations
 
 
+def _prep_inputs_(X, y, theta, penalty=None):
+    """Internal use function to simplify variable transformations for regression. This function is used on the inputs
+    to ensure they are the proper shapes
+
+    Parameters
+    ----------
+    X : ndarray
+    y : ndarray
+    theta : ndarray
+    penalty : ndarray, None, optiona
+
+    Returns
+    -------
+
+    """
+    X = np.asarray(X)                       # Convert to NumPy array
+    y = np.asarray(y)[:, None]              # Convert to NumPy array and ensure correct shape for matrix algebra
+    beta = np.asarray(theta)[:, None]       # Convert to NumPy array and ensure correct shape for matrix algebra
+
+    if penalty is None:                     # Return the transformed objects
+        return X, y, beta
+    else:                                   # Convert penalty term then return all
+        penalty = np.asarray(penalty)       # Convert to NumPy array
+        return X, y, beta, penalty
+
+
 def _model_transform_(model):
     """Internal use function to simplify the checking procedure for the model form to use. Takes the input string and
     returns the corresponding function for the variable transformation.
@@ -740,6 +758,13 @@ def _model_transform_(model):
     -------
     function
     """
+    # Checking object type (and convert to lower-case)
+    if isinstance(model, str):              # If string, convert to lower-case for internal handling
+        model = model.lower()
+    else:
+        raise ValueError("The model argument must be a str object.")
+
+    # Process the model transformations
     if model == 'linear':                   # If linear regression
         transform = identity                    # ... no transformation needed
     elif model == 'logistic':               # If logistic regression
@@ -808,10 +833,9 @@ def _bridge_penalty_(theta, gamma, penalty, n_obs):
         Number of observations. Used to rescale the penalty terms
     """
     # Checking the penalty term is non-negative
-    if isinstance(penalty, float) or isinstance(penalty, int):
-        if penalty < 0:
-            raise ValueError("The provided penalty term must be non-negative")
-    # TODO add test to ensure all penalties are non-negative
+    if penalty.size != 1:
+        if penalty.shape[0] != len(theta):
+            raise ValueError("The penalty term must be either a single number or the same length as theta.")
 
     # Checking a valid hyperparameter is being provided
     # if gamma <= 0:
