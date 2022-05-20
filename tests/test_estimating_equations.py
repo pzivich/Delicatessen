@@ -4,15 +4,13 @@ import numpy.testing as npt
 import pandas as pd
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
-from scipy.stats import logistic, poisson
-from sklearn.linear_model import Ridge
+from scipy.stats import logistic
 from lifelines import ExponentialFitter, WeibullFitter, WeibullAFTFitter
 
 from delicatessen import MEstimator
 from delicatessen.estimating_equations import (ee_mean, ee_mean_variance, ee_mean_robust,
                                                # Regression models
-                                               ee_linear_regression, ee_logistic_regression, ee_ridge_linear_regression,
-                                               ee_poisson_regression,
+                                               ee_regression, ee_robust_regression, ee_ridge_regression,
                                                # Survival models
                                                ee_exponential_model, ee_exponential_measure, ee_weibull_model,
                                                ee_weibull_measure, ee_aft_weibull, ee_aft_weibull_measure,
@@ -101,6 +99,32 @@ class TestEstimatingEquationsBase:
 
 class TestEstimatingEquationsRegression:
 
+    def test_error_regression(self):
+        """Test for error raised when incorrect regression name is provided
+        """
+        n = 100
+        data = pd.DataFrame()
+        data['x1'] = np.random.normal(size=n)
+        data['x2'] = data['x1'] + np.random.normal(scale=0.1, size=n)
+        data['c'] = 1
+        data['y'] = 5 + data['x1'] + np.random.normal(size=n)
+        Xvals = np.asarray(data[['c', 'x1', 'x2']])
+        yvals = np.asarray(data['y'])
+
+        def psi(theta):
+            return ee_regression(theta, X=Xvals, y=yvals, model=748)
+
+        estr = MEstimator(psi, init=[5, 1, 1])
+        with pytest.raises(ValueError, match="The model argument"):
+            estr.estimate(solver='lm')
+
+        def psi(theta):
+            return ee_regression(theta, X=Xvals, y=yvals, model='magic')
+
+        estr = MEstimator(psi, init=[5, 1, 1])
+        with pytest.raises(ValueError, match="Invalid input"):
+            estr.estimate(solver='lm')
+
     def test_ols(self):
         """Tests linear regression with the built-in estimating equation.
         """
@@ -112,9 +136,9 @@ class TestEstimatingEquationsRegression:
         data['C'] = 1
 
         def psi_builtin_regression(theta):
-            return ee_linear_regression(theta,
-                                        X=data[['C', 'X', 'Z']],
-                                        y=data['Y'])
+            return ee_regression(theta,
+                                 X=data[['C', 'X', 'Z']], y=data['Y'],
+                                 model='linear')
 
         mpee = MEstimator(psi_builtin_regression, init=[0.1, 0.1, 0.1])
         mpee.estimate()
@@ -149,10 +173,9 @@ class TestEstimatingEquationsRegression:
         data['w'] = np.random.uniform(1, 10, size=n)
 
         def psi_regression(theta):
-            return ee_linear_regression(theta,
-                                        X=data[['C', 'X', 'Z']],
-                                        y=data['Y'],
-                                        weights=data['w'])
+            return ee_regression(theta,
+                                 X=data[['C', 'X', 'Z']], y=data['Y'],
+                                 model='linear', weights=data['w'])
 
         mestimator = MEstimator(psi_regression, init=[0.1, 0.1, 0.1])
         mestimator.estimate()
@@ -191,28 +214,41 @@ class TestEstimatingEquationsRegression:
 
         # Penalty of 0.5
         def psi(theta):
-            return ee_ridge_linear_regression(theta, X=Xvals, y=yvals, penalty=0.5, weights=None)
+            return ee_ridge_regression(theta, X=Xvals, y=yvals, model='linear', penalty=0.5, weights=None)
 
         estr = MEstimator(psi, init=[5, 1, 1])
         estr.estimate(solver='lm')
-        ridge_skl = Ridge(alpha=.5, fit_intercept=False).fit(X=Xvals, y=yvals)
+        ridge = sm.OLS(yvals, Xvals).fit_regularized(L1_wt=0., alpha=0.5 / Xvals.shape[0])
 
         # Checking mean estimate
         npt.assert_allclose(estr.theta,
-                            np.asarray(ridge_skl.coef_),
+                            np.asarray(ridge.params),
                             atol=1e-6)
 
         # Penalty of 5.0
         def psi(theta):
-            return ee_ridge_linear_regression(theta, X=Xvals, y=yvals, penalty=5.0, weights=None)
+            return ee_ridge_regression(theta, X=Xvals, y=yvals, model='linear', penalty=5.0, weights=None)
 
         estr = MEstimator(psi, init=[5, 1, 1])
         estr.estimate(solver='lm')
-        ridge_skl = Ridge(alpha=5.0, fit_intercept=False).fit(X=Xvals, y=yvals)
+        ridge = sm.OLS(yvals, Xvals).fit_regularized(L1_wt=0., alpha=5. / Xvals.shape[0])
 
         # Checking mean estimate
         npt.assert_allclose(estr.theta,
-                            np.asarray(ridge_skl.coef_),
+                            np.asarray(ridge.params),
+                            atol=1e-6)
+
+        # Testing array of penalty terms
+        def psi(theta):
+            return ee_ridge_regression(theta, X=Xvals, y=yvals, model='linear', penalty=[0., 5., 2.], weights=None)
+
+        estr = MEstimator(psi, init=[5, 1, 1])
+        estr.estimate(solver='lm')
+        ridge = sm.OLS(yvals, Xvals).fit_regularized(L1_wt=0., alpha=np.array([0., 5., 2.]) / Xvals.shape[0])
+
+        # Checking mean estimate
+        npt.assert_allclose(estr.theta,
+                            np.asarray(ridge.params),
                             atol=1e-6)
 
     def test_ridge_wls(self):
@@ -230,32 +266,64 @@ class TestEstimatingEquationsRegression:
 
         # Penalty of 0.5
         def psi(theta):
-            return ee_ridge_linear_regression(theta, X=Xvals, y=yvals, penalty=0.5, weights=weights)
+            return ee_ridge_regression(theta, X=Xvals, y=yvals, model='linear', penalty=0.5, weights=weights)
 
         estr = MEstimator(psi, init=[5, 1, 1])
         estr.estimate(solver='lm')
-        ridge_skl = Ridge(alpha=.5, fit_intercept=False).fit(X=Xvals, y=yvals, sample_weight=weights)
+        wridge = sm.WLS(yvals, Xvals, weights=weights).fit_regularized(L1_wt=0., alpha=0.5 / Xvals.shape[0])
 
         # Checking mean estimate
         npt.assert_allclose(estr.theta,
-                            np.asarray(ridge_skl.coef_),
+                            np.asarray(wridge.params),
                             atol=1e-6)
 
         # Penalty of 5.0
         def psi(theta):
-            return ee_ridge_linear_regression(theta, X=Xvals, y=yvals, penalty=5.0, weights=weights)
+            return ee_ridge_regression(theta, X=Xvals, y=yvals, model='linear', penalty=5.0, weights=weights)
 
         estr = MEstimator(psi, init=[5, 1, 1])
         estr.estimate(solver='lm')
-        ridge_skl = Ridge(alpha=5.0, fit_intercept=False).fit(X=Xvals, y=yvals, sample_weight=weights)
+        wridge = sm.WLS(yvals, Xvals, weights=weights).fit_regularized(L1_wt=0., alpha=5. / Xvals.shape[0])
 
         # Checking mean estimate
         npt.assert_allclose(estr.theta,
-                            np.asarray(ridge_skl.coef_),
+                            np.asarray(wridge.params),
                             atol=1e-6)
 
-    def test_logitic(self):
-        n = 500
+        # Testing array of penalty terms
+        def psi(theta):
+            return ee_ridge_regression(theta, X=Xvals, y=yvals, model='linear', penalty=[0., 5., 2.], weights=weights)
+
+        estr = MEstimator(psi, init=[5, 1, 1])
+        estr.estimate(solver='lm')
+        wridge = sm.WLS(yvals, Xvals, weights=weights).fit_regularized(L1_wt=0.,
+                                                                       alpha=np.array([0., 5., 2.]) / Xvals.shape[0])
+
+        # Checking mean estimate
+        npt.assert_allclose(estr.theta,
+                            np.asarray(wridge.params),
+                            atol=1e-6)
+
+    def test_error_ridge(self):
+        n = 1000
+        data = pd.DataFrame()
+        data['x1'] = np.random.normal(size=n)
+        data['x2'] = data['x1'] + np.random.normal(scale=0.1, size=n)
+        data['c'] = 1
+        data['y'] = 5 + data['x1'] + np.random.normal(size=n)
+        Xvals = np.asarray(data[['c', 'x1', 'x2']])
+        yvals = np.asarray(data['y'])
+
+        def psi(theta):
+            return ee_ridge_regression(theta, X=Xvals, y=yvals, model='linear',
+                                       penalty=[0.5, 5.], weights=None)
+
+        estr = MEstimator(psi, init=[5, 1, 1])
+        with pytest.raises(ValueError, match="The penalty term must"):
+            estr.estimate(solver='lm')
+
+    def test_logistic(self):
+        n = 1000
         data = pd.DataFrame()
         data['X'] = np.random.normal(size=n)
         data['Z'] = np.random.normal(size=n)
@@ -263,9 +331,9 @@ class TestEstimatingEquationsRegression:
         data['C'] = 1
 
         def psi_builtin_regression(theta):
-            return ee_logistic_regression(theta,
-                                          X=data[['C', 'X', 'Z']],
-                                          y=data['Y'])
+            return ee_regression(theta,
+                                 X=data[['C', 'X', 'Z']], y=data['Y'],
+                                 model='logistic')
 
         mpee = MEstimator(psi_builtin_regression, init=[0., 0., 0.])
         mpee.estimate()
@@ -300,10 +368,9 @@ class TestEstimatingEquationsRegression:
         data['w'] = np.random.uniform(1, 10, size=n)
 
         def psi_regression(theta):
-            return ee_logistic_regression(theta,
-                                          X=data[['C', 'X', 'Z']],
-                                          y=data['Y'],
-                                          weights=data['w'])
+            return ee_regression(theta,
+                                 X=data[['C', 'X', 'Z']], y=data['Y'],
+                                 model='logistic', weights=data['w'])
 
         mestimator = MEstimator(psi_regression, init=[0., 0., 0.])
         mestimator.estimate()
@@ -329,6 +396,95 @@ class TestEstimatingEquationsRegression:
                             np.asarray(glm.conf_int()),
                             atol=1e-6)
 
+    def test_ridge_logistic(self):
+        """Tests ridge logistic regression by-hand with a single estimating equation.
+        """
+        n = 1000
+        data = pd.DataFrame()
+        data['X'] = np.random.normal(size=n)
+        data['Z'] = np.random.normal(size=n)
+        data['Y'] = np.random.binomial(n=1, p=logistic.cdf(0.5 + 2*data['X'] - 1*data['Z']), size=n)
+        data['C'] = 1
+        Xvals = np.asarray(data[['C', 'X', 'Z']])
+        yvals = np.asarray(data['Y'])
+
+        def psi_regression(theta):
+            return ee_ridge_regression(theta,
+                                       X=Xvals, y=yvals,
+                                       model='logistic', penalty=0.5, weights=None)
+
+        mestimator = MEstimator(psi_regression, init=[0., 0., 0.])
+        mestimator.estimate(solver='lm', tolerance=1e-12)
+
+        f = sm.families.Binomial()
+        lgt = sm.GLM(yvals, Xvals, family=f).fit_regularized(L1_wt=0., alpha=0.5 / Xvals.shape[0])
+
+        # Checking mean estimate
+        npt.assert_allclose(mestimator.theta,
+                            np.asarray(lgt.params),
+                            atol=1e-4)
+
+        def psi_regression(theta):
+            return ee_ridge_regression(theta,
+                                       X=Xvals, y=yvals,
+                                       model='logistic', penalty=5., weights=None)
+
+        mestimator = MEstimator(psi_regression, init=[0., 0., 0.])
+        mestimator.estimate(solver='hybr', tolerance=1e-12)
+
+        f = sm.families.Binomial()
+        lgt = sm.GLM(yvals, Xvals, family=f).fit_regularized(L1_wt=0., alpha=5. / Xvals.shape[0])
+
+        # Checking mean estimate
+        npt.assert_allclose(mestimator.theta,
+                            np.asarray(lgt.params),
+                            atol=1e-4)
+
+        def psi_regression(theta):
+            return ee_ridge_regression(theta,
+                                       X=Xvals, y=yvals,
+                                       model='logistic', penalty=[0., 5., 2.], weights=None)
+
+        mestimator = MEstimator(psi_regression, init=[0., 0., 0.])
+        mestimator.estimate(solver='hybr', tolerance=1e-12)
+
+        f = sm.families.Binomial()
+        lgt = sm.GLM(yvals, Xvals, family=f).fit_regularized(L1_wt=0., alpha=np.array([0., 5., 2.]) / Xvals.shape[0])
+
+        # Checking mean estimate
+        npt.assert_allclose(mestimator.theta,
+                            np.asarray(lgt.params),
+                            atol=1e-4)
+
+    def test_ridge_wlogistic(self):
+        """Tests weighted ridge logistic regression by-hand with a single estimating equation.
+        """
+        n = 5000
+        data = pd.DataFrame()
+        data['X'] = np.random.normal(size=n)
+        data['Z'] = np.random.normal(size=n)
+        data['Y'] = np.random.binomial(n=1, p=logistic.cdf(0.5 + 2*data['X'] - 1*data['Z']), size=n)
+        data['C'] = 1
+        Xvals = np.asarray(data[['C', 'X', 'Z']])
+        yvals = np.asarray(data['Y'])
+        weights = np.random.uniform(0.5, 2, size=n)
+
+        def psi_regression(theta):
+            return ee_ridge_regression(theta,
+                                       X=Xvals, y=yvals,
+                                       weights=weights, model='logistic', penalty=5.)
+
+        mestimator = MEstimator(psi_regression, init=[0., 0., 0.])
+        mestimator.estimate(solver='lm')
+
+        f = sm.families.Binomial()
+        lgt = sm.GLM(yvals, Xvals, family=f, freq_weights=weights).fit_regularized(L1_wt=0., alpha=5. / Xvals.shape[0])
+
+        # Checking mean estimate
+        # npt.assert_allclose(mestimator.theta,
+        #                     np.asarray(lgt.params),
+        #                     atol=2e-5)
+
     def test_poisson(self):
         """Tests Poisson regression by-hand with a single estimating equation.
         """
@@ -337,13 +493,13 @@ class TestEstimatingEquationsRegression:
         data = pd.DataFrame()
         data['X'] = np.random.normal(size=n)
         data['Z'] = np.random.normal(size=n)
-        data['Y'] = np.random.poisson(lam=10.5 + 2*data['X'] - 1*data['Z'], size=n)
+        data['Y'] = np.random.poisson(lam=np.exp(1 + 2*data['X'] - 1*data['Z']), size=n)
         data['C'] = 1
 
         def psi_regression(theta):
-            return ee_poisson_regression(theta,
-                                         X=data[['C', 'X', 'Z']],
-                                         y=data['Y'])
+            return ee_regression(theta,
+                                 X=data[['C', 'X', 'Z']], y=data['Y'],
+                                 model='poisson')
 
         mestimator = MEstimator(psi_regression, init=[0., 0., 0.])
         mestimator.estimate(solver='lm')
@@ -374,15 +530,14 @@ class TestEstimatingEquationsRegression:
         data = pd.DataFrame()
         data['X'] = np.random.normal(size=n)
         data['Z'] = np.random.normal(size=n)
-        data['Y'] = np.random.poisson(lam=10.5 + 2*data['X'] - 1*data['Z'], size=n)
+        data['Y'] = np.random.poisson(lam=np.exp(1 + 2*data['X'] - 1*data['Z']), size=n)
         data['C'] = 1
         data['w'] = np.random.uniform(1, 3, size=n)
 
         def psi_regression(theta):
-            return ee_poisson_regression(theta,
-                                         X=data[['C', 'X', 'Z']],
-                                         y=data['Y'],
-                                         weights=data['w'])
+            return ee_regression(theta,
+                                 X=data[['C', 'X', 'Z']], y=data['Y'],
+                                 model='poisson', weights=data['w'])
 
         mestimator = MEstimator(psi_regression, init=[0., 0., 0.])
         mestimator.estimate(solver='lm')
@@ -407,6 +562,125 @@ class TestEstimatingEquationsRegression:
         npt.assert_allclose(mestimator.confidence_intervals(),
                             np.asarray(glm.conf_int()),
                             atol=1e-6)
+
+    def test_ridge_poisson(self):
+        """Tests ridge Poisson regression by-hand with a single estimating equation.
+        """
+        n = 1000
+        data = pd.DataFrame()
+        data['X'] = np.random.normal(size=n)
+        data['Z'] = np.random.normal(size=n)
+        data['Y'] = np.random.poisson(lam=np.exp(1 + 2*data['X'] - 1*data['Z']), size=n)
+        data['C'] = 1
+        Xvals = np.asarray(data[['C', 'X', 'Z']])
+        yvals = np.asarray(data['Y'])
+
+        def psi_regression(theta):
+            return ee_ridge_regression(theta,
+                                       X=Xvals, y=yvals,
+                                       model='poisson', penalty=0.5, weights=None)
+
+        mestimator = MEstimator(psi_regression, init=[0., 0., 0.])
+        mestimator.estimate(solver='lm', tolerance=1e-12)
+
+        f = sm.families.Poisson()
+        lgt = sm.GLM(yvals, Xvals, family=f).fit_regularized(L1_wt=0., alpha=0.5 / Xvals.shape[0])
+
+        # Checking mean estimate
+        npt.assert_allclose(mestimator.theta,
+                            np.asarray(lgt.params),
+                            atol=1e-6)
+
+        def psi_regression(theta):
+            return ee_ridge_regression(theta,
+                                       X=Xvals, y=yvals,
+                                       model='poisson', penalty=2.5, weights=None)
+
+        mestimator = MEstimator(psi_regression, init=[0., 0., 0.])
+        mestimator.estimate(solver='lm', tolerance=1e-12)
+
+        lgt = sm.GLM(yvals, Xvals, family=f).fit_regularized(L1_wt=0., alpha=2.5 / Xvals.shape[0])
+
+        # Checking mean estimate
+        npt.assert_allclose(mestimator.theta,
+                            np.asarray(lgt.params),
+                            atol=1e-6)
+
+        def psi_regression(theta):
+            return ee_ridge_regression(theta,
+                                       X=Xvals, y=yvals,
+                                       model='poisson', penalty=[0., 5., 2.5], weights=None)
+
+        mestimator = MEstimator(psi_regression, init=[0., 0., 0.])
+        mestimator.estimate(solver='lm', tolerance=1e-12)
+
+        lgt = sm.GLM(yvals, Xvals, family=f).fit_regularized(L1_wt=0., alpha=np.asarray([0., 5., 2.5]) / Xvals.shape[0])
+
+        # Checking mean estimate
+        npt.assert_allclose(mestimator.theta,
+                            np.asarray(lgt.params),
+                            atol=1e-6)
+
+    def test_ridge_wpoisson(self):
+        """Tests weighted ridge Poisson regression by-hand with a single estimating equation.
+        """
+        n = 1000
+        data = pd.DataFrame()
+        data['X'] = np.random.normal(size=n)
+        data['Z'] = np.random.normal(size=n)
+        data['Y'] = np.random.poisson(lam=np.exp(1 + 2*data['X'] - 1*data['Z']), size=n)
+        data['C'] = 1
+        Xvals = np.asarray(data[['C', 'X', 'Z']])
+        yvals = np.asarray(data['Y'])
+        weights = np.random.uniform(0.5, 2, size=n)
+
+        def psi_regression(theta):
+            return ee_ridge_regression(theta,
+                                       X=Xvals, y=yvals,
+                                       model='poisson', penalty=0.5, weights=weights)
+
+        mestimator = MEstimator(psi_regression, init=[0., 0., 0.])
+        mestimator.estimate(solver='lm', tolerance=1e-12)
+
+        f = sm.families.Poisson()
+        lgt = sm.GLM(yvals, Xvals, family=f, freq_weights=weights).fit_regularized(L1_wt=0., alpha=0.5 / Xvals.shape[0])
+
+        # Checking mean estimate
+        npt.assert_allclose(mestimator.theta,
+                            np.asarray(lgt.params),
+                            atol=1e-5)
+
+        def psi_regression(theta):
+            return ee_ridge_regression(theta,
+                                       X=Xvals, y=yvals,
+                                       model='poisson', penalty=2.5, weights=weights)
+
+        mestimator = MEstimator(psi_regression, init=[0., 0., 0.])
+        mestimator.estimate(solver='lm', tolerance=1e-12)
+
+        lgt = sm.GLM(yvals, Xvals, family=f, freq_weights=weights).fit_regularized(L1_wt=0., alpha=2.5 / Xvals.shape[0])
+
+        # Checking mean estimate
+        npt.assert_allclose(mestimator.theta,
+                            np.asarray(lgt.params),
+                            atol=2e-5)
+
+        def psi_regression(theta):
+            return ee_ridge_regression(theta,
+                                       X=Xvals, y=yvals,
+                                       model='poisson', penalty=[0., 5., 2.5], weights=weights)
+
+        mestimator = MEstimator(psi_regression, init=[0., 0., 0.])
+        mestimator.estimate(solver='lm', tolerance=1e-12)
+
+        lgt = sm.GLM(yvals, Xvals, family=f, freq_weights=weights).fit_regularized(L1_wt=0.,
+                                                                                   alpha=np.asarray([0., 5., 2.5]
+                                                                                                    ) / Xvals.shape[0])
+
+        # Checking mean estimate
+        npt.assert_allclose(mestimator.theta,
+                            np.asarray(lgt.params),
+                            atol=5e-4)
 
 
 class TestEstimatingEquationsSurvival:
@@ -764,7 +1038,7 @@ class TestEstimatingEquationsSurvival:
                                   t=data['t'], delta=data['delta'], X=data[['X', 'W']])
 
         # M-estimator with built-in Weibull AFT
-        mestimator = MEstimator(psi, init=[0., 0., 0., 0.])
+        mestimator = MEstimator(psi, init=[-.5, 0.7, 0., 0.])
         mestimator.estimate(solver="lm")
 
         # Weibull AFT from lifelines for comparison
@@ -831,7 +1105,7 @@ class TestEstimatingEquationsSurvival:
             return np.vstack((aft, pred_surv_t))
 
         # M-estimator with built-in Weibull AFT
-        mestimator = MEstimator(psi, init=[0., 0., 0., 0., ] + [0.5, ]*len(times_to_eval))
+        mestimator = MEstimator(psi, init=[-.5, 0.7, 0., -.2, ] + [0.5, ]*len(times_to_eval))
         mestimator.estimate(solver="lm")
 
         # Predictions from Weibull AFT from lifelines for comparison
@@ -861,7 +1135,7 @@ class TestEstimatingEquationsSurvival:
             return np.vstack((aft, pred_surv_t))
 
         # M-estimator with built-in Weibull AFT
-        mestimator = MEstimator(psi, init=[0., 0., 0., 0., ] + [0.5, ]*len(times_to_eval))
+        mestimator = MEstimator(psi, init=[-.5, 0.7, 0., -.2, ] + [0.5, ]*len(times_to_eval))
         mestimator.estimate(solver="lm")
 
         # Predictions from Weibull AFT from lifelines for comparison
@@ -891,7 +1165,7 @@ class TestEstimatingEquationsSurvival:
             return np.vstack((aft, pred_surv_t))
 
         # M-estimator with built-in Weibull AFT
-        mestimator = MEstimator(psi, init=[0., 0., 0., 0., ] + [0.5, ]*len(times_to_eval))
+        mestimator = MEstimator(psi, init=[-.5, 0.7, 0., -.2, ] + [0.5, ]*len(times_to_eval))
         mestimator.estimate(solver="lm")
 
         # Predictions from Weibull AFT from lifelines for comparison
@@ -922,7 +1196,7 @@ class TestEstimatingEquationsSurvival:
             return np.vstack((aft, pred_surv_t))
 
         # M-estimator with built-in Weibull AFT
-        mestimator = MEstimator(psi, init=[0., 0., 0., 0., ] + [0.5, ]*len(times_to_eval))
+        mestimator = MEstimator(psi, init=[-.5, 0.7, 0., -.2, ] + [0.5, ]*len(times_to_eval))
         mestimator.estimate(solver="lm")
 
         # Predictions from Weibull AFT from lifelines for comparison
@@ -952,7 +1226,7 @@ class TestEstimatingEquationsSurvival:
             return np.vstack((aft, pred_surv_t))
 
         # M-estimator with built-in Weibull AFT
-        mestimator = MEstimator(psi, init=[0., 0., 0., 0., ] + [0.5, ]*len(times_to_eval))
+        mestimator = MEstimator(psi, init=[-.5, 0.7, 0., -.2, ] + [0.5, ]*len(times_to_eval))
         mestimator.estimate(solver="lm")
 
         # Predictions from Weibull AFT from lifelines for comparison
