@@ -1,6 +1,6 @@
 import numpy as np
 
-from .regression import ee_logistic_regression, ee_linear_regression
+from .regression import ee_regression
 from delicatessen.utilities import logit, inverse_logit, identity
 
 
@@ -227,15 +227,16 @@ def ee_gformula(theta, y, X, X1, X0=None, force_continuous=False):
 
     # Checking outcome variable type
     if np.isin(y, [0, 1]).all() and not force_continuous:
-        regression = ee_logistic_regression         # Use a logistic regression model
+        model = 'logistic'                          # Use a logistic regression model
         transform = inverse_logit                   # ... and need to inverse-logit transformation
     else:
-        regression = ee_linear_regression           # Use a linear regression model
+        model = 'linear'                            # Use a linear regression model
         transform = identity                        # ... and need to apply the identity (no) transformation
 
     # Estimating regression parameters
-    preds_reg = regression(theta=beta,              # beta coefficients
-                           X=X, y=y)                # along with observed X and observed y
+    preds_reg = ee_regression(theta=beta,              # beta coefficients
+                              X=X, y=y,                # ... along with observed X and observed y
+                              model=model)             # ... and specified model type
 
     # Calculating mean under X1
     ya1 = transform(np.dot(X1, beta)) - mu1         # mean under X1
@@ -314,7 +315,7 @@ def ee_ipw(theta, y, A, W, truncate=None):
     W : ndarray, list, vector
         2-dimensional vector of n observed values for b variables to model the probability of ``A`` with. No missing
         data should be included (missing data may cause unexpected behavior).
-    truncate : None, list, set, optional
+    truncate : None, list, set, ndarray, optional
         Bounds to truncate the estimated probabilities of ``A`` at. For example, estimated probabilities above 0.99 or
         below 0.01 can be set to 0.99 or 0.01, respectively. This is done by specifying ``truncate=(0.01, 0.99)``. Note
         this step is done via ``numpy.clip(.., a_min=truncate[0], a_max=truncate[1])``, so order is important. Default
@@ -389,9 +390,10 @@ def ee_ipw(theta, y, A, W, truncate=None):
     beta = theta[3:]                             # Extracting out theta's for the regression model
 
     # Estimating propensity score
-    preds_reg = ee_logistic_regression(theta=beta,    # Using logistic regression
-                                       X=W,           # Plug-in covariates for X
-                                       y=A)           # Plug-in treatment for Y
+    preds_reg = ee_regression(theta=beta,        # Using logistic regression
+                              X=W,               # ... plug-in covariates for X
+                              y=A,               # ... plug-in treatment for Y
+                              model='logistic')  # ... use a logistic model
 
     # Estimating weights
     pi = inverse_logit(np.dot(W, beta))          # Getting Pr(A|W) from model
@@ -507,7 +509,7 @@ def ee_aipw(theta, y, A, W, X, X1, X0, truncate=None, force_continuous=False):
         action is indicated by ``A``, then ``X0`` will take the original data ``X`` and update the values of ``A`` to
         follow the deterministic plan where ``A=0`` for all observatons. No missing data should be included (missing
         data may cause unexpected behavior).
-    truncate : None, list, set, optional
+    truncate : None, list, set, ndarray, optional
         Bounds to truncate the estimated probabilities of ``A`` at. For example, estimated probabilities above 0.99 or
         below 0.01 can be set to 0.99 or 0.01, respectively. This is done by specifying ``truncate=(0.01, 0.99)``. Note
         this step is done via ``numpy.clip(.., a_min=truncate[0], a_max=truncate[1])``, so order is important. Default
@@ -619,9 +621,9 @@ def ee_aipw(theta, y, A, W, X, X1, X0, truncate=None, force_continuous=False):
     beta = theta[3+W.shape[1]:]  # Parameter(s) for the outcome model
 
     # pi-model (logistic regression)
-    pi_model = ee_logistic_regression(theta=alpha,    # Estimating logistic model
-                                      X=W,
-                                      y=A)
+    pi_model = ee_regression(theta=alpha,    # Estimating logistic model
+                             X=W, y=A,
+                             model='logistic')
     pi = inverse_logit(np.dot(W, alpha))              # Estimating Pr(A|W)
     if truncate is not None:                          # Truncating Pr(A|W) when requested
         if truncate[0] > truncate[1]:
@@ -631,14 +633,15 @@ def ee_aipw(theta, y, A, W, X, X1, X0, truncate=None, force_continuous=False):
     # m-model (logistic regression)
     # Checking outcome variable type
     if np.isin(y, [0, 1]).all() and not force_continuous:
-        regression = ee_logistic_regression         # Use a logistic regression model
+        model = 'logistic'                          # Use a logistic regression model
         transform = inverse_logit                   # ... and need to inverse-logit transformation
     else:
-        regression = ee_linear_regression           # Use a linear regression model
+        model = 'linear'                            # Use a linear regression model
         transform = identity                        # ... and need to apply the identity (no) transformation
 
-    m_model = regression(theta=beta,                # Estimating the outcome model
-                         y=y, X=X)
+    m_model = ee_regression(theta=beta,                # Estimating the outcome model
+                            y=y, X=X,
+                            model=model)
     ya1 = transform(np.dot(X1, beta))               # Generating predicted values under X1
     ya0 = transform(np.dot(X0, beta))               # Generating predicted values under X0
 
