@@ -540,6 +540,7 @@ def ee_ridge_regression(theta, y, X, model, penalty, weights=None):
 
     >>> import numpy as np
     >>> import pandas as pd
+    >>> from scipy.stats import logistic
     >>> from delicatessen import MEstimator
     >>> from delicatessen.estimating_equations import ee_ridge_regression
 
@@ -547,29 +548,59 @@ def ee_ridge_regression(theta, y, X, model, penalty, weights=None):
 
     >>> n = 500
     >>> data = pd.DataFrame()
-    >>> data['X'] = np.random.normal(size=n)
+    >>> data['V'] = np.random.normal(size=n)
+    >>> data['W'] = np.random.normal(size=n)
+    >>> data['X'] = data['W'] + np.random.normal(scale=0.25, size=n)
     >>> data['Z'] = np.random.normal(size=n)
-    >>> data['Y'] = 0.5 + 2*data['X'] - 1*data['Z'] + np.random.normal(loc=0, size=n)
+    >>> data['Y1'] = 0.5 + 2*data['W'] - 1*data['Z'] + np.random.normal(loc=0, size=n)
+    >>> data['Y2'] = np.random.binomial(n=1, p=logistic.cdf(0.5 + 2*data['W'] - 1*data['Z']), size=n)
+    >>> data['Y3'] = np.random.poisson(lam=np.exp(1 + 2*data['W'] - 1*data['Z']), size=n)
     >>> data['C'] = 1
 
     Note that ``C`` here is set to all 1's. This will be the intercept in the regression.
 
-    Defining psi, or the stacked estimating equations
+    Defining psi, or the stacked estimating equations. Note that the penalty is a list of values. Here, we are *not*
+    penalizing the intercept (which is generally recommended when the intercept is unlikely to be zero). The remainder
+    of covariates have a penalty of 10 applied.
 
+    >>> penalty_vals = [0., 10., 10., 10., 10.]
     >>> def psi(theta):
-    >>>         x, y = data[['C', 'X', 'Z']], data['Y']
-    >>>         return ee_ridge_regression(theta=theta, X=x, y=y, model='linear', penalty=5.5)
+    >>>         x, y = data[['C', 'V', 'W', 'X', 'Z']], data['Y1']
+    >>>         return ee_ridge_regression(theta=theta, X=x, y=y, model='linear', penalty=penalty_vals)
 
-    Calling the M-estimation procedure (note that ``init`` has 3 values now, since ``X.shape[1] = 3``).
+    Calling the M-estimation procedure (note that ``init`` has 5 values now, since ``X.shape[1] = 5``).
 
-    >>> estr = MEstimator(stacked_equations=psi, init=[0., 0., 0.,])
-    >>> estr.estimate()
+    >>> estr = MEstimator(stacked_equations=psi, init=[0., 0., 0., 0., 0.])
+    >>> estr.estimate(solver='lm')
 
     Inspecting the parameter estimates, variance, and confidence intervals
 
     >>> estr.theta
     >>> estr.variance
     >>> estr.confidence_intervals()
+
+    Next, we can estimate the parameters for a logistic regression model as follows
+
+    >>> penalty_vals = [0., 10., 10., 10., 10.]
+    >>> def psi(theta):
+    >>>         x, y = data[['C', 'V', 'W', 'X', 'Z']], data['Y2']
+    >>>         return ee_ridge_regression(theta=theta, X=x, y=y, model='logistic', penalty=penalty_vals)
+
+    >>> estr = MEstimator(stacked_equations=psi, init=[0., 0., 0., 0., 0.])
+    >>> estr.estimate(solver='lm')
+
+    Finally, we can estimate the parameters for a Poisson regression model as follows
+
+    >>> penalty_vals = [0., 10., 10., 10., 10.]
+    >>> def psi(theta):
+    >>>         x, y = data[['C', 'V', 'W', 'X', 'Z']], data['Y3']
+    >>>         return ee_ridge_regression(theta=theta, X=x, y=y, model='poisson', penalty=penalty_vals)
+
+    >>> estr = MEstimator(stacked_equations=psi, init=[0., 0., 0., 0., 0.])
+    >>> estr.estimate(solver='lm')
+
+    Additionally, weighted versions of all the previous models can be estimated by specifying the optional ``weights``
+    argument.
 
     References
     ----------
@@ -669,6 +700,7 @@ def ee_lasso_regression(theta, y, X, model, penalty, epsilon=3.e-3, weights=None
 
     >>> import numpy as np
     >>> import pandas as pd
+    >>> from scipy.stats import logistic
     >>> from delicatessen import MEstimator
     >>> from delicatessen.estimating_equations import ee_lasso_regression
 
@@ -676,29 +708,60 @@ def ee_lasso_regression(theta, y, X, model, penalty, epsilon=3.e-3, weights=None
 
     >>> n = 500
     >>> data = pd.DataFrame()
-    >>> data['X'] = np.random.normal(size=n)
+    >>> data['V'] = np.random.normal(size=n)
+    >>> data['W'] = np.random.normal(size=n)
+    >>> data['X'] = data['W'] + np.random.normal(scale=0.25, size=n)
     >>> data['Z'] = np.random.normal(size=n)
-    >>> data['Y'] = 0.5 + 2*data['X'] - 1*data['Z'] + np.random.normal(loc=0, size=n)
+    >>> data['Y1'] = 0.5 + 2*data['W'] - 1*data['Z'] + np.random.normal(loc=0, size=n)
+    >>> data['Y2'] = np.random.binomial(n=1, p=logistic.cdf(0.5 + 2*data['W'] - 1*data['Z']), size=n)
+    >>> data['Y3'] = np.random.poisson(lam=np.exp(1 + 2*data['W'] - 1*data['Z']), size=n)
     >>> data['C'] = 1
 
     Note that ``C`` here is set to all 1's. This will be the intercept in the regression.
 
-    Defining psi, or the stacked estimating equations
+    Defining psi, or the stacked estimating equations. Note that the penalty is a list of values. Here, we are *not*
+    penalizing the intercept (which is generally recommended when the intercept is unlikely to be zero). The remainder
+    of covariates have a penalty of 10 applied.
 
+    >>> penalty_vals = [0., 10., 10., 10., 10.]
     >>> def psi(theta):
-    >>>         x, y = data[['C', 'X', 'Z']], data['Y']
-    >>>         return ee_lasso_regression(theta=theta, X=x, y=y, model='linear', penalty=5.5)
+    >>>         x, y = data[['C', 'V', 'W', 'X', 'Z']], data['Y1']
+    >>>         return ee_lasso_regression(theta=theta, X=x, y=y, model='linear', penalty=penalty_vals)
 
-    Calling the M-estimation procedure (note that ``init`` has 3 values now, since ``X.shape[1] = 3``).
+    Calling the M-estimation procedure (note that ``init`` has 5 values now, since ``X.shape[1] = 5``). Additionally,
+    we set the maximum number of iterations to be much larger.
 
-    >>> estr = MEstimator(stacked_equations=psi, init=[0., 0., 0.,])
-    >>> estr.estimate()
+    >>> estr = MEstimator(stacked_equations=psi, init=[0.01, 0.01, 0.01, 0.01, 0.01])
+    >>> estr.estimate(solver='lm', maxiter=20000)
 
     Inspecting the parameter estimates, variance, and confidence intervals
 
     >>> estr.theta
     >>> estr.variance
     >>> estr.confidence_intervals()
+
+    Next, we can estimate the parameters for a logistic regression model as follows
+
+    >>> penalty_vals = [0., 10., 10., 10., 10.]
+    >>> def psi(theta):
+    >>>         x, y = data[['C', 'V', 'W', 'X', 'Z']], data['Y2']
+    >>>         return ee_lasso_regression(theta=theta, X=x, y=y, model='logistic', penalty=penalty_vals)
+
+    >>> estr = MEstimator(stacked_equations=psi, init=[0.01, 0.01, 0.01, 0.01, 0.01])
+    >>> estr.estimate(solver='lm', maxiter=20000)
+
+    Finally, we can estimate the parameters for a Poisson regression model as follows
+
+    >>> penalty_vals = [0., 10., 10., 10., 10.]
+    >>> def psi(theta):
+    >>>         x, y = data[['C', 'V', 'W', 'X', 'Z']], data['Y3']
+    >>>         return ee_lasso_regression(theta=theta, X=x, y=y, model='poisson', penalty=penalty_vals)
+
+    >>> estr = MEstimator(stacked_equations=psi, init=[0.01, 0.01, 0.01, 0.01, 0.01])
+    >>> estr.estimate(solver='lm', maxiter=20000)
+
+    Additionally, weighted versions of all the previous models can be estimated by specifying the optional ``weights``
+    argument.
 
     References
     ----------
@@ -803,6 +866,7 @@ def ee_elasticnet_regression(theta, y, X, model, penalty, ratio, epsilon=3.e-3, 
 
     >>> import numpy as np
     >>> import pandas as pd
+    >>> from scipy.stats import logistic
     >>> from delicatessen import MEstimator
     >>> from delicatessen.estimating_equations import ee_elasticnet_regression
 
@@ -810,22 +874,29 @@ def ee_elasticnet_regression(theta, y, X, model, penalty, ratio, epsilon=3.e-3, 
 
     >>> n = 500
     >>> data = pd.DataFrame()
-    >>> data['X'] = np.random.normal(size=n)
+    >>> data['V'] = np.random.normal(size=n)
+    >>> data['W'] = np.random.normal(size=n)
+    >>> data['X'] = data['W'] + np.random.normal(scale=0.25, size=n)
     >>> data['Z'] = np.random.normal(size=n)
-    >>> data['Y'] = 0.5 + 2*data['X'] - 1*data['Z'] + np.random.normal(loc=0, size=n)
+    >>> data['Y1'] = 0.5 + 2*data['W'] - 1*data['Z'] + np.random.normal(loc=0, size=n)
+    >>> data['Y2'] = np.random.binomial(n=1, p=logistic.cdf(0.5 + 2*data['W'] - 1*data['Z']), size=n)
+    >>> data['Y3'] = np.random.poisson(lam=np.exp(1 + 2*data['W'] - 1*data['Z']), size=n)
     >>> data['C'] = 1
 
     Note that ``C`` here is set to all 1's. This will be the intercept in the regression.
 
-    Defining psi, or the stacked estimating equations
+    Defining psi, or the stacked estimating equations. Note that the penalty is a list of values. Here, we are *not*
+    penalizing the intercept (which is generally recommended when the intercept is unlikely to be zero). The remainder
+    of covariates have a penalty of 10 applied.
 
+    >>> penalty_vals = [0., 10., 10., 10., 10.]
     >>> def psi(theta):
-    >>>         x, y = data[['C', 'X', 'Z']], data['Y']
-    >>>         return ee_lasso_regression(theta=theta, X=x, y=y, model='linear', penalty=5.5)
+    >>>         x, y = data[['C', 'V', 'W', 'X', 'Z']], data['Y1']
+    >>>         return ee_elasticnet_regression(theta=theta, X=x, y=y, model='linear', ratio=0.5, penalty=penalty_vals)
 
-    Calling the M-estimation procedure (note that ``init`` has 3 values now, since ``X.shape[1] = 3``).
+    Calling the M-estimation procedure (note that ``init`` has 5 values now, since ``X.shape[1] = 5``).
 
-    >>> estr = MEstimator(stacked_equations=psi, init=[0., 0., 0.,])
+    >>> estr = MEstimator(stacked_equations=psi, init=[0.01, 0.01, 0.01, 0.01, 0.01])
     >>> estr.estimate()
 
     Inspecting the parameter estimates, variance, and confidence intervals
@@ -833,6 +904,29 @@ def ee_elasticnet_regression(theta, y, X, model, penalty, ratio, epsilon=3.e-3, 
     >>> estr.theta
     >>> estr.variance
     >>> estr.confidence_intervals()
+
+    Next, we can estimate the parameters for a logistic regression model as follows
+
+    >>> penalty_vals = [0., 10., 10., 10., 10.]
+    >>> def psi(theta):
+    >>>         x, y = data[['C', 'V', 'W', 'X', 'Z']], data['Y2']
+    >>>         return ee_elasticnet_regression(theta=theta, X=x, y=y, model='logistic', ratio=0.5, penalty=penalty_vals)
+
+    >>> estr = MEstimator(stacked_equations=psi, init=[0.01, 0.01, 0.01, 0.01, 0.01])
+    >>> estr.estimate(solver='lm', maxiter=20000)
+
+    Finally, we can estimate the parameters for a Poisson regression model as follows
+
+    >>> penalty_vals = [0., 10., 10., 10., 10.]
+    >>> def psi(theta):
+    >>>         x, y = data[['C', 'V', 'W', 'X', 'Z']], data['Y3']
+    >>>         return ee_elasticnet_regression(theta=theta, X=x, y=y, model='poisson', ratio=0.5, penalty=penalty_vals)
+
+    >>> estr = MEstimator(stacked_equations=psi, init=[0.01, 0.01, 0.01, 0.01, 0.01])
+    >>> estr.estimate(solver='lm', maxiter=20000)
+
+    Additionally, weighted versions of all the previous models can be estimated by specifying the optional ``weights``
+    argument.
 
     References
     ----------
@@ -933,29 +1027,37 @@ def ee_bridge_regression(theta, y, X, model, penalty, gamma, weights=None):
 
     >>> import numpy as np
     >>> import pandas as pd
+    >>> from scipy.stats import logistic
     >>> from delicatessen import MEstimator
     >>> from delicatessen.estimating_equations import ee_bridge_regression
 
-    Some generic data to estimate a linear regresion model
+    Some generic data to estimate a linear bridge regresion model
 
     >>> n = 500
     >>> data = pd.DataFrame()
-    >>> data['X'] = np.random.normal(size=n)
+    >>> data['V'] = np.random.normal(size=n)
+    >>> data['W'] = np.random.normal(size=n)
+    >>> data['X'] = data['W'] + np.random.normal(scale=0.25, size=n)
     >>> data['Z'] = np.random.normal(size=n)
-    >>> data['Y'] = 0.5 + 2*data['X'] - 1*data['Z'] + np.random.normal(loc=0, size=n)
+    >>> data['Y1'] = 0.5 + 2*data['W'] - 1*data['Z'] + np.random.normal(loc=0, size=n)
+    >>> data['Y2'] = np.random.binomial(n=1, p=logistic.cdf(0.5 + 2*data['W'] - 1*data['Z']), size=n)
+    >>> data['Y3'] = np.random.poisson(lam=np.exp(1 + 2*data['W'] - 1*data['Z']), size=n)
     >>> data['C'] = 1
 
     Note that ``C`` here is set to all 1's. This will be the intercept in the regression.
 
-    Defining psi, or the stacked estimating equations
+    Defining psi, or the stacked estimating equations. Note that the penalty is a list of values. Here, we are *not*
+    penalizing the intercept (which is generally recommended when the intercept is unlikely to be zero). The remainder
+    of covariates have a penalty of 10 applied.
 
+    >>> penalty_vals = [0., 10., 10., 10., 10.]
     >>> def psi(theta):
-    >>>         x, y = data[['C', 'X', 'Z']], data['Y']
-    >>>         return ee_lasso_regression(theta=theta, X=x, y=y, model='linear', penalty=5.5)
+    >>>         x, y = data[['C', 'V', 'W', 'X', 'Z']], data['Y']
+    >>>         return ee_bridge_regression(theta=theta, X=x, y=y, model='linear', gamma=2.3, penalty=penalty_vals)
 
-    Calling the M-estimation procedure (note that ``init`` has 3 values now, since ``X.shape[1] = 3``).
+    Calling the M-estimation procedure (note that ``init`` has 5 values now, since ``X.shape[1] = 5``).
 
-    >>> estr = MEstimator(stacked_equations=psi, init=[0., 0., 0.,])
+    >>> estr = MEstimator(stacked_equations=psi, init=[0., 0., 0., 0., 0.])
     >>> estr.estimate()
 
     Inspecting the parameter estimates, variance, and confidence intervals
@@ -963,6 +1065,29 @@ def ee_bridge_regression(theta, y, X, model, penalty, gamma, weights=None):
     >>> estr.theta
     >>> estr.variance
     >>> estr.confidence_intervals()
+
+    Next, we can estimate the parameters for a logistic regression model as follows
+
+    >>> penalty_vals = [0., 10., 10., 10., 10.]
+    >>> def psi(theta):
+    >>>         x, y = data[['C', 'V', 'W', 'X', 'Z']], data['Y2']
+    >>>         return ee_bridge_regression(theta=theta, X=x, y=y, model='logistic', gamma=2.3, penalty=penalty_vals)
+
+    >>> estr = MEstimator(stacked_equations=psi, init=[0.01, 0.01, 0.01, 0.01, 0.01])
+    >>> estr.estimate(solver='lm', maxiter=5000)
+
+    Finally, we can estimate the parameters for a Poisson regression model as follows
+
+    >>> penalty_vals = [0., 10., 10., 10., 10.]
+    >>> def psi(theta):
+    >>>         x, y = data[['C', 'V', 'W', 'X', 'Z']], data['Y3']
+    >>>         return ee_bridge_regression(theta=theta, X=x, y=y, model='poisson', gamma=2.3, penalty=penalty_vals)
+
+    >>> estr = MEstimator(stacked_equations=psi, init=[0.01, 0.01, 0.01, 0.01, 0.01])
+    >>> estr.estimate(solver='lm', maxiter=5000)
+
+    Additionally, weighted versions of all the previous models can be estimated by specifying the optional ``weights``
+    argument.
 
     References
     ----------
@@ -1004,7 +1129,7 @@ def _prep_inputs_(X, y, theta, penalty=None):
 
     Returns
     -------
-
+    transformed parameters
     """
     X = np.asarray(X)                       # Convert to NumPy array
     y = np.asarray(y)[:, None]              # Convert to NumPy array and ensure correct shape for matrix algebra
@@ -1078,8 +1203,7 @@ def _generate_weights_(weights, n_obs):
 def _bridge_penalty_(theta, gamma, penalty, n_obs):
     r"""Internal use function to calculate the corresponding penalty term. The penalty term formula is based on the
     bridge penalty, where LASSO is :math:`\gamma = 1` and ridge is :math:`\gamma = 2`. The penalty term is defined for
-    :math:`\gamma > 0` but :math:`\gamma < 1` requires special optimization. While the penalty term does not prevent
-    inputs less than 1, it will generate a :code:`UserWarning`.
+    :math:`\gamma > 0` but :math:`\gamma < 1` requires special optimization.
 
     Note
     ----
@@ -1107,6 +1231,10 @@ def _bridge_penalty_(theta, gamma, penalty, n_obs):
         consists of a single value or b values (to match the length of ``theta``).
     n_obs : int
         Number of observations. Used to rescale the penalty terms
+
+    Returns
+    -------
+    ndarray
     """
     # Checking the penalty term is non-negative
     if penalty.size != 1:
