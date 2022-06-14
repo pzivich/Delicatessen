@@ -456,35 +456,6 @@ class TestEstimatingEquationsRegression:
                             np.asarray(lgt.params),
                             atol=1e-4)
 
-    def test_ridge_wlogistic(self):
-        """Tests weighted ridge logistic regression by-hand with a single estimating equation.
-        """
-        n = 5000
-        data = pd.DataFrame()
-        data['X'] = np.random.normal(size=n)
-        data['Z'] = np.random.normal(size=n)
-        data['Y'] = np.random.binomial(n=1, p=logistic.cdf(0.5 + 2*data['X'] - 1*data['Z']), size=n)
-        data['C'] = 1
-        Xvals = np.asarray(data[['C', 'X', 'Z']])
-        yvals = np.asarray(data['Y'])
-        weights = np.random.uniform(0.5, 2, size=n)
-
-        def psi_regression(theta):
-            return ee_ridge_regression(theta,
-                                       X=Xvals, y=yvals,
-                                       weights=weights, model='logistic', penalty=5.)
-
-        mestimator = MEstimator(psi_regression, init=[0., 0., 0.])
-        mestimator.estimate(solver='lm')
-
-        f = sm.families.Binomial()
-        lgt = sm.GLM(yvals, Xvals, family=f, freq_weights=weights).fit_regularized(L1_wt=0., alpha=5. / Xvals.shape[0])
-
-        # Checking mean estimate
-        # npt.assert_allclose(mestimator.theta,
-        #                     np.asarray(lgt.params),
-        #                     atol=2e-5)
-
     def test_poisson(self):
         """Tests Poisson regression by-hand with a single estimating equation.
         """
