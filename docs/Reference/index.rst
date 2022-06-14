@@ -13,3 +13,4 @@ For a more narrative-driven description of M-Estimation and how to use ``delicat
 
     M-Estimator <M-Estimator.rst>
     Estimating Equations <Estimating Equations.rst>
+    Utilities <Utilities.rst>

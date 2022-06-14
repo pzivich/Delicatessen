@@ -8,7 +8,7 @@ estimating equations.
 Basic
 -------------------
 
-.. currentmodule:: delicatessen.estimating_equations
+.. currentmodule:: delicatessen.estimating_equations.basic
 
 .. autosummary::
   :toctree: generated/
@@ -21,21 +21,23 @@ Basic
 Regression
 -------------------
 
-.. currentmodule:: delicatessen.estimating_equations
+.. currentmodule:: delicatessen.estimating_equations.regression
 
 .. autosummary::
   :toctree: generated/
 
-  ee_linear_regression
-  ee_logistic_regression
-  ee_poisson_regression
-  ee_robust_linear_regression
+  ee_regression
+  ee_robust_regression
+  ee_ridge_regression
+  ee_lasso_regression
+  ee_elasticnet_regression
+  ee_bridge_regression
 
 
 Survival
 -------------------
 
-.. currentmodule:: delicatessen.estimating_equations
+.. currentmodule:: delicatessen.estimating_equations.survival
 
 .. autosummary::
   :toctree: generated/
@@ -51,7 +53,7 @@ Survival
 Dose Response
 -------------------
 
-.. currentmodule:: delicatessen.estimating_equations
+.. currentmodule:: delicatessen.estimating_equations.dose_response
 
 .. autosummary::
   :toctree: generated/
@@ -65,7 +67,7 @@ Dose Response
 Causal Inference
 -------------------
 
-.. currentmodule:: delicatessen.estimating_equations
+.. currentmodule:: delicatessen.estimating_equations.causal
 
 .. autosummary::
   :toctree: generated/
