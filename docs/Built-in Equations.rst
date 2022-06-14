@@ -150,17 +150,18 @@ In this case, ``X`` and ``Z`` are the independent variables and ``Y`` is the dep
 is created to be the intercept column, since the intercept needs to be manually provided (this may be different from
 other formula-based packages that automatically add the intercept to the regression).
 
-For this data, we can now create the wrapper function for the ``ee_linear_regression`` estimating equations
+For this data, we can now create the wrapper function for the ``ee_regression`` estimating equations
 
 .. code::
 
     from delicatessen import MEstimator
-    from delicatessen.estimating_equations import ee_linear_regression
+    from delicatessen.estimating_equations import ee_regression
 
     def psi(theta):
-        return ee_linear_regression(theta=theta,
-                                    X=data[['C', 'X', 'Z']],
-                                    y=data['Y'])
+        return ee_regression(theta=theta,
+                             X=data[['C', 'X', 'Z']],
+                             y=data['Y'],
+                             model='linear)
 
 After creating the wrapper function, we can now call the M-Estimation procedure to estimate the regression coefficients
 and their variance
@@ -213,17 +214,18 @@ In this case, ``X`` and ``Z`` are the independent variables and ``Y`` is the dep
 is created to be the intercept column, since the intercept needs to be manually provided (this may be different from
 other formula-based packages that automatically add the intercept to the regression).
 
-For this data, we can now create the wrapper function for the ``ee_logistic_regression`` estimating equations
+For this data, we can now create the wrapper function for the ``ee_regression`` estimating equations
 
 .. code::
 
     from delicatessen import MEstimator
-    from delicatessen.estimating_equations import ee_logistic_regression
+    from delicatessen.estimating_equations import ee_regression
 
     def psi(theta):
-        return ee_logistic_regression(theta=theta,
-                                      X=data[['C', 'X', 'Z']],
-                                      y=data['Y'])
+        return ee_regression(theta=theta,
+                             X=data[['C', 'X', 'Z']],
+                             y=data['Y'],
+                             model='logistic')
 
 After creating the wrapper function, we can now call the M-Estimation procedure to estimate the regression coefficients
 and their variance
@@ -254,6 +256,243 @@ While ``statsmodels`` likely runs faster, the benefit of M-estimation and ``deli
 equations can be stacked together (including multiple regression models). This advantage will become clearer in the
 causal section.
 
+Poisson Regression
+----------------------------
+
+In the case of a count dependent variable, Poisson regression can instead be performed. Consider the following
+simulated data set
+
+.. code::
+
+    import numpy as np
+    import pandas as pd
+
+    n = 500
+    data = pd.DataFrame()
+    data['X'] = np.random.normal(size=n)
+    data['Z'] = np.random.normal(size=n)
+    data['Y'] = data['Y3'] = np.random.poisson(lam=np.exp(0.5 + 2*data['X'] - 1*data['Z']), size=n)
+    data['C'] = 1
+
+In this case, ``X`` and ``Z`` are the independent variables and ``Y`` is the dependent variable. Here the column ``C``
+is created to be the intercept column, since the intercept needs to be manually provided (this may be different from
+other formula-based packages that automatically add the intercept to the regression).
+
+For this data, we can now create the wrapper function for the ``ee_regression`` estimating equations
+
+.. code::
+
+    from delicatessen import MEstimator
+    from delicatessen.estimating_equations import ee_regression
+
+    def psi(theta):
+        return ee_regression(theta=theta,
+                             X=data[['C', 'X', 'Z']],
+                             y=data['Y'],
+                             model='poisson')
+
+After creating the wrapper function, we can now call the M-Estimation procedure to estimate the regression coefficients
+and their variance
+
+.. code::
+
+    estr = MEstimator(stacked_equations=psi, init=[0., 0., 0.])
+    estr.estimate()
+
+    print(estr.theta)
+    print(estr.variance)
+
+Note that there are 3 independent variables, meaning ``init`` needs 3 starting values.
+
+Penalized Regression
+=============================
+
+There is also penalized regression models available. Here, we will demonstrate for linear regression, but logistic and
+Poisson penalized regression are also supported (through the :code:`model` argument).
+
+To demonstrate application of the penalized regression models, consider the following simulated data set
+
+.. code::
+
+    import numpy as np
+    import pandas as pd
+    from delicatessen import MEstimator
+    from delicatessen.estimating_equations import (ee_ridge_regression,
+                                                   ee_lasso_regression,
+                                                   ee_elasticnet_regression,
+                                                   ee_bridge_regression)
+
+    n = 500
+    data = pd.DataFrame()
+    data['V'] = np.random.normal(size=n)
+    data['W'] = np.random.normal(size=n)
+    data['X'] = data['W'] + np.random.normal(scale=0.25, size=n)
+    data['Z'] = np.random.normal(size=n)
+    data['Y'] = 0.5 + 2*data['W'] - 1*data['Z'] + np.random.normal(loc=0, size=n)
+    data['C'] = 1
+
+Here, there is both variables with no effect and collinearity in the data.
+
+Ridge Penalty
+----------------------------
+The Ridge or :math:`L_2` penalty is intended to penalize collinear terms. The penalty term in the estimating equations
+is
+
+.. math::
+
+    2 \frac{\lambda}{n} | \beta | \text{sign}(\beta)
+
+where :math:`\lambda` is the penalty term (and is scaled by :math:`n`) and :math:`\beta` are the regression
+coefficients.
+
+To implement ridge regression, the estimating equations can be specified as
+
+.. code::
+
+    penalty_vals = [0., 10., 10., 10., 10.]
+    def psi(theta):
+        x, y = data[['C', 'V', 'W', 'X', 'Z']], data['Y1']
+        return ee_ridge_regression(theta=theta, X=x, y=y, model='linear',
+                                   penalty=penalty_vals)
+
+Here, :math:`\lambda=10` for all coefficients, besides the intercept. The M-estimator is then implemented via
+
+.. code::
+
+    estr = MEstimator(stacked_equations=psi, init=[0., 0., 0., 0., 0.])
+    estr.estimate(solver='lm')
+
+    print(estr.theta)
+    print(estr.variance)
+
+Different penalty terms can be assigned to each coefficient. Furthermore, the ``center`` argument can be used to
+penalize towards non-zero values for all or some of the coefficients.
+
+LASSO Penalty
+----------------------------
+The LASSO or :math:`L_1` penalty is intended to penalize collinear terms. The penalty term in the estimating equations
+is
+
+.. math::
+
+    \frac{\lambda}{n} \text{sign}(\beta)
+
+Here, we use an approximation to the LASSO (rather than the LASSO itself). The reason for this is the LASSO can be
+difficult for root-finding procedures. Instead, we approximate the LASSO by using the bridge penalty with
+:math:`\gamma \rightarrow 1^+`. See the bridge penalty for further details. Another consequence is that coefficients
+will not be exactly zero, however some root-finding algorithms (use :code:`solver='lm'`) will shrink coefficients
+very near to zero.
+
+To implement LASSO regression, the estimating equations can be specified as
+
+.. code::
+
+    penalty_vals = [0., 10., 10., 10., 10.]
+    def psi(theta):
+        x, y = data[['C', 'V', 'W', 'X', 'Z']], data['Y1']
+        return ee_lasso_regression(theta=theta, X=x, y=y, model='linear',
+                                   penalty=penalty_vals)
+
+The approximation can be updated via the optional :code:`epsilon` argument. However, note that smaller values will not
+necessarily result in better approximations. The approximation value needs to be balanced against the strength of the
+penalty terms.
+
+Here, :math:`\lambda=10` for all coefficients, besides the intercept. The M-estimator is then implemented via
+
+.. code::
+
+    estr = MEstimator(stacked_equations=psi, init=[0., 0., 0., 0., 0.])
+    estr.estimate(solver='lm', maxiter=20000)  # NOTE increase in maxiter
+
+    print(estr.theta)
+    print(estr.variance)
+
+Notice the increase in the maximum number of iterations for the root-finder (and the use of :code:`'lm'`). These two
+choices will help the root-finder converge since the LASSO penalty can be difficult to solve for root-finding
+algorithms. Judicious selection of starting values can also help (e.g., starting values from an unpenalized linear
+model).
+
+Different penalty terms can be assigned to each coefficient. Furthermore, the ``center`` argument can be used to
+penalize towards non-zero values for all or some of the coefficients.
+
+Elastic-Net Penalty
+----------------------------
+The elastic-net penalty applies both the :math:`L_1` and :math:`L_2` penalties in a user-specified ratio. The
+elastic-net penalty in the estimating equation is
+
+.. math::
+
+    r \times sgn(\theta) - (1-r) \times 2 | \theta |^{1} sgn(\theta)
+
+where :math:`r` is the ratio between the :math:`L_1` and :math:`L_2` penalties. Setting :math:`r=1` is the LASSO penalty
+and :math:`r=0` is the Ridge penalty. As with LASSO, the approximation procedure is used instead of the 'true' LASSO.
+
+To implement elastic-net regression, the estimating equations can be specified as
+
+.. code::
+
+    penalty_vals = [0., 10., 10., 10., 10.]
+    def psi(theta):
+        x, y = data[['C', 'V', 'W', 'X', 'Z']], data['Y1']
+        return ee_elasticnet_regression(theta=theta, X=x, y=y, model='linear',
+                                        ratio=0.5, penalty=penalty_vals)
+
+Here, :math:`\lambda=10` for all coefficients, besides the intercept. The M-estimator is then implemented via
+
+.. code::
+
+    estr = MEstimator(stacked_equations=psi, init=[0., 0., 0., 0., 0.])
+    estr.estimate(solver='lm', maxiter=20000)  # NOTE increase in maxiter
+
+    print(estr.theta)
+    print(estr.variance)
+
+Notice the increase in the maximum number of iterations for the root-finder (and the use of :code:`'lm'`). These two
+choices will help the root-finder converge since the LASSO penalty can be difficult to solve for root-finding
+algorithms. Judicious selection of starting values can also help (e.g., starting values from an unpenalized linear
+model).
+
+Different penalty terms can be assigned to each coefficient. Furthermore, the ``center`` argument can be used to
+penalize towards non-zero values for all or some of the coefficients.
+
+Bridge Penalty
+----------------------------
+The bridge penalty is a generalization of the :math:`L_p` penalty, with the Ridge (:math:`p=2`) and LASSO (:math:`p=1`)
+as special cases. In the estimating equations, the bridge penalty is
+
+.. math::
+
+    \gamma \frac{\lambda}{n} | \beta |^{\gamma - 1} \text{sign}(\beta)
+
+where :math:`\gamma>0`. However, only :math:`\gamma \ge 1` is supported in ``delicatessen`` (due to the difficulty of
+root-finding for :math:`\gamma<1`).
+
+To implement bridge regression, the estimating equations can be specified as
+
+.. code::
+
+    penalty_vals = [0., 10., 10., 10., 10.]
+    def psi(theta):
+        x, y = data[['C', 'V', 'W', 'X', 'Z']], data['Y']
+        return ee_bridge_regression(theta=theta, X=x, y=y, model='linear',
+                                    gamma=2.3, penalty=penalty_vals)
+
+where :math:`\gamma` is the :math:`p` value in :math:`L_p`. Setting :math:`\gamma=1` is the LASSO penalty
+and :math:`\gamma=2` is the Ridge penalty. Here, we use a value larger than 2 for demonstration.
+
+.. code::
+
+    estr = MEstimator(stacked_equations=psi, init=[0., 0., 0., 0., 0.])
+    estr.estimate(solver='lm')
+
+    print(estr.theta)
+    print(estr.variance)
+
+For the bridge penalty, when :code:`\gamma >= 2`, a larger number of iterations may not be necessary (unlike the LASSO
+and elastic-net penalties). However, :code:`2 > \gamma > 1` may require increasing the max iterations.
+
+Different penalty terms can be assigned to each coefficient. Furthermore, the ``center`` argument can be used to
+penalize towards non-zero values for all or some of the coefficients.
 
 Survival
 =============================
@@ -762,11 +1001,11 @@ Causal Inference
 This next section describes a the available estimators for the causal mean. These estimators all rely on specific
 identification conditions to be able to interpret the estimate of the mean (or mean difference) as an estimate of the
 causal mean. For information on these assumptions, I recommend this
-`paper<https://www.ncbi.nlm.nih.gov/labs/pmc/articles/PMC2652882/>`_ as a general introduction.
+`this paper <https://www.ncbi.nlm.nih.gov/labs/pmc/articles/PMC2652882/>`_ as a general introduction.
 
 This section procedures that the identification conditions have been previously deliberated, and the causal mean is
-identified and is estimable (see this `paper<https://arxiv.org/abs/2108.11342>`_ or this
-`paper<https://arxiv.org/abs/1904.02826>`_ for more information on this concept).
+identified and is estimable (see `arXiv2108.11342 <https://arxiv.org/abs/2108.11342>`_ or
+`arXiv1904.02826 <https://arxiv.org/abs/1904.02826>`_ for more information on this concept).
 
 With that aside, let's proceed through the available estimators of the causal means. In the following examples, we will
 use the generic data example here, where :math:`Y(a)` is independent of :math:`A` conditional on :math:`W`. Below is
@@ -1131,7 +1370,7 @@ cumbersome).
 
 Additional Examples
 -------------------------------
-Additional examples are provided `here<https://github.com/pzivich/Delicatessen/tree/main/tutorials>`_.
+Additional examples are provided `here <https://github.com/pzivich/Delicatessen/tree/main/tutorials>`_.
 
 References and Further Readings
 ===============================

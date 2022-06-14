@@ -3,8 +3,9 @@ import numpy as np
 import pandas as pd
 from sklearn.linear_model import LinearRegression, HuberRegressor
 from delicatessen import MEstimator
-from delicatessen.estimating_equations import ee_mean, ee_mean_variance, ee_percentile, ee_positive_mean_deviation, \
-    ee_linear_regression, ee_robust_linear_regression
+from delicatessen.estimating_equations import (ee_mean, ee_mean_variance,
+                                               ee_percentile, ee_positive_mean_deviation,
+                                               ee_regression, ee_robust_linear_regression)
 
 epsilon = 1.0E-6
 np.random.seed(236461)
@@ -84,8 +85,8 @@ class TestMEstimationExamples:
             # Return values
             return mean, vari, sqrt_var, log_var
 
-        mestimate = MEstimator(psi_delta, init=[0, 0, 1, 1])
-        mestimate.estimate()
+        mestimate = MEstimator(psi_delta, init=[16, 1, 1, 1])
+        mestimate.estimate(solver='lm')
 
         assert mestimate.theta[0] - data['Y'].mean() < epsilon
         assert mestimate.theta[1] - data['Y'].var() < epsilon
@@ -213,7 +214,9 @@ class TestMEstimationExamples:
 
         # Test built-in equations
         mest = MEstimator(lambda theta: ee_positive_mean_deviation(theta, y), init=[0., 0., ])
-        mest.estimate()
+        mest.estimate(solver='hybr',
+                      tolerance=1e-3,
+                      dx=1, order=9)
 
         assert estr.theta[0] - mest.theta[0] < 0.1
         assert estr.theta[1] - mest.theta[1] < 0.1
@@ -244,7 +247,7 @@ class TestMEstimationExamples:
         assert estr.theta[2] - coef[2] < epsilon
 
         # Test built-in equations
-        mest = MEstimator(lambda theta: ee_linear_regression(theta=theta, X=data[['C', 'X', 'Z']], y=data['Y']),
+        mest = MEstimator(lambda theta: ee_regression(theta=theta, X=data[['C', 'X', 'Z']], y=data['Y'], model='linear'),
                           init=[0., 0., 0., ])
         mest.estimate()
 
@@ -277,7 +280,7 @@ class TestMEstimationExamples:
         estr = MEstimator(psi_robust_regression, init=[0., 0., 0., ])
         estr.estimate(solver='hybr')
 
-        model = HuberRegressor(epsilon=k).fit(x, y)
+        model = HuberRegressor(epsilon=k).fit(x, np.asarray(data['Y']))
         coef = model.coef_
 
         assert estr.theta[0] - coef[0] < 0.3
@@ -311,13 +314,14 @@ class TestMEstimationExamples:
 
         # Initializing MEstimator should work, but actually estimating should throw error.
         # Guarantees that lambda function given must have variable "theta" not anything else.
-        mest = MEstimator(lambda t: ee_linear_regression(theta=t, X=data[['C', 'X', 'Z']], y=data['Y']),
+        mest = MEstimator(lambda t: ee_regression(theta=t, X=data[['C', 'X', 'Z']], y=data['Y'], model='linear'),
                           init=[0., 0., 0., ])
         with pytest.raises(TypeError) as e_info:
             mest.estimate()
 
         # Initialize with valid lambda function
-        mest = MEstimator(lambda theta: ee_linear_regression(theta=theta, X=data[['C', 'X', 'Z']], y=data['Y']),
+        mest = MEstimator(lambda theta: ee_regression(theta=theta, X=data[['C', 'X', 'Z']],
+                                                      y=data['Y'], model='linear'),
                           init=[0., 0., 0., ])
         try:
             mest.estimate()

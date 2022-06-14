@@ -62,6 +62,11 @@ While pandas is not necessary to use ``delicatessen``, several examples are demo
 management. To replicate the tests in ``tests/`` you will need to install ``statsmodels`` and ``pytest`` (but this is
 not necessary for general use of the package either).
 
+Citation:
+-------------
+Please use the following citation for ``delicatessen``:
+Zivich PN, Klose M, Cole SR, Edwards JK, & Shook-Sa BE. (2022). Delicatessen: M-Estimation in Python.
+*arXiv preprint arXiv:2203.11300*.
 
 Contents:
 -------------------------------------
