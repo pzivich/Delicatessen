@@ -5,7 +5,7 @@ from sklearn.linear_model import LinearRegression, HuberRegressor
 from delicatessen import MEstimator
 from delicatessen.estimating_equations import (ee_mean, ee_mean_variance,
                                                ee_percentile, ee_positive_mean_deviation,
-                                               ee_regression, ee_robust_linear_regression)
+                                               ee_regression, ee_robust_regression)
 
 epsilon = 1.0E-6
 np.random.seed(236461)
@@ -288,7 +288,8 @@ class TestMEstimationExamples:
         assert estr.theta[2] - coef[2] < 1e-2
 
         # Test built-in equations
-        mest = MEstimator(lambda theta: ee_robust_linear_regression(theta, X=data[['C', 'X', 'Z']], y=data['Y'], k=2),
+        mest = MEstimator(lambda theta: ee_robust_regression(theta, X=data[['C', 'X', 'Z']], y=data['Y'],
+                                                             k=2, model='linear'),
                           init=[0., 0., 0., ])
         mest.estimate(solver='hybr')
 
