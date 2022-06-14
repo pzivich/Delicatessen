@@ -71,7 +71,7 @@ def ee_regression(theta, X, y, model, weights=None):
     >>> data['Z'] = np.random.normal(size=n)
     >>> data['Y1'] = 0.5 + 2*data['X'] - 1*data['Z'] + np.random.normal(loc=0, size=n)
     >>> data['Y2'] = np.random.binomial(n=1, p=logistic.cdf(0.5 + 2*data['X'] - 1*data['Z']), size=n)
-    >>> data['Y3'] = np.random.poisson(lam=10.5 + 2*data['X'] - 1*data['Z'], size=n)
+    >>> data['Y3'] = np.random.poisson(np.exp(lam=0.5 + 2*data['X'] - 1*data['Z']), size=n)
     >>> data['C'] = 1
 
     Note that ``C`` here is set to all 1's. This will be the intercept in the regression.
@@ -80,7 +80,7 @@ def ee_regression(theta, X, y, model, weights=None):
     equations
 
     >>> def psi(theta):
-    >>>         return ee_regression(theta=theta, X=data[['C', 'X', 'Z']], y=data['Y1'], model='linear')
+    >>>     return ee_regression(theta=theta, X=data[['C', 'X', 'Z']], y=data['Y1'], model='linear')
 
     Calling the M-estimation procedure (note that ``init`` requires 3 values, since ``X.shape[1] = 3``).
 
@@ -569,8 +569,8 @@ def ee_ridge_regression(theta, y, X, model, penalty, weights=None, center=0.):
 
     >>> penalty_vals = [0., 10., 10., 10., 10.]
     >>> def psi(theta):
-    >>>         x, y = data[['C', 'V', 'W', 'X', 'Z']], data['Y1']
-    >>>         return ee_ridge_regression(theta=theta, X=x, y=y, model='linear', penalty=penalty_vals)
+    >>>     x, y = data[['C', 'V', 'W', 'X', 'Z']], data['Y1']
+    >>>     return ee_ridge_regression(theta=theta, X=x, y=y, model='linear', penalty=penalty_vals)
 
     Calling the M-estimation procedure (note that ``init`` has 5 values now, since ``X.shape[1] = 5``).
 
@@ -587,8 +587,8 @@ def ee_ridge_regression(theta, y, X, model, penalty, weights=None, center=0.):
 
     >>> penalty_vals = [0., 10., 10., 10., 10.]
     >>> def psi(theta):
-    >>>         x, y = data[['C', 'V', 'W', 'X', 'Z']], data['Y2']
-    >>>         return ee_ridge_regression(theta=theta, X=x, y=y, model='logistic', penalty=penalty_vals)
+    >>>     x, y = data[['C', 'V', 'W', 'X', 'Z']], data['Y2']
+    >>>     return ee_ridge_regression(theta=theta, X=x, y=y, model='logistic', penalty=penalty_vals)
 
     >>> estr = MEstimator(stacked_equations=psi, init=[0., 0., 0., 0., 0.])
     >>> estr.estimate(solver='lm')
@@ -597,8 +597,8 @@ def ee_ridge_regression(theta, y, X, model, penalty, weights=None, center=0.):
 
     >>> penalty_vals = [0., 10., 10., 10., 10.]
     >>> def psi(theta):
-    >>>         x, y = data[['C', 'V', 'W', 'X', 'Z']], data['Y3']
-    >>>         return ee_ridge_regression(theta=theta, X=x, y=y, model='poisson', penalty=penalty_vals)
+    >>>     x, y = data[['C', 'V', 'W', 'X', 'Z']], data['Y3']
+    >>>     return ee_ridge_regression(theta=theta, X=x, y=y, model='poisson', penalty=penalty_vals)
 
     >>> estr = MEstimator(stacked_equations=psi, init=[0., 0., 0., 0., 0.])
     >>> estr.estimate(solver='lm')
@@ -734,8 +734,8 @@ def ee_lasso_regression(theta, y, X, model, penalty, epsilon=3.e-3, weights=None
 
     >>> penalty_vals = [0., 10., 10., 10., 10.]
     >>> def psi(theta):
-    >>>         x, y = data[['C', 'V', 'W', 'X', 'Z']], data['Y1']
-    >>>         return ee_lasso_regression(theta=theta, X=x, y=y, model='linear', penalty=penalty_vals)
+    >>>     x, y = data[['C', 'V', 'W', 'X', 'Z']], data['Y1']
+    >>>     return ee_lasso_regression(theta=theta, X=x, y=y, model='linear', penalty=penalty_vals)
 
     Calling the M-estimation procedure (note that ``init`` has 5 values now, since ``X.shape[1] = 5``). Additionally,
     we set the maximum number of iterations to be much larger.
@@ -753,8 +753,8 @@ def ee_lasso_regression(theta, y, X, model, penalty, epsilon=3.e-3, weights=None
 
     >>> penalty_vals = [0., 10., 10., 10., 10.]
     >>> def psi(theta):
-    >>>         x, y = data[['C', 'V', 'W', 'X', 'Z']], data['Y2']
-    >>>         return ee_lasso_regression(theta=theta, X=x, y=y, model='logistic', penalty=penalty_vals)
+    >>>     x, y = data[['C', 'V', 'W', 'X', 'Z']], data['Y2']
+    >>>     return ee_lasso_regression(theta=theta, X=x, y=y, model='logistic', penalty=penalty_vals)
 
     >>> estr = MEstimator(stacked_equations=psi, init=[0.01, 0.01, 0.01, 0.01, 0.01])
     >>> estr.estimate(solver='lm', maxiter=20000)
@@ -763,8 +763,8 @@ def ee_lasso_regression(theta, y, X, model, penalty, epsilon=3.e-3, weights=None
 
     >>> penalty_vals = [0., 10., 10., 10., 10.]
     >>> def psi(theta):
-    >>>         x, y = data[['C', 'V', 'W', 'X', 'Z']], data['Y3']
-    >>>         return ee_lasso_regression(theta=theta, X=x, y=y, model='poisson', penalty=penalty_vals)
+    >>>     x, y = data[['C', 'V', 'W', 'X', 'Z']], data['Y3']
+    >>>     return ee_lasso_regression(theta=theta, X=x, y=y, model='poisson', penalty=penalty_vals)
 
     >>> estr = MEstimator(stacked_equations=psi, init=[0.01, 0.01, 0.01, 0.01, 0.01])
     >>> estr.estimate(solver='lm', maxiter=20000)
@@ -905,8 +905,8 @@ def ee_elasticnet_regression(theta, y, X, model, penalty, ratio, epsilon=3.e-3, 
 
     >>> penalty_vals = [0., 10., 10., 10., 10.]
     >>> def psi(theta):
-    >>>         x, y = data[['C', 'V', 'W', 'X', 'Z']], data['Y1']
-    >>>         return ee_elasticnet_regression(theta=theta, X=x, y=y, model='linear', ratio=0.5, penalty=penalty_vals)
+    >>>     x, y = data[['C', 'V', 'W', 'X', 'Z']], data['Y1']
+    >>>     return ee_elasticnet_regression(theta=theta, X=x, y=y, model='linear', ratio=0.5, penalty=penalty_vals)
 
     Calling the M-estimation procedure (note that ``init`` has 5 values now, since ``X.shape[1] = 5``).
 
@@ -923,8 +923,8 @@ def ee_elasticnet_regression(theta, y, X, model, penalty, ratio, epsilon=3.e-3, 
 
     >>> penalty_vals = [0., 10., 10., 10., 10.]
     >>> def psi(theta):
-    >>>         x, y = data[['C', 'V', 'W', 'X', 'Z']], data['Y2']
-    >>>         return ee_elasticnet_regression(theta=theta, X=x, y=y, model='logistic', ratio=0.5, penalty=penalty_vals)
+    >>>     x, y = data[['C', 'V', 'W', 'X', 'Z']], data['Y2']
+    >>>     return ee_elasticnet_regression(theta=theta, X=x, y=y, model='logistic', ratio=0.5, penalty=penalty_vals)
 
     >>> estr = MEstimator(stacked_equations=psi, init=[0.01, 0.01, 0.01, 0.01, 0.01])
     >>> estr.estimate(solver='lm', maxiter=20000)
@@ -933,8 +933,8 @@ def ee_elasticnet_regression(theta, y, X, model, penalty, ratio, epsilon=3.e-3, 
 
     >>> penalty_vals = [0., 10., 10., 10., 10.]
     >>> def psi(theta):
-    >>>         x, y = data[['C', 'V', 'W', 'X', 'Z']], data['Y3']
-    >>>         return ee_elasticnet_regression(theta=theta, X=x, y=y, model='poisson', ratio=0.5, penalty=penalty_vals)
+    >>>     x, y = data[['C', 'V', 'W', 'X', 'Z']], data['Y3']
+    >>>     return ee_elasticnet_regression(theta=theta, X=x, y=y, model='poisson', ratio=0.5, penalty=penalty_vals)
 
     >>> estr = MEstimator(stacked_equations=psi, init=[0.01, 0.01, 0.01, 0.01, 0.01])
     >>> estr.estimate(solver='lm', maxiter=20000)
@@ -1071,8 +1071,8 @@ def ee_bridge_regression(theta, y, X, model, penalty, gamma, weights=None, cente
 
     >>> penalty_vals = [0., 10., 10., 10., 10.]
     >>> def psi(theta):
-    >>>         x, y = data[['C', 'V', 'W', 'X', 'Z']], data['Y']
-    >>>         return ee_bridge_regression(theta=theta, X=x, y=y, model='linear', gamma=2.3, penalty=penalty_vals)
+    >>>     x, y = data[['C', 'V', 'W', 'X', 'Z']], data['Y']
+    >>>     return ee_bridge_regression(theta=theta, X=x, y=y, model='linear', gamma=2.3, penalty=penalty_vals)
 
     Calling the M-estimation procedure (note that ``init`` has 5 values now, since ``X.shape[1] = 5``).
 
@@ -1089,8 +1089,8 @@ def ee_bridge_regression(theta, y, X, model, penalty, gamma, weights=None, cente
 
     >>> penalty_vals = [0., 10., 10., 10., 10.]
     >>> def psi(theta):
-    >>>         x, y = data[['C', 'V', 'W', 'X', 'Z']], data['Y2']
-    >>>         return ee_bridge_regression(theta=theta, X=x, y=y, model='logistic', gamma=2.3, penalty=penalty_vals)
+    >>>     x, y = data[['C', 'V', 'W', 'X', 'Z']], data['Y2']
+    >>>     return ee_bridge_regression(theta=theta, X=x, y=y, model='logistic', gamma=2.3, penalty=penalty_vals)
 
     >>> estr = MEstimator(stacked_equations=psi, init=[0.01, 0.01, 0.01, 0.01, 0.01])
     >>> estr.estimate(solver='lm', maxiter=5000)
@@ -1099,8 +1099,8 @@ def ee_bridge_regression(theta, y, X, model, penalty, gamma, weights=None, cente
 
     >>> penalty_vals = [0., 10., 10., 10., 10.]
     >>> def psi(theta):
-    >>>         x, y = data[['C', 'V', 'W', 'X', 'Z']], data['Y3']
-    >>>         return ee_bridge_regression(theta=theta, X=x, y=y, model='poisson', gamma=2.3, penalty=penalty_vals)
+    >>>     x, y = data[['C', 'V', 'W', 'X', 'Z']], data['Y3']
+    >>>     return ee_bridge_regression(theta=theta, X=x, y=y, model='poisson', gamma=2.3, penalty=penalty_vals)
 
     >>> estr = MEstimator(stacked_equations=psi, init=[0.01, 0.01, 0.01, 0.01, 0.01])
     >>> estr.estimate(solver='lm', maxiter=5000)
