@@ -486,10 +486,9 @@ def ee_robust_linear_regression(theta, X, y, k, weights=None):
 
 #################################################################
 # Penalized Regression Estimating Equations
-# TODO SCAD
 
 
-def ee_ridge_regression(theta, y, X, model, penalty, weights=None):
+def ee_ridge_regression(theta, y, X, model, penalty, weights=None, center=0.):
     r"""Default stacked estimating equation for ridge linear regression. Ridge regression applies an L2-regularization
     through a squared magnitude penalty. The estimating equation is
 
@@ -527,6 +526,11 @@ def ee_ridge_regression(theta, y, X, model, penalty, weights=None):
     weights : ndarray, list, vector, None, optional
         1-dimensional vector of n weights. No missing weights should be included. Default is None, which assigns a
         weight of 1 to all observations.
+    center : int, float, ndarray, list, vector, optional
+        Center or reference value to penalized estimated coefficients towards. Default is zero, which penalized
+        coefficients towards the null. Other center values can be specified for all coefficients (by providing an
+        integer or float) or covariate-specific centering values (by providing a vector of values of the same length as
+        X).
 
     Returns
     -------
@@ -610,7 +614,7 @@ def ee_ridge_regression(theta, y, X, model, penalty, weights=None):
     Fu WJ. (2003). Penalized estimating equations. Biometrics, 59(1), 126-132.
     """
     # Preparation of input shapes and object types
-    X, y, beta, penalty = _prep_inputs_(X=X, y=y, theta=theta, penalty=penalty)
+    X, y, beta, penalty, center = _prep_inputs_(X=X, y=y, theta=theta, penalty=penalty, center=center)
 
     # Determining transformation function to use for the regression model
     transform = _model_transform_(model=model)      # Looking up corresponding transformation
@@ -620,13 +624,13 @@ def ee_ridge_regression(theta, y, X, model, penalty, weights=None):
     w = _generate_weights_(weights=weights, n_obs=X.shape[0])
 
     # Creating penalty term for ridge regression (bridge with gamma=2 is the special case of ridge)
-    penalty_terms = _bridge_penalty_(theta=theta, n_obs=X.shape[0], penalty=penalty, gamma=2)
+    penalty_terms = _bridge_penalty_(theta=theta, n_obs=X.shape[0], penalty=penalty, gamma=2, center=center)
 
     # Output b-by-n matrix
     return w*(((y - pred_y) * X).T - penalty_terms[:, None])    # Score function with penalty term subtracted off
 
 
-def ee_lasso_regression(theta, y, X, model, penalty, epsilon=3.e-3, weights=None):
+def ee_lasso_regression(theta, y, X, model, penalty, epsilon=3.e-3, weights=None, center=0.):
     r"""Default stacked estimating equation for an approximate LASSO (least absolute shrinkage and selection operator)
     regressor. LASSO regression applies an L1-regularization through a magnitude penalty. The estimating equation for
     the approximate LASSO is
@@ -687,6 +691,11 @@ def ee_lasso_regression(theta, y, X, model, penalty, epsilon=3.e-3, weights=None
     weights : ndarray, list, vector, None, optional
         1-dimensional vector of n weights. No missing weights should be included. Default is None, which assigns a
         weight of 1 to all observations.
+    center : int, float, ndarray, list, vector, optional
+        Center or reference value to penalized estimated coefficients towards. Default is zero, which penalized
+        coefficients towards the null. Other center values can be specified for all coefficients (by providing an
+        integer or float) or covariate-specific centering values (by providing a vector of values of the same length as
+        X).
 
     Returns
     -------
@@ -771,7 +780,7 @@ def ee_lasso_regression(theta, y, X, model, penalty, epsilon=3.e-3, weights=None
     Fu WJ. (2003). Penalized estimating equations. Biometrics, 59(1), 126-132.
     """
     # Preparation of input shapes and object types
-    X, y, beta, penalty = _prep_inputs_(X=X, y=y, theta=theta, penalty=penalty)
+    X, y, beta, penalty, center = _prep_inputs_(X=X, y=y, theta=theta, penalty=penalty, center=center)
 
     # Determining transformation function to use for the regression model
     transform = _model_transform_(model=model)      # Looking up corresponding transformation
@@ -783,13 +792,13 @@ def ee_lasso_regression(theta, y, X, model, penalty, epsilon=3.e-3, weights=None
     # Creating penalty term for ridge regression (bridge with gamma=2 is the special case of ridge)
     if epsilon < 0:
         raise ValueError("epsilon must be greater than zero for the approximate LASSO")
-    penalty_terms = _bridge_penalty_(theta=theta, n_obs=X.shape[0], penalty=penalty, gamma=1+epsilon)
+    penalty_terms = _bridge_penalty_(theta=theta, n_obs=X.shape[0], penalty=penalty, gamma=1+epsilon, center=center)
 
     # Output b-by-n matrix
     return w*(((y - pred_y) * X).T - penalty_terms[:, None])    # Score function with penalty term subtracted off
 
 
-def ee_elasticnet_regression(theta, y, X, model, penalty, ratio, epsilon=3.e-3, weights=None):
+def ee_elasticnet_regression(theta, y, X, model, penalty, ratio, epsilon=3.e-3, weights=None, center=0.):
     r"""Default stacked estimating equation for Elastic-net regression. Elastic-net applies both L1- and
     L2-regularization at a pre-specified ratio. Notice that the L1 penalty is based on an approximation. See
     ``ee_lasso_regression`` for further details on the approximation for the L1 penalty. The estimating equation for
@@ -853,6 +862,11 @@ def ee_elasticnet_regression(theta, y, X, model, penalty, ratio, epsilon=3.e-3, 
     weights : ndarray, list, vector, None, optional
         1-dimensional vector of n weights. No missing weights should be included. Default is None, which assigns a
         weight of 1 to all observations.
+    center : int, float, ndarray, list, vector, optional
+        Center or reference value to penalized estimated coefficients towards. Default is zero, which penalized
+        coefficients towards the null. Other center values can be specified for all coefficients (by providing an
+        integer or float) or covariate-specific centering values (by providing a vector of values of the same length as
+        X).
 
     Returns
     -------
@@ -936,7 +950,7 @@ def ee_elasticnet_regression(theta, y, X, model, penalty, ratio, epsilon=3.e-3, 
     Fu WJ. (2003). Penalized estimating equations. Biometrics, 59(1), 126-132.
     """
     # Preparation of input shapes and object types
-    X, y, beta, penalty = _prep_inputs_(X=X, y=y, theta=theta, penalty=penalty)
+    X, y, beta, penalty, center = _prep_inputs_(X=X, y=y, theta=theta, penalty=penalty, center=center)
 
     # Determining transformation function to use for the regression model
     transform = _model_transform_(model=model)  # Looking up corresponding transformation
@@ -951,15 +965,15 @@ def ee_elasticnet_regression(theta, y, X, model, penalty, ratio, epsilon=3.e-3, 
     if not 0 <= ratio <= 1:
         raise ValueError("The elastic-net penalty is only defined for 0 <= ratio <= 1. The input L1:L2 ratio was "
                          + str(ratio))
-    penalty_l1 = _bridge_penalty_(theta=theta, n_obs=X.shape[0], penalty=penalty, gamma=1 + epsilon)
-    penalty_l2 = _bridge_penalty_(theta=theta, n_obs=X.shape[0], penalty=penalty, gamma=2)
+    penalty_l1 = _bridge_penalty_(theta=theta, n_obs=X.shape[0], penalty=penalty, gamma=1+epsilon, center=center)
+    penalty_l2 = _bridge_penalty_(theta=theta, n_obs=X.shape[0], penalty=penalty, gamma=2, center=center)
     penalty_terms = ratio*penalty_l1 + (1-ratio)*penalty_l2
 
     # Output b-by-n matrix
     return w * (((y - pred_y) * X).T - penalty_terms[:, None])  # Score function with penalty term subtracted off
 
 
-def ee_bridge_regression(theta, y, X, model, penalty, gamma, weights=None):
+def ee_bridge_regression(theta, y, X, model, penalty, gamma, weights=None, center=0.):
     r"""Default stacked estimating equation for bridge penalized regression. The bridge penalty is a generalization
     of penalized regression, that includes L1 and L2-regularization as special cases. The estimating equation for
     bridge penalized regression is
@@ -1014,6 +1028,11 @@ def ee_bridge_regression(theta, y, X, model, penalty, gamma, weights=None):
     weights : ndarray, list, vector, None, optional
         1-dimensional vector of n weights. No missing weights should be included. Default is None, which assigns a
         weight of 1 to all observations.
+    center : int, float, ndarray, list, vector, optional
+        Center or reference value to penalized estimated coefficients towards. Default is zero, which penalized
+        coefficients towards the null. Other center values can be specified for all coefficients (by providing an
+        integer or float) or covariate-specific centering values (by providing a vector of values of the same length as
+        X).
 
     Returns
     -------
@@ -1097,7 +1116,7 @@ def ee_bridge_regression(theta, y, X, model, penalty, gamma, weights=None):
     Fu WJ. (2003). Penalized estimating equations. Biometrics, 59(1), 126-132.
     """
     # Preparation of input shapes and object types
-    X, y, beta, penalty = _prep_inputs_(X=X, y=y, theta=theta, penalty=penalty)
+    X, y, beta, penalty, center = _prep_inputs_(X=X, y=y, theta=theta, penalty=penalty, center=center)
 
     # Determining transformation function to use for the regression model
     transform = _model_transform_(model=model)  # Looking up corresponding transformation
@@ -1107,7 +1126,7 @@ def ee_bridge_regression(theta, y, X, model, penalty, gamma, weights=None):
     w = _generate_weights_(weights=weights, n_obs=X.shape[0])
 
     # Creating penalty term for ridge regression (bridge with gamma=2 is the special case of ridge)
-    penalty_terms = _bridge_penalty_(theta=theta, n_obs=X.shape[0], penalty=penalty, gamma=gamma)
+    penalty_terms = _bridge_penalty_(theta=theta, n_obs=X.shape[0], penalty=penalty, gamma=gamma, center=center)
 
     # Output b-by-n matrix
     return w * (((y - pred_y) * X).T - penalty_terms[:, None])  # Score function with penalty term subtracted off
@@ -1116,7 +1135,7 @@ def ee_bridge_regression(theta, y, X, model, penalty, gamma, weights=None):
 #################################################################
 # Utility functions for regression equations
 
-def _prep_inputs_(X, y, theta, penalty=None):
+def _prep_inputs_(X, y, theta, penalty=None, center=None):
     """Internal use function to simplify variable transformations for regression. This function is used on the inputs
     to ensure they are the proper shapes
 
@@ -1139,7 +1158,8 @@ def _prep_inputs_(X, y, theta, penalty=None):
         return X, y, beta
     else:                                   # Convert penalty term then return all
         penalty = np.asarray(penalty)       # Convert to NumPy array
-        return X, y, beta, penalty
+        center = np.asarray(center)         # Convert to NumPy array
+        return X, y, beta, penalty, center
 
 
 def _model_transform_(model, assert_linear_model=False):
@@ -1200,7 +1220,7 @@ def _generate_weights_(weights, n_obs):
     return w
 
 
-def _bridge_penalty_(theta, gamma, penalty, n_obs):
+def _bridge_penalty_(theta, gamma, penalty, n_obs, center):
     r"""Internal use function to calculate the corresponding penalty term. The penalty term formula is based on the
     bridge penalty, where LASSO is :math:`\gamma = 1` and ridge is :math:`\gamma = 2`. The penalty term is defined for
     :math:`\gamma > 0` but :math:`\gamma < 1` requires special optimization.
@@ -1240,16 +1260,18 @@ def _bridge_penalty_(theta, gamma, penalty, n_obs):
     if penalty.size != 1:
         if penalty.shape[0] != len(theta):
             raise ValueError("The penalty term must be either a single number or the same length as theta.")
+    if center.size != 1:
+        if center.shape[0] != len(theta):
+            raise ValueError("The center term must be either a single number or the same length as theta.")
 
     # Checking a valid hyperparameter is being provided
     # if gamma <= 0:
-    #     raise ValueError("L_{gamma} is only available for `gamma` > 0")
+    #     raise ValueError("L_{gamma} is not defined for `gamma` > 0")
     if gamma < 1:
-        # warnings.warn("L_{gamma} for `gamma` < 1 is difficult to solve. Therefore, penalization behavior should not "
-        #               "be trusted.", UserWarning)
-        raise ValueError("L_{gamma} for `gamma` < 1 is not currently able to be supported with estimating equations.")
+        raise ValueError("L_{gamma} for `gamma` < 1 is not currently able to be supported with estimating equations "
+                         "evaluated using numerical methods.")
 
     # Calculating the penalties
     penalty_scaled = penalty / (gamma * n_obs)
-    penalty_terms = penalty_scaled * gamma * (np.abs(theta)**(gamma-1)) * np.sign(theta)
+    penalty_terms = penalty_scaled * gamma * (np.abs(theta - center)**(gamma-1)) * np.sign(theta - center)
     return penalty_terms
