@@ -16,7 +16,7 @@ Sample Mean (7.2.2)
 
 First, we demonstrate a simple estimating equation for the mean and variance. The estimating equations are
 
-.. image:: images/ee_example_mean.png
+.. image:: images/ee_example_mean.PNG
 
 To demonstrate the example, we will use some generic data for :\math:`Y`. Below is an example data set that will be
 used up to Section 7.2.6:
@@ -74,7 +74,7 @@ Ratio (7.2.3)
 Now consider if we wanted to estimate the ratio between two means. For estimation of a ratio, we can consider the
 following estimating equation
 
-.. image:: images/ee_example_ratio1.png
+.. image:: images/ee_example_ratio1.PNG
 
 We can translate the estimating equation from math into python as
 
