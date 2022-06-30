@@ -1040,15 +1040,7 @@ In ``delicatessen``, the built-in IPW estimator consists of 4 estimating equatio
 outcomes supported by ``ee_ipw`` (since we are using the Horwitz-Thompson estimator). The stacked estimating equations
 are
 
-.. math::
-
-    \sum_i^n \psi_d(Y_i, A_i, \pi_i, \theta_0) = \sum_i^n (\theta_1 - \theta_2) - \theta_0 = 0
-
-    \sum_i^n \psi_1(Y_i, A_i, \pi_i, \theta_1) = \sum_i^n \frac{A_i \times Y_i}{\pi_i} - \theta_1 = 0
-
-    \sum_i^n \psi_0(Y_i, A_i, \pi_i, \theta_2) = \sum_i^n \frac{(1-A_i) \times Y_i}{1-\pi_i} - \theta_2 = 0
-
-    \sum_i^n \psi_g(A_i, W_i, \theta) = \sum_i^n (A_i - expit(W_i^T \alpha)) W_i = 0
+.. image:: images/ee_builtin_ipw.png
 
 where :math:`\theta_1` is the average causal effect, :math:`\theta_2` is the mean under the plan where
 :math:`A=1` for everyone, :math:`\theta_3` is the mean under the plan where :math:`A=0` for everyone, and
@@ -1124,12 +1116,7 @@ where :math:`m_a(W_i; \hat{\beta}) = E[Y_i|A_i=a,W_i; \hat{\beta}]`. In ``delica
 consists of either 2 estimating equations or 4 estimating equations, with both binary and continuous outcomes supported.
 The 2 stacked estimating equations are
 
-.. math::
-
-    \sum_i^n \psi_1(Y_i, X_i, \theta_1) = \sum_i^n g(\hat{Y}_i^a) - \theta_1 = 0
-
-    \sum_i^n \psi_m(Y_i, X_i, \theta) = \sum_i^n (Y_i - \text{expit}(X_i^T \theta)) X_i = 0
-
+.. image:: images/ee_builtin_gcomp1.png
 
 where :math:`\theta_1` is the mean under the action :math:`a`, and :math:`\beta` is the parameters for the regression
 model used to estimate the outcomes. Notice that the g-computation procedure supports generic deterministic plans
@@ -1139,18 +1126,9 @@ These plans are more general than those allowed by either the built-in IPW or bu
 The 4 stacked estimating equations instead compare the mean difference between two action plans. The estimating
 equations are
 
-.. math::
+.. image:: images/ee_builtin_gcomp2.png
 
-    \sum_i^n \psi_1(Y_i, X_i, \theta_1) = \sum_i^n (\theta_2 - \theta_3) - \theta_1 = 0
-
-    \sum_i^n \psi_1(Y_i, X_i, \theta_2) = \sum_i^n g(\hat{Y}_i^a) - \theta_2 = 0
-
-    \sum_i^n \psi_1(Y_i, X_i, \theta_3) = \sum_i^n g(\hat{Y}_i^a) - \theta_3 = 0
-
-    \sum_i^n \psi_m(Y_i, X_i, \theta) = \sum_i^n (Y_i - \text{expit}(X_i^T \theta)) X_i = 0
-
-
-where :math:`\theta_1` is the average causal effect, :math:`\theta_2` is the mean under the first plan, :math:`\theta_3`
+where :math:`\theta_0` is the average causal effect, :math:`\theta_1` is the mean under the first plan, :math:`\theta_2`
 is the mean under the second, and :math:`\beta` is the parameters for the regression model used to predict the
 outcomes.
 
@@ -1277,21 +1255,9 @@ the built-in AIPW estimator only supports the average causal effect as the param
 
 The stacked estimating equations are
 
-.. math::
+.. image:: images/ee_builtin_aipw.png
 
-    \sum_i^n \psi_0(Y_i, A_i, \pi_i, \theta_0) = \sum_i^n (\theta_1 - \theta_2) - \theta_0 = 0
-
-    \sum_i^n \psi_1(Y_i, A_i, W_i, \pi_i, \theta_1) = \sum_i^n (\frac{A_i \times Y_i}{\pi_i} -
-    \frac{\hat{Y^1}(A_i-\pi_i}{\pi_i}) - \theta_1 = 0
-
-    \sum_i^n \psi_0(Y_i, A_i, \pi_i, \theta_2) = \sum_i^n (\frac{(1-A_i) \times Y_i}{1-\pi_i} +
-    \frac{\hat{Y^0}(A_i-\pi_i}{1-\pi_i})) - \theta_2 = 0
-
-    \sum_i^n \psi_g(A_i, W_i, \alpha) = \sum_i^n (A_i - expit(W_i^T \alpha)) W_i = 0
-
-    \sum_i^n \psi_m(Y_i, X_i, \beta) = \sum_i^n (Y_i - X_i^T \beta) X_i = 0
-
-where :math:`\theta_1` is the average causal effect, :math:`\theta_2` is the mean under the first plan, :math:`\theta_3`
+where :math:`\theta_0` is the average causal effect, :math:`\theta_1` is the mean under the first plan, :math:`\theta_2`
 is the mean under the second, :math:`\alpha` is the parameters for the propensity score logistic model, and
 :math:`\beta` is the parameters for the regression model used to predict the outcomes. For binary outcomes, the final
 estimating equation is replaced with the logistic model analog.

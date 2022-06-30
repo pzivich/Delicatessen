@@ -16,10 +16,7 @@ Sample Mean (7.2.2)
 
 First, we demonstrate a simple estimating equation for the mean and variance. The estimating equations are
 
-.. math::
-
-    \psi_1(Y_i, \theta) &= Y_i - \theta_1 \\
-    \psi_2(Y_i, \theta) &= (Y_i - \theta_1)^2 - \theta_2
+.. image:: images/ee_example_mean.png
 
 To demonstrate the example, we will use some generic data for :\math:`Y`. Below is an example data set that will be
 used up to Section 7.2.6:
@@ -77,10 +74,7 @@ Ratio (7.2.3)
 Now consider if we wanted to estimate the ratio between two means. For estimation of a ratio, we can consider the
 following estimating equation
 
-.. math::
-
-    \psi_1(Y_i, X_i, \theta) = Y_i - \theta_1 X_i
-
+.. image:: images/ee_example_ratio1.png
 
 We can translate the estimating equation from math into python as
 
@@ -107,12 +101,7 @@ There is another set of stacked estimating equations we can consider for the rat
 of the means and then take the ratio of those means (rather than doing everything simultaneously). Below is this
 alternative set of estimating equations
 
-.. math::
-
-    \psi_1(Y_i, X_i, \theta) &= Y_i - \theta_1 \\
-    \psi_2(Y_i, X_i, \theta) &= X_i - \theta_2 \\
-    \psi_3(Y_i, X_i, \theta) &= \theta_1 - \theta_2 \times \theta_3
-
+.. image:: images/ee_example_ratio2.png
 
 Translating this to an estimating equation in Python
 
@@ -148,13 +137,7 @@ equation and automatically estimate the variance for the transformed parameter(s
 we stack the estimating equation for the transformation into our set of estimating equations. Below is the
 mean-variance estimating equations stacked with two transformations of the variance
 
-.. math::
-
-    \psi_1(Y_i, \theta) &= Y_i - \theta_1 \\
-    \psi_2(Y_i, \theta) &= (Y_i - \theta_1)^2 - \theta_2 \\
-    \psi_3(Y_i, \theta) &= \sqrt{\theta_2} - \theta_3 \\
-    \psi_4(Y_i, \theta) &= \log(\theta_2) - \theta_4
-
+.. image:: images/ee_example_delta.png
 
 These equations can be expressed programmatically as
 
@@ -190,10 +173,7 @@ possibly mismeasured variables, and :math:`T` is the instrument for :math:`X`.
 
 The first set of estimating equations consider in Chapter 7 are
 
-.. math::
-
-    \psi_1(Y_i, W_i, T_i, \theta) &= \theta_1 - T_i \\
-    \psi_2(Y_i, W_i, T_i, \theta) &= (Y_i - \theta_2 W_i)(\theta_1 - T_i)
+.. image:: images/ee_example_instru1.png
 
 To demonstrate the example, below is some generic simulated data in the described instrumental variable context
 
@@ -224,12 +204,7 @@ The previous estimating equations can be translated as
 As mentioned in the chapter, certain joint distributions may be of interest. To capture these additional distributions,
 the estimating equations were updated to
 
-.. math::
-
-    \psi_1(Y_i, W_i, T_i, \theta) &= \theta_1 - T_i \\
-    \psi_2(Y_i, W_i, T_i, \theta) &= \theta_2 - W_i \\
-    \psi_3(Y_i, W_i, T_i, \theta) &= (Y_i - \theta_3 W_i)(\theta_2 - W_i) \\
-    \psi_4(Y_i, W_i, T_i, \theta) &= (Y_i - \theta_4 W_i)(\theta_1 - T_i)
+.. image:: images/ee_example_instru2.png
 
 Again, we can easily translate these equations for ``delicatessen``,
 
@@ -263,9 +238,7 @@ To begin, we generate some generic data used for this example and several of the
 
 For the robust mean, the estimating equation proposed by Huber (1964) is
 
-.. math::
-
-    \psi_k(Y_i, \theta) = g_k(Y_i) - \theta_1
+.. image:: images/ee_example_rmean.png
 
 where :math:`k` indicates the bound, such that if :math:`Y_i>k` then :math:`k`, or :math:`Y_i<-k` then :math:`-k`,
 otherwise :math:`Y_i`. Below is the estimating equation translated into code
@@ -296,9 +269,7 @@ Despite the sandwich variance needing the function to be smooth at :math:`\theta
 M-Estimation can also be used with non-smooth function. For example, the estimating equations for the sample quantile
 is
 
-.. math::
-
-    \psi_q(Y_i, \theta) = q - I(Y_i \le \theta)
+.. image:: images/ee_example_quantile.png
 
 It is this section, that we need to talk about different root-finding methods, and numerically approximating
 derivatives. In the previous examples, we had smooth function that were both easy to find the roots of and had smooth
@@ -358,10 +329,7 @@ Positive Mean Deviation (7.4.3)
 For another non-smooth estimating equation(s), we can talk about the positive mean deviation. The estimating equations
 are
 
-.. math::
-
-    \psi_1 = 2(Y_i - \theta_2) I(Y_i > \theta_2) - \theta_1 \\
-    \psi_2 = 0.5 - I(Y_i \le \theta_2)
+.. image:: images/ee_example_pmd.png
 
 where :math:`\theta_1` is the positive mean deviation and :math:`\theta_2` is the median.
 
@@ -394,10 +362,7 @@ Linear Regression (7.5.1)
 
 For linear regression, the estimating equation is
 
-.. math::
-
-    \psi(X_i, Y_i, \beta) = (Y_i - X_i^T \beta) X_i
-
+.. image:: images/ee_example_reg.png
 
 For the following examples, the following generic simulated data is used
 
@@ -468,9 +433,7 @@ The next example is robust regression, where the standard linear regression mode
 Essentially, we use the robust mean formula from before but now apply it to the error terms of the regression model.
 The estimating equations are
 
-.. math::
-
-    \psi(X_i, Y_i \beta) = g_k(Y_i - X_i^T \beta) X_i
+.. image:: images/ee_example_robustreg.png
 
 where :math:`k` indicates the bound, such that if :math:`Y_i>k` then :math:`k`, or :math:`Y_i<-k` then :math:`-k`,
 otherwise :math:`Y_i`.
