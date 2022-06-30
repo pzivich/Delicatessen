@@ -1040,7 +1040,7 @@ In ``delicatessen``, the built-in IPW estimator consists of 4 estimating equatio
 outcomes supported by ``ee_ipw`` (since we are using the Horwitz-Thompson estimator). The stacked estimating equations
 are
 
-.. image:: images/ee_builtin_ipw.png
+.. image:: images/ee_builtin_ipw.PNG
 
 where :math:`\theta_1` is the average causal effect, :math:`\theta_2` is the mean under the plan where
 :math:`A=1` for everyone, :math:`\theta_3` is the mean under the plan where :math:`A=0` for everyone, and
@@ -1116,7 +1116,7 @@ where :math:`m_a(W_i; \hat{\beta}) = E[Y_i|A_i=a,W_i; \hat{\beta}]`. In ``delica
 consists of either 2 estimating equations or 4 estimating equations, with both binary and continuous outcomes supported.
 The 2 stacked estimating equations are
 
-.. image:: images/ee_builtin_gcomp1.png
+.. image:: images/ee_builtin_gcomp1.PNG
 
 where :math:`\theta_1` is the mean under the action :math:`a`, and :math:`\beta` is the parameters for the regression
 model used to estimate the outcomes. Notice that the g-computation procedure supports generic deterministic plans
@@ -1126,7 +1126,7 @@ These plans are more general than those allowed by either the built-in IPW or bu
 The 4 stacked estimating equations instead compare the mean difference between two action plans. The estimating
 equations are
 
-.. image:: images/ee_builtin_gcomp2.png
+.. image:: images/ee_builtin_gcomp2.PNG
 
 where :math:`\theta_0` is the average causal effect, :math:`\theta_1` is the mean under the first plan, :math:`\theta_2`
 is the mean under the second, and :math:`\beta` is the parameters for the regression model used to predict the
@@ -1255,7 +1255,7 @@ the built-in AIPW estimator only supports the average causal effect as the param
 
 The stacked estimating equations are
 
-.. image:: images/ee_builtin_aipw.png
+.. image:: images/ee_builtin_aipw.PNG
 
 where :math:`\theta_0` is the average causal effect, :math:`\theta_1` is the mean under the first plan, :math:`\theta_2`
 is the mean under the second, :math:`\alpha` is the parameters for the propensity score logistic model, and

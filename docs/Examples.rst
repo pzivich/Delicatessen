@@ -101,7 +101,7 @@ There is another set of stacked estimating equations we can consider for the rat
 of the means and then take the ratio of those means (rather than doing everything simultaneously). Below is this
 alternative set of estimating equations
 
-.. image:: images/ee_example_ratio2.png
+.. image:: images/ee_example_ratio2.PNG
 
 Translating this to an estimating equation in Python
 
@@ -137,7 +137,7 @@ equation and automatically estimate the variance for the transformed parameter(s
 we stack the estimating equation for the transformation into our set of estimating equations. Below is the
 mean-variance estimating equations stacked with two transformations of the variance
 
-.. image:: images/ee_example_delta.png
+.. image:: images/ee_example_delta.PNG
 
 These equations can be expressed programmatically as
 
@@ -173,7 +173,7 @@ possibly mismeasured variables, and :math:`T` is the instrument for :math:`X`.
 
 The first set of estimating equations consider in Chapter 7 are
 
-.. image:: images/ee_example_instru1.png
+.. image:: images/ee_example_instru1.PNG
 
 To demonstrate the example, below is some generic simulated data in the described instrumental variable context
 
@@ -204,7 +204,7 @@ The previous estimating equations can be translated as
 As mentioned in the chapter, certain joint distributions may be of interest. To capture these additional distributions,
 the estimating equations were updated to
 
-.. image:: images/ee_example_instru2.png
+.. image:: images/ee_example_instru2.PNG
 
 Again, we can easily translate these equations for ``delicatessen``,
 
@@ -238,7 +238,7 @@ To begin, we generate some generic data used for this example and several of the
 
 For the robust mean, the estimating equation proposed by Huber (1964) is
 
-.. image:: images/ee_example_rmean.png
+.. image:: images/ee_example_rmean.PNG
 
 where :math:`k` indicates the bound, such that if :math:`Y_i>k` then :math:`k`, or :math:`Y_i<-k` then :math:`-k`,
 otherwise :math:`Y_i`. Below is the estimating equation translated into code
@@ -269,7 +269,7 @@ Despite the sandwich variance needing the function to be smooth at :math:`\theta
 M-Estimation can also be used with non-smooth function. For example, the estimating equations for the sample quantile
 is
 
-.. image:: images/ee_example_quantile.png
+.. image:: images/ee_example_quantile.PNG
 
 It is this section, that we need to talk about different root-finding methods, and numerically approximating
 derivatives. In the previous examples, we had smooth function that were both easy to find the roots of and had smooth
@@ -329,7 +329,7 @@ Positive Mean Deviation (7.4.3)
 For another non-smooth estimating equation(s), we can talk about the positive mean deviation. The estimating equations
 are
 
-.. image:: images/ee_example_pmd.png
+.. image:: images/ee_example_pmd.PNG
 
 where :math:`\theta_1` is the positive mean deviation and :math:`\theta_2` is the median.
 
@@ -362,7 +362,7 @@ Linear Regression (7.5.1)
 
 For linear regression, the estimating equation is
 
-.. image:: images/ee_example_reg.png
+.. image:: images/ee_example_reg.PNG
 
 For the following examples, the following generic simulated data is used
 
@@ -433,7 +433,7 @@ The next example is robust regression, where the standard linear regression mode
 Essentially, we use the robust mean formula from before but now apply it to the error terms of the regression model.
 The estimating equations are
 
-.. image:: images/ee_example_robustreg.png
+.. image:: images/ee_example_robustreg.PNG
 
 where :math:`k` indicates the bound, such that if :math:`Y_i>k` then :math:`k`, or :math:`Y_i<-k` then :math:`-k`,
 otherwise :math:`Y_i`.
