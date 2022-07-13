@@ -480,3 +480,47 @@ class TestMEstimation:
 
         # Check variance estimates are all close
         npt.assert_allclose(ns.variance, ys.variance)
+
+    def test_subset_params2(self):
+        # Creating data set
+        n = 1000
+        d = pd.DataFrame()
+        d['W'] = np.random.normal(size=n)
+        d['A'] = np.random.binomial(n=1, p=logistic.cdf(d['W']), size=n)
+        d['Y1'] = 1 + 1 * d['W'] + np.random.normal(size=n)
+        d['Y0'] = 0 + 0 * d['W'] + np.random.normal(size=n)
+        d['Y'] = np.where(d['A'] == 1, d['Y1'], d['Y0'])
+        d['AW'] = d['A'] * d['W']
+        d['C'] = 1
+        d['A1'] = 1
+        d['A1W'] = 1 * d['W']
+
+        # Setting up data from M-estimation
+        x = np.asarray(d[['C', 'A', 'W', 'AW']])
+        x1 = np.asarray(d[['C', 'A1', 'W', 'A1W']])
+        y = np.asarray(d['Y'])
+
+        # IPW mean estimating equation
+        def psi(theta):
+            ee_reg = ee_regression(theta=theta[1:],
+                                   X=x, y=y,
+                                   model='linear')
+            ee_mean = np.dot(x1, theta[1:]) - theta[0]
+            return np.vstack((ee_mean,
+                              ee_reg))
+
+        # Full solve
+        init = [0, ] + [0, ]*x.shape[1]
+        ns = MEstimator(psi, init=init)
+        ns.estimate(solver='lm')
+
+        # Subset solve (using previous regression solutions)
+        init = [0, 0, ] + list(ns.theta[2:4]) + [0, ]
+        ys = MEstimator(psi, init=init, subset=[0, 1, 4])
+        ys.estimate(solver='lm')
+
+        # Check point estimates are all close
+        npt.assert_allclose(ns.theta, ys.theta)
+
+        # Check variance estimates are all close
+        npt.assert_allclose(ns.variance, ys.variance)
