@@ -276,7 +276,7 @@ class MEstimator:
         if self._subset_ is None:                        # If NOT subset,
             self.theta = slv_theta                       # ... then use the full output/solved theta
         else:                                            # If subset,
-            self.theta = copy(self.init)                 # ... copy the initial values
+            self.theta = np.asarray(self.init)           # ... copy the initial values
             for s, n in zip(self._subset_, slv_theta):   # ... then look over the subset and input theta
                 self.theta[s] = n                        # ... and update the subset to the output/solved theta
 
@@ -357,12 +357,13 @@ class MEstimator:
             b-by-1 array, which is the sum over n for each b.
         """
         # Option for the subset argument
-        if self._subset_ is None:                      # If NOT subset
+        if self._subset_ is None:                      # If NOT subset then,
             full_theta = theta                         # ... then use the full input theta
-        else:                                          # If subset
-            full_theta = copy(self.init)               # ... copy the initial values
-            for s, n in zip(self._subset_, theta):     # ... then look over the subset and input theta
-                full_theta[s] = n                      # ... and update the subset to the input theta values
+        else:                                          # If subset then,
+            full_theta = np.asarray(self.init)         # ... copy the initial values to ndarray
+            np.put(full_theta,                         # ... update in place the previous array
+                   ind=self._subset_,                  # ... go to the subset indices
+                   v=theta)                            # ... then input current iteration values
 
         # Calculating the stacked estimating equations output
         stacked_equations = np.asarray(self.stacked_equations(full_theta))  # Returning stacked equation
@@ -370,6 +371,7 @@ class MEstimator:
         if len(stacked_equations.shape) == 1:          # If stacked_equation returns 1 value, only return that 1 value
             vals = np.sum(stacked_equations)           # ... avoids SciPy error by returning value rather than tuple
         else:                                          # Else return a tuple for optimization
+            # NOTE: switching to np.sum(..., axis=1) didn't speed things up versus a for-loop
             vals = ()                                  # ... create empty tuple
             rows = stacked_equations.shape[0]          # ... determine how many rows / parameters are present
             if self._subset_ is None:                  # ... if no subset, then simple loop where
