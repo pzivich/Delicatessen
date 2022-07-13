@@ -496,9 +496,7 @@ def ee_ridge_regression(theta, y, X, model, penalty, weights=None, center=0.):
 
         \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n (Y_i - X_i^T \theta) X_i - \lambda \theta = 0
 
-    Here, theta is a 1-by-b array, where b is the distinct covariates included as part of X. For example, if X is a
-    3-by-n matrix, then theta will be a 1-by-3 array. The code is general to allow for an arbitrary number of X's (as
-    long as there is enough support in the data).
+    where :math:`\lambda` is the penalty term.
 
     Note
     ----
@@ -637,9 +635,10 @@ def ee_lasso_regression(theta, y, X, model, penalty, epsilon=3.e-3, weights=None
 
     .. math::
 
-        \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n (Y_i - X_i^T \theta) X_i - (1 + \epsilon) | \theta |^{\epsilon}
-        sgn(\theta) = 0
+        \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n (Y_i - X_i^T \theta) X_i - \lambda (1 + \epsilon)
+        | \theta |^{\epsilon} sign(\theta) = 0
 
+    where :math:`\lambda` is the penalty term.
     Here, we are using an approximation based on the bridge penalty. For the bridge penalty, LASSO is the special case
     where :math:`\epsilon = 0`. By making :math:`\epsilon > 0`, we can approximate the LASSO. See the rest of the
     documentation for further details.
@@ -806,13 +805,13 @@ def ee_elasticnet_regression(theta, y, X, model, penalty, ratio, epsilon=3.e-3, 
 
     .. math::
 
-        \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n (Y_i - X_i^T \theta) X_i - r (1 + \epsilon) | \theta |^{\epsilon}
-        sgn(\theta) - (1-r) 2 | \theta |^{1} sgn(\theta) = 0
+        \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n (Y_i - X_i^T \theta) X_i - \lambda r (1 + \epsilon)
+        | \theta |^{\epsilon} sign(\theta) - \lambda (1-r) \theta = 0
 
-    where :math:`r` is the ratio for the L1 vs L2 penalty. Here, we are using an approximation based on the bridge
-    penalty. For the bridge penalty, LASSO is the special case where :math:`\gamma = 1`. By making :math:`\epsilon > 0`,
-    we can approximate the LASSO. The ridge penalty is the bridge penalty where :math:`\gamma = 2`, which can be
-    evaluated directly.
+    where :math:`\lambda` is the penalty term and :math:`r` is the ratio for the L1 vs L2 penalty. Here, we are using
+    an approximation based on the bridge penalty. For the bridge penalty, LASSO is the special case where
+    :math:`\gamma = 1`. By making :math:`\epsilon > 0`, we can approximate the LASSO. The ridge penalty is the bridge
+    penalty where :math:`\gamma = 2`, which can be evaluated directly.
 
     Note
     ----
@@ -980,9 +979,10 @@ def ee_bridge_regression(theta, y, X, model, penalty, gamma, weights=None, cente
 
     .. math::
 
-        \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n (Y_i - X_i^T \theta) X_i - \gamma | \theta |^{\gamma - 1}
-        sgn(\theta) = 0
+        \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n (Y_i - X_i^T \theta) X_i - \lambda \gamma | \theta |^{\gamma - 1}
+        sign(\theta) = 0
 
+    where :math:`\lambda` is the penalty term and :math:`\gamma` is a tuning parameter.
     For the bridge penalty, LASSO is the special case where :math:`\gamma = 1` and ridge regression is
     :math:`\gamma = 2`. While the bridge penalty is defined for :math:`\gamma > 0`, the provided estimating equation
     only supports :math:`\gamma \ge 1`. Additionally, LASSO is not strictly convex, so :math:`\gamma = 1` is not
@@ -1233,7 +1233,7 @@ def _bridge_penalty_(theta, gamma, penalty, n_obs, center):
 
     .. math::
 
-        \lambda \gamma | \theta |^{\gamma - 1} sgn(\theta)
+        \lambda \gamma | \theta |^{\gamma - 1} sign(\theta)
 
     where :math:`\lambda` is the (scaled) penalty, :math:`\gamma` is the hyperparameter for the bridge penalty, and
     :math:`\theta` are the regression coefficients.

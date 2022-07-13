@@ -2,6 +2,7 @@ import numpy as np
 from scipy.optimize import newton, root
 from scipy.misc import derivative
 from scipy.stats import norm
+from copy import copy
 
 from delicatessen.utilities import partial_derivative
 
@@ -69,6 +70,18 @@ class MEstimator:
         documentation for how to construct a set of estimating equations.
     init : list, set, array
         Initial values to optimize for the function.
+    subset : list, set, array, None, optional
+        Optional argument to conduct the root-finding procedure on a subset of parameters in the stacked estimating
+        equations. The input list is used to location index the parameter array via ``np.take()``. The subset list will
+        only affect the root-finding procedure (i.e., the sandwich variance estimator ignores the subset argument).
+        Default is None, which runs the root-finding procedure for all parameters in the stacked equations.
+
+    Note
+    ----
+    Because the root-finding procedure is NOT ran for parameters outside of the subset, those coefficients must be
+    'pre-washed' or have been solved outside of the iteration. In general, I do NOT recommend using the ``subset``
+    argument unless a series of complex estimating equations need to be solved, and some of the equations can be
+    solved outside of the stack.
 
     Examples
     --------
@@ -143,9 +156,13 @@ class MEstimator:
 
     Stefanski LA, & Boos DD. (2002). The calculus of M-estimation. The American Statistician, 56(1), 29-38.
     """
-    def __init__(self, stacked_equations, init=None):
+    def __init__(self, stacked_equations, init=None, subset=None):
         self.stacked_equations = stacked_equations     # User-input stacked estimating equations
         self.init = init                               # User-input initial starting values for solving estimating eqs
+        if subset is None:
+            self._subset_ = subset
+        else:
+            self._subset_ = sorted(subset)
 
         # Storage for results from the M-Estimation procedure
         self.n_obs = None                 # Number of unique observations (calculated later)
@@ -208,7 +225,8 @@ class MEstimator:
                              "https://deli.readthedocs.io/en/latest/Custom%20Equations.html#handling-np-nan")
 
         if vals_at_init.ndim == 1 and np.asarray(self.init).shape[0] == 1:     # Checks to ensure dimensions align
-            pass             # starting line is to work-around if inits=[0, ]. Otherwise breaks the first else-if
+            # the starting if-state is to work-around inits=[0, ] (otherwise breaks the first else-if)
+            pass
         elif vals_at_init.ndim == 1 and np.asarray(self.init).shape[0] != 1:
             raise ValueError("The number of initial values and the number of rows returned by `stacked_equations` "
                              "should be equal but there are " + str(np.asarray(self.init).shape[0]) + " initial values "
@@ -227,36 +245,63 @@ class MEstimator:
         # Trick to get the number of observations from the estimating equations (transposed above)
         self.n_obs = vals_at_init.shape[0]
 
-        # Step 1: solving the M-estimator stacked equations
-        self.theta = self._solve_coefficients_(stacked_equations=self._mestimation_answer_,  # Give the EE's
-                                               init=self.init,                               # Give the initial vals
-                                               method=solver,                                # Specify the solver
-                                               maxiter=maxiter,                              # Set max iterations
-                                               tolerance=tolerance                           # Set allowable tolerance
-                                               )
+        # STEP 1: solving the M-estimator stacked equations
+        # To allow for optimization of only a subset of parameters in the estimating equation (in theory meant to
+        #   simplify the process of complex stacked estimating equations where pre-washing can be done effectively),
+        #   we do some internal processing. Essentially, we 'freeze' the parameters outside of self._subset_ as their
+        #   inits, and let the root-finding procedure update the self._subset_ parameters. We do this by subsetting out
+        #   the init values then passing them along to root(). Behind the scenes, self._mestimation_answer_() expands
+        #   the parameters (to include everything), calculates the estimating equation at those values, and then
+        #   extracts the corresponding subset.
+        #   This process only takes place within Step 1 (the sandwich variance did not require any corresponding
+        #   updates). There is an inherent danger with this process in that if non-subset parameters are not pre-washed,
+        #   then the returned parameters will not be correct. I am considering adding a warning for self_subset_, but I
+        #   may just have to trust the user...
 
-        # Step 2: calculating Variance
-        # Step 2.1: baking the Bread
-        self.bread = self._bread_matrix_(theta=self.theta,                           # Use inner function for bread
-                                         stacked_equations=self.stacked_equations,
-                                         dx=dx,
-                                         order=order) / self.n_obs                         # ... and divide by n
+        # Processing initial values based on whether subset option was specified
+        if self._subset_ is None:                        # If NOT subset,
+            inits = self.init                            # ... give all initial values
+        else:                                            # If subset,
+            inits = np.take(self.init, self._subset_)    # ... then extract initial values for the subset
 
-        # Step 2.2: slicing the meat
-        evald_theta = np.asarray(self.stacked_equations(theta=self.theta))  # Evaluating EE at the optim values of theta
-        self.meat = np.dot(evald_theta, evald_theta.T) / self.n_obs         # Meat is a simple dot product of two arrays
+        # Calculating parameters values via the root-finder (for only the subset of values!)
+        slv_theta = self._solve_coefficients_(stacked_equations=self._mestimation_answer_,  # Give the EE's
+                                              init=inits,                                   # Give the subset vals
+                                              method=solver,                                # Specify the solver
+                                              maxiter=maxiter,                              # Set max iterations
+                                              tolerance=tolerance                           # Set allowable tolerance
+                                              )
 
-        # Step 2.3: assembling the sandwich (variance)
-        if allow_pinv:                                  # re-worked to supports 1d theta
-            bread_invert = np.linalg.pinv(self.bread)   # ... so find the inverse (or pseudo-inverse)
-        else:
-            bread_invert = np.linalg.inv(self.bread)    # ... so find the inverse (NOT pseudo-inverse)
+        # Processing parameters after the root-finding procedure
+        if self._subset_ is None:                        # If NOT subset,
+            self.theta = slv_theta                       # ... then use the full output/solved theta
+        else:                                            # If subset,
+            self.theta = np.asarray(self.init)           # ... copy the initial values
+            for s, n in zip(self._subset_, slv_theta):   # ... then look over the subset and input theta
+                self.theta[s] = n                        # ... and update the subset to the output/solved theta
+
+        # STEP 2: calculating Variance
+        # STEP 2.1: baking the Bread
+        self.bread = self._bread_matrix_(theta=self.theta,                           # Provide theta-hat
+                                         stacked_equations=self.stacked_equations,   # Stacked estimating equations
+                                         dx=dx,                                      # Derivative approximation value
+                                         order=order) / self.n_obs                   # Order for deriv ... then divide
+
+        # STEP 2.2: slicing the meat
+        evald_theta = np.asarray(self.stacked_equations(theta=self.theta))           # Evaluating EE at theta-hat
+        self.meat = np.dot(evald_theta, evald_theta.T) / self.n_obs                  # Meat is dot product of arrays
+
+        # STEP 2.3: assembling the sandwich (variance)
+        if allow_pinv:                                                               # Support 1D theta-hat
+            bread_invert = np.linalg.pinv(self.bread)                                # ... find pseudo-inverse
+        else:                                                                        # Support 1D theta-hat
+            bread_invert = np.linalg.inv(self.bread)                                 # ... find inverse
         # Two sets of matrix multiplication to get the sandwich variance
         sandwich = np.dot(np.dot(bread_invert, self.meat), bread_invert.T)
 
-        # Step 3: updating storage for results
-        self.asymptotic_variance = sandwich       # Asymptotic variance estimate requires division by n (done above)
-        self.variance = sandwich / self.n_obs     # Variance estimate requires division by n^2
+        # STEP 3: updating storage for results
+        self.asymptotic_variance = sandwich       # Asymptotic variance requires division by n (done above)
+        self.variance = sandwich / self.n_obs     # Variance estimate requires division by n^2 (second done here)
 
     def confidence_intervals(self, alpha=0.05):
         r"""Calculate Wald-type :math:`(1 - \alpha) \times 100`% confidence intervals using the point estimates and
@@ -282,6 +327,7 @@ class MEstimator:
             b-by-2 array, where row 1 is the confidence intervals for :math:`\theta_1`, ..., and row b is the confidence
             intervals for :math:`\theta_b`
         """
+        # Check valid alpha value is being provided
         if not 0 < alpha < 1:
             raise ValueError("`alpha` must be 0 < a < 1")
 
@@ -293,6 +339,7 @@ class MEstimator:
         lower_ci = self.theta - z_alpha * param_se          # Calculate lower CI
         upper_ci = self.theta + z_alpha * param_se          # Calculate upper CI
 
+        # Return 2D array of lower and upper confidence intervals
         return np.asarray([lower_ci, upper_ci]).T
 
     def _mestimation_answer_(self, theta):
@@ -309,14 +356,33 @@ class MEstimator:
         array :
             b-by-1 array, which is the sum over n for each b.
         """
-        stacked_equations = np.asarray(self.stacked_equations(theta))  # Returning stacked equation
+        # Option for the subset argument
+        if self._subset_ is None:                      # If NOT subset then,
+            full_theta = theta                         # ... then use the full input theta
+        else:                                          # If subset then,
+            full_theta = np.asarray(self.init)         # ... copy the initial values to ndarray
+            np.put(full_theta,                         # ... update in place the previous array
+                   ind=self._subset_,                  # ... go to the subset indices
+                   v=theta)                            # ... then input current iteration values
 
-        if len(stacked_equations.shape) == 1:        # If stacked_equation returns 1 value, only return that 1 value
-            vals = np.sum(stacked_equations)         # ... avoids SciPy error by returning value rather than tuple
-        else:                                        # Else return a tuple for optimization
-            vals = ()                                # ... create empty tuple
-            for i in self.stacked_equations(theta):  # ... go through each individual theta
-                vals += (np.sum(i),)                 # ... add the theta sum to the tuple of thetas
+        # Calculating the stacked estimating equations output
+        stacked_equations = np.asarray(self.stacked_equations(full_theta))  # Returning stacked equation
+
+        if len(stacked_equations.shape) == 1:          # If stacked_equation returns 1 value, only return that 1 value
+            vals = np.sum(stacked_equations)           # ... avoids SciPy error by returning value rather than tuple
+        else:                                          # Else return a tuple for optimization
+            # NOTE: switching to np.sum(..., axis=1) didn't speed things up versus a for-loop
+            vals = ()                                  # ... create empty tuple
+            rows = stacked_equations.shape[0]          # ... determine how many rows / parameters are present
+            if self._subset_ is None:                  # ... if no subset, then simple loop where
+                for i in range(rows):                  # ... go through each individual theta in the stack
+                    row = stacked_equations[i, :]      # ... extract corresponding row
+                    vals += (np.sum(row), )            # ... then add the theta sum to the tuple of thetas
+            else:                                      # ... if subset, then conditional loop (to speed up)
+                for i in range(rows):                  # ... go through each individual theta in the stack
+                    if i in self._subset_:             # ... if parameter is in subset then
+                        row = stacked_equations[i, :]  # ... extract corresponding row
+                        vals += (np.sum(row), )        # ... then add the theta sum to the tuple of thetas
 
         # Return the calculated values of theta
         return vals
@@ -391,7 +457,8 @@ class MEstimator:
                              "documentation for valid"
                              "options for the optimizer.")
 
-        return psi                             # Return optimized theta array
+        # Return optimized theta array
+        return psi
 
     @staticmethod
     def _bread_individual_(theta, variable_index, output_index, stacked_equations, dx, order):

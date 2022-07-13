@@ -10,17 +10,22 @@ def ee_4p_logistic(theta, X, y):
 
     .. math::
 
-        \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n (Y_i - expit(X_i^T \theta)) X_i = 0
+        \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n -2 (Y_i - \hat{Y}_i) (1 - 1/(1 + \rho)) = 0
 
-        \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n (Y_i - expit(X_i^T \theta)) X_i = 0
+        \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n 2 (Y_i - \hat{Y}_i) (\theta_3 - \theta_0) \frac{\theta_2}{\theta_1}
+        \frac{\rho}{(1 + \rho)^2} = 0
 
-        \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n (Y_i - expit(X_i^T \theta)) X_i = 0
+        \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n 2 (Y_i - \hat{Y}_i) (\theta_3 - \theta_0) \log(D_i / \theta_1)
+        \frac{\rho}{(1 + \rho)^2} = 0
 
-        \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n (Y_i - expit(X_i^T \theta)) X_i = 0
+        \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n 2 (Y_i - \hat{Y}_i) (1 / (1 + \rho))) = 0
 
-    Here, theta is a 1-by-4 array, where 4 are the 4 parameters of the 4PL. The first theta corresponds to lower limit,
-    the second corresponds to the effective dose (ED50), the third corresponds to the steepness of the curve, and the
-    fourth corresponds to the upper limit.
+    where :math:`R_i` is the response of individual :math:`i`, :math:`D_i` is the dose,
+    :math:`\rho = \frac{D_i}{\theta_1}^{\theta_2}`, and
+    :math:`\hat{Y_i} = \theta_0 + \frac{\theta_3 - \theta_0}{1+\rho}`.
+    Here, theta is a 1-by-4 array, where 4 are the 4 parameters of the 4PL. The first theta corresponds to lower limit
+    (:math:`\theta_0`), the second corresponds to the effective dose (ED50) (:math:`\theta_1`), the third corresponds
+    to the steepness of the curve (:math:`\theta_2`), and the fourth corresponds to the upper limit (:math:`\theta_3`).
 
     Note
     ----
@@ -123,7 +128,7 @@ def ee_4p_logistic(theta, X, y):
                         where=0 < X)              # ... where dose>0 (otherwise puts zero in place)
 
     # Calculate the derivatives for the gradient
-    deriv = np.array((1 - 1/(1+rho),                                           # Gradient for lower limit
+    deriv = np.array((1 - 1/(1 + rho),                                         # Gradient for lower limit
                      (theta[3]-theta[0])*theta[2]/theta[1]*rho/(1+rho)**2,     # Gradient for steepness
                      (theta[3] - theta[0]) * nested_log * rho / (1 + rho)**2,  # Gradient for ED50
                      1 / (1 + rho)), )                                         # Gradient for upper limit
@@ -138,15 +143,21 @@ def ee_3p_logistic(theta, X, y, lower):
 
     .. math::
 
-        \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n (Y_i - expit(X_i^T \theta)) X_i = 0
+        \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n 2 (Y_i - \hat{Y}_i) (\theta_3 - \theta_0) \frac{\theta_2}{\theta_1}
+        \frac{\rho}{(1 + \rho)^2} = 0
 
-        \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n (Y_i - expit(X_i^T \theta)) X_i = 0
+        \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n 2 (Y_i - \hat{Y}_i) (\theta_3 - \theta_0) \log(D_i / \theta_1)
+        \frac{\rho}{(1 + \rho)^2} = 0
 
-        \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n (Y_i - expit(X_i^T \theta)) X_i = 0
+        \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n 2 (Y_i - \hat{Y}_i) (1 / (1 + \rho))) = 0
 
-    Here, theta is a 1-by-3 array, where 3 are the 3 parameters of the 3PL. The first theta corresponds to the
-    effective dose (ED50), the second corresponds to the steepness of the curve, and the third corresponds to the upper
-    limit. The lower limit is pre-specified by the user (and is no longer estimated)
+    where :math:`R_i` is the response of individual :math:`i`, :math:`D_i` is the dose,
+    :math:`\rho = \frac{D_i}{\theta_1}^{\theta_2}`, and
+    :math:`\hat{Y_i} = \theta_0 + \frac{\theta_3 - \theta_0}{1+\rho}`.
+    Here, theta is a 1-by-3 array for the 3PL. The first theta corresponds to the effective dose (ED50)
+    (:math:`\theta_1`), the second corresponds to the steepness of the curve (:math:`\theta_2`), and the third
+    corresponds to the upper limit (:math:`\theta_3`). The lower limit (:math:`\theta_0`, ``lower``) is pre-specified
+    by the user (and is no longer estimated)
 
     Note
     ----
@@ -265,15 +276,19 @@ def ee_2p_logistic(theta, X, y, lower, upper):
 
     .. math::
 
-        \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n (Y_i - expit(X_i^T \theta)) X_i = 0
+        \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n 2 (Y_i - \hat{Y}_i) (\theta_3 - \theta_0) \frac{\theta_2}{\theta_1}
+        \frac{\rho}{(1 + \rho)^2} = 0
 
-        \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n (Y_i - expit(X_i^T \theta)) X_i = 0
+        \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n 2 (Y_i - \hat{Y}_i) (\theta_3 - \theta_0) \log(D_i / \theta_1)
+        \frac{\rho}{(1 + \rho)^2} = 0
 
-        \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n (Y_i - expit(X_i^T \theta)) X_i = 0
-
-    Here, theta is a 1-by-2 array, where 2 are the 2 parameters of the 2PL. The first theta corresponds to the
-    effective dose (ED50), and the second corresponds to the steepness of the curve. Both the lower limit and upper
-    limit are pre-specified by the user (and no longer estimated).
+    where :math:`R_i` is the response of individual :math:`i`, :math:`D_i` is the dose,
+    :math:`\rho = \frac{D_i}{\theta_1}^{\theta_2}`, and
+    :math:`\hat{Y_i} = \theta_0 + \frac{\theta_3 - \theta_0}{1+\rho}`.
+    Here, theta is a 1-by-3 array for the 3PL. The first theta corresponds to the effective dose (ED50)
+    (:math:`\theta_1`), and the second corresponds to the steepness of the curve (:math:`\theta_2`). The lower limit
+    (:math:`\theta_0`, ``lower``) and upper limit (:math:`\theta_3`, ``upper``) are pre-specified by the user (and are
+    no longer estimated)
 
     Note
     ----
@@ -391,7 +406,7 @@ def ee_effective_dose_delta(theta, y, delta, steepness, ed50, lower, upper):
     .. math::
 
         \psi(Y_i, \theta) = \beta_1 + \frac{\beta_4 - \beta_1}{1 + (\theta / \beta_2)^{\beta_3}} - \beta_4(1-\delta)
-        - \beta_1 \delta
+        - \beta_1 \delta = 0
 
     where theta is the :math:`ED(\delta)`, and the beta values are from a 4PL model (1: lower limit, 2: steepness,
     3: ED(50), 4: upper limit). When lower or upper limits are place, the corresponding beta's are replaced by
