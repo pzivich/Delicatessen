@@ -225,7 +225,8 @@ class MEstimator:
                              "https://deli.readthedocs.io/en/latest/Custom%20Equations.html#handling-np-nan")
 
         if vals_at_init.ndim == 1 and np.asarray(self.init).shape[0] == 1:     # Checks to ensure dimensions align
-            pass             # starting line is to work-around if inits=[0, ]. Otherwise breaks the first else-if
+            # the starting if-state is to work-around inits=[0, ] (otherwise breaks the first else-if)
+            pass
         elif vals_at_init.ndim == 1 and np.asarray(self.init).shape[0] != 1:
             raise ValueError("The number of initial values and the number of rows returned by `stacked_equations` "
                              "should be equal but there are " + str(np.asarray(self.init).shape[0]) + " initial values "
@@ -281,26 +282,26 @@ class MEstimator:
 
         # STEP 2: calculating Variance
         # STEP 2.1: baking the Bread
-        self.bread = self._bread_matrix_(theta=self.theta,                           # Use inner function for bread
-                                         stacked_equations=self.stacked_equations,
-                                         dx=dx,
-                                         order=order) / self.n_obs                         # ... and divide by n
+        self.bread = self._bread_matrix_(theta=self.theta,                           # Provide theta-hat
+                                         stacked_equations=self.stacked_equations,   # Stacked estimating equations
+                                         dx=dx,                                      # Derivative approximation value
+                                         order=order) / self.n_obs                   # Order for deriv ... then divide
 
         # STEP 2.2: slicing the meat
-        evald_theta = np.asarray(self.stacked_equations(theta=self.theta))  # Evaluating EE at the optim values of theta
-        self.meat = np.dot(evald_theta, evald_theta.T) / self.n_obs         # Meat is a simple dot product of two arrays
+        evald_theta = np.asarray(self.stacked_equations(theta=self.theta))           # Evaluating EE at theta-hat
+        self.meat = np.dot(evald_theta, evald_theta.T) / self.n_obs                  # Meat is dot product of arrays
 
         # STEP 2.3: assembling the sandwich (variance)
-        if allow_pinv:                                  # re-worked to supports 1d theta
-            bread_invert = np.linalg.pinv(self.bread)   # ... so find the inverse (or pseudo-inverse)
-        else:
-            bread_invert = np.linalg.inv(self.bread)    # ... so find the inverse (NOT pseudo-inverse)
+        if allow_pinv:                                                               # Support 1D theta-hat
+            bread_invert = np.linalg.pinv(self.bread)                                # ... find pseudo-inverse
+        else:                                                                        # Support 1D theta-hat
+            bread_invert = np.linalg.inv(self.bread)                                 # ... find inverse
         # Two sets of matrix multiplication to get the sandwich variance
         sandwich = np.dot(np.dot(bread_invert, self.meat), bread_invert.T)
 
         # STEP 3: updating storage for results
-        self.asymptotic_variance = sandwich       # Asymptotic variance estimate requires division by n (done above)
-        self.variance = sandwich / self.n_obs     # Variance estimate requires division by n^2
+        self.asymptotic_variance = sandwich       # Asymptotic variance requires division by n (done above)
+        self.variance = sandwich / self.n_obs     # Variance estimate requires division by n^2 (second done here)
 
     def confidence_intervals(self, alpha=0.05):
         r"""Calculate Wald-type :math:`(1 - \alpha) \times 100`% confidence intervals using the point estimates and
@@ -326,6 +327,7 @@ class MEstimator:
             b-by-2 array, where row 1 is the confidence intervals for :math:`\theta_1`, ..., and row b is the confidence
             intervals for :math:`\theta_b`
         """
+        # Check valid alpha value is being provided
         if not 0 < alpha < 1:
             raise ValueError("`alpha` must be 0 < a < 1")
 
@@ -337,6 +339,7 @@ class MEstimator:
         lower_ci = self.theta - z_alpha * param_se          # Calculate lower CI
         upper_ci = self.theta + z_alpha * param_se          # Calculate upper CI
 
+        # Return 2D array of lower and upper confidence intervals
         return np.asarray([lower_ci, upper_ci]).T
 
     def _mestimation_answer_(self, theta):
@@ -452,7 +455,8 @@ class MEstimator:
                              "documentation for valid"
                              "options for the optimizer.")
 
-        return psi                             # Return optimized theta array
+        # Return optimized theta array
+        return psi
 
     @staticmethod
     def _bread_individual_(theta, variable_index, output_index, stacked_equations, dx, order):
