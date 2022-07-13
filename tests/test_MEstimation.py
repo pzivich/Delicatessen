@@ -439,7 +439,7 @@ class TestMEstimation:
 
     def test_subset_params(self):
         # Creating data set
-        n = 1000
+        n = 2500
         d = pd.DataFrame()
         d['W'] = np.random.normal(size=n)
         d['A'] = np.random.binomial(n=1, p=logistic.cdf(d['W']), size=n)
@@ -483,7 +483,7 @@ class TestMEstimation:
 
     def test_subset_params2(self):
         # Creating data set
-        n = 1000
+        n = 2500
         d = pd.DataFrame()
         d['W'] = np.random.normal(size=n)
         d['A'] = np.random.binomial(n=1, p=logistic.cdf(d['W']), size=n)
