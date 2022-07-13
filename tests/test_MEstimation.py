@@ -479,7 +479,7 @@ class TestMEstimation:
         npt.assert_allclose(ns.theta, ys.theta)
 
         # Check variance estimates are all close
-        npt.assert_allclose(ns.variance, ys.variance)
+        npt.assert_allclose(ns.variance, ys.variance, rtol=1e-6)
 
     def test_subset_params2(self):
         # Creating data set
@@ -523,4 +523,4 @@ class TestMEstimation:
         npt.assert_allclose(ns.theta, ys.theta)
 
         # Check variance estimates are all close
-        npt.assert_allclose(ns.variance, ys.variance)
+        npt.assert_allclose(ns.variance, ys.variance, rtol=1e-6)
