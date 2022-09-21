@@ -222,10 +222,10 @@ class MEstimator:
             nans_in_column = np.sum(np.isnan(vals_at_init), axis=0)        # Counting up all NAN's per estimating eq
             columns_w_nans = np.argwhere(nans_in_column >= 1).flatten()    # Returning indices that have any NAN's
             raise ValueError("When evaluated at the initial values, the `stacked_equations` return at least one "
-                             "np.nan for the estimating equations at the following indices: " +
+                             "np.nan at the following estimating equation indices: " +
                              str(list(columns_w_nans)) + ". "
                              "As delicatessen does not natively handle missing data, please ensure the "
-                             "provided estimating equations handle any np.nan values accordingly. For details on "
+                             "provided estimating equations resolve any np.nan values accordingly. For details on "
                              "how to handle np.nan's see the documentation at: "
                              "https://deli.readthedocs.io/en/latest/Custom%20Equations.html#handling-np-nan")
 
