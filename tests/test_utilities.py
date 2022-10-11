@@ -2,7 +2,7 @@ import pytest
 import numpy as np
 import numpy.testing as npt
 
-from delicatessen.utilities import inverse_logit, logit, partial_derivative
+from delicatessen.utilities import inverse_logit, logit, partial_derivative, robust_loss_functions
 
 
 class TestFunctions:
@@ -82,3 +82,64 @@ class TestFunctions:
         dy1 = partial_derivative(func=function, var=1, point=np.array([loc_x, loc_y]), output=0,
                                  dx=1, order=5)
         npt.assert_allclose(dy1, partial_y_derivative(loc_x, loc_y))
+
+    def test_rloss_huber(self):
+        """Checks the robust loss function: Huber's
+        """
+        residuals = np.array([-5, 1, 0, -2, 8, 3])
+
+        func = robust_loss_functions(residual=residuals, loss='huber', k=4)
+        byhand = np.array([-4, 1, 0, -2, 4, 3])
+
+        npt.assert_allclose(func, byhand)
+
+    def test_rloss_tukey(self):
+        """Checks the robust loss function: Tukey's biweight
+        """
+        residuals = np.array([-5, 1, 0.1, -2, 8, 3])
+
+        func = robust_loss_functions(residual=residuals, loss='tukey', k=4)
+
+        byhand = np.array([-5 * 0,
+                           1 * ((1-(1/4)**2)**2),
+                           0.1 * ((1-(0.1/4)**2)**2),
+                           -2 * ((1-(2/4)**2)**2),
+                           8 * 0,
+                           3 * ((1-(3/4)**2)**2)])
+
+        npt.assert_allclose(func, byhand)
+
+    def test_rloss_andrew(self):
+        """Checks the robust loss function: Andrew's Sine
+        """
+        residuals = np.array([-5, 1, 0.1, -2, 8, 3])
+
+        func = robust_loss_functions(residual=residuals, loss='andrew', k=1)
+
+        byhand = np.array([-5 * 0,
+                           np.sin(1 / 1),
+                           np.sin(0.1 / 1),
+                           np.sin(-2 / 1),
+                           8 * 0,
+                           np.sin(3 / 1)])
+
+        npt.assert_allclose(func, byhand)
+
+    def test_rloss_hampel(self):
+        """Checks the robust loss function: Hampel
+        """
+        residuals = np.array([-5, 1, 1.5, -1.3, 0.1, -2, 8, 3])
+
+        func = robust_loss_functions(residual=residuals, loss='hampel',
+                                     k=4, a=1, b=2)
+
+        byhand = np.array([-5 * 0,
+                           1,
+                           1,
+                           -1,
+                           0.1,
+                           (-4 + 2)/(-4 + 2)*-1,
+                           8 * 0,
+                           (4 - 3)/(4 - 2)*1])
+
+        npt.assert_allclose(func, byhand)
