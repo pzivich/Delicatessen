@@ -83,7 +83,11 @@ middle ground, whereby outliers contribute to estimation but their influence is 
     obs_vals = [1, -10, 2, 1, 4, 1, 4, 2, 4, 2, 3, 12]
 
 Instead, the robust mean can be used instead. The robust mean estimating equation is available in ``ee_mean_robust``,
-with several different options for the loss function.
+with several different options for the loss function. The following is a plot showcasing the influence functions for
+the available robust loss functions.
+
+.. image:: images/robust_loss.png
+
 
 .. code::
 
@@ -91,7 +95,7 @@ with several different options for the loss function.
     from delicatessen.estimating_equations import ee_mean_robust
 
     def psi(theta):
-        return ee_mean_robust(theta=theta, y=obs_vals, k=6)
+        return ee_mean_robust(theta=theta, y=obs_vals, loss='huber', k=6)
 
     estr = MEstimator(stacked_equations=psi, init=[0, ])
     estr.estimate()
