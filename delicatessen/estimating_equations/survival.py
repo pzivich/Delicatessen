@@ -86,7 +86,12 @@ def ee_exponential_model(theta, t, delta):
     ----------
     Collett D. (2015). Modelling survival data in medical research. CRC press.
     """
-    return (delta / theta) - t  # Returning calculation for exponential distribution
+    # Converting input to NumPy arrays
+    delta = np.asarray(delta)
+    t = np.asarray(t)
+
+    # Returning calculation for exponential distribution
+    return (delta / theta) - t
 
 
 def ee_weibull_model(theta, t, delta):
@@ -178,6 +183,10 @@ def ee_weibull_model(theta, t, delta):
     ----------
     Collett D. (2015). Modelling survival data in medical research. CRC press.
     """
+    # Converting input to NumPy arrays
+    delta = np.asarray(delta)
+    t = np.asarray(t)
+
     # Extracting and naming parameters for my convenience
     lambd, gamma = theta[0], theta[1]             # Names / parameterization follow Collett
 
