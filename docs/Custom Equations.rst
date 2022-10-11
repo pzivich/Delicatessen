@@ -2,9 +2,7 @@ Custom Estimating Equations
 =====================================
 
 One of the key advantages of ``delicatessen`` is that it has a lot of flexibility in the estimating equations that can
-be specified. Basically, it will allow for any estimating equation to be passed to it (but not that the estimating
-equation(s) *must* be unbiased for the theory behind M-estimation to hold). Here, I provide an overview and tips for
-how to build your own estimating equation.
+be specified. Here, I provide an overview and tips for how to build your own estimating equation with ``delicatessen``.
 
 In general, it will be best if you find an explicit paper or book that directly provides the estimating equation(s) to
 you. Alternatively, if you can find the score function or gradient for a regression model, that is the corresponding
@@ -74,9 +72,9 @@ We can then run this estimating equation with
     mest = MEstimator(psi, init=[0., 0., 0.])
     mest.estimate()
 
-for which the coefficients match the coefficients from a ordinary least squares model (variance estimates will differ,
-since most OLS software uses a different variance estimator). Here, we can further vectorize the estimating equation. In
-the vector-form, this code will run much faster.
+for which the coefficients match the coefficients from a ordinary least squares model (variance estimates may differ,
+since most OLS software use the inverse of the information matrix to estimate the variance). Here, we can further
+vectorize the estimating equation. In the vector-form, this code will run much faster.
 
 With some careful experimentation, the following is a vectorized version. Remember that ``delicatessen`` is expecting a
 3-by-n array to be given by the ``psi`` function in this example. Failure to provide this is a common mistake when
@@ -91,17 +89,14 @@ building custom estimating equations.
         return ((y - np.dot(X, beta)) * X).T
 
 
-As before, we can run this chunk of code. However, this is substantially faster. If we run both implementations on the
-same data set of 10,000 observations, the for-loop version took approximately 1.60 seconds and the vectorized version
-took 0.05 seconds (on my fairly new laptop). Vectorizing (even parts of an estimating equation) can help to improve
-run-times if you find the M-Estimation procedure taking too long.
-
+As before, we can run this chunk of code. Vectorizing (even parts of an estimating equation) can help to improve
+run-times if you find the M-estimator taking too long.
 
 Building with basics
 -------------------------------------
 
 Instead of building everything from scratch, you can also piece together the built-in estimating equations with your
-own code. To demonstrate this, I will go through how I developed the code for inverse probability weighting.
+own code. To demonstrate this, we will go through how we developed the code for inverse probability weighting.
 
 The inverse probability weighting estimator consists of four estimating equations: the difference between the weighted
 means, the weighted mean under :math:`A=1`, the weighted mean under :math:`A=0`, and the propensity score model. We
@@ -132,10 +127,10 @@ estimator
         beta = theta[3:]   # Extracting out theta's for the regression model
 
         # Estimating propensity score using delicatessen
-        preds_reg = ee_logistic_regression(theta=beta,    # Using logistic regression
-                                           X=W,           # Plug-in covariates for X
-                                           y=A)           # Plug-in treatment for Y
-
+        preds_reg = ee_regression(theta=beta,        # Built-in regression
+                                  X=W,               # Plug-in covariates for X
+                                  y=A,               # Plug-in treatment for Y
+                                  model='logistic')  # Specify logistic
         # Estimating weights
         pi = inverse_logit(np.dot(W, beta))          # Pr(A|W) using delicatessen.utilities
 
@@ -161,16 +156,15 @@ the estimating equation and returning a stacked array of the estimates.
 
 One important piece to note here is that the returned array should be in the *same* order as the theta's are input. As
 done here, all the ``theta`` values are the 3rd are for the propensity score model. Therefore, the propensity score
-model values are last in the returned stack. Returning the values in a different order than expected by theta is a
-common mistake and will lead to failed optimizations.
+model values are last in the returned stack. Returning the values in a different order than expected by :math:`\theta`
+is a common mistake and will lead to failed root-finding.
 
 Handling ``np.nan``
 -------------------------------------
 
 Sometimes, ``np.nan`` will be necessary to include in your data set. However, ``delicatessen`` does not naturally
-handle ``np.nan``. In fact, ``delicatessen`` will fail to optimize the provided estimating equations when there are
-``np.nan``'s present (this is by design). The following discusses how ``np.nan`` can be handled appropriately in the
-estimating equations.
+handle ``np.nan``. In fact, ``delicatessen`` will return an error when there are ``np.nan``'s present (this is by
+design). The following discusses how ``np.nan`` can be handled appropriately in the estimating equations.
 
 In the first case, we will consider handling ``np.nan`` with a built-in estimating equation. When trying to fit a
 regression model where there are ``np.nan``'s present, the estimating equation missing values must be manually set to
@@ -254,7 +248,14 @@ back to the formula. Here, the IPW mean is
 
     \sum_{i=1}^{n} \left( \frac{I(R_i=1) Y_i}{\Pr(R_i=1 | X_i)} - \theta \right) = 0
 
-As seen with the indicator function, observations where :math:`Y` is missing should contribute a zero *minus theta*.
+As seen with the indicator function, observations where :math:`Y` is missing should contribute a zero *minus*
+:math:`\theta`. If we had instead used, the Hajek estimator
+
+.. math::
+
+    \sum_{i=1}^{n} \left((Y_i - \theta) \frac{I(R_i=1)}{\Pr(R_i=1 | X_i)} \right) = 0
+
+The subtraction would have been on the inside of the ``np.where`` step.
 
 Common Mistakes
 -------------------------------------
@@ -274,4 +275,4 @@ mistakes here and improve the documentation for custom estimating equations.
 
 Additional Examples
 -------------------------------
-Additional examples are provided `here<https://github.com/pzivich/Delicatessen/tree/main/tutorials>`_.
+Additional examples are provided `here<https://github.com/pzivich/Delicatessen/tree/main/tutorials>`_ .

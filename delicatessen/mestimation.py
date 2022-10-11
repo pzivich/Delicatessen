@@ -12,29 +12,32 @@ class MEstimator:
 
     M-Estimation, or loosely referred to as estimating equations, is a general approach to point and variance
     estimation that consists of defining an estimator as the solution to an estimating equation (but does not require
-    the derivative of a log-likelihood function). M-estimators satisify the following constraint
+    the derivative of a log-likelihood function). M-estimators satisify the following
 
     .. math::
 
-        \sum_{i=1}^n \psi(Y_i, \hat{\theta}) = 0
+        \sum_{i=1}^n \psi(O_i, \hat{\theta}) = 0
+
+    where :math:`\psi` is the :math:`v`-dimensional vector of estimating equation(s), :math:`\hat{\theta}` is the
+    :math:`v`-dimensional parameter vector, and :math:`O_i` is the observed data (independent but not necessarily
+    identically distributed).
 
     Note
     ----
-    One advantage of M-Estimation is that many estimators can be written as M-Estimators. This simplifies theoretical
-    analysis and application under a large-sample approximation framework.
+    M-Estimation is advantageous in both theoretical and applied research. M-estimation simplifies proofs of
+    consistency and asymptotic normality of estimator sunder a large-sample approximation framework. In application,
+    M-estimators simplify estimation of the variance of parameters and automate the delta-method.
 
 
     M-Estimation consists of two broad step: point estimation and variance estimation. Point estimation is carried out
-    by determining at which values of theta the given estimating equations are equal to zero. This is done via SciPy's
-    ``newton`` algorithm by default.
-
-    For variance estimation, the sandwich asymptotic variance estimator is used, which consists of
+    by determining the values of :math:`\theta` where the sum of the estimating equations are zero. For variance
+    estimation, the asymptotic sandwich variance estimator is used, which consists of
 
     .. math::
 
-        B_n(Y, \hat{\theta})^{-1} \times F_n(Y, \hat{\theta}) \times B_n(Y, (\hat{\theta})^{-1})^T
+        B_n(Y, \hat{\theta})^{-1} F_n(Y, \hat{\theta}) \left(B_n(Y, \hat{\theta}^{-1})\right)^T
 
-    where B is the bread and F is the filling
+    where :math:`B` is the 'bread' and :math:`F` is the 'filling'
 
     .. math::
 
@@ -44,24 +47,22 @@ class MEstimator:
 
         F_n(Y, \hat{\theta}) = n^{-1} \sum_{i=1}^{n} \psi(Y_i, \hat{\theta}) \times \psi(Y_i, \hat{\theta})^T
 
-    The partial derivatives for the bread are calculated using an adaptation of SciPy's ``derivative`` functionality
-    for partial derivatives. Inverting the bread is done via NumPy's ``linalg.pinv``. For the filling, the dot product
-    is taken for the evaluated theta's.
+    The partial derivatives for the bread are calculated using numerical approximation methods. Inverting the bread is
+    done via NumPy's ``linalg.pinv``. For the filling, the dot product is taken at :math:`\hat{\theta}`.
 
     Note
     ----
     A hard part (that must be done by the user) is to specify the stacked estimating equations. Be sure to check
-    the provided examples for the format. Pre-built estimating equations for common problems are available to ease
-    burden.
+    the provided examples for the format. Pre-built estimating equations for common problems are made available.
 
-    After completion of these steps, point and variance estimates for theta stored. These can be directly pulled from
-    the class object and further manipulated. For example, calculation of 95% confidence intervals.
+
+    After completion of these steps, point and variance estimates are stored. These can be extracted from
+    ``MEstimator``.
 
     Note
     ----
-    For complex regression problems, the optimizer behind the scenes is not particularly robust (unlike functions
-    specializing in solely logistic regression). Therefore, pre-washed values can be fed forward as the initial values
-    (which should result in a more stable optimization).
+    For complex regression problems, the root-finding algorithms are not as robust relative to other approaches based
+    on higher-order derivatives. 'Pre-washed' values can be fed forward as the initial values.
 
     Parameters
     ----------
@@ -69,19 +70,18 @@ class MEstimator:
         Function that returns a b-by-n NumPy array of the estimating equations. See provided examples in the
         documentation for how to construct a set of estimating equations.
     init : list, set, array
-        Initial values to optimize for the function.
+        Initial values for the root-finding algorithm.
     subset : list, set, array, None, optional
         Optional argument to conduct the root-finding procedure on a subset of parameters in the stacked estimating
         equations. The input list is used to location index the parameter array via ``np.take()``. The subset list will
         only affect the root-finding procedure (i.e., the sandwich variance estimator ignores the subset argument).
-        Default is None, which runs the root-finding procedure for all parameters in the stacked equations.
+        Default is ``None``, which runs the root-finding procedure for all parameters in the stacked equations.
 
     Note
     ----
     Because the root-finding procedure is NOT ran for parameters outside of the subset, those coefficients must be
-    'pre-washed' or have been solved outside of the iteration. In general, I do NOT recommend using the ``subset``
-    argument unless a series of complex estimating equations need to be solved, and some of the equations can be
-    solved outside of the stack.
+    solved outside of ``MEstimator``. In general, I do NOT recommend using the ``subset`` argument unless a series of
+    complex estimating equations need to be solved.
 
     Examples
     --------
@@ -108,10 +108,10 @@ class MEstimator:
 
     Inspecting the parameter estimates, the variance, 95% confidence intervals, and the asymptotic variance
 
-    >>> estr.theta
-    >>> estr.variance
-    >>> estr.confidence_intervals()
-    >>> estr.asymptotic_variance
+    >>> estr.theta                     # Point estimates
+    >>> estr.variance                  # Covariance matrix
+    >>> estr.confidence_intervals()    # Confidence intervals
+    >>> estr.asymptotic_variance       # Asymptotic covariance matrix
 
     Alternatively, a custom estimating equation can be specified. This is done by constructing a valid estimating
     equation for the ``MEstimator``. The ``MEstimator`` expects the ``psi`` function to return a b-by-n array, where b
@@ -120,9 +120,9 @@ class MEstimator:
 
     >>> def psi(theta):
     >>>     y = np.array(y_dat)
-    >>>     piece_1 = y - theta[0]
-    >>>     piece_2 = (y - theta[0]) ** 2 - theta[1]
-    >>>     return piece_1, piece_2
+    >>>     mean = y - theta[0]
+    >>>     variance = (y - theta[0]) ** 2 - theta[1]
+    >>>     return mean, variance
 
     The M-estimation procedure is called using the same approach as before
 
@@ -131,7 +131,7 @@ class MEstimator:
 
     Note that ``len(init)`` should be equal to b. So in this case, two initial values are provided.
 
-    Finally, the M-Estimator can also be run with a user-provided root-finding algorithm. To specify a custom
+    ``MEstimator`` can also be run with a user-provided root-finding algorithm. To specify a custom
     root-finder, a function must be created by the user that consists of two keyword arguments (``stacked_equations``,
     ``init``) and must return only the optimized values. The following is an example with SciPy's Levenberg-Marquardt
     algorithm in ``root``.
@@ -179,7 +179,7 @@ class MEstimator:
         Parameters
         ----------
         solver : str, function, callable, optional
-            Method to use for the root finding procedure. Default is the secant method (``scipy.optimize.newton``).
+            Method to use for the root-finding procedure. Default is the secant method (``scipy.optimize.newton``).
             Other built-in option is the Levenberg-Marquardt algorithm (``scipy.optimize.root(method='lm')``), and
             a modification of the Powell hybrid method (``scipy.optimize.root(method='hybr')``). Finally, any generic
             root-finding algorithm can be used via a user-provided callable object (function). The function should
@@ -192,15 +192,14 @@ class MEstimator:
             is not used for user-specified solvers
         tolerance : float, optional
             Maximum tolerance for errors in the root finding. This argument is passed ``scipy.optimize`` via the
-            ``tol`` parameter. Default is 1e-9, which I have seen good performance with. I do not recommend going below
-            this tolerance level (at this time). This argument is not used for user-specified solvers
+            ``tol`` parameter. Default is 1e-9.
         dx : float, optional
-            Spacing to use to numerically approximate the partial derivatives of the bread matrix. Default is 1e-9,
-            which should work well for most applications. It is generally not recommended to have a large ``dx``, since
-            some large values can poorly approximate derivatives. Otherwise, also increase ``order``.
+            Spacing to use to numerically approximate the partial derivatives of the bread matrix. Default is 1e-9. It
+            is generally not recommended to have a large ``dx``, since some large values can poorly approximate
+            derivatives.
         order : int, optional
             Number of points to use to numerically approximate the partial derivative (must be an odd number). Default
-            is 3, which is the default for SciPy.
+            is 3.
         allow_pinv : bool, optional
             The default is ``True`` which uses ``numpy.linalg.pinv`` to find the inverse (or pseudo-inverse if matrix is
             non-invertible) for the bread. This default option is more robust to the possible matrices. If you want
@@ -309,12 +308,12 @@ class MEstimator:
         self.variance = sandwich / self.n_obs     # Variance estimate requires division by n^2 (second done here)
 
     def confidence_intervals(self, alpha=0.05):
-        r"""Calculate Wald-type :math:`(1 - \alpha) \times 100`% confidence intervals using the point estimates and
+        r"""Calculate Wald-type :math:`(1 - \alpha) \times` 100% confidence intervals using the point estimates and
         the sandwich variance. The formula for the confidence intervals are
 
         .. math::
 
-            \hat{\theta} +/- Z_{\alpha / 2} \times \widehat{SE}(\hat{\theta})
+            \hat{\theta} \pm Z_{\alpha / 2} \times \widehat{SE}(\hat{\theta})
 
         Note
         ----

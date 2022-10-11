@@ -4,44 +4,43 @@ Delicatessen
 =====================================
 
 ``delicatessen`` is a one-stop shop for all your sandwich (variance) needs. This Python 3.6+ library supports
-M-Estimation, which is a general statistical framework for estimating unknown parameters. If you are an R user, I
-highly recommend the R library ``geex`` (`Saul & Hudgens (2020) <https://bsaul.github.io/geex/>`_).
-``delicatessen`` supports a variety of pre-built estimating equations as well as custom, user-specified estimating
+M-estimation, which is a general statistical framework for estimating unknown parameters. If you are an R user, I
+recommend looking into ``geex`` (`Saul & Hudgens (2020) <https://bsaul.github.io/geex/>`_).
+``delicatessen`` supports a variety of pre-built estimating equations as well as custom, user built estimating
 equations.
 
-Here, we provide a brief overview of M-Estimation. For a more detailed and precise introduction, please refer to
-Stefanski & Boos (2002) or Boos & Stefanski (2013). M-Estimation was developed to study the large sample properties of
+Here, we provide a brief overview of M-Estimation. For a more detailed, please refer to
+Stefanski & Boos (2002) or Boos & Stefanski (2013). M-estimation was developed to study the large sample properties of
 robust statistics. However, many common large-sample statistics can be expressed with estimating equations, so
-M-Estimation provides a unified structure and a streamlined approach to estimation. Let the parameter of interest be
+M-estimation provides a unified structure and a streamlined approach to estimation. Let the parameter of interest be
 the vector :math:`\theta = (\theta_1, \theta_2, ..., \theta_v)` and data is observed for :math:`n` independent units
-:math:`Z_1, Z_2, …, Z_n`. Then :math:`\theta` can often be expressed as the solution to the vector equation
-:math:`\sum_{i=1}^{n} \psi(Z_i,\theta) = 0` where :math:`\psi(\dot)` is a known :math:`v \times 1`-function that does
-not depend on observation :math:`i` or :math:`n`. To compute point estimates, the vector equation is solved using the
-:math:`n` units. M-Estimators further provides a convenient and automatic method of calculating large-sample variance
-estimators via the . The sandwich variance estimator is:
+:math:`Z_1, Z_2, …, Z_n`. An M-estimator, :math:`\theta` is the solution to the vector equation
+:math:`\sum_{i=1}^{n} \psi(Z_i,\theta) = 0` where :math:`\psi` is a known :math:`v \times 1`-function that does
+not depend on observation :math:`i` or :math:`n`. M-estimators further provides a convenient and automatic method of
+calculating large-sample variance estimators via the sandwich variance
 
 .. math::
 
-    V_n(Y,\hat{\theta}) = A_n(Y,\hat{\theta})^{-1} B_n(Y,\hat{\theta}) \left(A_n(Y,\hat{\theta})^{-1}\right)^T
+    V_n(Y,\hat{\theta}) = B_n(Y,\hat{\theta})^{-1} F_n(Y,\hat{\theta}) \left(B_n(Y,\hat{\theta})^{-1}\right)^T
 
-where
-
-.. math::
-
-    A_n(Y,\hat{\theta}) = n^{-1} \sum_i^n - \psi'(Y_i, \hat{\theta})
-
-where the prime indicates the first derivative, and
+where the 'bread' is
 
 .. math::
 
-    B_n(Y,\hat{\theta}) = n^{-1} \sum_i^n \psi(Y_i, \hat{\theta}) \psi(Y_i, \hat{\theta})^T
+    B_n(Y,\hat{\theta}) = n^{-1} \sum_i^n - \psi'(Y_i, \hat{\theta})
+
+where the :math:`\psi'` indicates the partial derivative, and the 'filling' is
+
+.. math::
+
+    F_n(Y,\hat{\theta}) = n^{-1} \sum_i^n \psi(Y_i, \hat{\theta}) \psi(Y_i, \hat{\theta})^T
 
 While M-Estimation is a general approach, widespread application is hindered by the corresponding derivative and matrix
-calculations. For complex estimating equations, these calculations can be especially tedious. To circumvent these
-barriers, ``delicatessen`` automates the M-Estimator.
+calculations. To circumvent these barriers, ``delicatessen`` automates M-estimators using numerical approximation
+methods.
 
-The following description is a high-level description of the process. The user provides their estimating equation(s) to
-the ``MEstimator`` class object. Next, the ``MEstimator`` object solves for :math:`\theta` using a root-finding
+The following description is a high-level overview. The user provides their estimating equation(s) to
+the ``MEstimator`` class object. Next, the ``MEstimator`` object solves for :math:`\hat{\theta}` using a root-finding
 algorithm. After successful completion of the root-finding step, the bread is computed by numerically approximating the
 partial derivatives and the filling is calculated. Finally, the sandwich variance is computed.
 
@@ -52,12 +51,11 @@ To install ``delicatessen``, use the following command in terminal or command pr
 
 ``python -m pip install delicatessen``
 
-Only two dependencies are necessary for ``delicatessen`` (both of which you will likely have already installed): NumPy
-and SciPy.
+Only two dependencies for ``delicatessen`` are: NumPy, SciPy.
 
-While pandas is not necessary to use ``delicatessen``, several examples are demonstrated with pandas for ease of data
-management. To replicate the tests in ``tests/`` you will need to install ``statsmodels`` and ``pytest`` (but this is
-not necessary for general use of the package either).
+While pandas is not necessary, several examples are demonstrated with pandas for ease of data management. To replicate
+the tests in ``tests/`` you will need to install ``statsmodels`` and ``pytest`` (but this is not necessary for general
+use of the package).
 
 Citation:
 -------------

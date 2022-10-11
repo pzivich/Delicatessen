@@ -5,20 +5,30 @@ Here, we provide an overview of some of the built-in estimating equations with `
 split into three sections, corresponding to basic, regression, and causal estimating equations.
 
 All built-in estimating equations need to be 'wrapped' inside an outer function. Below is a generic example of an outer
-function, where ``psi`` is the wrapper function and ``ee`` is the generic estimating equation example (``ee`` does not
-exist but it a placeholder here).
+function, where ``psi`` is the wrapper function and ``ee`` is the generic estimating equation example (``ee`` is not a
+valid built-in estimating equation).
 
 .. code::
 
     def psi(theta):
         return ee(theta=theta, data=data)
 
-Here, the generic ``ee`` takes two inputs ``theta`` and ``data``. ``theta`` is the general theta vector that is present
+Here, ``ee`` takes two inputs ``theta`` and ``data``. ``theta`` is the general theta vector that is present
 in all stacked estimating equations expected by ``delicatessen``. ``data`` is an argument that takes an input source
 of data. The ``data`` provided should be **in the local scope** of the ``.py`` file this function lives in.
 
 After wrapped in an outer function, the function can be passed to ``MEstimator``. See the examples below for further
 details and examples.
+
+To replicate the following examples, please load the following libraries as shown
+
+.. code::
+
+    import numpy as np
+    import pandas as pd
+    import matplotlib.pyplot as plt
+    from delicatessen import MEstimator
+
 
 Basic Equations
 =============================
@@ -72,11 +82,8 @@ middle ground, whereby outliers contribute to estimation but their influence is 
 
     obs_vals = [1, -10, 2, 1, 4, 1, 4, 2, 4, 2, 3, 12]
 
-Rather than excluding the -10 and 12, we can use the robust mean proposed by Huber. This trims the outliers to a
-pre-specified level. Therefore, they still contribute information but only values up to the bound. In this example, a
-bound of -6,6 will be applied.
-
-The robust mean estimating equation is available in ``ee_mean_robust``.
+Instead, the robust mean can be used instead. The robust mean estimating equation is available in ``ee_mean_robust``,
+with several different options for the loss function.
 
 .. code::
 
@@ -106,7 +113,6 @@ The mean-variance estimating equation can be implemented as follows (remember th
 
 .. code::
 
-    from delicatessen import MEstimator
     from delicatessen.estimating_equations import ee_mean_variance
 
     def psi(theta):
@@ -117,10 +123,10 @@ The mean-variance estimating equation can be implemented as follows (remember th
 
     print(estr.theta)  # [2.4, 1.44]
 
-*Note* the ``init`` here takes two values because the stacked estimating equations has a length of 2 (``theta`` is
-b-by-1 where b=2). The first value of ``theta`` is the mean and the second is the variance. Now, the variance output
-provides a 2-by-2 covariance matrix. The leading diagonal of that matrix are the variances (where the first is the
-estimated variance of the mean and the second is the estimated variance of the variance).
+*Note* ``init`` here takes two values because there are two parameters. The first value of ``theta`` is the mean and
+the second is the variance. Now, the variance output provides a 2-by-2 covariance matrix. The leading diagonal of that
+matrix are the variances (where the first is the estimated variance of the mean and the second is the estimated
+variance of the variance).
 
 Regression
 =============================
@@ -143,7 +149,9 @@ To demonstrate application, consider the following simulated data set
     data = pd.DataFrame()
     data['X'] = np.random.normal(size=n)
     data['Z'] = np.random.normal(size=n)
-    data['Y'] = 0.5 + 2*data['X'] - 1*data['Z'] + np.random.normal(loc=0, size=n)
+    data['Y1'] = 0.5 + 2*data['X'] - 1*data['Z'] + np.random.normal(loc=0, size=n)
+    data['Y2'] = np.random.binomial(n=1, p=logistic.cdf(0.5 + 2*data['X'] - 1*data['Z']), size=n)
+    data['Y3'] = data['Y3'] = np.random.poisson(lam=np.exp(0.5 + 2*data['X'] - 1*data['Z']), size=n)
     data['C'] = 1
 
 In this case, ``X`` and ``Z`` are the independent variables and ``Y`` is the dependent variable. Here the column ``C``
@@ -154,14 +162,13 @@ For this data, we can now create the wrapper function for the ``ee_regression`` 
 
 .. code::
 
-    from delicatessen import MEstimator
     from delicatessen.estimating_equations import ee_regression
 
     def psi(theta):
         return ee_regression(theta=theta,
                              X=data[['C', 'X', 'Z']],
-                             y=data['Y'],
-                             model='linear)
+                             y=data['Y1'],
+                             model='linear')
 
 After creating the wrapper function, we can now call the M-Estimation procedure to estimate the regression coefficients
 and their variance
@@ -169,10 +176,7 @@ and their variance
 .. code::
 
     estr = MEstimator(stacked_equations=psi, init=[0., 0., 0.])
-    estr.estimate()
-
-    print(estr.theta)
-    print(estr.variance)
+    estr.estimate(solver='lm')
 
 Note that there are 3 independent variables, meaning ``init`` needs 3 starting values. The linear regression done here
 should match the ``statsmodels`` generalized linear model with a robust variance estimate. Below is code on how to
@@ -197,19 +201,6 @@ Logistic Regression
 In the case of a binary dependent variable, logistic regression can instead be performed. Consider the following
 simulated data set
 
-.. code::
-
-    import numpy as np
-    import pandas as pd
-    from scipy.stats import logistic
-
-    n = 500
-    data = pd.DataFrame()
-    data['X'] = np.random.normal(size=n)
-    data['Z'] = np.random.normal(size=n)
-    data['Y'] = np.random.binomial(n=1, p=logistic.cdf(0.5 + 2*data['X'] - 1*data['Z']), size=n)
-    data['C'] = 1
-
 In this case, ``X`` and ``Z`` are the independent variables and ``Y`` is the dependent variable. Here the column ``C``
 is created to be the intercept column, since the intercept needs to be manually provided (this may be different from
 other formula-based packages that automatically add the intercept to the regression).
@@ -218,13 +209,10 @@ For this data, we can now create the wrapper function for the ``ee_regression`` 
 
 .. code::
 
-    from delicatessen import MEstimator
-    from delicatessen.estimating_equations import ee_regression
-
     def psi(theta):
         return ee_regression(theta=theta,
                              X=data[['C', 'X', 'Z']],
-                             y=data['Y'],
+                             y=data['Y2'],
                              model='logistic')
 
 After creating the wrapper function, we can now call the M-Estimation procedure to estimate the regression coefficients
@@ -233,10 +221,7 @@ and their variance
 .. code::
 
     estr = MEstimator(stacked_equations=psi, init=[0., 0., 0.])
-    estr.estimate()
-
-    print(estr.theta)
-    print(estr.variance)
+    estr.estimate(solver='lm')
 
 Note that there are 3 independent variables, meaning ``init`` needs 3 starting values. The logistic regression done here
 should match the ``statsmodels`` generalized linear model with a robust variance estimate. Below is code on how to
@@ -247,7 +232,7 @@ compare to ``statsmodels.glm``.
     import statsmodels.api as sm
     import statsmodels.formula.api as smf
 
-    glm = smf.glm("Y ~ X + Z", data,
+    glm = smf.glm("Y2 ~ X + Z", data,
                   family=sm.families.Binomial()).fit(cov_type="HC1")
     print(np.asarray(glm.params))         # Point estimates
     print(np.asarray(glm.cov_params()))   # Covariance matrix
@@ -262,18 +247,6 @@ Poisson Regression
 In the case of a count dependent variable, Poisson regression can instead be performed. Consider the following
 simulated data set
 
-.. code::
-
-    import numpy as np
-    import pandas as pd
-
-    n = 500
-    data = pd.DataFrame()
-    data['X'] = np.random.normal(size=n)
-    data['Z'] = np.random.normal(size=n)
-    data['Y'] = data['Y3'] = np.random.poisson(lam=np.exp(0.5 + 2*data['X'] - 1*data['Z']), size=n)
-    data['C'] = 1
-
 In this case, ``X`` and ``Z`` are the independent variables and ``Y`` is the dependent variable. Here the column ``C``
 is created to be the intercept column, since the intercept needs to be manually provided (this may be different from
 other formula-based packages that automatically add the intercept to the regression).
@@ -282,13 +255,10 @@ For this data, we can now create the wrapper function for the ``ee_regression`` 
 
 .. code::
 
-    from delicatessen import MEstimator
-    from delicatessen.estimating_equations import ee_regression
-
     def psi(theta):
         return ee_regression(theta=theta,
                              X=data[['C', 'X', 'Z']],
-                             y=data['Y'],
+                             y=data['Y3'],
                              model='poisson')
 
 After creating the wrapper function, we can now call the M-Estimation procedure to estimate the regression coefficients
@@ -297,12 +267,38 @@ and their variance
 .. code::
 
     estr = MEstimator(stacked_equations=psi, init=[0., 0., 0.])
-    estr.estimate()
-
-    print(estr.theta)
-    print(estr.variance)
+    estr.estimate(solver='lm')
 
 Note that there are 3 independent variables, meaning ``init`` needs 3 starting values.
+
+Robust Regression
+=============================
+
+Similar to the mean, regression can also be made robust to outliers. This is simply accomplished by placing a loss
+function on the residuals. Again, several loss functions are available. Robust regression is only available for linear
+regression models.
+
+Continuing with the data generated in the previous example, robust linear regression can be implemented as follows
+
+.. code::
+
+    from delicatessen.estimating_equations import ee_robust_regression
+
+    def psi(theta):
+        return ee_robust_regression(theta=theta,
+                                    X=data[['C', 'X', 'Z']],
+                                    y=data['Y1'],
+                                    model='linear', k=1.345)
+
+After creating the wrapper function, we can now call the M-Estimation procedure
+
+.. code::
+
+    estr = MEstimator(stacked_equations=psi, init=[0.5, 2., -1.])
+    estr.estimate(solver='lm')
+
+Note: to help the root-finding procedure, we generally recommend using the simple linear regression values as the
+initial values for robust linear regression.
 
 Penalized Regression
 =============================
@@ -314,9 +310,6 @@ To demonstrate application of the penalized regression models, consider the foll
 
 .. code::
 
-    import numpy as np
-    import pandas as pd
-    from delicatessen import MEstimator
     from delicatessen.estimating_equations import (ee_ridge_regression,
                                                    ee_lasso_regression,
                                                    ee_elasticnet_regression,
@@ -362,9 +355,6 @@ Here, :math:`\lambda=10` for all coefficients, besides the intercept. The M-esti
     estr = MEstimator(stacked_equations=psi, init=[0., 0., 0., 0., 0.])
     estr.estimate(solver='lm')
 
-    print(estr.theta)
-    print(estr.variance)
-
 Different penalty terms can be assigned to each coefficient. Furthermore, the ``center`` argument can be used to
 penalize towards non-zero values for all or some of the coefficients.
 
@@ -377,11 +367,9 @@ is
 
     \frac{\lambda}{n} \text{sign}(\beta)
 
-Here, we use an approximation to the LASSO (rather than the LASSO itself). The reason for this is the LASSO can be
-difficult for root-finding procedures. Instead, we approximate the LASSO by using the bridge penalty with
-:math:`\gamma \rightarrow 1^+`. See the bridge penalty for further details. Another consequence is that coefficients
-will not be exactly zero, however some root-finding algorithms (use :code:`solver='lm'`) will shrink coefficients
-very near to zero.
+Here, we use an approximation to the LASSO (rather than the LASSO itself). Specifically, no root may exist for LASSO.
+Instead, we approximate the LASSO by using the bridge penalty with :math:`\gamma \rightarrow 1^+`. See the bridge
+penalty for further details.
 
 To implement LASSO regression, the estimating equations can be specified as
 
@@ -404,9 +392,6 @@ Here, :math:`\lambda=10` for all coefficients, besides the intercept. The M-esti
     estr = MEstimator(stacked_equations=psi, init=[0., 0., 0., 0., 0.])
     estr.estimate(solver='lm', maxiter=20000)  # NOTE increase in maxiter
 
-    print(estr.theta)
-    print(estr.variance)
-
 Notice the increase in the maximum number of iterations for the root-finder (and the use of :code:`'lm'`). These two
 choices will help the root-finder converge since the LASSO penalty can be difficult to solve for root-finding
 algorithms. Judicious selection of starting values can also help (e.g., starting values from an unpenalized linear
@@ -414,6 +399,9 @@ model).
 
 Different penalty terms can be assigned to each coefficient. Furthermore, the ``center`` argument can be used to
 penalize towards non-zero values for all or some of the coefficients.
+
+Note: the derivative does not always exist for LASSO. Therefore, the sandwich variance estimator may not be valid. When
+using LASSO, a nonparametric bootstrap should be used to estimate the variance instead.
 
 Elastic-Net Penalty
 ----------------------------
@@ -434,7 +422,8 @@ To implement elastic-net regression, the estimating equations can be specified a
     penalty_vals = [0., 10., 10., 10., 10.]
     def psi(theta):
         x, y = data[['C', 'V', 'W', 'X', 'Z']], data['Y1']
-        return ee_elasticnet_regression(theta=theta, X=x, y=y, model='linear',
+        return ee_elasticnet_regression(theta=theta, X=x, y=y,
+                                        model='linear',
                                         ratio=0.5, penalty=penalty_vals)
 
 Here, :math:`\lambda=10` for all coefficients, besides the intercept. The M-estimator is then implemented via
@@ -444,9 +433,6 @@ Here, :math:`\lambda=10` for all coefficients, besides the intercept. The M-esti
     estr = MEstimator(stacked_equations=psi, init=[0., 0., 0., 0., 0.])
     estr.estimate(solver='lm', maxiter=20000)  # NOTE increase in maxiter
 
-    print(estr.theta)
-    print(estr.variance)
-
 Notice the increase in the maximum number of iterations for the root-finder (and the use of :code:`'lm'`). These two
 choices will help the root-finder converge since the LASSO penalty can be difficult to solve for root-finding
 algorithms. Judicious selection of starting values can also help (e.g., starting values from an unpenalized linear
@@ -454,6 +440,9 @@ model).
 
 Different penalty terms can be assigned to each coefficient. Furthermore, the ``center`` argument can be used to
 penalize towards non-zero values for all or some of the coefficients.
+
+Note: the derivative does not always exist for elastic-net. Therefore, the sandwich variance estimator may not be valid.
+When using elastic-net, a nonparametric bootstrap should be used to estimate the variance instead.
 
 Bridge Penalty
 ----------------------------
@@ -464,8 +453,9 @@ as special cases. In the estimating equations, the bridge penalty is
 
     \gamma \frac{\lambda}{n} | \beta |^{\gamma - 1} \text{sign}(\beta)
 
-where :math:`\gamma>0`. However, only :math:`\gamma \ge 1` is supported in ``delicatessen`` (due to the difficulty of
-root-finding for :math:`\gamma<1`).
+where :math:`\gamma>0`. However, only :math:`\gamma \ge 1` is supported in ``delicatessen`` (due to the no roots
+potentially existing when :math:`\gamma<1`). Additionally, the sandwich variance estimator is not valid when
+:math:`\gamma<2`, and a nonparametric bootstrap should be used to estimate the variance instead
 
 To implement bridge regression, the estimating equations can be specified as
 
@@ -474,7 +464,8 @@ To implement bridge regression, the estimating equations can be specified as
     penalty_vals = [0., 10., 10., 10., 10.]
     def psi(theta):
         x, y = data[['C', 'V', 'W', 'X', 'Z']], data['Y']
-        return ee_bridge_regression(theta=theta, X=x, y=y, model='linear',
+        return ee_bridge_regression(theta=theta, X=x, y=y,
+                                    model='linear',
                                     gamma=2.3, penalty=penalty_vals)
 
 where :math:`\gamma` is the :math:`p` value in :math:`L_p`. Setting :math:`\gamma=1` is the LASSO penalty
@@ -485,30 +476,23 @@ and :math:`\gamma=2` is the Ridge penalty. Here, we use a value larger than 2 fo
     estr = MEstimator(stacked_equations=psi, init=[0., 0., 0., 0., 0.])
     estr.estimate(solver='lm')
 
-    print(estr.theta)
-    print(estr.variance)
-
-For the bridge penalty, when :code:`\gamma >= 2`, a larger number of iterations may not be necessary (unlike the LASSO
-and elastic-net penalties). However, :code:`2 > \gamma > 1` may require increasing the max iterations.
-
 Different penalty terms can be assigned to each coefficient. Furthermore, the ``center`` argument can be used to
 penalize towards non-zero values for all or some of the coefficients.
 
 Survival
 =============================
-Estimating equations for parametric survival models are available in v0.3+. Currently available are: exponential and
-weibull models, and accelerated failure time models (AFT). As commonly done in survival analysis, we can imagine that
-each person has two unique times: their event time (:math:`T_i`) and their censoring time (:math:`C_i`). However, we
-(the researcher) are only able to observe whichever one of those times occurs first. Therefore the observable data is
-:math:`t_i = min(T_i, C_i)` and :math:`\delta_i = I(t_i = T_i)`.
+Suppose each person has two unique times: their event time (:math:`T_i`) and their censoring time (:math:`C_i`).
+However, we are only able to observe whichever one of those times occurs first. Therefore the
+observable data is :math:`T^*_i = \text{min}(T_i, C_i)` and :math:`\delta_i = I(T^*_i = T_i)`. However, we want to
+estimate some probability of events using :math:`T_i^*,\delta_i` For an introduction to survival analysis, I would
+recommend Collett D. (2015). "Modelling survival data in medical research".
 
-For the basic survival models, we will use the following generated data set. In accordance with the description above,
-each person is assigned two possible times and then we generate the observed data (``t`` and ``delta`` here).
+Currently available estimating equations for parametric survival models are: exponential and Weibull models, and
+accelerated failure time models (AFT). For the basic survival models, we will use the following generated data set. In
+accordance with the description above, each person is assigned two possible times and then we generate the observed
+data (``t`` and ``delta`` here).
 
 .. code::
-
-    import numpy as np
-    import pandas as pd
 
     n = 100
     d = pd.DataFrame()
@@ -518,20 +502,18 @@ each person is assigned two possible times and then we generate the observed dat
     d['delta'] = np.where(d['T'] < d['C'], 1, 0)
     d['t'] = np.where(d['delta'] == 1, d['T'], d['C'])
 
-For an introduction to survival analysis, I would recommend Collett D. (2015). "Modelling survival data in medical
-research".
-
 Exponential
 -----------------------------
 The exponential model is a one-parameter model, that stipulates the hazard of the event of interest is constant. While
 often too restrictive of an assumption for widespread use, we demonstrate application here.
 
+.. code::
+
+    from delicatessen.estimating_equations import ee_exponential_model, ee_exponential_measure
+
 The wrapper function for the exponential model should look like
 
 .. code::
-
-    from delicatessen import MEstimator
-    from delicatessen.estimating_equations import ee_exponential_model, ee_exponential_measure
 
     def psi(theta):
         # Estimating equations for the exponential model
@@ -545,9 +527,6 @@ exponential model
     estr = MEstimator(psi, init=[1., ])
     estr.estimate(solver='lm')
 
-    print(estr.theta)
-    print(estr.variance)
-
 Here, the parameter for the exponential model should be non-negative (the optimizer does not know this), so a positive
 value should be given to help the root-finding procedure along.
 
@@ -559,8 +538,6 @@ provided time points.
 Below is how we could further generate a plot of the survival function from the estimated exponential model
 
 .. code::
-
-    import matplotlib.pyplot as plt
 
     resolution = 50
     time_spacing = list(np.linspace(0.01, 5, resolution))
@@ -597,12 +574,13 @@ The Weibull model is a generalization of the exponential model to two-parameters
 to vary over time (it can increase or decrease monotonically). While this assumption is also quite restrictive, it may
 be more useful.
 
+.. code::
+
+    from delicatessen.estimating_equations import ee_weibull_model, ee_weibull_measure
+
 The wrapper function for the Weibull model should look like
 
 .. code::
-
-    from delicatessen import MEstimator
-    from delicatessen.estimating_equations import ee_weibull_model, ee_weibull_measure
 
     def psi(theta):
         # Estimating equations for the Weibull model
@@ -615,9 +593,6 @@ Weibull model
 
     estr = MEstimator(psi, init=[1., 1.])
     estr.estimate(solver='lm')
-
-    print(estr.theta)
-    print(estr.variance)
 
 Here, the parameters for the Weibull model should be non-negative (the optimizer does not know this), so a positive
 value should be given to help the root-finding procedure along.
@@ -665,9 +640,9 @@ pre-washing the Weibull model parameter (i.e., use the solution from the previou
 Accelerated Failure Time
 -----------------------------
 Currently, only an AFT model with a Weibull (Weibull-AFT) is available for use. Plans are to add support for other
-AFT. Unlike the previous exponential and Weibull models, the AFT models can further include covariates, where the effect
-of a covariate is interpreted as an 'acceleration' factor. In the two sample case, the AFT can be thought of as the
-following
+AFT distributions. Unlike the previous exponential and Weibull models, the AFT models can further include covariates,
+where the effect of a covariate is interpreted as an 'acceleration' factor. In the two sample case, the AFT can be
+thought of as the following
 
 .. math::
 
@@ -701,12 +676,13 @@ The Weibull AFT assumes that errors follow a Weibull distribution. Therefore, th
 scale parameter (like the Weibull model from before) but not it further includes parameters for each covariate included
 in the AFT model.
 
+.. code::
+
+    from delicatessen.estimating_equations import ee_aft_weibull, ee_aft_weibull_measure
+
 The wrapper function for the Weibull AFT model should look like
 
 .. code::
-
-    from delicatessen import MEstimator
-    from delicatessen.estimating_equations import ee_aft_weibull, ee_aft_weibull_measure
 
     def psi(theta):
         # Estimating equations for the Weibull AFT model
@@ -714,7 +690,7 @@ The wrapper function for the Weibull AFT model should look like
                               t=d['t'], delta=d['delta'],
                               X=d[['X', 'W']])
 
-After creating the wrapper function, we can now call the M-Estimation procedure to estimate the parameters for the
+After creating the wrapper function, we can now call the M-estimator to estimate the parameters for the
 Weibull model
 
 .. code::
@@ -830,13 +806,12 @@ implicit bounds the root-finder isn't aware of. To avoid these issues, we can gi
 First, the upper limit should *always* be greater than the lower limit. Second, the ED50 should be between the lower
 and upper limits. Third, the sign for the steepness depends on whether the response declines (positive) or the response
 increases (negative). Finally, some solvers may be better suited to the problem, so try a few different options. With
-decent initial values, I have found ``lm`` to be fairly reliable.
+decent initial values, we have found ``lm`` to be fairly reliable.
 
 For the 4PL, good general starting values I have found are the following. For the lower-bound, give the minimum response
-value as the initial. For ED50, give the mid-point between the maximum response and the minimum response. The initial
-value for steepness is more difficult. Ideally, we would give a starting value of zero, but that will fail in this
-4PL. Giving a larger starting value (between 2 to 8) works in this example. For the upper-bound, give the maximum
-response value as the initial.
+value as the initial. For ED50, give the median response. The initial value for steepness is more difficult. Ideally,
+we would give a starting value of zero, but that will fail in this 4PL. Giving a larger starting value (between 2 to 8)
+works in this example. For the upper-bound, give the maximum response value as the initial.
 
 To summarize, be sure to examine your data (e.g., scatterplot). This will help to determine the initial starting values
 for the root-finding procedure. Otherwise, you may come across a convergence error.
@@ -908,7 +883,7 @@ While a lower-limit of zero makes sense in this example, the upper-limit of 8 is
 only be viewed as an example of the 2PL model and not how it should be applied in practice). Setting the limits as
 constants should be motivated by substantive knowledge of the problem.
 
-After creating the wrapper function, we can now call the M-Estimation procedure to estimate the coefficients for the
+After creating the wrapper function, we can now call the M-estimator to estimate the coefficients for the
 2PL model and their variance
 
 .. code::
@@ -920,21 +895,20 @@ After creating the wrapper function, we can now call the M-Estimation procedure 
     print(estr.theta)
     print(estr.variance)
 
-As before, you may notice convergence errors. This estimating equation can be hard to optimize since it has implicit
-bounds the root-finder isn't aware of. To avoid these issues, we can give the root-finder good starting values.
+As before, you may notice convergence errors. To avoid these issues, we can give the root-finder good starting values.
 
 For the 2PL, good general starting values I have found are the following. For ED50, give the mid-point between the
 maximum response and the minimum response. The initial value for steepness is more difficult. Ideally, we would give a
 starting value of zero, but that will fail in this 2PL.
 
 To summarize, be sure to examine your data (e.g., scatterplot). This will help to determine the initial starting values
-for the root-finding procedure. Otherwise, you may come across a convergence error.
+for the root-finding procedure.
 
 
 ED(:math:`\delta`)
 ----------------------------
 
-In addition to the :math:`x`-parameter logistic models, an estimating equation to estimate a corresponding
+In addition to the :math:`X`-parameter logistic models, an estimating equation to estimate a corresponding
 :math:`\delta` effective dose is available. Notice that this estimating equation should be stacked with one of
 the :math:`x`-PL models. Here, we demonstrate with the 3PL model.
 
@@ -973,8 +947,8 @@ and estimating equations for these effective doses are
 
 Notice that the estimating equations are stacked together in the order of the ``theta`` vector.
 
-After creating the wrapper function, we can now call the M-Estimation procedure to estimate the coefficients for the
-3PL model, the ED for the :math:`\delta` values, and their variance
+After creating the wrapper function, we can now estimate the coefficients for the 3PL model, the ED for the
+:math:`\delta` values, and their variance
 
 .. code::
 
@@ -998,7 +972,7 @@ starting point for each being the mid-point of the response values.
 Causal Inference
 =============================
 
-This next section describes a the available estimators for the causal mean. These estimators all rely on specific
+This next section describes available estimators for the causal mean. These estimators all rely on specific
 identification conditions to be able to interpret the estimate of the mean (or mean difference) as an estimate of the
 causal mean. For information on these assumptions, I recommend this
 `this paper <https://www.ncbi.nlm.nih.gov/labs/pmc/articles/PMC2652882/>`_ as a general introduction.
@@ -1029,7 +1003,7 @@ Inverse probability weighting
 -------------------------------------
 
 First, we use the inverse probability weighting (IPW) estimator, which models the probability of :math:`A` conditional
-on :math:`W`. In general, the IPW estimator for the mean difference can be written as
+on :math:`W`. In general, the Horvitz-Thompson IPW estimator for the mean difference can be written as
 
 .. math::
 
@@ -1050,7 +1024,6 @@ To load the estimating equations,
 
 .. code::
 
-    from delicatessen import MEstimators
     from delicatessen.estimating_equations import ee_ipw
 
 The estimating equation is then wrapped inside the wrapper ``psi`` function. Notice that the estimating equation has
@@ -1067,7 +1040,7 @@ scores with.
 
 Note that we add an intercept to the logistic model by adding a column of 1's via ``d['C']``.
 
-Here, the initial values provided must be 3+*b* (where *b* is the number of columns in W). For binary
+Here, the initial values provided must be 3 + *b* (where *b* is the number of columns in W). For binary
 outcomes, it will likely be best practice to have the initial values set as ``[0., 0.5, 0.5, ...]``. followed by b
 ``0.``'s. For continuous outcomes, all ``0.`` can be used instead. Furthermore, a logistic model for the propensity
 scores could be optimized outside of ``delicatessen`` and those (pre-washed) regression estimates can be passed as
@@ -1089,14 +1062,7 @@ After successful optimization, we can inspect the estimated values.
     estr.theta[2]    # causal mean under X0
     estr.theta[3:]   # logistic regression coefficients
 
-The variance and Wald-type confidence intervals can also be output via
-
-.. code::
-
-    estr.variance
-    estr.confidence_intervals()
-
-The IPW estimators demonstrates a key advantage of M-Estimation. The stacked estimating equations means that the
+The IPW estimators demonstrates a key advantage of M-estimators. The stacked estimating equations means that the
 sandwich variance correctly incorporates the uncertainty in estimation of the propensity scores into the parameter(s)
 of interest (e.g., average causal effect). Therefore, we do not have to rely on the nonparametric bootstrap
 (computationally cumbersome) or the GEE-trick (conservative estimate of the variance for the average causal effect).
@@ -1136,7 +1102,6 @@ To load the estimating equations,
 
 .. code::
 
-    from delicatessen import MEstimators
     from delicatessen.estimating_equations import ee_gformula
 
 The estimating equation is then wrapped inside the wrapper ``psi`` function. In the first example, we focus on
@@ -1266,7 +1231,6 @@ To load the estimating equations,
 
 .. code::
 
-    from delicatessen import MEstimators
     from delicatessen.estimating_equations import ee_aipw
 
 The estimating equation is then wrapped inside the wrapper ``psi`` function. Like ``ee_gformula``, ``ee_aipw`` requires
@@ -1297,8 +1261,8 @@ copy where :math:`A=0` for everyone. Below is code that does this step and creat
 
 Note that we add an intercept to the outcome model by adding a column of 1's via ``d['C']``.
 
-Here, the initial values provided must be 3+*b*+*c* (where *b* is the number of columns in W and *c* is the number of
-columns in X). For binary outcomes, it will likely be best practice to have the initial values set as
+Here, the initial values provided must be 3 + *b* + *c* (where *b* is the number of columns in W and *c* is the number
+of columns in X). For binary outcomes, it will likely be best practice to have the initial values set as
 ``[0., 0.5, 0.5, ...]``. followed by b ``0.``'s. For continuous outcomes, all ``0.`` can be used instead. Furthermore,
 a regression models could be optimized outside of ``delicatessen`` and those (pre-washed) regression estimates can be
 passed as initial values to speed up optimization.
