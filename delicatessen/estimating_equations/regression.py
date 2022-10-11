@@ -8,25 +8,25 @@ from delicatessen.utilities import logit, inverse_logit, identity, robust_loss_f
 
 
 def ee_regression(theta, X, y, model, weights=None):
-    r"""Default stacked estimating equation for regression, with available options including: linear, logistic, and
-    Poisson regression. The general estimating equation is
+    r"""Estimating equation for regression. Options include: linear, logistic, and Poisson regression. The general
+    estimating equation is
 
     .. math::
 
         \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n (Y_i - g(X_i^T \theta)) X_i = 0
 
-    where :math:`g` indicates a general transformation function. For linear regression, :math:`g` is the identity
-    function. Logistic regression uses the expit, or the inverse-logit function, :math:`expit(u) = 1 / (1 + exp(u))`.
-    Finally, Poisson regression is :math:`g(u) = \exp(u)`.
+    where :math:`g` indicates a transformation function. For linear regression, :math:`g` is the identity function.
+    Logistic regression uses the inverse-logit function, :math:`expit(u) = 1 / (1 + exp(u))`. Finally, Poisson
+    regression is :math:`\exp(u)`.
 
     Here, theta is a 1-by-b array, where b is the distinct covariates included as part of X. For example, if X is a
-    3-by-n matrix, then theta will be a 1-by-3 array. The code is general to allow for an arbitrary number of X's (as
-    long as there is enough support in the data).
+    3-by-n matrix, then theta will be a 1-by-3 array. The code is general to allow for an arbitrary number of X's.
 
     Note
     ----
     All provided estimating equations are meant to be wrapped inside a user-specified function. Throughout, these
     user-defined functions are defined as ``psi``.
+
 
     Here, :math:`\theta` corresponds to the coefficients in the corresponding regression model
 
@@ -34,24 +34,21 @@ def ee_regression(theta, X, y, model, weights=None):
     ----------
     theta : ndarray, list, vector
         Theta in this case consists of b values. Therefore, initial values should consist of the same number as the
-        number of columns present. This can easily be accomplished generally by ``[0, ] * X.shape[1]``.
+        number of columns present. This can easily be implemented by ``[0, ] * X.shape[1]``.
     X : ndarray, list, vector
-        2-dimensional vector of n observed values for b variables. No missing data should be included (missing data
-        may cause unexpected behavior).
+        2-dimensional vector of n observed values for b variables.
     y : ndarray, list, vector
-        1-dimensional vector of n observed values. No missing data should be included (missing data may cause unexpected
-        behavior).
+        1-dimensional vector of n observed values.
     model : str
         Type of regression model to estimate. Options are ``'linear'`` (linear regression), ``'logistic'`` (logistic
         regression), and ``'poisson'`` (Poisson regression).
     weights : ndarray, list, vector, None, optional
-        1-dimensional vector of n weights. No missing weights should be included. Default is None, which assigns a
-        weight of 1 to all observations.
+        1-dimensional vector of n weights. Default is None, which assigns a weight of 1 to all observations.
 
     Returns
     -------
     array :
-        Returns a b-by-n NumPy array evaluated for the input theta and y
+        Returns a b-by-n NumPy array evaluated for the input ``theta``
 
     Examples
     --------
@@ -82,7 +79,7 @@ def ee_regression(theta, X, y, model, weights=None):
     >>> def psi(theta):
     >>>     return ee_regression(theta=theta, X=data[['C', 'X', 'Z']], y=data['Y1'], model='linear')
 
-    Calling the M-estimation procedure (note that ``init`` requires 3 values, since ``X.shape[1] = 3``).
+    Calling the M-estimator (note that ``init`` requires 3 values, since ``X.shape[1]`` is 3).
 
     >>> estr = MEstimator(stacked_equations=psi, init=[0., 0., 0.,])
     >>> estr.estimate()
@@ -109,8 +106,7 @@ def ee_regression(theta, X, y, model, weights=None):
     >>> estr = MEstimator(stacked_equations=psi, init=[0., 0., 0.,])
     >>> estr.estimate()
 
-    Additionally, weighted versions of all the previous models can be estimated by specifying the optional ``weights``
-    argument.
+    Weighted models can be estimated by specifying the optional ``weights`` argument.
 
     References
     ----------
@@ -132,59 +128,11 @@ def ee_regression(theta, X, y, model, weights=None):
 
 
 def ee_linear_regression(theta, X, y, weights=None):
-    r"""Default stacked estimating equation for linear regression without the homoscedastic assumption.
+    r"""Estimating equation for linear regression.
 
     Note
     ----
     The function ``ee_linear_regression`` is deprecated. Please use ``ee_regression`` instead.
-
-    The estimating equation is
-
-    .. math::
-
-        \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n (Y_i - X_i^T \theta) X_i = 0
-
-    Here, theta is a 1-by-b array, where b is the distinct covariates included as part of X. For example, if X is a
-    3-by-n matrix, then theta will be a 1-by-3 array. The code is general to allow for an arbitrary number of X's (as
-    long as there is enough support in the data).
-
-    Note
-    ----
-    All provided estimating equations are meant to be wrapped inside a user-specified function. Throughtout, these
-    user-defined functions are defined as ``psi``.
-
-    Here, theta corresponds to the coefficients in a linear regression model
-
-    Note
-    ----
-    For complex regression problems, the optimizer behind the scenes is not particularly robust (unlike functions
-    specializing in solely OLS). Therefore, optimization of OLS via a separate functionality can be done then those
-    estimated parameters are fed forward as the initial values (which should result in a more stable optimization).
-
-    Parameters
-    ----------
-    theta : ndarray, list, vector
-        Theta in this case consists of b values. Therefore, initial values should consist of the same number as the
-        number of columns present. This can easily be accomplished generally by ``[0, ] * X.shape[1]``.
-    X : ndarray, list, vector
-        2-dimensional vector of n observed values for b variables. No missing data should be included (missing data
-        may cause unexpected behavior).
-    y : ndarray, list, vector
-        1-dimensional vector of n observed values. No missing data should be included (missing data may cause unexpected
-        behavior).
-    weights : ndarray, list, vector, None, optional
-        1-dimensional vector of n weights. No missing weights should be included. Default is None, which assigns a
-        weight of 1 to all observations.
-
-    Returns
-    -------
-    array :
-        Returns a b-by-n NumPy array evaluated for the input theta and y
-
-    References
-    ----------
-    Boos DD, & Stefanski LA. (2013). M-estimation (estimating equations). In Essential Statistical Inference
-    (pp. 297-337). Springer, New York, NY.
     """
     warnings.warn("Regression estimating equations should be implemented using `ee_regression`. The specific type of "
                   "regression estimating equations will be removed in v1.0", DeprecationWarning)
@@ -192,67 +140,11 @@ def ee_linear_regression(theta, X, y, weights=None):
 
 
 def ee_logistic_regression(theta, X, y, weights=None):
-    r"""Default stacked estimating equation for logistic regression.
+    r"""Estimating equation for logistic regression.
 
     Note
     ----
     The function ``ee_linear_regression`` is deprecated. Please use ``ee_regression`` instead.
-
-    The estimating equation is
-
-    .. math::
-
-        \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n (Y_i - expit(X_i^T \theta)) X_i = 0
-
-    where expit, or the inverse logit is
-
-    .. math::
-
-        expit(u) = 1 / (1 + exp(u))
-
-    Here, theta is a 1-by-b array, where b is the distinct covariates included as part of X. For example, if X is a
-    3-by-n matrix, then theta will be a 1-by-3 array. The code is general to allow for an arbitrary number of X's (as
-    long as there is enough support in the data).
-
-    Note
-    ----
-    All provided estimating equations are meant to be wrapped inside a user-specified function. Throughtout, these
-    user-defined functions are defined as ``psi``.
-
-    Here, theta corresponds to the coefficients in a logistic regression model, and therefore are the log-odds.
-
-    Note
-    ----
-    For complex regression problems, the optimizer behind the scenes is not particularly robust (unlike functions
-    specializing in solely logistic regression). Therefore, optimization of logistic regression via a separate
-    functionality can be done then those estimated parameters are fed forward as the initial values (which should
-    result in a more stable optimization).
-
-
-    Parameters
-    ----------
-    theta : ndarray, list, vector
-        Theta in this case consists of b values. Therefore, initial values should consist of the same number as the
-        number of columns present. This can easily be accomplished generally by ``[0, ] * X.shape[1]``.
-    X : ndarray, list, vector
-        2-dimensional vector of n observed values for b variables. No missing data should be included (missing data
-        may cause unexpected behavior).
-    y : ndarray, list, vector
-        1-dimensional vector of n observed values. The Y values should all be 0 or 1. No missing data should be
-        included (missing data may cause unexpected behavior).
-    weights : ndarray, list, vector, None, optional
-        1-dimensional vector of n weights. No missing weights should be included. Default is None, which assigns a
-        weight of 1 to all observations.
-
-    Returns
-    -------
-    array :
-        Returns a b-by-n NumPy array evaluated for the input theta and y
-
-    References
-    ----------
-    Boos DD, & Stefanski LA. (2013). M-estimation (estimating equations). In Essential Statistical Inference
-    (pp. 297-337). Springer, New York, NY.
     """
     warnings.warn("Regression estimating equations should be implemented using `ee_regression`. The specific type of "
                   "regression estimating equations will be removed in v1.0", DeprecationWarning)
@@ -260,53 +152,11 @@ def ee_logistic_regression(theta, X, y, weights=None):
 
 
 def ee_poisson_regression(theta, X, y, weights=None):
-    r"""Default stacked estimating equation for Poisson regression.
+    r"""Estimating equation for Poisson regression.
 
     Note
     ----
     The function ``ee_linear_regression`` is deprecated. Please use ``ee_regression`` instead.
-
-    The estimating equation is
-
-    .. math::
-
-        \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n (Y_i - \exp(X_i^T \theta)) X_i = 0
-
-    Here, theta is a 1-by-b array, where b is the distinct covariates included as part of X. For example, if X is a
-    3-by-n matrix, then theta will be a 1-by-3 array. The code is general to allow for an arbitrary number of X's (as
-    long as there is enough support in the data).
-
-    Note
-    ----
-    All provided estimating equations are meant to be wrapped inside a user-specified function. Throughtout, these
-    user-defined functions are defined as ``psi``.
-
-    Note
-    ----
-    For complex regression problems, the optimizer behind the scenes is not particularly robust (unlike functions
-    specializing in solely logistic regression). Therefore, optimization of logistic regression via a separate
-    functionality can be done then those estimated parameters are fed forward as the initial values (which should
-    result in a more stable optimization).
-
-    Parameters
-    ----------
-    theta : ndarray, list, vector
-        Theta in this case consists of b values. Therefore, initial values should consist of the same number as the
-        number of columns present. This can easily be accomplished generally by ``[0, ] * X.shape[1]``.
-    X : ndarray, list, vector
-        2-dimensional vector of n observed values for b variables. No missing data should be included (missing data
-        may cause unexpected behavior).
-    y : ndarray, list, vector
-        1-dimensional vector of n observed values. The Y values should all be 0 or 1. No missing data should be
-        included (missing data may cause unexpected behavior).
-    weights : ndarray, list, vector, None, optional
-        1-dimensional vector of n weights. No missing weights should be included. Default is None, which assigns a
-        weight of 1 to all observations.
-
-    Returns
-    -------
-    array :
-        Returns a b-by-n NumPy array evaluated for the input theta and y
     """
     warnings.warn("Regression estimating equations should be implemented using `ee_regression`. The specific type of "
                   "regression estimating equations will be removed in v1.0", DeprecationWarning)
@@ -318,13 +168,13 @@ def ee_poisson_regression(theta, X, y, weights=None):
 
 
 def ee_robust_regression(theta, X, y, model, k, loss='huber', weights=None, upper=None, lower=None):
-    r"""Default stacked estimating equations for (unscaled) robust regression. Specifically, robust linear regression is
-    robust to outlying observations of the outcome variable (``y``). Currently, only linear regression is supported by
+    r"""Estimating equations for (unscaled) robust regression. Robust linear regression is robust to outlying
+    observations of the outcome variable (``y``). Currently, only linear regression is supported by
     ``ee_robust_regression``. The estimating equation is
 
     .. math::
 
-        \sum_i^n \f_k(Y_i - X_i^T \theta) X_i = 0
+        \sum_{i=1}^n f_k(Y_i - X_i^T \theta) X_i = 0
 
     where :math:`f_k(x)` is the corresponding robust loss function. Options for the loss function include: Huber,
     Tukey's biweight, Andrew's Sine, and Hampel. See ``robust_loss_function`` for further details on the loss
@@ -349,23 +199,20 @@ def ee_robust_regression(theta, X, y, model, k, loss='huber', weights=None, uppe
     ----------
     theta : ndarray, list, vector
         Theta in this case consists of b values. Therefore, initial values should consist of the same number as the
-        number of columns present. This can easily be accomplished generally by ``[0, ] * X.shape[1]``.
+        number of columns present. This can easily be implemented via ``[0, ] * X.shape[1]``.
     X : ndarray, list, vector
-        2-dimensional vector of n observed values for b variables. No missing data should be included (missing data
-        may cause unexpected behavior).
+        2-dimensional vector of n observed values for b variables.
     y : ndarray, list, vector
-        1-dimensional vector of n observed values. No missing data should be included (missing data may cause unexpected
-        behavior).
+        1-dimensional vector of n observed values.
     model : str
-        Type of regression model to estimate. Options only include ``'linear'`` (linear regression).
+        Type of regression model to estimate. Options include: ``'linear'`` (linear regression).
     k : int, float
         Tuning or hyperparameter for the chosen loss function. Notice that the choice of hyperparameter should depend
         on the chosen loss function.
     loss : str, optional
         Robust loss function to use. Default is 'huber'. Options include 'andrew', 'hampel', 'huber', 'tukey'.
     weights : ndarray, list, vector, None, optional
-        1-dimensional vector of n weights. No missing weights should be included. Default is None, which assigns a
-        weight of 1 to all observations.
+        1-dimensional vector of n weights. Default is None, which assigns a weight of 1 to all observations.
     lower : int, float, None, optional
         Lower parameter for the 'hampel' loss function. This parameter does not impact the other loss functions.
         Default is ``None``.
@@ -376,7 +223,7 @@ def ee_robust_regression(theta, X, y, model, k, loss='huber', weights=None, uppe
     Returns
     -------
     array :
-        Returns a b-by-n NumPy array evaluated for the input theta and y
+        Returns a b-by-n NumPy array evaluated for the input ``theta``
 
     Examples
     --------
@@ -407,7 +254,7 @@ def ee_robust_regression(theta, X, y, model, k, loss='huber', weights=None, uppe
     >>> def psi(theta):
     >>>         return ee_robust_regression(theta=theta, X=X, y=y, model='linear', k=1.345, loss='huber')
 
-    Calling the M-estimation procedure (note that ``init`` has 3 values now, since ``X.shape[1] = 3``).
+    Calling the M-estimator procedure (note that ``init`` has 3 values now, since ``X.shape[1]`` is 3).
 
     >>> estr = MEstimator(stacked_equations=psi, init=[0., 0., 0.,])
     >>> estr.estimate()
@@ -458,66 +305,15 @@ def ee_robust_regression(theta, X, y, model, k, loss='huber', weights=None, uppe
 
 
 def ee_robust_linear_regression(theta, X, y, k, weights=None):
-    r"""Default stacked estimating equation for robust linear regression.
+    r"""Estimating equations for robust linear regression.
 
     Note
     ----
     The function ``ee_robust_linear_regression`` is deprecated. Please use ``ee_robust_regression`` instead.
-
-    The estimating equation is
-
-    .. math::
-
-        \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n \psi_k(Y_i - X_i^T \theta) X_i = 0
-
-    where k indicates the upper and lower bounds. Here, theta is a 1-by-b array, where b is the distinct covariates
-    included as part of X. For example, if X is a 3-by-n matrix, then theta will be a 1-by-3 array. The code is general
-    to allow for an arbitrary number of X's (as long as there is enough support in the data).
-
-    Note
-    ----
-    All provided estimating equations are meant to be wrapped inside a user-specified function. Throughtout, these
-    user-defined functions are defined as ``psi``.
-
-    Here, theta corresponds to the coefficients in a robust linear regression model
-
-    Note
-    ----
-    For complex regression problems, the optimizer behind the scenes is not particularly robust (unlike functions
-    specializing in solely OLS). Therefore, optimization of OLS via a separate functionality can be done then those
-    estimated parameters are fed forward as the initial values (which should result in a more stable optimization).
-
-    Parameters
-    ----------
-    theta : ndarray, list, vector
-        Theta in this case consists of b values. Therefore, initial values should consist of the same number as the
-        number of columns present. This can easily be accomplished generally by ``[0, ] * X.shape[1]``.
-    X : ndarray, list, vector
-        2-dimensional vector of n observed values for b variables. No missing data should be included (missing data
-        may cause unexpected behavior).
-    y : ndarray, list, vector
-        1-dimensional vector of n observed values. No missing data should be included (missing data may cause unexpected
-        behavior).
-    k : int, float
-        Value to set the symmetric maximum upper and lower bounds on the difference between the observations and
-        predicted values
-    weights : ndarray, list, vector, None, optional
-        1-dimensional vector of n weights. No missing weights should be included. Default is None, which assigns a
-        weight of 1 to all observations.
-
-    Returns
-    -------
-    array :
-        Returns a b-by-n NumPy array evaluated for the input theta and y
-
-    References
-    ----------
-    Boos DD, & Stefanski LA. (2013). M-estimation (estimating equations). In Essential Statistical Inference
-    (pp. 297-337). Springer, New York, NY.
     """
     warnings.warn("Robust regression estimating equations should be implemented using `ee_robust_regression`. The "
                   "specific type of regression estimating equations will be removed in v1.0", DeprecationWarning)
-    return ee_robust_regression(theta=theta, X=X, y=y, model='linear', k=k, weights=weights)
+    return ee_robust_regression(theta=theta, X=X, y=y, model='linear', loss='huber', k=k, weights=weights)
 
 
 #################################################################
@@ -525,12 +321,12 @@ def ee_robust_linear_regression(theta, X, y, k, weights=None):
 
 
 def ee_ridge_regression(theta, y, X, model, penalty, weights=None, center=0.):
-    r"""Default stacked estimating equation for ridge linear regression. Ridge regression applies an L2-regularization
-    through a squared magnitude penalty. The estimating equation is
+    r"""Estimating equations for ridge regression. Ridge regression applies an L2-regularization through a squared
+    magnitude penalty. The estimating equation(s) is
 
     .. math::
 
-        \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n (Y_i - X_i^T \theta) X_i - \lambda \theta = 0
+        \sum_{i=1}^n (Y_i - X_i^T \theta) X_i - \lambda \theta = 0
 
     where :math:`\lambda` is the penalty term.
 
@@ -543,25 +339,22 @@ def ee_ridge_regression(theta, y, X, model, penalty, weights=None, center=0.):
     ----------
     theta : ndarray, list, vector
         Theta in this case consists of b values. Therefore, initial values should consist of the same number as the
-        number of columns present. This can easily be accomplished generally by ``[0, ] * X.shape[1]``.
+        number of columns present. This can easily be implemented via ``[0, ] * X.shape[1]``.
     X : ndarray, list, vector
-        2-dimensional vector of n observed values for b variables. No missing data should be included (missing data
-        may cause unexpected behavior).
+        2-dimensional vector of n observed values for b variables.
     y : ndarray, list, vector
-        1-dimensional vector of n observed values. No missing data should be included (missing data may cause unexpected
-        behavior).
+        1-dimensional vector of n observed values.
     model : str
         Type of regression model to estimate. Options are ``'linear'`` (linear regression), ``'logistic'`` (logistic
         regression), and ``'poisson'`` (Poisson regression).
     penalty : int, float, ndarray, list, vector
         Penalty term to apply to all coefficients (if only a integer or float is provided) or the corresponding
         coefficient (if a list or vector of integers or floats is provided). Note that the penalty term should either
-        consists of a single value or b values (to match the length of ``theta``).
+        consists of a single value or b values (to match the length of ``theta``). The penalty is scaled by n.
     weights : ndarray, list, vector, None, optional
-        1-dimensional vector of n weights. No missing weights should be included. Default is None, which assigns a
-        weight of 1 to all observations.
+        1-dimensional vector of n weights. Default is ``None``, which assigns a weight of 1 to all observations.
     center : int, float, ndarray, list, vector, optional
-        Center or reference value to penalized estimated coefficients towards. Default is zero, which penalized
+        Center or reference value to penalized estimated coefficients towards. Default is ``0``, which penalized
         coefficients towards the null. Other center values can be specified for all coefficients (by providing an
         integer or float) or covariate-specific centering values (by providing a vector of values of the same length as
         X).
@@ -569,7 +362,7 @@ def ee_ridge_regression(theta, y, X, model, penalty, weights=None, center=0.):
     Returns
     -------
     array :
-        Returns a b-by-n NumPy array evaluated for the input theta and y
+        Returns a b-by-n NumPy array evaluated for the input ``theta``
 
     Examples
     --------
@@ -582,7 +375,7 @@ def ee_ridge_regression(theta, y, X, model, penalty, weights=None, center=0.):
     >>> from delicatessen import MEstimator
     >>> from delicatessen.estimating_equations import ee_ridge_regression
 
-    Some generic data to estimate a linear regresion model
+    Some generic data to estimate Ridge regression models
 
     >>> n = 500
     >>> data = pd.DataFrame()
@@ -606,7 +399,7 @@ def ee_ridge_regression(theta, y, X, model, penalty, weights=None, center=0.):
     >>>     x, y = data[['C', 'V', 'W', 'X', 'Z']], data['Y1']
     >>>     return ee_ridge_regression(theta=theta, X=x, y=y, model='linear', penalty=penalty_vals)
 
-    Calling the M-estimation procedure (note that ``init`` has 5 values now, since ``X.shape[1] = 5``).
+    Calling the M-estimator (note that ``init`` has 5 values now, since ``X.shape[1]`` is 5).
 
     >>> estr = MEstimator(stacked_equations=psi, init=[0., 0., 0., 0., 0.])
     >>> estr.estimate(solver='lm')
@@ -637,12 +430,11 @@ def ee_ridge_regression(theta, y, X, model, penalty, weights=None, center=0.):
     >>> estr = MEstimator(stacked_equations=psi, init=[0., 0., 0., 0., 0.])
     >>> estr.estimate(solver='lm')
 
-    Additionally, weighted versions of all the previous models can be estimated by specifying the optional ``weights``
-    argument.
+    Weighted models can be estimated by specifying the optional ``weights`` argument.
 
     References
     ----------
-    Fu WJ. (1998). Penalized regressions: the bridge versus the lasso. Journal of Computational and Graphical
+    Fu WJ. (1998). Penalized regressions: the Bridge versus the LASSO. Journal of Computational and Graphical
     Statistics, 7(3), 397-416.
 
     Fu WJ. (2003). Penalized estimating equations. Biometrics, 59(1), 126-132.
@@ -665,25 +457,26 @@ def ee_ridge_regression(theta, y, X, model, penalty, weights=None, center=0.):
 
 
 def ee_lasso_regression(theta, y, X, model, penalty, epsilon=3.e-3, weights=None, center=0.):
-    r"""Default stacked estimating equation for an approximate LASSO (least absolute shrinkage and selection operator)
-    regressor. LASSO regression applies an L1-regularization through a magnitude penalty. The estimating equation for
-    the approximate LASSO is
-
-    .. math::
-
-        \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n (Y_i - X_i^T \theta) X_i - \lambda (1 + \epsilon)
-        | \theta |^{\epsilon} sign(\theta) = 0
-
-    where :math:`\lambda` is the penalty term.
-    Here, we are using an approximation based on the bridge penalty. For the bridge penalty, LASSO is the special case
-    where :math:`\epsilon = 0`. By making :math:`\epsilon > 0`, we can approximate the LASSO. See the rest of the
-    documentation for further details.
+    r"""Estimating equation for an approximate LASSO (least absolute shrinkage and selection operator) regressor. LASSO
+    regression applies an L1-regularization through a magnitude penalty.
 
     Note
     ----
-    LASSO is not strictly convex. Therefore, root-finding may be difficult. To get around this issue,
-    ``ee_lasso_regression`` uses an approximation to LASSO. Additionally, the approximate LASSO will not result in
-    coefficients of exactly zero, but coefficients will be shrunk to near zero.
+    As the derivative of the estimating equation for LASSO is not defined, the bread (and sandwich) cannot be used to
+    estimate the variance in all settings.
+
+
+    The estimating equation for the approximate LASSO is
+
+    .. math::
+
+        \sum_i^n (Y_i - X_i^T \theta) X_i - \lambda (1 + \epsilon) | \theta |^{\epsilon} sign(\theta) = 0
+
+    where :math:`\lambda` is the penalty term.
+
+    Here, an approximation based on the bridge penalty for the LASSO is used. For the bridge penalty, LASSO is the
+    special case where :math:`\epsilon = 0`. By making :math:`\epsilon > 0`, we can approximate the LASSO. The true
+    LASSO may not be possible to implement due to the existence of multiple solutions
 
     Here, :math:`\theta` is a 1-by-b array, where b is the distinct covariates included as part of X. For example, if
     X is a 3-by-n matrix, then theta will be a 1-by-3 array. The code is general to allow for an arbitrary number of
@@ -694,40 +487,30 @@ def ee_lasso_regression(theta, y, X, model, penalty, epsilon=3.e-3, weights=None
     The 'strength' of the penalty term is indicated by :math:`\lambda`, which is the ``penalty`` argument scaled (or
     divided by) the number of observations.
 
-    Note
-    ----
-    Root-finding for ``ee_lasso_regression`` can be difficult. In general, it is recommended to use the
-    Leverberg-Marquette algorithm (``MEstimator.estimate(solver='lm')``), increase the number of iterations, and
-    possibly run some pre-washing for starting values.
 
     Parameters
     ----------
     theta : ndarray, list, vector
         Theta in this case consists of b values. Therefore, initial values should consist of the same number as the
-        number of columns present. This can easily be accomplished generally by ``[0, ] * X.shape[1]``.
+        number of columns present. This can easily be implemented via ``[0, ] * X.shape[1]``.
     X : ndarray, list, vector
-        2-dimensional vector of n observed values for b variables. No missing data should be included (missing data
-        may cause unexpected behavior).
+        2-dimensional vector of n observed values for b variables.
     y : ndarray, list, vector
-        1-dimensional vector of n observed values. No missing data should be included (missing data may cause unexpected
-        behavior).
+        1-dimensional vector of n observed values.
     model : str
         Type of regression model to estimate. Options are ``'linear'`` (linear regression), ``'logistic'`` (logistic
         regression), and ``'poisson'`` (Poisson regression).
     penalty : int, float, ndarray, list, vector
         Penalty term to apply to all coefficients (if only a integer or float is provided) or the corresponding
         coefficient (if a list or vector of integers or floats is provided). Note that the penalty term should either
-        consists of a single value or b values (to match the length of ``theta``).
+        consists of a single value or b values (to match the length of ``theta``).  The penalty is scaled by n.
     epsilon : float, optional
-        Approximation error to use for the LASSO approximation. LASSO is the case where ``epsilon=0``. However, the
-        lack of strict convexity of the penalty may causes issues for root-finding. Using an approximation described
-        by Fu (2003) is used instead. Instead, ``epsilon`` is set to be slightly larger than 1. Notice that ``epsilon``
-        must be > 0. Default argument is 0.003, which results in a bridge penalty of 1.0003.
+        Approximation error to use for the LASSO approximation. Default argument is ``0.003``, which results in a
+        bridge penalty of 1.0003.
     weights : ndarray, list, vector, None, optional
-        1-dimensional vector of n weights. No missing weights should be included. Default is None, which assigns a
-        weight of 1 to all observations.
+        1-dimensional vector of n weights. Default is ``None``, which assigns a weight of 1 to all observations.
     center : int, float, ndarray, list, vector, optional
-        Center or reference value to penalized estimated coefficients towards. Default is zero, which penalized
+        Center or reference value to penalized estimated coefficients towards. Default is ``0``, which penalized
         coefficients towards the null. Other center values can be specified for all coefficients (by providing an
         integer or float) or covariate-specific centering values (by providing a vector of values of the same length as
         X).
@@ -735,7 +518,7 @@ def ee_lasso_regression(theta, y, X, model, penalty, epsilon=3.e-3, weights=None
     Returns
     -------
     array :
-        Returns a b-by-n NumPy array evaluated for the input theta and y
+        Returns a b-by-n NumPy array evaluated for the input ``theta``
 
     Examples
     --------
@@ -748,7 +531,7 @@ def ee_lasso_regression(theta, y, X, model, penalty, epsilon=3.e-3, weights=None
     >>> from delicatessen import MEstimator
     >>> from delicatessen.estimating_equations import ee_lasso_regression
 
-    Some generic data to estimate a linear regresion model
+    Some generic data to estimate a LASSO regression model
 
     >>> n = 500
     >>> data = pd.DataFrame()
@@ -772,17 +555,14 @@ def ee_lasso_regression(theta, y, X, model, penalty, epsilon=3.e-3, weights=None
     >>>     x, y = data[['C', 'V', 'W', 'X', 'Z']], data['Y1']
     >>>     return ee_lasso_regression(theta=theta, X=x, y=y, model='linear', penalty=penalty_vals)
 
-    Calling the M-estimation procedure (note that ``init`` has 5 values now, since ``X.shape[1] = 5``). Additionally,
-    we set the maximum number of iterations to be much larger.
+    Calling the M-estimator (note that ``init`` has 5 values now, since ``X.shape[1]`` is 5).
 
     >>> estr = MEstimator(stacked_equations=psi, init=[0.01, 0.01, 0.01, 0.01, 0.01])
     >>> estr.estimate(solver='lm', maxiter=20000)
 
-    Inspecting the parameter estimates, variance, and confidence intervals
+    Inspecting the parameter estimates
 
     >>> estr.theta
-    >>> estr.variance
-    >>> estr.confidence_intervals()
 
     Next, we can estimate the parameters for a logistic regression model as follows
 
@@ -804,8 +584,7 @@ def ee_lasso_regression(theta, y, X, model, penalty, epsilon=3.e-3, weights=None
     >>> estr = MEstimator(stacked_equations=psi, init=[0.01, 0.01, 0.01, 0.01, 0.01])
     >>> estr.estimate(solver='lm', maxiter=20000)
 
-    Additionally, weighted versions of all the previous models can be estimated by specifying the optional ``weights``
-    argument.
+    Weighted models can be estimated by specifying the optional ``weights`` argument.
 
     References
     ----------
@@ -834,25 +613,24 @@ def ee_lasso_regression(theta, y, X, model, penalty, epsilon=3.e-3, weights=None
 
 
 def ee_elasticnet_regression(theta, y, X, model, penalty, ratio, epsilon=3.e-3, weights=None, center=0.):
-    r"""Default stacked estimating equation for Elastic-net regression. Elastic-net applies both L1- and
-    L2-regularization at a pre-specified ratio. Notice that the L1 penalty is based on an approximation. See
-    ``ee_lasso_regression`` for further details on the approximation for the L1 penalty. The estimating equation for
-    Elastic-net with the approximate L1 penalty is
-
-    .. math::
-
-        \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n (Y_i - X_i^T \theta) X_i - \lambda r (1 + \epsilon)
-        | \theta |^{\epsilon} sign(\theta) - \lambda (1-r) \theta = 0
-
-    where :math:`\lambda` is the penalty term and :math:`r` is the ratio for the L1 vs L2 penalty. Here, we are using
-    an approximation based on the bridge penalty. For the bridge penalty, LASSO is the special case where
-    :math:`\gamma = 1`. By making :math:`\epsilon > 0`, we can approximate the LASSO. The ridge penalty is the bridge
-    penalty where :math:`\gamma = 2`, which can be evaluated directly.
+    r"""Estimating equations for Elastic-Net regression. Elastic-Net applies both L1- and L2-regularization at a
+    pre-specified ratio. Notice that the L1 penalty is based on an approximation. See ``ee_lasso_regression`` for
+    further details on the approximation for the L1 penalty.
 
     Note
     ----
-    LASSO is not strictly convex. Therefore, root-finding may be difficult. To get around this issue,
-    ``ee_elasticnet_regression`` uses an approximation to LASSO.
+    As the derivative of the estimating equation for Elastic-Net is not defined, the bread (and sandwich) cannot be used to
+    estimate the variance in all settings.
+
+
+    The estimating equation for Elastic-Net with the approximate L1 penalty is
+
+    .. math::
+
+        \sum_{i=1}^n (Y_i - X_i^T \theta) X_i - \lambda r (1 + \epsilon)
+        | \theta |^{\epsilon} sign(\theta) - \lambda (1-r) \theta = 0
+
+    where :math:`\lambda` is the penalty term and :math:`r` is the ratio for the L1 vs L2 penalty.
 
     Here, :math:`\theta` is a 1-by-b array, where b is the distinct covariates included as part of X. For example, if
     X is a 3-by-n matrix, then theta will be a 1-by-3 array. The code is general to allow for an arbitrary number of
@@ -863,42 +641,33 @@ def ee_elasticnet_regression(theta, y, X, model, penalty, ratio, epsilon=3.e-3, 
     The 'strength' of the penalty term is indicated by :math:`\lambda`, which is the ``penalty`` argument scaled (or
     divided by) the number of observations.
 
-    Note
-    ----
-    Root-finding for ``ee_elasticnet_regression`` can be difficult when the L1 penalty is set to be stronger. In
-    general, it is recommended to use the Leverberg-Marquette algorithm (``MEstimator.estimate(solver='lm')``).
 
     Parameters
     ----------
     theta : ndarray, list, vector
         Theta in this case consists of b values. Therefore, initial values should consist of the same number as the
-        number of columns present. This can easily be accomplished generally by ``[0, ] * X.shape[1]``.
+        number of columns present. This can easily be implemented via ``[0, ] * X.shape[1]``.
     X : ndarray, list, vector
-        2-dimensional vector of n observed values for b variables. No missing data should be included (missing data
-        may cause unexpected behavior).
+        2-dimensional vector of n observed values for b variables.
     y : ndarray, list, vector
-        1-dimensional vector of n observed values. No missing data should be included (missing data may cause unexpected
-        behavior).
+        1-dimensional vector of n observed values.
     model : str
         Type of regression model to estimate. Options are ``'linear'`` (linear regression), ``'logistic'`` (logistic
         regression), and ``'poisson'`` (Poisson regression).
     penalty : int, float, ndarray, list, vector
         Penalty term to apply to all coefficients (if only a integer or float is provided) or the corresponding
         coefficient (if a list or vector of integers or floats is provided). Note that the penalty term should either
-        consists of a single value or b values (to match the length of ``theta``).
+        consists of a single value or b values (to match the length of ``theta``). The penalty is scaled by n.
     ratio : float
-        Ratio for the L1 vs L2 penalty in Elastic-net. The ratio must be be :math:`0 \ge r \ge 1`. Setting ``ratio=1``
+        Ratio for the L1 vs L2 penalty in Elastic-net. The ratio must be be :math:`0 \le r \le 1`. Setting ``ratio=1``
         results in LASSO and ``ratio=0`` results in ridge regression.
     epsilon : float, optional
-        Approximation error to use for the LASSO approximation. LASSO is the case where ``epsilon=0``. However, the
-        lack of strict convexity of the penalty may causes issues for root-finding. Using an approximation described
-        by Fu (2003) is used instead. Instead, ``epsilon`` is set to be slightly larger than 1. Notice that ``epsilon``
-        must be > 0. Default argument is 0.003, which results in a bridge penalty of 1.0003.
+        Approximation error to use for the LASSO approximation. Default argument is ``0.003``, which results in a
+        bridge penalty of 1.0003.
     weights : ndarray, list, vector, None, optional
-        1-dimensional vector of n weights. No missing weights should be included. Default is None, which assigns a
-        weight of 1 to all observations.
+        1-dimensional vector of n weights. Default is ```None``, which assigns a weight of 1 to all observations.
     center : int, float, ndarray, list, vector, optional
-        Center or reference value to penalized estimated coefficients towards. Default is zero, which penalized
+        Center or reference value to penalized estimated coefficients towards. Default is ``0``, which penalized
         coefficients towards the null. Other center values can be specified for all coefficients (by providing an
         integer or float) or covariate-specific centering values (by providing a vector of values of the same length as
         X).
@@ -919,7 +688,7 @@ def ee_elasticnet_regression(theta, y, X, model, penalty, ratio, epsilon=3.e-3, 
     >>> from delicatessen import MEstimator
     >>> from delicatessen.estimating_equations import ee_elasticnet_regression
 
-    Some generic data to estimate a linear regresion model
+    Some generic data to estimate a Elastic-Net regression model
 
     >>> n = 500
     >>> data = pd.DataFrame()
@@ -943,16 +712,14 @@ def ee_elasticnet_regression(theta, y, X, model, penalty, ratio, epsilon=3.e-3, 
     >>>     x, y = data[['C', 'V', 'W', 'X', 'Z']], data['Y1']
     >>>     return ee_elasticnet_regression(theta=theta, X=x, y=y, model='linear', ratio=0.5, penalty=penalty_vals)
 
-    Calling the M-estimation procedure (note that ``init`` has 5 values now, since ``X.shape[1] = 5``).
+    Calling the M-estimator (note that ``init`` has 5 values now, since ``X.shape[1]`` is 5).
 
     >>> estr = MEstimator(stacked_equations=psi, init=[0.01, 0.01, 0.01, 0.01, 0.01])
     >>> estr.estimate()
 
-    Inspecting the parameter estimates, variance, and confidence intervals
+    Inspecting the parameter estimates
 
     >>> estr.theta
-    >>> estr.variance
-    >>> estr.confidence_intervals()
 
     Next, we can estimate the parameters for a logistic regression model as follows
 
@@ -974,8 +741,7 @@ def ee_elasticnet_regression(theta, y, X, model, penalty, ratio, epsilon=3.e-3, 
     >>> estr = MEstimator(stacked_equations=psi, init=[0.01, 0.01, 0.01, 0.01, 0.01])
     >>> estr.estimate(solver='lm', maxiter=20000)
 
-    Additionally, weighted versions of all the previous models can be estimated by specifying the optional ``weights``
-    argument.
+    Weighted models can be estimated by specifying the optional ``weights`` argument.
 
     References
     ----------
@@ -1009,21 +775,23 @@ def ee_elasticnet_regression(theta, y, X, model, penalty, ratio, epsilon=3.e-3, 
 
 
 def ee_bridge_regression(theta, y, X, model, penalty, gamma, weights=None, center=0.):
-    r"""Default stacked estimating equation for bridge penalized regression. The bridge penalty is a generalization
-    of penalized regression, that includes L1 and L2-regularization as special cases. The estimating equation for
-    bridge penalized regression is
+    r"""Estimating equation for bridge penalized regression. The bridge penalty is a generalization of penalized
+    regression, that includes L1 and L2-regularization as special cases.
+
+    Note
+    ----
+    While the bridge penalty is defined for :math:`\gamma > 0`, the provided estimating equation only supports
+    :math:`\gamma \ge 1`. Additionally, the derivative of the estimating equation is not defined when
+    :math:`\gamma<2`. Therefore, the bread (and sandwich) cannot be used to estimate the variance in those settings.
+
+
+    The estimating equation for bridge penalized regression is
 
     .. math::
 
-        \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n (Y_i - X_i^T \theta) X_i - \lambda \gamma | \theta |^{\gamma - 1}
-        sign(\theta) = 0
+        \sum_{i=1}^n (Y_i - X_i^T \theta) X_i - \lambda \gamma | \theta |^{\gamma - 1} sign(\theta) = 0
 
     where :math:`\lambda` is the penalty term and :math:`\gamma` is a tuning parameter.
-    For the bridge penalty, LASSO is the special case where :math:`\gamma = 1` and ridge regression is
-    :math:`\gamma = 2`. While the bridge penalty is defined for :math:`\gamma > 0`, the provided estimating equation
-    only supports :math:`\gamma \ge 1`. Additionally, LASSO is not strictly convex, so :math:`\gamma = 1` is not
-    generally recommended. Instead, an approximate LASSO can be accomplished by setting :math:`\gamma` to be slightly
-    larger than 1 (as done in ``ee_lasso_regression``.
 
     Here, :math:`\theta` is a 1-by-b array, where b is the distinct covariates included as part of X. For example, if
     X is a 3-by-n matrix, then theta will be a 1-by-3 array. The code is general to allow for an arbitrary number of
@@ -1034,38 +802,30 @@ def ee_bridge_regression(theta, y, X, model, penalty, gamma, weights=None, cente
     The 'strength' of the penalty term is indicated by :math:`\lambda`, which is the ``penalty`` argument scaled (or
     divided by) the number of observations.
 
-    Note
-    ----
-    Root-finding for ``ee_bridge_regression`` can be difficult when :math:`2 > \gamma > 1`. In general, it is
-    recommended to use the Leverberg-Marquette algorithm (``MEstimator.estimate(solver='lm')``).
 
     Parameters
     ----------
     theta : ndarray, list, vector
         Theta in this case consists of b values. Therefore, initial values should consist of the same number as the
-        number of columns present. This can easily be accomplished generally by ``[0, ] * X.shape[1]``.
+        number of columns present. This can easily be implemented via ``[0, ] * X.shape[1]``.
     X : ndarray, list, vector
-        2-dimensional vector of n observed values for b variables. No missing data should be included (missing data
-        may cause unexpected behavior).
+        2-dimensional vector of n observed values for b variables.
     y : ndarray, list, vector
-        1-dimensional vector of n observed values. No missing data should be included (missing data may cause unexpected
-        behavior).
+        1-dimensional vector of n observed values.
     model : str
         Type of regression model to estimate. Options are ``'linear'`` (linear regression), ``'logistic'`` (logistic
         regression), and ``'poisson'`` (Poisson regression).
     penalty : int, float, ndarray, list, vector
         Penalty term to apply to all coefficients (if only a integer or float is provided) or the corresponding
         coefficient (if a list or vector of integers or floats is provided). Note that the penalty term should either
-        consists of a single value or b values (to match the length of ``theta``).
+        consists of a single value or b values (to match the length of ``theta``). The penalty is scaled by n.
     gamma : float
         Hyperparameter for the bridge penalty, defined for :math:`\gamma > 0`. However, only :math:`\gamma \ge 1` are
-        supported. If :math:`\gamma = 1`, then the bridge penalty is LASSO. If :math:`\gamma = 2`, then the bridge
-        penalty is ridge.
+        supported.
     weights : ndarray, list, vector, None, optional
-        1-dimensional vector of n weights. No missing weights should be included. Default is None, which assigns a
-        weight of 1 to all observations.
+        1-dimensional vector of n weights. Default is ``None``, which assigns a weight of 1 to all observations.
     center : int, float, ndarray, list, vector, optional
-        Center or reference value to penalized estimated coefficients towards. Default is zero, which penalized
+        Center or reference value to penalized estimated coefficients towards. Default is ``0``, which penalized
         coefficients towards the null. Other center values can be specified for all coefficients (by providing an
         integer or float) or covariate-specific centering values (by providing a vector of values of the same length as
         X).
@@ -1073,7 +833,7 @@ def ee_bridge_regression(theta, y, X, model, penalty, gamma, weights=None, cente
     Returns
     -------
     array :
-        Returns a b-by-n NumPy array evaluated for the input theta and y
+        Returns a b-by-n NumPy array evaluated for the input ``theta``
 
     Examples
     --------
@@ -1086,7 +846,7 @@ def ee_bridge_regression(theta, y, X, model, penalty, gamma, weights=None, cente
     >>> from delicatessen import MEstimator
     >>> from delicatessen.estimating_equations import ee_bridge_regression
 
-    Some generic data to estimate a linear bridge regresion model
+    Some generic data to estimate a bridge regression model
 
     >>> n = 500
     >>> data = pd.DataFrame()
@@ -1110,7 +870,7 @@ def ee_bridge_regression(theta, y, X, model, penalty, gamma, weights=None, cente
     >>>     x, y = data[['C', 'V', 'W', 'X', 'Z']], data['Y']
     >>>     return ee_bridge_regression(theta=theta, X=x, y=y, model='linear', gamma=2.3, penalty=penalty_vals)
 
-    Calling the M-estimation procedure (note that ``init`` has 5 values now, since ``X.shape[1] = 5``).
+    Calling the M-estimator (note that ``init`` has 5 values now, since ``X.shape[1]`` is 5).
 
     >>> estr = MEstimator(stacked_equations=psi, init=[0., 0., 0., 0., 0.])
     >>> estr.estimate()
@@ -1141,8 +901,7 @@ def ee_bridge_regression(theta, y, X, model, penalty, gamma, weights=None, cente
     >>> estr = MEstimator(stacked_equations=psi, init=[0.01, 0.01, 0.01, 0.01, 0.01])
     >>> estr.estimate(solver='lm', maxiter=5000)
 
-    Additionally, weighted versions of all the previous models can be estimated by specifying the optional ``weights``
-    argument.
+    Weighted models can be estimated by specifying the optional ``weights`` argument.
 
     References
     ----------
@@ -1178,9 +937,13 @@ def _prep_inputs_(X, y, theta, penalty=None, center=None):
     Parameters
     ----------
     X : ndarray
+        Dependent variables
     y : ndarray
+        Independent variable
     theta : ndarray
-    penalty : ndarray, None, optiona
+        Input parameters
+    penalty : ndarray, None, optional
+        Input penalty term(s)
 
     Returns
     -------
@@ -1301,11 +1064,15 @@ def _bridge_penalty_(theta, gamma, penalty, n_obs, center):
             raise ValueError("The center term must be either a single number or the same length as theta.")
 
     # Checking a valid hyperparameter is being provided
-    # if gamma <= 0:
-    #     raise ValueError("L_{gamma} is not defined for `gamma` > 0")
     if gamma < 1:
         raise ValueError("L_{gamma} for `gamma` < 1 is not currently able to be supported with estimating equations "
                          "evaluated using numerical methods.")
+    # Warning about the bread for problematic hyperparameters
+    if gamma < 2:
+        warnings.warn("The estimating equation for chosen penalized regression model is not always differentiable. "
+                      "Therefore, the bread matrix is not always defined for finite samples, and the sandwich should "
+                      "not be used to estimate the variance.",
+                      UserWarning)
 
     # Calculating the penalties
     penalty_scaled = penalty / (gamma * n_obs)

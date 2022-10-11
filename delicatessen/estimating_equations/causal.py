@@ -9,25 +9,20 @@ from delicatessen.utilities import logit, inverse_logit, identity
 
 
 def ee_gformula(theta, y, X, X1, X0=None, force_continuous=False):
-    r"""Default stacked estimating equation for parametric g-computation in the time-fixed setting. The parameter of
-    interest can either be the mean under a single interventions or plans on an action, or the mean difference between
-    two interventions or plans on an action. This is accomplished by providing the estimating equation the observed
-    data (``X``, ``y``), and the same data under the actions (``X1`` and optionally ``X0``).
+    r"""Estimating equations for the g-computation. The parameter of interest can either be the mean under a single
+    policy or plan of action, or the mean difference between two policies. This is accomplished by providing the
+    estimating equation the observed data (``X``, ``y``), and the same data under the actions (``X1`` and optionally
+    ``X0``).
 
-    For continuous Y, the linear regression estimating equation is
-
-    .. math::
-
-        \sum_i^n \psi_m(Y_i, X_i, \theta) = \sum_i^n (Y_i - X_i^T \theta) X_i = 0
-
-    and for logistic regression, the estimating equation is
+    The outcome regression estimating equation is
 
     .. math::
 
-        \sum_i^n \psi_m(Y_i, X_i, \beta) = \sum_i^n (Y_i - expit(X_i^T \beta)) X_i = 0
+        \sum_{i=1}^n (Y_i - g(X_i^T \beta)) X_i = 0
 
-    By default, `ee_gformula` detects whether `y` is all binary (zero or one), and applies logistic regression if that
-    is evaluated to be true. See the parameters for further details.
+    where :math:`g` indicates a transformation function. For linear regression, :math:`g` is the identity function.
+    Logistic regression uses the inverse-logit function. By default, `ee_gformula` detects whether `y` is all binary
+    (zero or one), and applies logistic regression if that is evaluated to be true.
 
     There are two variations on the parameter of interest. The first could be the mean under a plan, where the plan sets
     the values of action :math:`A` (e.g., exposure, treatment, vaccination, etc.). The estimating equation for this
@@ -35,10 +30,7 @@ def ee_gformula(theta, y, X, X1, X0=None, force_continuous=False):
 
     .. math::
 
-        \sum_i^n \psi_1(Y_i, X_i, \theta_1) = \sum_i^n g(\hat{Y}_i) - \theta_1 = 0
-
-    Here, the function :math:`g(.)` is a generic function. If linear regression was used, :math:`g(.)` is the identity
-    function. If logistic regression was used, :math:`g(.)` is the expit or inverse-logit function.
+        \sum_{i=1}^n g({X_i^*}^T \beta) - \theta_1 = 0
 
     Note
     ----
@@ -51,18 +43,20 @@ def ee_gformula(theta, y, X, X1, X0=None, force_continuous=False):
 
     .. math::
 
-        \sum_i^n \psi_0(Y_i, X_i, \theta_0) = \sum_i^n (\theta_1 - \theta_2) - \theta_0 = 0
-
-        \sum_i^n \psi_1(Y_i, X_i, \theta_1) = \sum_i^n g(\hat{Y}_i) - \theta_1 = 0
-
-        \sum_i^n \psi_0(Y_i, X_i, \theta_2) = \sum_i^n g(\hat{Y}_i) - \theta_2 = 0
-
+        \sum_{i=1}^n
+        \begin{bmatrix}
+            (\theta_1 - \theta_2) - \theta_0
+            g({X_i^1}^T \beta) - \theta_1
+            g({X_i^0}^T \beta) - \theta_2
+        \end{bmatrix}
+        = 0
 
     Note
     ----
     This variation includes :math:`3+b` parameters, where the first parameter is the causal mean difference, the second
     is the causal mean under plan 1, the third is the causal mean under plan 0, and the remainder are the parameters
     for the regression model.
+
 
     The parameter of interest is designated by the user via whether the optional argument ``X0`` is left as ``None``
     (which estimates the causal mean) or is given an array (which estimates the causal mean difference and the
@@ -73,28 +67,19 @@ def ee_gformula(theta, y, X, X1, X0=None, force_continuous=False):
     All provided estimating equations are meant to be wrapped inside a user-specified function. Throughtout, these
     user-defined functions are defined as ``psi``.
 
-    See the examples below for how action plans are specified.
-
     Parameters
     ----------
     theta : ndarray, list, vector
-        Array of parameters to estimate. For the Cox model, corresponds to the log hazard ratios
+        Theta consists of 1+b values if ``X0`` is ``None``, and 3+b values if ``X0`` is not ``None``.
     y : ndarray, list, vector
-        1-dimensional vector of n observed values. The Y values should all be 0 or 1. No missing data should be
-        included (missing data may cause unexpected behavior).
+        1-dimensional vector of n observed values. The Y values should all be 0 or 1.
     X : ndarray, list, vector
-        2-dimensional vector of n observed values for b variables. No missing data should be included (missing data
-        may cause unexpected behavior).
+        2-dimensional vector of n observed values for b variables.
     X1 : ndarray, list, vector
-        2-dimensional vector of n observed values for b variables under the action plan. If the action is indicated by
-        ``A``, then ``X1`` will take the original data ``X`` and update the values of ``A`` to follow the deterministic
-        plan. No missing data should be included (missing data may cause unexpected behavior).
+        2-dimensional vector of n observed values for b variables under the action plan.
     X0 : ndarray, list, vector, None, optional
-        2-dimensional vector of n observed values for b variables under the action plan. This second argument is
-        optional and should be specified if a causal mean difference between two action plans is of interest. If the
-        action is indicated by ``A``, then ``X0`` will take the original data ``X`` and update the values of ``A`` to
-        follow the deterministic reference plan. No missing data should be included (missing data may cause unexpected
-        behavior).
+        2-dimensional vector of n observed values for b variables under the separate action plan. This second argument
+        is optional and should be specified if the causal mean difference between two action plans is of interest.
     force_continuous : bool, optional
         Option to force the use of linear regression despite detection of a binary variable.
 
@@ -144,11 +129,11 @@ def ee_gformula(theta, y, X, X1, X0=None, force_continuous=False):
     Notice that ``y`` corresponds to the observed outcomes, ``X`` corresponds to the observed covariate data, and ``X1``
     corresponds to the covariate data *under the action plan*.
 
-    Now we can call the M-Estimation procedure. Since we are estimating the causal mean, and the regression parameters,
+    Now we can call the M-Estimator. Since we are estimating the causal mean, and the regression parameters,
     the length of the initial values needs to correspond with this. Our linear regression model consists of 4
     coefficients, so we need 1+4=5 initial values. When the outcome is binary (like it is in this example), we can be
     nice to the optimizer and give it a starting value of 0.5 for the causal mean (since 0.5 is in the middle of that
-    distribution). Below is the call to ``MEstimator``
+    distribution).
 
     >>> estr = MEstimator(psi, init=[0.5, 0., 0., 0., 0.])
     >>> estr.estimate(solver='lm')
@@ -159,7 +144,7 @@ def ee_gformula(theta, y, X, X1, X0=None, force_continuous=False):
     >>> estr.variance
     >>> estr.confidence_intervals()
 
-    More specifically, the causal mean is
+    The causal mean is
 
     >>> estr.theta[0]
 
@@ -258,23 +243,14 @@ def ee_gformula(theta, y, X, X1, X0=None, force_continuous=False):
 
 
 def ee_ipw(theta, y, A, W, truncate=None):
-    r"""Default stacked estimating equation for inverse probability weighting in the time-fixed setting. The
-    parameter of interest is the average causal effect. For estimation of the weights (or propensity scores), a
-    logistic model is used.
-
-    Note
-    ----
-    Unlike ``ee_gformula``, ``ee_ipw`` only provides the average causal effect (and the causal means for ``A=1`` and
-    ``A=0``). In other words, the implementation of IPW does not support generic action plans off-the-shelf,
-    unlike ``ee_gformula``.
-
-    The first estimating equation for the logistic regression model is
+    r"""Estimating equation for inverse probability weighting estimator. For estimation of the weights (or propensity
+    scores), a logistic model is used. The first estimating equations for the logistic regression model are
 
     .. math::
 
-        \sum_i^n \psi_g(A_i, W_i, \alpha) = \sum_i^n (A_i - expit(W_i^T \alpha)) W_i = 0
+        \sum_{i=1}^n (A_i - expit(W_i^T \alpha)) W_i = 0
 
-    where A is the treatment and W is the set of confounders.
+    where A is the action and W is the set of confounders.
 
     For the implementation of the inverse probability weighting estimator, stacked estimating equations are used
     for the mean had everyone been set to ``A=1``, the mean had everyone been set to ``A=0``, and the mean difference
@@ -282,49 +258,52 @@ def ee_ipw(theta, y, A, W, truncate=None):
 
     .. math::
 
-        \sum_i^n \psi_d(Y_i, A_i, \pi_i, \theta_0) = \sum_i^n (\theta_1 - \theta_2) - \theta_0 = 0
+        \sum_{i=1}^n
+        \begin{bmatrix}
+            (\theta_1 - \theta_2) - \theta_0
+            \frac{A_i \times Y_i}{\pi_i} - \theta_1 - \theta_1
+            \frac{(1-A_i) \times Y_i}{1-\pi_i} - \theta_2
+        \end{bmatrix}
+        = 0
 
-        \sum_i^n \psi_1(Y_i, A_i, \pi_i, \theta_1) = \sum_i^n \frac{A_i \times Y_i}{\pi_i} - \theta_1 = 0
+    where :math:`\pi_i = expit(W_i^T \alpha)`. Due to these 3 extra values, the length of the theta vector is 3+b,
+    where b is the number of parameters in the regression model.
 
-        \sum_i^n \psi_0(Y_i, A_i, \pi_i, \theta_2) = \sum_i^n \frac{(1-A_i) \times Y_i}{1-\pi_i} - \theta_2 = 0
+    Note
+    ----
+    Unlike ``ee_gformula``, ``ee_ipw`` always provides the average causal effect, and causal means for ``A=1`` and
+    ``A=0``.
 
 
-    Due to these 3 extra values, the length of the theta vector is 3+b, where b is the number of parameters in the
-    regression model.
+    Here, theta corresponds to a variety of different quantities. The *first* value in theta vector is the causal mean
+    difference, the *second* is the mean had everyone been set to ``A=1``, the *third* is the mean had everyone been
+    set to ``A=0``. The remainder of the parameters correspond to the logistic regression model coefficients.
 
     Note
     ----
     All provided estimating equations are meant to be wrapped inside a user-specified function. Throughtout, these
     user-defined functions are defined as ``psi``.
 
-    Here, theta corresponds to a variety of different quantities. The *first* value in theta vector is the mean
-    difference (or average causal effect), the *second* is the mean had everyone been set to ``A=1``, the *third* is the
-    mean had everyone been set to ``A=0``. The remainder of the parameters correspond to the logistic regression model
-    coefficients.
-
     Parameters
     ----------
     theta : ndarray, list, vector
-        Array of parameters to estimate. For the Cox model, corresponds to the log hazard ratios
+        Theta consists of 3+b values.
     y : ndarray, list, vector
-        1-dimensional vector of n observed values. No missing data should be included (missing data may cause
-        unexpected behavior).
+        1-dimensional vector of n observed values.
     A : ndarray, list, vector
-        1-dimensional vector of n observed values. The A values should all be 0 or 1. No missing data should be
-        included (missing data may cause unexpected behavior).
+        1-dimensional vector of n observed values. The A values should all be 0 or 1.
     W : ndarray, list, vector
-        2-dimensional vector of n observed values for b variables to model the probability of ``A`` with. No missing
-        data should be included (missing data may cause unexpected behavior).
+        2-dimensional vector of n observed values for b variables to model the probability of ``A`` with.
     truncate : None, list, set, ndarray, optional
         Bounds to truncate the estimated probabilities of ``A`` at. For example, estimated probabilities above 0.99 or
         below 0.01 can be set to 0.99 or 0.01, respectively. This is done by specifying ``truncate=(0.01, 0.99)``. Note
         this step is done via ``numpy.clip(.., a_min=truncate[0], a_max=truncate[1])``, so order is important. Default
-        is None, which applies to no truncation.
+        is ``None``, which applies no truncation.
 
     Returns
     -------
     array :
-        Returns a (3+b)-by-n NumPy array evaluated for the input theta and y
+        Returns a (3+b)-by-n NumPy array evaluated for the input ``theta``
 
     Examples
     --------
@@ -335,7 +314,7 @@ def ee_ipw(theta, y, A, W, truncate=None):
     >>> from delicatessen import MEstimator
     >>> from delicatessen.estimating_equations import ee_ipw
 
-    Some generic causal data
+    Some generic data
 
     >>> n = 200
     >>> d = pd.DataFrame()
@@ -352,7 +331,7 @@ def ee_ipw(theta, y, A, W, truncate=None):
     >>>     return ee_ipw(theta, y=d['Y'], A=d['A'],
     >>>                   W=d[['C', 'W']])
 
-    Calling the M-estimation procedure. Since `X` is 2-by-n here and IPW has 3 additional parameters, the initial
+    Calling the M-estimation procedure. Since ``W`` is 2-by-n here and IPW has 3 additional parameters, the initial
     values should be of length 3+2=5. In general, it will be best to start with [0., 0.5, 0.5, ...] as the initials when
     ``Y`` is binary. Otherwise, starting with all 0. as initials is reasonable.
 
@@ -417,103 +396,79 @@ def ee_ipw(theta, y, A, W, truncate=None):
 
 
 def ee_aipw(theta, y, A, W, X, X1, X0, truncate=None, force_continuous=False):
-    r"""Default stacked estimating equation for augmented inverse probability weighting (AIPW) in the time-fixed
-    setting. The parameter of interest is the average causal effect.
+    r"""Estimating equation for augmented inverse probability weighting (AIPW) estimator. AIPW consists of two nuisance
+    models (the propensity score model and the outcome model). For estimation of the propensity scores, the estimating
+    equations are
+
+    .. math::
+
+        \sum_{i=1}^n (A_i - expit(W_i^T \alpha)) W_i = 0
+
+    where ``A`` is the treatment and ``W`` is the set of confounders. The estimating equations for the outcome model
+    are
+
+    .. math::
+
+        \sum_{i=1}^n (Y_i - g(X_i^T \beta)) X_i = 0
+
+    By default, `ee_aipw` detects whether `y` is all binary (zero or one), and applies logistic regression. Notice that
+    ``X`` here should consists of both ``A`` and ``W`` (with possible interaction terms or other differences in
+    functional forms from the propensity score model).
+
+    The AIPW estimating equations include the causal mean difference, mean had everyone been set to ``A=1``, and the
+    mean had everyone been set to ``A=0``
+
+    .. math::
+
+        \sum_{i=1}^n
+        \begin{bmatrix}
+            (\theta_1 - \theta_2) - \theta_0 \\
+            \frac{A_i \times Y_i}{\pi_i} - \frac{\hat{Y^1}(A_i-\pi_i}{\pi_i} - \theta_1 \\
+            \frac{(1-A_i) \times Y_i}{1-\pi_i} + \frac{\hat{Y^0}(A_i-\pi_i}{1-\pi_i} - \theta_2
+        \end{bmatrix}
+        = 0
+
+    where :math:`\hat{Y}^a = g({X_i^*}^T \beta)`.
 
     Note
     ----
-    Unlike ``ee_gformula``, ``ee_ipw`` only provides the average causal effect (and the causal means for ``A=1`` and
-    ``A=0``). In other words, the implementation of IPW does not support generic action plans off-the-shelf,
-    unlike ``ee_gformula``.
+    Unlike ``ee_gformula``, ``ee_aipw`` always provides the average causal effect, and causal means for ``A=1`` and
+    ``A=0``.
 
-    AIPW consists of two nuisance models (the propensity score model and the outcome model). For estimation of the
-    propensity scores, a logistic model is used.
 
-    .. math::
-
-        \sum_i^n \psi_g(A_i, W_i, \alpha) = \sum_i^n (A_i - expit(W_i^T \alpha)) W_i = 0
-
-    where ``A`` is the treatment and ``W`` is the set of confounders.
-
-    Next, an outcome model is specified. For continuous Y, the linear regression estimating equation is
-
-    .. math::
-
-        \sum_i^n \psi_m(Y_i, X_i, \beta) = \sum_i^n (Y_i - X_i^T \beta) X_i = 0
-
-    and for logistic regression, the estimating equation is
-
-    .. math::
-
-        \sum_i^n \psi_m(Y_i, X_i, \beta) = \sum_i^n (Y_i - expit(X_i^T \beta)) X_i = 0
-
-    By default, `ee_aipw` detects whether `y` is all binary (zero or one), and applies logistic regression if that
-    happens. See the parameters for more details. Notice that ``X`` here should consists of both ``A`` and ``W`` (with
-    possible interaction terms or other differences in functional forms from the propensity score model).
-
-    For the implementation of the AIPW estimator, stacked estimating equations further include the mean had everyone
-    been set to ``A=1``, the mean had everyone been set to ``A=0``, and the mean difference. Those estimating equations
-    look like
-
-    .. math::
-
-        \sum_i^n \psi_0(Y_i, A_i, \pi_i, \theta_0) = \sum_i^n (\theta_1 - \theta_2) - \theta_0 = 0
-
-        \sum_i^n \psi_1(Y_i, A_i, W_i, \pi_i, \theta_1) = \sum_i^n (\frac{A_i \times Y_i}{\pi_i} -
-        \frac{\hat{Y^1}(A_i-\pi_i}{\pi_i}) - \theta_1 = 0
-
-        \sum_i^n \psi_0(Y_i, A_i, \pi_i, \theta_2) = \sum_i^n (\frac{(1-A_i) \times Y_i}{1-\pi_i} +
-        \frac{\hat{Y^0}(A_i-\pi_i}{1-\pi_i})) - \theta_2 = 0
-
-    where :math:`Y^a` is the predicted values of :math:`Y` from the outcome model under action
-    assignment :math:`A=a`.
-
-    Due to these 3 extra values and two nuisance models, the length of the theta vector is 3+b+c, where b is the number
-    of columns in ``W``, and c is the number of columns in ``X``.
+    Due to these 3 extra values and two nuisance models, the length of the parameter vector is 3+b+c, where b is the
+    number of columns in ``W``, and c is the number of columns in ``X``. The *first* value in theta vector is the
+    causal mean difference (or average causal effect), the *second* is the mean had everyone been given ``A=1``, the
+    *third* is the mean had everyone been given ``A=0``. The remainder of the parameters correspond to the regression
+    model coefficients, in the order input. The first 'chunk' of  coefficients correspond to the propensity score model
+    and the last 'chunk' correspond to the outcome model.
 
     Note
     ----
     All provided estimating equations are meant to be wrapped inside a user-specified function. Throughtout, these
     user-defined functions are defined as ``psi``.
 
-    Here, theta corresponds to a variety of different quantities. The *first* value in theta vector is mean
-    difference (or average causal effect), the *second* is the mean had everyone been given ``A=1``, the *third* is the
-    mean had everyone been given ``A=0``. The remainder of the parameters correspond to the regression model
-    coefficients, in the order input. The first 'chunk' of coefficients correspond to the propensity score model
-    and the last 'chunk' correspond to the outcome model.
-
     Parameters
     ----------
     theta : ndarray, list, vector
-        Array of parameters to estimate. For the Cox model, corresponds to the log hazard ratios
+        Theta consists of 3+b+c values.
     y : ndarray, list, vector
-        1-dimensional vector of n observed values. No missing data should be included (missing data may cause
-        unexpected behavior).
+        1-dimensional vector of n observed values.
     A : ndarray, list, vector
-        1-dimensional vector of n observed values. The A values should all be 0 or 1. No missing data should be
-        included (missing data may cause unexpected behavior).
+        1-dimensional vector of n observed values. The A values should all be 0 or 1.
     W : ndarray, list, vector
-        2-dimensional vector of n observed values for b variables to model the probability of ``A`` with. No missing
-        data should be included (missing data may cause unexpected behavior).
+        2-dimensional vector of n observed values for b variables to model the probability of ``A`` with.
     X : ndarray, list, vector
-        2-dimensional vector of n observed values for c variables to model the outcome ``y``. No missing data should
-        be included (missing data may cause unexpected behavior).
+        2-dimensional vector of n observed values for c variables to model the outcome ``y``.
     X1 : ndarray, list, vector
-        2-dimensional vector of n observed values for b variables under the action plan. If the action is indicated by
-        ``A``, then ``X1`` will take the original data ``X`` and update the values of ``A`` to follow the deterministic
-        plan where ``A=1`` for all observations. No missing data should be included (missing data may cause unexpected
-        behavior).
+        2-dimensional vector of n observed values for b variables under the action plan where ``A=1`` for all units.
     X0 : ndarray, list, vector, None, optional
-        2-dimensional vector of n observed values for b variables under the action plan. This second argument is
-        optional and should be specified if a causal mean difference between two action plans is of interest. If the
-        action is indicated by ``A``, then ``X0`` will take the original data ``X`` and update the values of ``A`` to
-        follow the deterministic plan where ``A=0`` for all observatons. No missing data should be included (missing
-        data may cause unexpected behavior).
+        2-dimensional vector of n observed values for b variables under the action plan where ``A=0`` for all units.
     truncate : None, list, set, ndarray, optional
         Bounds to truncate the estimated probabilities of ``A`` at. For example, estimated probabilities above 0.99 or
         below 0.01 can be set to 0.99 or 0.01, respectively. This is done by specifying ``truncate=(0.01, 0.99)``. Note
         this step is done via ``numpy.clip(.., a_min=truncate[0], a_max=truncate[1])``, so order is important. Default
-        is None, which applies to no truncation.
+        is ``None``, which applies to no truncation.
     force_continuous : bool, optional
         Option to force the use of linear regression despite detection of a binary variable.
 
@@ -531,7 +486,7 @@ def ee_aipw(theta, y, A, W, X, X1, X0, truncate=None, force_continuous=False):
     >>> from delicatessen import MEstimator
     >>> from delicatessen.estimating_equations import ee_aipw
 
-    Some generic causal data
+    Some generic data
 
     >>> n = 200
     >>> d = pd.DataFrame()
@@ -566,7 +521,7 @@ def ee_aipw(theta, y, A, W, X, X1, X0, truncate=None, force_continuous=False):
     >>>                    X1=d1[['C', 'A', 'W', 'AW']],
     >>>                    X0=d0[['C', 'A', 'W', 'AW']])
 
-    Calling the M-estimation procedure. AIPW has 3 parameters with 2 coefficients in the propensity score model, and
+    Calling the M-estimator. AIPW has 3 parameters with 2 coefficients in the propensity score model, and
     4 coefficients in the outcome model, the total number of initial values should be 3+2+4=9. When Y is binary, it
     will be best to start with ``[0., 0.5, 0.5, ...]`` followed by all ``0.`` for the initial values. Otherwise,
     starting with all 0. as initials is reasonable.
@@ -618,10 +573,10 @@ def ee_aipw(theta, y, A, W, X, X1, X0, truncate=None, force_continuous=False):
     mu1 = theta[1]                 # Parameter for the mean under A=1
     mu0 = theta[2]                 # Parameter for the mean under A=0
     alpha = theta[3:3+W.shape[1]]  # Parameter(s) for the propensity score model
-    beta = theta[3+W.shape[1]:]  # Parameter(s) for the outcome model
+    beta = theta[3+W.shape[1]:]    # Parameter(s) for the outcome model
 
     # pi-model (logistic regression)
-    pi_model = ee_regression(theta=alpha,    # Estimating logistic model
+    pi_model = ee_regression(theta=alpha,             # Estimating logistic model
                              X=W, y=A,
                              model='logistic')
     pi = inverse_logit(np.dot(W, alpha))              # Estimating Pr(A|W)
@@ -633,17 +588,17 @@ def ee_aipw(theta, y, A, W, X, X1, X0, truncate=None, force_continuous=False):
     # m-model (logistic regression)
     # Checking outcome variable type
     if np.isin(y, [0, 1]).all() and not force_continuous:
-        model = 'logistic'                          # Use a logistic regression model
-        transform = inverse_logit                   # ... and need to inverse-logit transformation
+        model = 'logistic'                             # Use a logistic regression model
+        transform = inverse_logit                      # ... and need to inverse-logit transformation
     else:
-        model = 'linear'                            # Use a linear regression model
-        transform = identity                        # ... and need to apply the identity (no) transformation
+        model = 'linear'                               # Use a linear regression model
+        transform = identity                           # ... and need to apply the identity (no) transformation
 
     m_model = ee_regression(theta=beta,                # Estimating the outcome model
                             y=y, X=X,
                             model=model)
-    ya1 = transform(np.dot(X1, beta))               # Generating predicted values under X1
-    ya0 = transform(np.dot(X0, beta))               # Generating predicted values under X0
+    ya1 = transform(np.dot(X1, beta))                  # Generating predicted values under X1
+    ya0 = transform(np.dot(X0, beta))                  # Generating predicted values under X0
 
     # AIPW estimator
     ace = np.ones(y.shape[0]) * (mu1 - mu0) - mud               # Calculating the ATE

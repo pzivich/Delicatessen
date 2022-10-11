@@ -6,16 +6,16 @@ import numpy as np
 
 
 def ee_exponential_model(theta, t, delta):
-    r"""Default stacked estimating equation for a one-parameter exponential survival model. Let :math:`T_i` indicate the
+    r"""Estimating equation for an exponential model. Let :math:`T_i` indicate the
     time of the event and :math:`C_i` indicate the time to right censoring. Therefore, the observable data consists of
-    :math:`t_i = min(T_i, C_i)` and :math:`\delta_i = I(t_i = T_i)`. The estimating equation is
+    :math:`t_i = \min(T_i, C_i)` and :math:`\Delta_i = I(t_i = T_i)`. The estimating equation is
 
     .. math::
 
-        \psi(t_i,\delta_i; \lambda) = \frac{\delta_i}{\lambda} -  t_i
+        \sum_{i=1}^n \frac{\Delta_i}{\lambda} -  t_i = 0
 
     Here, :math:`\theta` is a single parameter that corresponds to the scale parameter for the exponential distribution.
-    The hazard from the Weibull model is parameterized as the following
+    The hazard from the exponential model is parameterized as the following
 
     .. math::
 
@@ -26,22 +26,21 @@ def ee_exponential_model(theta, t, delta):
     All provided estimating equations are meant to be wrapped inside a user-specified function. Throughtout, these
     user-defined functions are defined as ``psi``.
 
+
     Parameters
     ----------
     theta : ndarray, list, vector
         Theta in the case of the exponential model consists of a single value. Furthermore, the parameter will be
-        non-negative. Therefore, an initial value like the ``[1, ]`` is recommended.
+        non-negative. Therefore, an initial value like the ``[1, ]`` should be provided.
     t : ndarray, list, vector
-        1-dimensional vector of n observed times. No missing data should be included (missing data may cause
-        unexpected behavior).
+        1-dimensional vector of n observed times.
     delta : ndarray, list, vector
-        1-dimensional vector of n event indicators, where 1 indicates an event and 0 indicates right censoring. No
-        missing data should be included (missing data may cause unexpected behavior).
+        1-dimensional vector of n event indicators, where 1 indicates an event and 0 indicates right censoring.
 
     Returns
     -------
     array :
-        Returns a 1-by-n NumPy array evaluated for the input theta.
+        Returns a 1-by-n NumPy array evaluated for the input ``theta``
 
     Examples
     --------
@@ -68,7 +67,7 @@ def ee_exponential_model(theta, t, delta):
     >>>         return ee_exponential_model(theta=theta,
     >>>                                     t=data['t'], delta=data['delta'])
 
-    Calling the M-estimation procedure (note that `init` has 1 value).
+    Calling the M-estimator
 
     >>> estr = MEstimator(stacked_equations=psi, init=[1.])
     >>> estr.estimate(solver='lm')
@@ -85,21 +84,24 @@ def ee_exponential_model(theta, t, delta):
 
     References
     ----------
-
+    Collett D. (2015). Modelling survival data in medical research. CRC press.
     """
     return (delta / theta) - t  # Returning calculation for exponential distribution
 
 
 def ee_weibull_model(theta, t, delta):
-    r"""Default stacked estimating equation for a two-parameter Weibull survival model. Let :math:`T_i` indicate the
-    time of the event and :math:`C_i` indicate the time to right censoring. Therefore, the observable data consists of
-    :math:`t_i = min(T_i, C_i)` and :math:`\delta_i = I(t_i = T_i)`. The estimating equation is
+    r"""Estimating equation for a two-parameter Weibull model. Let :math:`T_i` indicate the time of the event and
+    :math:`C_i` indicate the time to right censoring. Therefore, the observable data consists of
+    :math:`t_i = min(T_i, C_i)` and :math:`\Delta_i = I(t_i = T_i)`. The estimating equations are
 
     .. math::
 
-        \psi(t_i,\delta_i; \lambda, \gamma) = \frac{\delta_i}{\lambda} -  t_i^{\gamma} \\
-        \psi(t_i,\delta_i; \lambda, \gamma) = \frac{\delta_i}{\gamma} + \delta_i \log(t_i)
-        - \lambda t_i^{\gamma} \log(t_i)
+        \sum_{i=1}^n =
+        \begin{bmatrix}
+            \frac{\Delta_i}{\lambda} -  t_i^{\gamma} \\
+            \frac{\Delta_i}{\gamma} + \Delta_i \log(t_i) - \lambda t_i^{\gamma} \log(t_i)
+        \end{bmatrix}
+        = 0
 
     Here, :math:`\theta` consists of two parameters for the Weibull model: the scale (:math:`\lambda`) and the shape
     (:math:`\gamma`). The hazard from the Weibull model is parameterized as the following
@@ -112,6 +114,7 @@ def ee_weibull_model(theta, t, delta):
     ----
     All provided estimating equations are meant to be wrapped inside a user-specified function. Throughtout, these
     user-defined functions are defined as ``psi``.
+
 
     Parameters
     ----------
@@ -155,7 +158,7 @@ def ee_weibull_model(theta, t, delta):
     >>>         return ee_weibull_model(theta=theta,
     >>>                                 t=data['t'], delta=data['delta'])
 
-    Calling the M-estimation procedure (note that `init` has 1 value).
+    Calling the M-estimator
 
     >>> estr = MEstimator(stacked_equations=psi, init=[1., 1.])
     >>> estr.estimate(solver='lm')
@@ -173,10 +176,10 @@ def ee_weibull_model(theta, t, delta):
 
     References
     ----------
-
+    Collett D. (2015). Modelling survival data in medical research. CRC press.
     """
     # Extracting and naming parameters for my convenience
-    lambd, gamma = theta[0], theta[1]   # Names follow Collett
+    lambd, gamma = theta[0], theta[1]             # Names / parameterization follow Collett
 
     # Calculating the contributions
     contribution_1 = (delta/lambd) - t**gamma     # Calculating estimating equation for lambda
@@ -190,22 +193,20 @@ def ee_weibull_model(theta, t, delta):
 
 
 def ee_exponential_measure(theta, times, n, measure, scale):
-    r"""Default stacked estimating equation to calculate a survival measure (survival, density, risk, hazard, cumulative
-    hazard) given the parameters of an exponential model. Let :math:`T_i` indicate the time of the event and :math:`C_i`
-    indicate the time to right censoring. Therefore, the observable data consists of :math:`t_i = min(T_i, C_i)` and
-    :math:`\delta_i = I(t_i = T_i)`. The estimating equation for the survival function at time :math:`t` is
+    r"""Estimating equation to calculate a survival measure (survival, density, risk, hazard, cumulative hazard) from
+    the exponential model. The estimating equation for the survival function at time :math:`t` is
 
     .. math::
 
-        \psi_S(t,\delta_i; \theta, \lambda) = \exp(- \lambda t) - \theta
+        \sum_{i=1}^n \exp(- \lambda t) - \theta = 0
 
     and the estimating equation for the hazard function at time :math:`t` is
 
     .. math::
 
-        \psi_h(t; \theta, \mu, \lambda) = \lambda - \theta
+        \sum_{i=1}^n \lambda - \theta = 0
 
-    For the other measures, we take advantage of the following transformation between survival measures
+    For the other measures, we take advantage of the following transformations
 
     .. math::
 
@@ -215,8 +216,8 @@ def ee_exponential_measure(theta, times, n, measure, scale):
 
     Note
     ----
-    For proper uncertainty estimation, this estimating equation is meant to be stacked together with the corresponding
-    exponential model.
+    For proper uncertainty estimation, this estimating equation is meant to be stacked with ``ee_exponential_model``.
+
 
     Parameters
     ----------
@@ -238,7 +239,7 @@ def ee_exponential_measure(theta, times, n, measure, scale):
     Returns
     -------
     array :
-        Returns a t-by-n NumPy array evaluated for the input theta
+        Returns a t-by-n NumPy array evaluated for the input ``theta``
 
     Examples
     --------
@@ -250,7 +251,7 @@ def ee_exponential_measure(theta, times, n, measure, scale):
     >>> from delicatessen import MEstimator
     >>> from delicatessen.estimating_equations import ee_exponential_model, ee_exponential_measure
 
-    Some generic survival data to estimate an exponential survival model
+    Some generic survival data to estimate an exponential model
 
     >>> n = 100
     >>> data = pd.DataFrame()
@@ -270,8 +271,7 @@ def ee_exponential_measure(theta, times, n, measure, scale):
     >>>                                          scale=theta[0])
     >>>     return np.vstack((exp, pred_surv_t))
 
-    Calling the M-estimation procedure (note that `init` has 2 value, one for the scale and the other for
-    :math:`S(t=5)`).
+    Calling the M-estimator (note that `init` has 2 value, one for the scale and the other for :math:`S(t=5)`).
 
     >>> estr = MEstimator(stacked_equations=psi, init=[1., 0.5])
     >>> estr.estimate(solver='lm')
@@ -287,9 +287,8 @@ def ee_exponential_measure(theta, times, n, measure, scale):
 
     Note
     ----
-    When calculate the survival (or other measures) at many time points, it is generally best to optimize the
-    exponential coefficients in a separate model, then use the pre-washed coefficients in another M-estimator with the
-    many time points. This helps the optimizer to converge faster in number of iterations and total run-time.
+    When calculate the survival (or other measures) at many time points, it is generally best to
+    pre-wash the coefficients to reduce the number of iterations and total run-time.
 
 
     To make everything easier, we will generate a list of uniformly spaced values between the start and end points of
@@ -310,8 +309,7 @@ def ee_exponential_measure(theta, times, n, measure, scale):
     >>>                                          scale=theta[0])
     >>>     return np.vstack((exp, pred_surv_t))
 
-    Calling the M-estimation procedure. As stated in the note above, we use the pre-washed covariates to help the
-    optimizer (since the resolution means we are estimating 50 different parameters).
+    Calling the M-estimator
 
     >>> mestr = MEstimator(psi, init=list(estr.theta[0]) + fast_inits)
     >>> mestr.estimate(solver="lm")
@@ -326,7 +324,7 @@ def ee_exponential_measure(theta, times, n, measure, scale):
 
     References
     ----------
-
+    Collett D. (2015). Modelling survival data in medical research. CRC press.
     """
     # Lazy approach that just calls existing weibull measure function (exponential is a Weibull with shape=1
     return ee_weibull_measure(theta=theta, times=times,
@@ -335,20 +333,18 @@ def ee_exponential_measure(theta, times, n, measure, scale):
 
 
 def ee_weibull_measure(theta, times, n, measure, scale, shape):
-    r"""Default stacked estimating equation to calculate a survival measure (survival, density, risk, hazard, cumulative
-    hazard) given the parameters of a Weibull model. Let :math:`T_i` indicate the time of the event and :math:`C_i`
-    indicate the time to right censoring. Therefore, the observable data consists of :math:`t_i = min(T_i, C_i)` and
-    :math:`\delta_i = I(t_i = T_i)`. The estimating equation for the survival function at time :math:`t` is
+    r"""Estimating equation to calculate a survival measure (survival, density, risk, hazard, cumulative hazard) for
+    the Weibull model. The estimating equation for the survival function at time :math:`t` is
 
     .. math::
 
-        \psi_S(t; \theta, \lambda, \gamma) = \exp(- \lambda t^{\gamma}) - \theta
+        \sum_{i=1}^n \exp(- \lambda t^{\gamma}) - \theta = 0
 
     and the estimating equation for the hazard function at time :math:`t` is
 
     .. math::
 
-        \psi_h(t; \theta, \mu, \beta, \gamma) = \lambda \gamma t^{\gamma - 1} - \theta
+        \sum_{i=1}^n \lambda \gamma t^{\gamma - 1} - \theta = 0
 
     For the other measures, we take advantage of the following transformation between survival measures
 
@@ -360,8 +356,7 @@ def ee_weibull_measure(theta, times, n, measure, scale, shape):
 
     Note
     ----
-    For proper uncertainty estimation, this estimating equation is meant to be stacked together with the corresponding
-    Weibull model.
+    For proper uncertainty estimation, this estimating equation is meant to be stacked with ``ee_weibull_model``.
 
     Parameters
     ----------
@@ -386,7 +381,7 @@ def ee_weibull_measure(theta, times, n, measure, scale, shape):
     Returns
     -------
     array :
-        Returns a t-by-n NumPy array evaluated for the input theta
+        Returns a t-by-n NumPy array evaluated for the input ``theta``
 
     Examples
     --------
@@ -398,7 +393,7 @@ def ee_weibull_measure(theta, times, n, measure, scale, shape):
     >>> from delicatessen import MEstimator
     >>> from delicatessen.estimating_equations import ee_weibull_model, ee_weibull_measure
 
-    Some generic survival data to estimate an exponential survival model
+    Some generic survival data to estimate a Weibull model
 
     >>> n = 100
     >>> data = pd.DataFrame()
@@ -418,8 +413,7 @@ def ee_weibull_measure(theta, times, n, measure, scale, shape):
     >>>                                      scale=theta[0], shape=theta[1])
     >>>     return np.vstack((exp, pred_surv_t))
 
-    Calling the M-estimation procedure (note that `init` has 2 value, one for the scale and the other for
-    :math:`S(t=5)`).
+    Calling the M-estimator
 
     >>> estr = MEstimator(stacked_equations=psi, init=[1., 1., 0.5])
     >>> estr.estimate(solver='lm')
@@ -435,9 +429,8 @@ def ee_weibull_measure(theta, times, n, measure, scale, shape):
 
     Note
     ----
-    When calculate the survival (or other measures) at many time points, it is generally best to optimize the Weibull
-    coefficients in a separate model, then use the pre-washed coefficients in another M-estimator with the many
-    time points. This helps the optimizer to converge faster in number of iterations and total run-time.
+    When calculate the survival (or other measures) at many time points, it is generally best to
+    pre-wash the coefficients to reduce the number of iterations and total run-time.
 
 
     To make everything easier, we will generate a list of uniformly spaced values between the start and end points of
@@ -458,8 +451,7 @@ def ee_weibull_measure(theta, times, n, measure, scale, shape):
     >>>                                      scale=theta[0], shape=theta[1])
     >>>     return np.vstack((exp, pred_surv_t))
 
-    Calling the M-estimation procedure. As stated in the note above, we use the pre-washed covariates to help the
-    optimizer (since the resolution means we are estimating 50 different parameters).
+    Calling the M-estimator
 
     >>> mestr = MEstimator(psi, init=list(estr.theta[0:2]) + fast_inits)
     >>> mestr.estimate(solver="lm")
@@ -474,7 +466,7 @@ def ee_weibull_measure(theta, times, n, measure, scale, shape):
 
     References
     ----------
-
+    Collett D. (2015). Modelling survival data in medical research. CRC press.
     """
     lambd, gamma = scale, shape
 
@@ -516,19 +508,21 @@ def ee_weibull_measure(theta, times, n, measure, scale, shape):
 
 
 def ee_aft_weibull(theta, X, t, delta, weights=None):
-    r"""Default stacked estimating equation for accelerated failure time (AFT) model with a Weibull distribution. Let
-    :math:`T_i` indicate the time of the event and :math:`C_i` indicate the time to right censoring. Therefore, the
-    observable data consists of :math:`t_i = min(T_i, C_i)` and :math:`\delta_i = I(t_i = T_i)`. The estimating
-    equation is
+    r"""Estimating equation for accelerated failure time (AFT) model with a Weibull distribution. Let :math:`T_i`
+    indicate the time of the event and :math:`C_i` indicate the time to right censoring. Therefore, the observable data
+    consists of :math:`t_i = min(T_i, C_i)` and :math:`\Delta_i = I(t_i = T_i)`. The estimating equations are
 
     .. math::
 
-        \psi(t_i,X_i,\delta_i; \lambda, \beta, \gamma) = \frac{\delta_i}{\lambda} -  t_i^{\gamma} \exp(\beta X_i) \\
-        \psi(t_i,X_i,\delta_i; \lambda, \beta, \gamma) = \delta_i X_i - (\lambda  t_i^{\gamma} \exp(\beta X_i))X_i \\
-        \psi(t_i,X_i,\delta_i; \lambda, \beta, \gamma) = \frac{\delta_i}{\gamma} + \delta_i \log(t) - \lambda
-        t_i^{\gamma} \exp(\beta X_i) \log(t)
+        \sum_{i=1}^n =
+        \begin{bmatrix}
+            \frac{\Delta_i}{\lambda} -  t_i^{\gamma} \exp(\beta X_i) \\
+            \Delta_i X_i - (\lambda  t_i^{\gamma} \exp(\beta X_i))X_i \\
+            \frac{\Delta_i}{\gamma} + \Delta_i \log(t) - \lambda t_i^{\gamma} \exp(\beta X_i) \log(t)
+        \end{bmatrix}
+        = 0
 
-    Here, the Weibull-AFT actually consists of the following parameters: :math:`\mu, \beta, \sigma`. The above
+    The AFT consists of the following parameters: :math:`\mu, \beta, \sigma`. The above
     estimating equations use the proportional hazards form of the Weibull model. For the Weibull AFT, notice the
     following relation between the coefficients: :math:`\lambda = - \mu \gamma`,
     :math:`\beta_{PH} = - \beta_{AFT} \gamma`, and :math:`\gamma = \exp(\sigma)`.
@@ -546,28 +540,21 @@ def ee_aft_weibull(theta, X, t, delta, weights=None):
     ----------
     theta : ndarray, list, vector
         theta consists of 1+b+1 values. Therefore, initial values should consist of the same number as the number of
-        columns present in ``X`` plus 2. This can easily be accomplished generally by
+        columns present in ``X`` plus 2. This can easily be implemented via
         ``[0, ] + [0, ] * X.shape[1] + [0, ]``.
     X : ndarray, list, vector
-        2-dimensional vector of n observed values for b variables. No missing data should be included (missing data
-        may cause unexpected behavior).
+        2-dimensional vector of n observed values for b variables.
     t : ndarray, list, vector
-        1-dimensional vector of n observed times. Note that times can either be events (indicated by :math:`\delta_i=1`)
-        or censored (indicated by :math:`\delta_i=0`). No missing data should be included (missing data may cause
-        unexpected behavior).
+        1-dimensional vector of n observed times.
     delta : ndarray, list, vector
-        1-dimensional vector of n values indicating whether the time was an event or censoring. No missing data should
-        be included (missing data may cause unexpected behavior).
+        1-dimensional vector of n values indicating whether the time was an event or censoring.
     weights : ndarray, list, vector, None, optional
-        1-dimensional vector of n weights. No missing weights should be included. Default is None, which assigns a
-        weight of 1 to all observations.
+        1-dimensional vector of n weights. Default is ``None``, which assigns a weight of 1 to all observations.
 
     Returns
     -------
     array :
-        Returns a b-by-n NumPy array evaluated for the input theta. The first element of theta corresponds to the scale
-        parameter, the last element corresponds to the shape parameter, and the middle parameters correspond to the
-        model coefficients.
+        Returns a b-by-n NumPy array evaluated for the input ``theta``.
 
     Examples
     --------
@@ -597,7 +584,7 @@ def ee_aft_weibull(theta, X, t, delta, weights=None):
     >>>         return ee_aft_weibull(theta=theta, X=d_obs[['C', 'X', 'Z']],
     >>>                               t=d_obs['t'], delta=d_obs['delta'])
 
-    Calling the M-estimation procedure (note that `init` has 2+2 values now, since ``X.shape[1] = 2``).
+    Calling the M-estimator (note that `init` has 4 values now, since ``X.shape[1]`` is 2).
 
     >>> estr = MEstimator(stacked_equations=psi, init=[0., 0., 0., 0.])
     >>> estr.estimate(solver='lm')
@@ -668,21 +655,19 @@ def ee_aft_weibull(theta, X, t, delta, weights=None):
 
 
 def ee_aft_weibull_measure(theta, times, X, measure, mu, beta, sigma):
-    r"""Default stacked estimating equation to calculate a survival measure (survival, density, risk, hazard,
-    cumulative hazard) given a specific covariate pattern and coefficients from a Weibull accelerated failure time
-    (AFT) model. Let :math:`T_i` indicate the time of the event and :math:`C_i` indicate the time to right censoring.
-    Therefore, the observable data consists of :math:`t_i = min(T_i, C_i)` and :math:`\delta_i = I(t_i = T_i)`. The
-    estimating equation for the survival function at time :math:`t` is
+    r"""Estimating equation to calculate a survival measure (survival, density, risk, hazard, cumulative hazard) given
+    a specific covariate pattern and Weibull accelerated failure time (AFT) model. The estimating equation for the
+    survival function at time :math:`t` is
 
     .. math::
 
-        \psi_S(t,X_i; \theta, \mu, \beta, \sigma) = \exp(-1 \lambda_i t^{\gamma}) - \theta
+        \sum_{i=1}^n \exp(-1 \lambda_i t^{\gamma}) - \theta = 0
 
     and the estimating equation for the hazard function at time :math:`t` is
 
     .. math::
 
-        \psi_h(t,X_i; \theta, \mu, \beta, \sigma) = \lambda_i \gamma t^{\gamma - 1} - \theta
+        \sum_{i=1}^n  \lambda_i \gamma t^{\gamma - 1} - \theta = 0
 
     where
 
@@ -713,8 +698,7 @@ def ee_aft_weibull_measure(theta, times, X, measure, mu, beta, sigma):
         A single time or 1-dimensional collection of times to calculate the measure at. The number of provided times
         should consist of the same number of elements as provided in the ``theta`` argument.
     X : ndarray, list, vector
-        2-dimensional vector of n observed values for b variables. No missing data should be included (missing data
-        may cause unexpected behavior).
+        2-dimensional vector of n observed values for b variables.
     measure : str
         Measure to calculate. Options include survival (``'survival'``), density (``'density'``), risk or the cumulative
         density (``'risk'``), hazard (``'hazard'``), or cumulative hazard (``'cumulative_hazard'``).
@@ -770,8 +754,7 @@ def ee_aft_weibull_measure(theta, times, X, measure, mu, beta, sigma):
     >>>                                          mu=theta[0], beta=theta[1:3], sigma=theta[3])
     >>>     return np.vstack((aft, pred_surv_t))
 
-    Calling the M-estimation procedure (note that `init` has 2+2+1 values now, since ``X.shape[1] = 2`` and we are
-    calculating the survival at time 5).
+    Calling the M-estimator
 
     >>> estr = MEstimator(stacked_equations=psi, init=[0., 0., 0., 0., 0.5])
     >>> estr.estimate(solver='lm')
@@ -787,9 +770,8 @@ def ee_aft_weibull_measure(theta, times, X, measure, mu, beta, sigma):
 
     Note
     ----
-    When calculate the survival (or other measures) at many time points, it is generally best to optimize the Weibull
-    AFT coefficients in a separate model, then use the pre-washed coefficients in another M-estimator with the many
-    time points. This helps the optimizer to converge faster in number of iterations and total run-time.
+    When calculate the survival (or other measures) at many time points, it is generally best to
+    pre-wash the coefficients to reduce the number of iterations and total run-time.
 
 
     To make everything easier, we will generate a list of uniformly spaced values between the start and end points of
@@ -810,8 +792,7 @@ def ee_aft_weibull_measure(theta, times, X, measure, mu, beta, sigma):
     >>>                                          mu=theta[0], beta=theta[1:3], sigma=theta[3])
     >>>     return np.vstack((aft, pred_surv_t))
 
-    Calling the M-estimation procedure. As stated in the note above, we use the pre-washed covariates to help the
-    optimizer (since the resolution means we are estimating 50 different parameters).
+    Calling the M-estimator
 
     >>> estr = MEstimator(psi, init=list(estr.theta[0:4]) + fast_inits)
     >>> estr.estimate(solver="lm")

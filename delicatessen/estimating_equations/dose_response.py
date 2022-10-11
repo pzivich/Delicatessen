@@ -5,24 +5,23 @@ import numpy as np
 
 
 def ee_4p_logistic(theta, X, y):
-    r"""Default stacked estimating equation estimating equations for the four parameter logistic model (4PL). 4PL is
-    often used for dose-response and bioassay analyses. The estimating equations are
+    r"""Estimating equations for the 4-parameter logistic model (4PL). The estimating equations are
 
     .. math::
 
-        \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n -2 (Y_i - \hat{Y}_i) (1 - 1/(1 + \rho)) = 0
-
-        \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n 2 (Y_i - \hat{Y}_i) (\theta_3 - \theta_0) \frac{\theta_2}{\theta_1}
-        \frac{\rho}{(1 + \rho)^2} = 0
-
-        \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n 2 (Y_i - \hat{Y}_i) (\theta_3 - \theta_0) \log(D_i / \theta_1)
-        \frac{\rho}{(1 + \rho)^2} = 0
-
-        \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n 2 (Y_i - \hat{Y}_i) (1 / (1 + \rho))) = 0
+        \sum_{i=1}^n
+        \begin{bmatrix}
+            -2 (Y_i - \hat{Y}_i) (1 - 1/(1 + \rho)) \\
+            2 (Y_i - \hat{Y}_i) (\theta_3 - \theta_0) \frac{\theta_2}{\theta_1} \frac{\rho}{(1 + \rho)^2} \\
+            2 (Y_i - \hat{Y}_i) (\theta_3 - \theta_0) \log(D_i / \theta_1) \frac{\rho}{(1 + \rho)^2} \\
+            2 (Y_i - \hat{Y}_i) (1 / (1 + \rho)))
+        \end{bmatrix}
+        = 0
 
     where :math:`R_i` is the response of individual :math:`i`, :math:`D_i` is the dose,
     :math:`\rho = \frac{D_i}{\theta_1}^{\theta_2}`, and
     :math:`\hat{Y_i} = \theta_0 + \frac{\theta_3 - \theta_0}{1+\rho}`.
+
     Here, theta is a 1-by-4 array, where 4 are the 4 parameters of the 4PL. The first theta corresponds to lower limit
     (:math:`\theta_0`), the second corresponds to the effective dose (ED50) (:math:`\theta_1`), the third corresponds
     to the steepness of the curve (:math:`\theta_2`), and the fourth corresponds to the upper limit (:math:`\theta_3`).
@@ -37,16 +36,14 @@ def ee_4p_logistic(theta, X, y):
     theta : ndarray, list, vector
         Theta in this case consists of 4 values. In general, starting values ``>0`` are better choices for the 4PL model
     X : ndarray, list, vector
-        1-dimensional vector of n dose values. No missing data should be included (missing data may cause unexpected
-        behavior).
+        1-dimensional vector of n dose values.
     y : ndarray, list, vector
-        1-dimensional vector of n response values. No missing data should be included (missing data may cause
-        unexpected behavior).
+        1-dimensional vector of n response values.
 
     Returns
     -------
     array :
-        Returns a 4-by-n NumPy array evaluated for the input theta, y, X
+        Returns a 4-by-n NumPy array evaluated for the input ``theta``
 
     Examples
     --------
@@ -68,7 +65,7 @@ def ee_4p_logistic(theta, X, y):
     >>> def psi(theta):
     >>>     return ee_4p_logistic(theta=theta, X=dose_data, y=resp_data)
 
-    The 4PL model and others are harder to optimize compared to other estimating equations. Namely, the optimizer is
+    The 4PL model and others are harder to solve compared to other estimating equations. Namely, the root-finder is
     not aware of implicit bounds on the parameters. To reduce non-convergence issues, we can give the root-finder good
     starting values.
 
@@ -138,22 +135,22 @@ def ee_4p_logistic(theta, X, y):
 
 
 def ee_3p_logistic(theta, X, y, lower):
-    r"""Default stacked estimating equation estimating equations for the three parameter logistic model (3PL). 3PL is
-    often used for dose-response and bioassay analyses. The estimating equations are
+    r"""Estimating equations for the 3-parameter logistic model (3PL). The estimating equations are
 
     .. math::
 
-        \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n 2 (Y_i - \hat{Y}_i) (\theta_3 - \theta_0) \frac{\theta_2}{\theta_1}
-        \frac{\rho}{(1 + \rho)^2} = 0
-
-        \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n 2 (Y_i - \hat{Y}_i) (\theta_3 - \theta_0) \log(D_i / \theta_1)
-        \frac{\rho}{(1 + \rho)^2} = 0
-
-        \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n 2 (Y_i - \hat{Y}_i) (1 / (1 + \rho))) = 0
+        \sum_{i=1}^n
+        \begin{bmatrix}
+            -2 (Y_i - \hat{Y}_i) (1 - 1/(1 + \rho)) \\
+            2 (Y_i - \hat{Y}_i) (\theta_3 - \theta_0) \frac{\theta_2}{\theta_1} \frac{\rho}{(1 + \rho)^2} \\
+            2 (Y_i - \hat{Y}_i) (\theta_3 - \theta_0) \log(D_i / \theta_1) \frac{\rho}{(1 + \rho)^2} \\
+        \end{bmatrix}
+        = 0
 
     where :math:`R_i` is the response of individual :math:`i`, :math:`D_i` is the dose,
     :math:`\rho = \frac{D_i}{\theta_1}^{\theta_2}`, and
     :math:`\hat{Y_i} = \theta_0 + \frac{\theta_3 - \theta_0}{1+\rho}`.
+
     Here, theta is a 1-by-3 array for the 3PL. The first theta corresponds to the effective dose (ED50)
     (:math:`\theta_1`), the second corresponds to the steepness of the curve (:math:`\theta_2`), and the third
     corresponds to the upper limit (:math:`\theta_3`). The lower limit (:math:`\theta_0`, ``lower``) is pre-specified
@@ -169,11 +166,9 @@ def ee_3p_logistic(theta, X, y, lower):
     theta : ndarray, list, vector
         Theta in this case consists of 3 values. In general, starting values ``>0`` are better choices for the 3PL model
     X : ndarray, list, vector
-        1-dimensional vector of n dose values. No missing data should be included (missing data may cause unexpected
-        behavior).
+        1-dimensional vector of n dose values.
     y : ndarray, list, vector
-        1-dimensional vector of n response values. No missing data should be included (missing data may cause
-        unexpected behavior).
+        1-dimensional vector of n response values.
     lower : int, float
         Set value for the lower limit.
 
@@ -204,25 +199,8 @@ def ee_3p_logistic(theta, X, y, lower):
     >>>     return ee_3p_logistic(theta=theta, X=dose_data, y=resp_data,
     >>>                           lower=0)
 
-    The 3PL model and others are harder to optimize compared to other estimating equations. Namely, the optimizer is
-    not aware of implicit bounds on the parameters. To reduce non-convergence issues, we can give the root-finder good
-    starting values.
-
-    For the 3PL, the upper limit should *always* be greater than the set lower limit. Second, the ED50 should be between
-    the lower and upper limits. Third, the sign for the steepness depends on whether the response declines (positive)
-    or the response increases (negative). Finally, some solvers may be better suited to the problem, so try a few
-    different options.
-
-    Here, we use some general starting values that should perform well in many cases. For ED50, give the mid-point
-    between the maximum response and the minimum response. The initial value for steepness is more difficult. Ideally,
-    we would give a starting value of zero, but that will fail in this example. Giving a small positive starting value
-    works in this example. For the upper-bound, give the maximum response value as the initial. Finally, we use the
-    ``lm`` solver.
-
-    Note
-    ----
-    To summarize the recommendations, be sure to examine your data (e.g., scatterplot). This will help to determine the
-    initial starting values for the root-finding procedure. Otherwise, you may come across a convergence error.
+    The 3PL model and others are harder to solve compared to other estimating equations. See the advice provided in the
+    ``ee_4p_logistic`` documentation.
 
     >>> estr = MEstimator(psi, init=[(np.max(resp_data)+np.min(resp_data)) / 2,
     >>>                              (np.max(resp_data)+np.min(resp_data)) / 2,
@@ -271,21 +249,22 @@ def ee_3p_logistic(theta, X, y, lower):
 
 
 def ee_2p_logistic(theta, X, y, lower, upper):
-    r"""Default stacked estimating equation estimating equations for the two parameter logistic model (2PL). 2PL is
-    often used for dose-response and bioassay analyses. The estimating equations are
+    r"""Estimating equations for the 2-parameter logistic model (2PL). The estimating equations are
 
     .. math::
 
-        \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n 2 (Y_i - \hat{Y}_i) (\theta_3 - \theta_0) \frac{\theta_2}{\theta_1}
-        \frac{\rho}{(1 + \rho)^2} = 0
-
-        \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n 2 (Y_i - \hat{Y}_i) (\theta_3 - \theta_0) \log(D_i / \theta_1)
-        \frac{\rho}{(1 + \rho)^2} = 0
+        \sum_{i=1}^n
+        \begin{bmatrix}
+            2 (Y_i - \hat{Y}_i) (\theta_3 - \theta_0) \frac{\theta_2}{\theta_1} \frac{\rho}{(1 + \rho)^2} \\
+            2 (Y_i - \hat{Y}_i) (\theta_3 - \theta_0) \log(D_i / \theta_1) \frac{\rho}{(1 + \rho)^2} \\
+        \end{bmatrix}
+        = 0
 
     where :math:`R_i` is the response of individual :math:`i`, :math:`D_i` is the dose,
     :math:`\rho = \frac{D_i}{\theta_1}^{\theta_2}`, and
     :math:`\hat{Y_i} = \theta_0 + \frac{\theta_3 - \theta_0}{1+\rho}`.
-    Here, theta is a 1-by-3 array for the 3PL. The first theta corresponds to the effective dose (ED50)
+
+    Here, theta is a 1-by-2 array for the 2PL. The first theta corresponds to the effective dose (ED50)
     (:math:`\theta_1`), and the second corresponds to the steepness of the curve (:math:`\theta_2`). The lower limit
     (:math:`\theta_0`, ``lower``) and upper limit (:math:`\theta_3`, ``upper``) are pre-specified by the user (and are
     no longer estimated)
@@ -300,11 +279,9 @@ def ee_2p_logistic(theta, X, y, lower, upper):
     theta : ndarray, list, vector
         Theta in this case consists of 2 values. In general, starting values >0 are better choices for the 3PL model
     X : ndarray, list, vector
-        1-dimensional vector of n dose values. No missing data should be included (missing data may cause unexpected
-        behavior).
+        1-dimensional vector of n dose values.
     y : ndarray, list, vector
-        1-dimensional vector of n response values. No missing data should be included (missing data may cause
-        unexpected behavior).
+        1-dimensional vector of n response values.
     lower : int, float
         Set value for the lower limit.
     upper : int, float
@@ -338,23 +315,8 @@ def ee_2p_logistic(theta, X, y, lower, upper):
     >>>     return ee_2p_logistic(theta=theta, X=dose_data, y=resp_data,
     >>>                           lower=0, upper=8)
 
-    The 2PL model and others are harder to optimize compared to other estimating equations. Namely, the optimizer is
-    not aware of implicit bounds on the parameters. To reduce non-convergence issues, we can give the root-finder good
-    starting values.
-
-    First, the ED50 should be between the lower and upper limits. Second, the sign for the steepness depends on whether
-    the response declines (positive) or the response increases (negative). Finally, some solvers may be better suited
-    to the problem, so try a few different options.
-
-    Here, we use some general starting values that should perform well in many cases. For ED50, give the mid-point
-    between the maximum response and the minimum response. The initial value for steepness is more difficult. Ideally,
-    we would give a starting value of zero, but that will fail in this example. Giving a small positive starting value
-    works in this example. Finally, we use the ``lm`` solver.
-
-    Note
-    ----
-    To summarize the recommendations, be sure to examine your data (e.g., scatterplot). This will help to determine the
-    initial starting values for the root-finding procedure. Otherwise, you may come across a convergence error.
+    The 2PL model and others are harder to solve compared to other estimating equations. See the advice provided in the
+    ``ee_4p_logistic`` documentation.
 
     >>> estr = MEstimator(psi, init=[(np.max(resp_data)+np.min(resp_data)) / 2,
     >>>                              (np.max(resp_data)+np.min(resp_data)) / 2])
@@ -405,17 +367,12 @@ def ee_effective_dose_delta(theta, y, delta, steepness, ed50, lower, upper):
 
     .. math::
 
-        \psi(Y_i, \theta) = \beta_1 + \frac{\beta_4 - \beta_1}{1 + (\theta / \beta_2)^{\beta_3}} - \beta_4(1-\delta)
-        - \beta_1 \delta = 0
+        \sum_{i=1}^n \theta_1 + \frac{\theta_4 - \theta_1}{1 + (\theta_5 / \theta_2)^{\theta_3}} - \theta_4(1-\delta) -
+        \theta_1 \delta = 0
 
-    where theta is the :math:`ED(\delta)`, and the beta values are from a 4PL model (1: lower limit, 2: steepness,
-    3: ED(50), 4: upper limit). When lower or upper limits are place, the corresponding beta's are replaced by
-    constants. For proper uncertainty estimation, this estimating equation should be stacked together with the
-    correspond PL model.
-
-    Note
-    ----
-    This estimating equation is meant to be paired with the estimating equations for either the 4PL, 3PL, or 2PL models.
+    where :math:`\theta_5` is the :math:`ED(\delta)`, and the other :math:`\theta` are from a PL model (1: lower limit,
+    2: steepness, 3: ED(50), 4: upper limit). For proper uncertainty estimation, this estimating equation should be
+    stacked with the correspond PL model.
 
     Parameters
     ----------

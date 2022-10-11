@@ -1,3 +1,5 @@
+import warnings
+
 import numpy as np
 from delicatessen.utilities import robust_loss_functions
 
@@ -7,11 +9,11 @@ from delicatessen.utilities import robust_loss_functions
 
 
 def ee_mean(theta, y):
-    r"""Default stacked estimating equation for the mean. The estimating equation for the mean is
+    r"""Estimating equation for the mean. The estimating equation for the mean is
 
     .. math::
 
-        \sum_i^n \psi(Y_i, \theta_1) = \sum_i^n Y_i - \theta_1 = 0
+        \sum_{i=1}^n Y_i - \theta_1 = 0
 
     Note
     ----
@@ -22,15 +24,14 @@ def ee_mean(theta, y):
     ----------
     theta : ndarray, list, vector
         Theta in the case of the mean consists of a single value. Therefore, an initial value like the form of
-        [0, ] is recommended.
+        ``[0, ]`` should be provided.
     y : ndarray, list, vector
-        1-dimensional vector of n observed values. No missing data should be included (missing data may cause unexpected
-        behavior when attempting to calculate the mean).
+        1-dimensional vector of n observed values.
 
     Returns
     -------
     array :
-        Returns a 1-by-n NumPy array evaluated for the input theta and y
+        Returns a 1-by-n NumPy array evaluated for the input ``theta`` and ``y``
 
     Examples
     --------
@@ -43,12 +44,12 @@ def ee_mean(theta, y):
 
     >>> y_dat = [1, 2, 4, 1, 2, 3, 1, 5, 2]
 
-    Defining psi, or the stacked estimating equations
+    Defining psi, or the estimating equation
 
     >>> def psi(theta):
     >>>     return ee_mean(theta=theta, y=y_dat)
 
-    Calling the M-estimation procedure
+    Calling the M-estimator
 
     >>> estr = MEstimator(stacked_equations=psi, init=[0, ])
     >>> estr.estimate()
@@ -72,12 +73,12 @@ def ee_mean(theta, y):
 
 
 def ee_mean_robust(theta, y, k, loss='huber', lower=None, upper=None):
-    r""" Default stacked estimating equation for the (unscaled) robust mean. The estimating equation for the robust
+    r"""Estimating equation for the (unscaled) robust mean. The estimating equation for the robust
     mean is
 
     .. math::
 
-        \sum_i^n f_k(Y_i - \theta) = 0
+        \sum_{i=1}^n f_k(Y_i - \theta) = 0
 
     where :math:`f_k(x)` is the corresponding robust loss function. Options for the loss function include: Huber,
     Tukey's biweight, Andrew's Sine, and Hampel. See ``robust_loss_function`` for further details on the loss
@@ -98,13 +99,12 @@ def ee_mean_robust(theta, y, k, loss='huber', lower=None, upper=None):
     ----------
     theta : ndarray, list, vector
         Theta in the case of the robust mean consists of a single value. Therefore, an initial value like the form of
-        ``[0, ]`` is recommended.
+        ``[0, ]`` is should be provided.
     y : ndarray, vector, list
-        1-dimensional vector of n observed values. No missing data should be included (missing data may cause unexpected
-        behavior when attempting to calculate the robust mean).
+        1-dimensional vector of n observed values.
     k : int, float
-        Tuning or hyperparameter for the chosen loss function. Notice that the choice of hyperparameter should depend
-        on the chosen loss function.
+        Tuning or hyperparameter for the chosen loss function. Notice that the choice of hyperparameter depends on the
+        loss function.
     loss : str, optional
         Robust loss function to use. Default is 'huber'. Options include 'andrew', 'hampel', 'huber', 'tukey'.
     lower : int, float, None, optional
@@ -172,17 +172,20 @@ def ee_mean_robust(theta, y, k, loss='huber', lower=None, upper=None):
 
 
 def ee_mean_variance(theta, y):
-    r"""Default stacked estimating equation for mean and variance. The estimating equations for the mean and
+    r"""Estimating equations for the mean and variance. The estimating equations for the mean and
      variance are
 
     .. math::
 
-        \sum_i^n \psi_1(Y_i, \theta_1) = \sum_i^n Y_i - \theta_1 = 0
+        \sum_{i=1}^n
+        \begin{bmatrix}
+            Y_i - \theta_1 = 0 \\
+            (Y_i - \theta_1)^2 - \theta_2
+        \end{bmatrix}
+        = 0
 
-        \sum_i^n \psi_2(Y_i, \theta_1) = \sum_i^n (Y_i - \theta_1)^2 - \theta_2 = 0
-
-    Unlike ``ee_mean``, theta consists of 2 elements. The output covariance matrix will also provide estimates for each
-    of the theta values.
+    Unlike ``ee_mean``, ``theta`` consists of 2 parameters. The output covariance matrix will also provide estimates
+    for each of the ``theta`` values.
 
     Note
     ----
@@ -193,7 +196,8 @@ def ee_mean_variance(theta, y):
     Parameters
     ----------
     theta : ndarray, list, vector
-        Theta in this case consists of two values. Therefore, initial values like the form of [0, 0] is recommended.
+        Theta in this case consists of two values. Therefore, initial values like the form of ``[0, 0]`` should be
+        provided.
     y : ndarray, list, vector
         1-dimensional vector of n observed values. No missing data should be included (missing data may cause unexpected
         behavior when attempting to calculate the mean).
@@ -219,7 +223,7 @@ def ee_mean_variance(theta, y):
     >>> def psi(theta):
     >>>     return ee_mean_variance(theta=theta, y=y_dat)
 
-    Calling the M-estimation procedure (note that `init` has 2 values now).
+    Calling the M-estimator (note that `init` has 2 values)
 
     >>> estr = MEstimator(stacked_equations=psi, init=[0, 0, ])
     >>> estr.estimate()
@@ -231,7 +235,7 @@ def ee_mean_variance(theta, y):
     >>> estr.asymptotic_variance
 
     For this estimating equation, ``mestimation.theta[1]`` and ``mestimation.asymptotic_variance[0][0]`` are expected
-    to always be equal.
+    to be equal.
 
     References
     ----------
@@ -247,30 +251,26 @@ def ee_mean_variance(theta, y):
 
 
 def ee_percentile(theta, y, q):
-    r"""Default stacked estimating equation for percentiles (or quantiles).
-
-    Note
-    ----
-    Due to this estimating equation being non-smooth, estimated percentile values may differ from the closed-form
-    definition of the percentile. In general, closed form solutions for percentiles will be preferred, but this
-    estimating equation is offered for completeness.
+    r"""Estimating equation for the q percentile. The estimating equation is
 
     .. math::
 
-        \sum_i^n \psi_q(Y_i, \theta_q) = \sum_i^n q - I(Y_i \le \theta_q) = 0
+        \sum_{i=1}^n q - I(Y_i \le \theta) = 0
 
-    Notice that this estimating equation is non-smooth. Therefore, optimization and numerically approximating
-    derivatives for this estimating equation are more difficult.
+    where :math:`0 < q < 1` is the percentile. Notice that this estimating equation is non-smooth. Therefore,
+    root-finding is difficult.
 
     Note
     ----
-    The following optional parameters ``MEstimator.estimate()`` may benefit from these changes ``solver='hybr'``,
-    ``dx=1``, ``order=15``, and increasing the ``tolerance``.
+    As the derivative of the estimating equation is not defined at :math:`\hat{\theta}`, the bread (and sandwich)
+    cannot be used to estimate the variance. This estimating equation is offered for completeness, but is not generally
+    recommended for applications.
 
     Parameters
     ----------
     theta : ndarray, list, vector
-        Theta in this case consists of two values. Therefore, initial values like the form of [0, 0] is recommended.
+        Theta in this case consists of one value. Therefore, initial values like the form of ``[0, ]`` should be
+        provided.
     y : ndarray, list, vector
         1-dimensional vector of n observed values. No missing data should be included (missing data may cause unexpected
         behavior when attempting to calculate the mean).
@@ -320,6 +320,11 @@ def ee_percentile(theta, y, q):
     Boos DD, & Stefanski LA. (2013). M-estimation (estimating equations). In Essential Statistical Inference
     (pp. 297-337). Springer, New York, NY.
     """
+    # Warning about the bread
+    warnings.warn("The estimating equation is not differentiable at theta. Therefore, the bread matrix is not defined "
+                  "for finite samples, and the sandwich should not be used to estimate the variance.",
+                  UserWarning)
+
     if q >= 1 or q <= 0:
         raise ValueError("`q` must be (0, 1)")
 
@@ -331,16 +336,25 @@ def ee_percentile(theta, y, q):
 
 
 def ee_positive_mean_deviation(theta, y):
-    r"""Default stacked estimating equations for the positive mean deviation. The estimating equations are
+    r"""Estimating equations for the positive mean deviation. The estimating equations are
 
     .. math::
 
-        \sum_i^n \psi_1(Y_i, \theta) = \sum_i^n 2(Y_i - \theta_2)I(Y_i > \theta_2) - \theta_1 = 0
-
-        \sum_i^n \psi_2(Y_i, \theta) = \sum_i^n 0.5 - I(Y_i \le - \theta_2) = 0
+        \sum_{i=1}^n
+        \begin{bmatrix}
+            2(Y_i - \theta_2)I(Y_i > \theta_2) - \theta_1 \\
+            0.5 - I(Y_i \le \theta_2)
+        \end{bmatrix}
+        = 0
 
     where the first estimating equation is for the positive mean difference, and the second estimating equation is for
-    the median.
+    the median. Notice that this estimating equation is non-smooth. Therefore, root-finding is difficult.
+
+    Note
+    ----
+    As the derivative of the estimating equation for the median is not defined at :math:`\hat{\theta}`, the bread (and
+    sandwich) cannot be used to estimate the variance. This estimating equation is offered for completeness, but is not
+    generally recommended for applications.
 
     Note
     ----
@@ -393,6 +407,11 @@ def ee_positive_mean_deviation(theta, y):
     Boos DD, & Stefanski LA. (2013). M-estimation (estimating equations). In Essential Statistical Inference
     (pp. 297-337). Springer, New York, NY.
     """
+    # Warning about the bread
+    warnings.warn("The estimating equation for the median is not differentiable. Therefore, the bread matrix is not "
+                  "defined for finite samples, and the sandwich should not be used to estimate the variance.",
+                  UserWarning)
+
     # Convert input y values to NumPy array
     y_array = np.asarray(y)
 

@@ -15,6 +15,8 @@ Basic
   ee_mean
   ee_mean_robust
   ee_mean_variance
+  ee_percentile
+  ee_positive_mean_deviation
 
 
 Regression
