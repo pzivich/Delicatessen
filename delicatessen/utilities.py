@@ -94,9 +94,35 @@ def robust_loss_functions(residual, loss, k, a=None, b=None):
     ----
     The loss functions here are technically the first-order derivatives of the loss functions
 
-    The following score of the loss functions, :math:`f_k()`, are available:
+    The following score of the loss functions, :math:`f_k()`, are available.
 
-    ...
+    Andrew's Sine
+
+    .. math::
+
+        f_k(x) = I(k \pi <= x <= k \pi) \times \sin(x/k)
+
+    Huber
+
+    .. math::
+
+        f_k(x) = x \times I(-k < x < k) + k \times (1 - I(-k < x < k)) \times \text{sign}(x)
+
+    Tukey's biweight
+
+    .. math::
+
+        f_k(x) = x \times I(-k < x < k) + x \left( 1 - (x/k)^2 \right)^2
+
+    Hampel (Hampel's add two additional parameters, :math:`a` and :math:`b`)
+
+    .. math::
+
+        f_k(x) = I(-a < x < a) \times x
+                 + I(a \ge |x| < b) \times a \times \text{sign}(x)
+                 + I(b \ge x < k) \times a \frac{k - x}{k - b}
+                 + I(-b \le x > -k) \times -a \frac{-k + x}{-k + b}
+                 + I(|x| \ge k) \times 0
 
     Parameters
     ----------
@@ -121,6 +147,30 @@ def robust_loss_functions(residual, loss, k, a=None, b=None):
 
     Examples
     --------
+    Using the robust loss function
+
+    >>> import numpy as np
+    >>> from delicatessen.utilities import robust_loss_functions
+
+    Some generic data to stand-in for the residuals
+
+    >>> residuals = np.random.standard_cauchy(size=20)
+
+    Huber's loss function
+
+    >>> robust_loss_functions(residuals, loss='huber', k=1.345)
+
+    Andrew's Sine
+
+    >>> robust_loss_functions(residuals, loss='andrew', k=1.339)
+
+    Tukey's biweight
+
+    >>> robust_loss_functions(residuals, loss='tukey', k=4.685)
+
+    Hampel's loss function
+
+    >>> robust_loss_functions(residuals, loss='hampel', k=8, a=2, b=4)
 
     References
     ----------

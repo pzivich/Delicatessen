@@ -1,7 +1,7 @@
 import warnings
 import numpy as np
 
-from delicatessen.utilities import logit, inverse_logit, identity
+from delicatessen.utilities import logit, inverse_logit, identity, robust_loss_functions
 
 #################################################################
 # Basic Regression Estimating Equations
@@ -317,18 +317,28 @@ def ee_poisson_regression(theta, X, y, weights=None):
 # Robust Regression Estimating Equations
 
 
-def ee_robust_regression(theta, X, y, model, k, weights=None):
-    r"""Default stacked estimating equation for robust regression. Specifically, robust linear regression is
+def ee_robust_regression(theta, X, y, model, k, loss='huber', weights=None, upper=None, lower=None):
+    r"""Default stacked estimating equations for (unscaled) robust regression. Specifically, robust linear regression is
     robust to outlying observations of the outcome variable (``y``). Currently, only linear regression is supported by
     ``ee_robust_regression``. The estimating equation is
 
     .. math::
 
-        \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n \psi_k(Y_i - X_i^T \theta) X_i = 0
+        \sum_i^n \f_k(Y_i - X_i^T \theta) X_i = 0
 
-    where k indicates the upper and lower bounds. Here, theta is a 1-by-b array, where b is the distinct covariates
-    included as part of X. For example, if X is a 3-by-n matrix, then theta will be a 1-by-3 array. The code is general
-    to allow for an arbitrary number of X's (as long as there is enough support in the data).
+    where :math:`f_k(x)` is the corresponding robust loss function. Options for the loss function include: Huber,
+    Tukey's biweight, Andrew's Sine, and Hampel. See ``robust_loss_function`` for further details on the loss
+    functions for the robust mean.
+
+    Note
+    ----
+    The estimating-equation is not non-differentiable everywhere for some loss functions. Therefore, it is assumed that
+    no points occur exactly at the non-differentiable points. For truly continuous :math:`Y`, the probability of that
+    occurring is zero.
+
+    Here, theta is a 1-by-b array, where b is the distinct covariates included as part of X. For example, if X is a
+    3-by-n matrix, then theta will be a 1-by-3 array. The code is general to allow for an arbitrary number of X's (as
+    long as there is enough support in the data).
 
     Note
     ----
@@ -349,11 +359,19 @@ def ee_robust_regression(theta, X, y, model, k, weights=None):
     model : str
         Type of regression model to estimate. Options only include ``'linear'`` (linear regression).
     k : int, float
-        Value to set the symmetric maximum upper and lower bounds on the difference between the observations and
-        predicted values
+        Tuning or hyperparameter for the chosen loss function. Notice that the choice of hyperparameter should depend
+        on the chosen loss function.
+    loss : str, optional
+        Robust loss function to use. Default is 'huber'. Options include 'andrew', 'hampel', 'huber', 'tukey'.
     weights : ndarray, list, vector, None, optional
         1-dimensional vector of n weights. No missing weights should be included. Default is None, which assigns a
         weight of 1 to all observations.
+    lower : int, float, None, optional
+        Lower parameter for the 'hampel' loss function. This parameter does not impact the other loss functions.
+        Default is ``None``.
+    upper : int, float, None, optional
+        Upper parameter for the 'hampel' loss function. This parameter does not impact the other loss functions.
+        Default is ``None``.
 
     Returns
     -------
@@ -379,13 +397,15 @@ def ee_robust_regression(theta, X, y, model, k, weights=None):
     >>> data['Y'] = 0.5 + 2*data['X'] - 1*data['Z'] + np.random.normal(loc=0, scale=3, size=n)
     >>> data['C'] = 1
 
+    >>> X = data[['C', 'X', 'Z']]
+    >>> y = data['Y']
+
     Note that ``C`` here is set to all 1's. This will be the intercept in the regression.
 
-    Defining psi, or the stacked estimating equations
+    Defining psi, or the stacked estimating equations for Huber's robust regression
 
     >>> def psi(theta):
-    >>>         return ee_robust_regression(theta=theta, X=data[['C', 'X', 'Z']], y=data['Y'], model='linear', k=3)
-
+    >>>         return ee_robust_regression(theta=theta, X=X, y=y, model='linear', k=1.345, loss='huber')
 
     Calling the M-estimation procedure (note that ``init`` has 3 values now, since ``X.shape[1] = 3``).
 
@@ -400,8 +420,20 @@ def ee_robust_regression(theta, X, y, model, k, weights=None):
 
     References
     ----------
+    Andrews DF. (1974). A robust method for multiple linear regression. *Technometrics*, 16(4), 523-531.
+
+    Beaton AE & Tukey JW (1974). The fitting of power series, meaning polynomials, illustrated on band-spectroscopic
+    data. *Technometrics*, 16(2), 147-185.
+
     Boos DD, & Stefanski LA. (2013). M-estimation (estimating equations). In Essential Statistical Inference
     (pp. 297-337). Springer, New York, NY.
+
+    Hampel FR. (1971). A general qualitative definition of robustness. *The Annals of Mathematical Statistics*,
+    42(6), 1887-1896.
+
+    Huber PJ. (1964). Robust Estimation of a Location Parameter. *The Annals of Mathematical Statistics*, 35(1), 73–101.
+
+    Huber PJ, Ronchetti EM. (2009) Robust Statistics 2nd Edition. Wiley. pgs 98-100
     """
     # Preparation of input shapes and object types
     X, y, beta = _prep_inputs_(X=X, y=y, theta=theta, penalty=None)
@@ -415,10 +447,14 @@ def ee_robust_regression(theta, X, y, model, k, weights=None):
     pred_y = transform(np.dot(X, beta))                       # Generating predicted values
 
     # Generating predictions and applying Huber function for robust
-    pred_error = np.clip(y - pred_y, -k, k)
+    residual = robust_loss_functions(residual=y - pred_y,     # Calculating robust residuals
+                                     k=k,                     # ... hyperparameter for loss function
+                                     loss=loss,               # ... chosen loss function
+                                     a=lower,                 # ... upper limit (Hampel only)
+                                     b=upper)                 # ... lower limit (Hampel only)
 
     # Output b-by-n matrix
-    return w*(pred_error * X).T    # Score function
+    return w*(residual * X).T    # Score function
 
 
 def ee_robust_linear_regression(theta, X, y, k, weights=None):

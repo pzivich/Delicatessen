@@ -1,4 +1,6 @@
 import numpy as np
+from delicatessen.utilities import robust_loss_functions
+
 
 #################################################################
 # Basic Estimating Equations
@@ -69,20 +71,23 @@ def ee_mean(theta, y):
     return y_array - theta
 
 
-def ee_mean_robust(theta, y, k):
-    r""" Default stacked estimating equation for robust mean (location) estimator. The estimating equation for the
-    robust mean is
+def ee_mean_robust(theta, y, k, loss='huber', lower=None, upper=None):
+    r""" Default stacked estimating equation for the (unscaled) robust mean. The estimating equation for the robust
+    mean is
 
     .. math::
 
-        \sum_i^n \psi(Y_i, \theta_1) = \sum_i^n Y^*_i - \theta_1 = 0
+        \sum_i^n f_k(Y_i - \theta) = 0
 
-    where :math:`Y^*` is bounded between :math:`k` and :math:`-k`.
+    where :math:`f_k(x)` is the corresponding robust loss function. Options for the loss function include: Huber,
+    Tukey's biweight, Andrew's Sine, and Hampel. See ``robust_loss_function`` for further details on the loss
+    functions for the robust mean.
 
     Note
     ----
-    Since psi is non-differentiable at :math:`k` or :math:`-k`, it must be assumed that the mean is sufficiently far
-    from :math:`k`. Otherwise, difficulties might arise in the variance calculation.
+    The estimating-equation is not non-differentiable everywhere for some loss functions. Therefore, it is assumed that
+    no points occur exactly at the non-differentiable points. For truly continuous :math:`Y`, the probability of that
+    occurring is zero.
 
     Note
     ----
@@ -98,7 +103,16 @@ def ee_mean_robust(theta, y, k):
         1-dimensional vector of n observed values. No missing data should be included (missing data may cause unexpected
         behavior when attempting to calculate the robust mean).
     k : int, float
-        Value to set the maximum upper and lower bounds on the observed values.
+        Tuning or hyperparameter for the chosen loss function. Notice that the choice of hyperparameter should depend
+        on the chosen loss function.
+    loss : str, optional
+        Robust loss function to use. Default is 'huber'. Options include 'andrew', 'hampel', 'huber', 'tukey'.
+    lower : int, float, None, optional
+        Lower parameter for the 'hampel' loss function. This parameter does not impact the other loss functions.
+        Default is ``None``.
+    upper : int, float, None, optional
+        Upper parameter for the 'hampel' loss function. This parameter does not impact the other loss functions.
+        Default is ``None``.
 
     Returns
     -------
@@ -116,10 +130,10 @@ def ee_mean_robust(theta, y, k):
 
     >>> y_dat = [-10, 1, 2, 4, 1, 2, 3, 1, 5, 2, 33]
 
-    Defining psi, or the stacked estimating equations
+    Defining psi, or the stacked estimating equations for Huber's robust mean
 
     >>> def psi(theta):
-    >>>     return ee_mean_robust(theta=theta, y=y_dat, k=9)
+    >>>     return ee_mean_robust(theta=theta, y=y_dat, k=9, loss='huber')
 
     Calling the M-estimation procedure
 
@@ -134,20 +148,27 @@ def ee_mean_robust(theta, y, k):
 
     References
     ----------
+    Andrews DF. (1974). A robust method for multiple linear regression. *Technometrics*, 16(4), 523-531.
+
+    Beaton AE & Tukey JW (1974). The fitting of power series, meaning polynomials, illustrated on band-spectroscopic
+    data. *Technometrics*, 16(2), 147-185.
+
     Boos DD, & Stefanski LA. (2013). M-estimation (estimating equations). In Essential Statistical Inference
     (pp. 297-337). Springer, New York, NY.
 
-    Huber PJ. (1992). Robust estimation of a location parameter. In Breakthroughs in statistics (pp. 492-518).
-    Springer, New York, NY.
+    Hampel FR. (1971). A general qualitative definition of robustness. *The Annals of Mathematical Statistics*,
+    42(6), 1887-1896.
+
+    Huber PJ. (1964). Robust Estimation of a Location Parameter. *The Annals of Mathematical Statistics*, 35(1), 73–101.
+
+    Huber PJ, Ronchetti EM. (2009) Robust Statistics 2nd Edition. Wiley. pgs 98-100
     """
-    # Convert input y values to NumPy array
-    y_array = np.asarray(y)
-
-    # Bounding via np.clip
-    y_bound = np.clip(y_array, a_min=-k, a_max=k)
-
-    # Output 1-by-n array estimating equation for robust mean
-    return y_bound - theta
+    # Calculate the robust loss function of the residuals for the mean
+    return robust_loss_functions(residual=np.asarray(y) - theta,   # Convert y to array and calculate residual
+                                 k=k,                              # ... hyperparameter for loss function
+                                 loss=loss,                        # ... chosen loss function to use
+                                 a=lower,                          # ... lower limit (Hampel only)
+                                 b=upper)                          # ... upper limit (Hampel only)
 
 
 def ee_mean_variance(theta, y):
@@ -310,7 +331,7 @@ def ee_percentile(theta, y, q):
 
 
 def ee_positive_mean_deviation(theta, y):
-    """Default stacked estimating equations for the positive mean deviation. The estimating equations are
+    r"""Default stacked estimating equations for the positive mean deviation. The estimating equations are
 
     .. math::
 
