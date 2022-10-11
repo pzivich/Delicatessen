@@ -55,7 +55,16 @@ class TestEstimatingEquationsBase:
 
     def test_mean_robust(self):
         y = [-10, -1, 2, 3, -2, 0, 3, 5, 12]
-        yk = [-6, -1, 2, 3, -2, 0, 3, 5, 6]
+
+        def byhand(theta):
+            k = 6
+            ee_rm = np.array(y) - theta
+            ee_rm = np.where(ee_rm > k, k, ee_rm)
+            ee_rm = np.where(ee_rm < -k, -k, ee_rm)
+            return ee_rm
+
+        ref = MEstimator(byhand, init=[0, ])
+        ref.estimate()
 
         def psi(theta):
             return ee_mean_robust(theta=theta, y=y, k=6)
@@ -65,8 +74,8 @@ class TestEstimatingEquationsBase:
 
         # Checking mean estimate
         npt.assert_allclose(mestimator.theta[0],
-                            np.mean(yk),
-                            atol=1e-6)
+                            ref.theta[0],
+                            atol=1e-9)
 
     def test_mean_variance(self):
         """Tests mean-variance with the built-in estimating equations.
