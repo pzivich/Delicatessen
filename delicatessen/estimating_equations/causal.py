@@ -37,6 +37,7 @@ def ee_gformula(theta, y, X, X1, X0=None, force_continuous=False):
     This variation includes :math:`1+b` parameters, where the first parameter is the causal mean, and the remainder are
     the parameters for the regression model.
 
+
     The alternative parameter of interest could be the mean difference between two plans. A common example of this would
     be the average causal effect, where the plans are all-action-one versus all-action-zero. Therefore, the estimating
     equations consist of the following three equations
@@ -45,8 +46,8 @@ def ee_gformula(theta, y, X, X1, X0=None, force_continuous=False):
 
         \sum_{i=1}^n
         \begin{bmatrix}
-            (\theta_1 - \theta_2) - \theta_0
-            g({X_i^1}^T \beta) - \theta_1
+            (\theta_1 - \theta_2) - \theta_0 \\
+            g({X_i^1}^T \beta) - \theta_1 \\
             g({X_i^0}^T \beta) - \theta_2
         \end{bmatrix}
         = 0
@@ -260,8 +261,8 @@ def ee_ipw(theta, y, A, W, truncate=None):
 
         \sum_{i=1}^n
         \begin{bmatrix}
-            (\theta_1 - \theta_2) - \theta_0
-            \frac{A_i \times Y_i}{\pi_i} - \theta_1 - \theta_1
+            (\theta_1 - \theta_2) - \theta_0 \\
+            \frac{A_i \times Y_i}{\pi_i} - \theta_1 - \theta_1 \\
             \frac{(1-A_i) \times Y_i}{1-\pi_i} - \theta_2
         \end{bmatrix}
         = 0
@@ -297,7 +298,7 @@ def ee_ipw(theta, y, A, W, truncate=None):
     truncate : None, list, set, ndarray, optional
         Bounds to truncate the estimated probabilities of ``A`` at. For example, estimated probabilities above 0.99 or
         below 0.01 can be set to 0.99 or 0.01, respectively. This is done by specifying ``truncate=(0.01, 0.99)``. Note
-        this step is done via ``numpy.clip(.., a_min=truncate[0], a_max=truncate[1])``, so order is important. Default
+        this step is done via ``numpy.clip(.., a_min, a_max)``, so order is important. Default
         is ``None``, which applies no truncation.
 
     Returns
@@ -467,7 +468,7 @@ def ee_aipw(theta, y, A, W, X, X1, X0, truncate=None, force_continuous=False):
     truncate : None, list, set, ndarray, optional
         Bounds to truncate the estimated probabilities of ``A`` at. For example, estimated probabilities above 0.99 or
         below 0.01 can be set to 0.99 or 0.01, respectively. This is done by specifying ``truncate=(0.01, 0.99)``. Note
-        this step is done via ``numpy.clip(.., a_min=truncate[0], a_max=truncate[1])``, so order is important. Default
+        this step is done via ``numpy.clip(.., a_min, a_max)``, so order is important. Default
         is ``None``, which applies to no truncation.
     force_continuous : bool, optional
         Option to force the use of linear regression despite detection of a binary variable.

@@ -280,9 +280,12 @@ Robust Regression
 
 Similar to the mean, regression can also be made robust to outliers. This is simply accomplished by placing a loss
 function on the residuals. Again, several loss functions are available. Robust regression is only available for linear
-regression models.
+regression models. The following is a plot showcasing the influence functions for the available robust loss functions.
 
-Continuing with the data generated in the previous example, robust linear regression can be implemented as follows
+.. image:: images/robust_loss.png
+
+Continuing with the data generated in the previous example, robust linear regression with Huber's loss function can be
+implemented as follows
 
 .. code::
 
@@ -292,7 +295,7 @@ Continuing with the data generated in the previous example, robust linear regres
         return ee_robust_regression(theta=theta,
                                     X=data[['C', 'X', 'Z']],
                                     y=data['Y1'],
-                                    model='linear', k=1.345)
+                                    model='linear', loss='huber', k=1.345)
 
 After creating the wrapper function, we can now call the M-Estimation procedure
 
@@ -414,7 +417,7 @@ elastic-net penalty in the estimating equation is
 
 .. math::
 
-    r \times sgn(\theta) - (1-r) \times 2 | \theta |^{1} sgn(\theta)
+    r \times \text{sign}(\theta) - (1-r) \times 2 | \theta |^{1} \text{sign}(\theta)
 
 where :math:`r` is the ratio between the :math:`L_1` and :math:`L_2` penalties. Setting :math:`r=1` is the LASSO penalty
 and :math:`r=0` is the Ridge penalty. As with LASSO, the approximation procedure is used instead of the 'true' LASSO.
@@ -773,7 +776,7 @@ Inderjit et al. (2002). This data can be loaded via
     resp_data = d[:, 0]   # Response data
 
 
-4-parameter Logistic
+4-Parameter Log-Logistic
 ----------------------------
 
 The 4-parameter logistic model (4PL) consists of parameters for the lower-limit of the response, the effective dose,
@@ -821,7 +824,7 @@ To summarize, be sure to examine your data (e.g., scatterplot). This will help t
 for the root-finding procedure. Otherwise, you may come across a convergence error.
 
 
-3-parameter Logistic
+3-Parameter Log-Logistic
 ----------------------------
 
 The 3-parameter logistic model (3PL) consists of parameters for the effective dose, steepness of the curve, and the
@@ -865,7 +868,7 @@ example. For the upper-bound, give the maximum response value as the initial.
 To summarize, be sure to examine your data (e.g., scatterplot). This will help to determine the initial starting values
 for the root-finding procedure. Otherwise, you may come across a convergence error.
 
-2-parameter Logistic
+2-Parameter Log-Logistic
 ----------------------------
 
 The 2-parameter logistic model (2PL) consists of parameters for the effective dose, and steepness of the curve. Here,

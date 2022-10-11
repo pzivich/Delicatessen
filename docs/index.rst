@@ -15,25 +15,25 @@ robust statistics. However, many common large-sample statistics can be expressed
 M-estimation provides a unified structure and a streamlined approach to estimation. Let the parameter of interest be
 the vector :math:`\theta = (\theta_1, \theta_2, ..., \theta_v)` and data is observed for :math:`n` independent units
 :math:`Z_1, Z_2, …, Z_n`. An M-estimator, :math:`\theta` is the solution to the vector equation
-:math:`\sum_{i=1}^{n} \psi(Z_i,\theta) = 0` where :math:`\psi` is a known :math:`v \times 1`-function that does
+:math:`\sum_{i=1}^{n} \psi(Z_i, \hat{\theta}) = 0` where :math:`\psi` is a known :math:`v \times 1`-function that does
 not depend on observation :math:`i` or :math:`n`. M-estimators further provides a convenient and automatic method of
 calculating large-sample variance estimators via the sandwich variance
 
 .. math::
 
-    V_n(Y,\hat{\theta}) = B_n(Y,\hat{\theta})^{-1} F_n(Y,\hat{\theta}) \left(B_n(Y,\hat{\theta})^{-1}\right)^T
+    V_n(Z,\hat{\theta}) = B_n(Z,\hat{\theta})^{-1} F_n(Z,\hat{\theta}) \left(B_n(Z,\hat{\theta})^{-1}\right)^T
 
 where the 'bread' is
 
 .. math::
 
-    B_n(Y,\hat{\theta}) = n^{-1} \sum_i^n - \psi'(Y_i, \hat{\theta})
+    B_n(Z,\hat{\theta}) = n^{-1} \sum_{i=1}^n - \psi'(Z_i, \hat{\theta})
 
 where the :math:`\psi'` indicates the partial derivative, and the 'filling' is
 
 .. math::
 
-    F_n(Y,\hat{\theta}) = n^{-1} \sum_i^n \psi(Y_i, \hat{\theta}) \psi(Y_i, \hat{\theta})^T
+    F_n(Z,\hat{\theta}) = n^{-1} \sum_{i=1}^n \psi(Z_i, \hat{\theta}) \psi(Z_i, \hat{\theta})^T
 
 While M-Estimation is a general approach, widespread application is hindered by the corresponding derivative and matrix
 calculations. To circumvent these barriers, ``delicatessen`` automates M-estimators using numerical approximation
@@ -54,8 +54,8 @@ To install ``delicatessen``, use the following command in terminal or command pr
 Only two dependencies for ``delicatessen`` are: NumPy, SciPy.
 
 While pandas is not necessary, several examples are demonstrated with pandas for ease of data management. To replicate
-the tests in ``tests/`` you will need to install ``statsmodels`` and ``pytest`` (but this is not necessary for general
-use of the package).
+the tests in ``tests/`` you will also need to install ``statsmodels`` and ``pytest`` (but this is not necessary for
+general use of the package).
 
 Citation:
 -------------

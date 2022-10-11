@@ -13,10 +13,10 @@ def ee_regression(theta, X, y, model, weights=None):
 
     .. math::
 
-        \sum_i^n \psi(Y_i, X_i, \theta) = \sum_i^n (Y_i - g(X_i^T \theta)) X_i = 0
+        \sum_{i=1}^n (Y_i - g(X_i^T \theta)) X_i = 0
 
     where :math:`g` indicates a transformation function. For linear regression, :math:`g` is the identity function.
-    Logistic regression uses the inverse-logit function, :math:`expit(u) = 1 / (1 + exp(u))`. Finally, Poisson
+    Logistic regression uses the inverse-logit function, :math:`\text{expit}(u) = 1 / (1 + \exp(u))`. Finally, Poisson
     regression is :math:`\exp(u)`.
 
     Here, theta is a 1-by-b array, where b is the distinct covariates included as part of X. For example, if X is a
@@ -169,7 +169,7 @@ def ee_poisson_regression(theta, X, y, weights=None):
 
 def ee_robust_regression(theta, X, y, model, k, loss='huber', weights=None, upper=None, lower=None):
     r"""Estimating equations for (unscaled) robust regression. Robust linear regression is robust to outlying
-    observations of the outcome variable (``y``). Currently, only linear regression is supported by
+    observations of the outcome variable. Currently, only linear regression is supported by
     ``ee_robust_regression``. The estimating equation is
 
     .. math::
@@ -185,6 +185,7 @@ def ee_robust_regression(theta, X, y, model, k, loss='huber', weights=None, uppe
     The estimating-equation is not non-differentiable everywhere for some loss functions. Therefore, it is assumed that
     no points occur exactly at the non-differentiable points. For truly continuous :math:`Y`, the probability of that
     occurring is zero.
+
 
     Here, theta is a 1-by-b array, where b is the distinct covariates included as part of X. For example, if X is a
     3-by-n matrix, then theta will be a 1-by-3 array. The code is general to allow for an arbitrary number of X's (as
@@ -265,6 +266,8 @@ def ee_robust_regression(theta, X, y, model, k, loss='huber', weights=None, uppe
     >>> estr.variance
     >>> estr.confidence_intervals()
 
+    Weighted models can be estimated by specifying the optional ``weights`` argument.
+
     References
     ----------
     Andrews DF. (1974). A robust method for multiple linear regression. *Technometrics*, 16(4), 523-531.
@@ -326,7 +329,7 @@ def ee_ridge_regression(theta, y, X, model, penalty, weights=None, center=0.):
 
     .. math::
 
-        \sum_{i=1}^n (Y_i - X_i^T \theta) X_i - \lambda \theta = 0
+        \sum_{i=1}^n \left{(Y_i - X_i^T \theta) X_i - \lambda \theta \right} = 0
 
     where :math:`\lambda` is the penalty term.
 
@@ -470,7 +473,8 @@ def ee_lasso_regression(theta, y, X, model, penalty, epsilon=3.e-3, weights=None
 
     .. math::
 
-        \sum_i^n (Y_i - X_i^T \theta) X_i - \lambda (1 + \epsilon) | \theta |^{\epsilon} sign(\theta) = 0
+        \sum_{i=1}^n \left{(Y_i - X_i^T \theta) X_i - \lambda (1 + \epsilon) | \theta |^{\epsilon} sign(\theta) \right}
+        = 0
 
     where :math:`\lambda` is the penalty term.
 
@@ -627,8 +631,8 @@ def ee_elasticnet_regression(theta, y, X, model, penalty, ratio, epsilon=3.e-3, 
 
     .. math::
 
-        \sum_{i=1}^n (Y_i - X_i^T \theta) X_i - \lambda r (1 + \epsilon)
-        | \theta |^{\epsilon} sign(\theta) - \lambda (1-r) \theta = 0
+        \sum_{i=1}^n \left{ (Y_i - X_i^T \theta) X_i - \lambda r (1 + \epsilon)
+        | \theta |^{\epsilon} sign(\theta) - \lambda (1-r) \theta \right} = 0
 
     where :math:`\lambda` is the penalty term and :math:`r` is the ratio for the L1 vs L2 penalty.
 
@@ -640,7 +644,6 @@ def ee_elasticnet_regression(theta, y, X, model, penalty, ratio, epsilon=3.e-3, 
     ----
     The 'strength' of the penalty term is indicated by :math:`\lambda`, which is the ``penalty`` argument scaled (or
     divided by) the number of observations.
-
 
     Parameters
     ----------
@@ -789,7 +792,7 @@ def ee_bridge_regression(theta, y, X, model, penalty, gamma, weights=None, cente
 
     .. math::
 
-        \sum_{i=1}^n (Y_i - X_i^T \theta) X_i - \lambda \gamma | \theta |^{\gamma - 1} sign(\theta) = 0
+        \sum_{i=1}^n \left{ (Y_i - X_i^T \theta) X_i - \lambda \gamma | \theta |^{\gamma - 1} sign(\theta) \right} = 0
 
     where :math:`\lambda` is the penalty term and :math:`\gamma` is a tuning parameter.
 
@@ -801,7 +804,6 @@ def ee_bridge_regression(theta, y, X, model, penalty, gamma, weights=None, cente
     ----
     The 'strength' of the penalty term is indicated by :math:`\lambda`, which is the ``penalty`` argument scaled (or
     divided by) the number of observations.
-
 
     Parameters
     ----------

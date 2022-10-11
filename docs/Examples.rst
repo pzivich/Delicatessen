@@ -282,14 +282,6 @@ are
 
 where :math:`\theta_1` is the positive mean deviation and :math:`\theta_2` is the median.
 
-The estimating equations can be translated into code by
-
-.. code::
-
-    def psi_deviation(theta):
-        return ((2 * (y - theta[1]) * (y > theta[1])) - theta[0],
-                1/2 - (y <= theta[1]), )
-
 As before, this estimating equation is not smooth at :math:`\hat{\theta}_2`
 
 Linear Regression (7.5.1)
@@ -395,4 +387,4 @@ major outliers, so the change is small here).
 
 Additional Examples
 -------------------------------
-Additional examples are provided `here<https://github.com/pzivich/Delicatessen/tree/main/tutorials>`_ .
+Additional examples are provided `here <https://github.com/pzivich/Delicatessen/tree/main/tutorials>`_ .

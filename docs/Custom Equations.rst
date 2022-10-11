@@ -21,7 +21,7 @@ First, we have the estimating equation (which is the score function) provided in
 
 .. math::
 
-    \sum_i^n \psi(Y_i, X_i, \theta) = (Y_i - X_i^T \beta) X_i = 0
+    \sum_i^n (Y_i - X_i^T \beta) X_i = 0
 
 We will demonstrate using the following simulated data set
 
@@ -104,13 +104,14 @@ can write this as
 
 .. math::
 
-    \sum_i^n \psi_1(Y_i, A_i, \pi_i, \theta_0) = \sum_i^n (\theta_1 - \theta_2) - \theta_0 = 0
-
-    \sum_i^n \psi_2(Y_i, A_i, \pi_i, \theta_1) = \sum_i^n \frac{A_i \times Y_i}{\pi_i} - \theta_1 = 0
-
-    \sum_i^n \psi_3(Y_i, A_i, \pi_i, \theta_2) = \sum_i^n \frac{(1-A_i) \times Y_i}{1-\pi_i} - \theta_2 = 0
-
-    \sum_i^n \psi_4(A_i, W_i, \alpha) = \sum_i^n (A_i - \text{expit}(W_i^T \alpha)) W_i = 0
+    \sum_{i=1}^n
+    \begin{bmatrix}
+        (\theta_1 - \theta_2) - \theta_0 \\
+        \frac{A_i \times Y_i}{\pi_i} - \theta_1 \\
+        \frac{(1-A_i) \times Y_i}{1-\pi_i} - \theta_2 \\
+        (A_i - \text{expit}(W_i^T \alpha)) W_i
+    \end{bmatrix}
+    = 0
 
 
 Rather than re-code the logistic regression model (to estimate the propensity scores), we will use the built-in
@@ -275,4 +276,4 @@ mistakes here and improve the documentation for custom estimating equations.
 
 Additional Examples
 -------------------------------
-Additional examples are provided `here<https://github.com/pzivich/Delicatessen/tree/main/tutorials>`_ .
+Additional examples are provided `here <https://github.com/pzivich/Delicatessen/tree/main/tutorials>`_ .

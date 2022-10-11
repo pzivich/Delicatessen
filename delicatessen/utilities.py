@@ -94,6 +94,7 @@ def robust_loss_functions(residual, loss, k, a=None, b=None):
     ----
     The loss functions here are technically the first-order derivatives of the loss functions
 
+
     The following score of the loss functions, :math:`f_k()`, are available.
 
     Andrew's Sine
@@ -118,11 +119,14 @@ def robust_loss_functions(residual, loss, k, a=None, b=None):
 
     .. math::
 
-        f_k(x) = I(-a < x < a) \times x
-                 + I(a \ge |x| < b) \times a \times \text{sign}(x)
-                 + I(b \ge x < k) \times a \frac{k - x}{k - b}
-                 + I(-b \le x > -k) \times -a \frac{-k + x}{-k + b}
-                 + I(|x| \ge k) \times 0
+        f_k(x) =
+        \begin{bmatrix}
+            I(-a < x < a) \times x \\
+            + I(a \ge |x| < b) \times a \times \text{sign}(x) \\
+            + I(b \ge x < k) \times a \frac{k - x}{k - b} \\
+            + I(-b \le x > -k) \times -a \frac{-k + x}{-k + b} \\
+            + I(|x| \ge k) \times 0
+        \end{bmatrix}
 
     Parameters
     ----------

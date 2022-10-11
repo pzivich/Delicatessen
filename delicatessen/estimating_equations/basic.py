@@ -13,7 +13,7 @@ def ee_mean(theta, y):
 
     .. math::
 
-        \sum_{i=1}^n Y_i - \theta_1 = 0
+        \sum_{i=1}^n Y_i - \theta = 0
 
     Note
     ----
@@ -234,8 +234,7 @@ def ee_mean_variance(theta, y):
     >>> estr.variance
     >>> estr.asymptotic_variance
 
-    For this estimating equation, ``mestimation.theta[1]`` and ``mestimation.asymptotic_variance[0][0]`` are expected
-    to be equal.
+    For this estimating equation, ``estr.theta[1]`` and ``estr.asymptotic_variance[0][0]`` are expected to be equal.
 
     References
     ----------
@@ -305,15 +304,13 @@ def ee_percentile(theta, y, q):
     >>> estr.estimate(solver='hybr', tolerance=1e-3, dx=1, order=15)
 
     Notice that we use a different solver, tolerance values, and parameters for numerically approximating the derivative
-    here. These changes generally work better for percentile optimizations since the estimating equation is non-smooth.
-    Furthermore, optimization is hard when only a few observations (<100) are available. In general, closed form
-    solutions for percentiles will be preferred.
+    here. These changes generally work better for the percentile since the estimating equation is non-smooth.
+    Furthermore, optimization is hard when only a few observations (<100) are available.
 
     >>> estr.theta
 
     Then displays the estimated percentile / median. In this example, there is a difference between the closed form
-    solution (``-0.07978``) and M-Estimation (``-0.06022``). Again, this results from the non-smooth estimating
-    equation.
+    solution (-0.07978) and M-Estimation (-0.06022).
 
     References
     ----------
@@ -396,11 +393,9 @@ def ee_positive_mean_deviation(theta, y):
     >>> estr = MEstimator(stacked_equations=psi, init=[0, 0, ])
     >>> estr.estimate()
 
-    Inspecting the parameter estimates, the variance, and the asymptotic variance
+    Inspecting the parameter estimates
 
     >>> estr.theta
-    >>> estr.variance
-    >>> estr.asymptotic_variance
 
     References
     ----------
