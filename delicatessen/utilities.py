@@ -1,38 +1,4 @@
 import numpy as np
-from scipy.misc import derivative
-from copy import copy
-
-
-def partial_derivative(func, var, point, output, dx, order):
-    """Calculate the partial derivatives for a given function
-
-    Parameters
-    ----------
-    func : function
-        Function with multiple variables to calculate the partial derivatives for
-    var : int
-        Index of variable to take the derivative of.
-    point : ndarray
-        Values to evaluate the partial derivative at
-    output : int
-        Index of the variable to extract the partial derivative of.
-    dx : float
-        Spacing to use to numerically approximate the partial derivatives of the bread matrix.
-    order : int
-        Number of points to use to evaluate the derivative. Must be an odd number
-
-    Returns
-    -------
-    float
-        Partial derivative at the variable at a particular points
-    """
-    args = copy(point[:])  # Copy is needed here to prevent over-writing (not sure why SciPy overwrites if not)
-
-    def wraps(x):
-        args[var] = x
-        return func(args)[output]
-
-    return derivative(wraps, point[var], dx=dx, order=order)
 
 
 def logit(prob):

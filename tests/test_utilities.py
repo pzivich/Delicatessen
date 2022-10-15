@@ -2,7 +2,7 @@ import pytest
 import numpy as np
 import numpy.testing as npt
 
-from delicatessen.utilities import inverse_logit, logit, partial_derivative, robust_loss_functions
+from delicatessen.utilities import inverse_logit, logit, robust_loss_functions
 
 
 class TestFunctions:
@@ -56,32 +56,6 @@ class TestFunctions:
         odds = np.array([0., -1.098612288668, 1.098612288668, 0.])
 
         npt.assert_allclose(inverse_logit(odds), prbs)
-
-    def test_partial_derivative(self):
-        """Checks the partial derivative numerical approximations with known solution
-        """
-        def function(arg):
-            x, y = arg
-            return (x**2) * (y**3),
-
-        def partial_x_derivative(x, y):
-            return 2 * x * (y**3)
-
-        def partial_y_derivative(x, y):
-            return 3 * (x**2) * (y**2)
-
-        loc_x = 3
-        loc_y = -1
-
-        # Checking partial derivative for X
-        dx1 = partial_derivative(func=function, var=0, point=np.array([loc_x, loc_y]), output=0,
-                                 dx=1, order=5)
-        npt.assert_allclose(dx1, partial_x_derivative(loc_x, loc_y))
-
-        # Checking partial derivative for Y
-        dy1 = partial_derivative(func=function, var=1, point=np.array([loc_x, loc_y]), output=0,
-                                 dx=1, order=5)
-        npt.assert_allclose(dy1, partial_y_derivative(loc_x, loc_y))
 
     def test_rloss_huber(self):
         """Checks the robust loss function: Huber's

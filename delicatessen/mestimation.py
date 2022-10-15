@@ -1,10 +1,9 @@
 import numpy as np
 from scipy.optimize import newton, root
 from scipy.misc import derivative
+from scipy.optimize import approx_fprime
 from scipy.stats import norm
 from copy import copy
-
-from delicatessen.utilities import partial_derivative
 
 
 class MEstimator:
@@ -287,9 +286,7 @@ class MEstimator:
         # STEP 2: calculating Variance
         # STEP 2.1: baking the Bread
         self.bread = self._bread_matrix_(theta=self.theta,                           # Provide theta-hat
-                                         stacked_equations=self.stacked_equations,   # Stacked estimating equations
-                                         dx=dx,                                      # Derivative approximation value
-                                         order=order) / self.n_obs                   # Order for deriv ... then divide
+                                         dx=dx) / self.n_obs                         # Derivative approximation value
 
         # STEP 2.2: slicing the meat
         evald_theta = np.asarray(self.stacked_equations(theta=self.theta))           # Evaluating EE at theta-hat
@@ -348,7 +345,8 @@ class MEstimator:
 
     def _mestimation_answer_(self, theta):
         """Internal function to evaluate the sum of the estimating equations. The summation must be internally evaluated
-        since the bread requires calculation of the sum of the derivatives.
+        since the bread requires calculation of the sum of the derivatives. This function is used by the root-finding
+        procedure (since we need the subset applied).
 
         Parameters
         ----------
@@ -361,6 +359,7 @@ class MEstimator:
             b-by-1 array, which is the sum over n for each b.
         """
         # Option for the subset argument
+        # TODO this subset breaks the bread matrix...
         if self._subset_ is None:                      # If NOT subset then,
             full_theta = theta                         # ... then use the full input theta
         else:                                          # If subset then,
@@ -369,24 +368,66 @@ class MEstimator:
                    ind=self._subset_,                  # ... go to the subset indices
                    v=theta)                            # ... then input current iteration values
 
-        # Calculating the stacked estimating equations output
         stacked_equations = np.asarray(self.stacked_equations(full_theta))  # Returning stacked equation
+        return self._mestimator_sum_(stacked_equations=stacked_equations,   # Passing to evaluating function
+                                     subset=self._subset_)                  # ... with specified subset
 
-        if len(stacked_equations.shape) == 1:          # If stacked_equation returns 1 value, only return that 1 value
-            vals = np.sum(stacked_equations)           # ... avoids SciPy error by returning value rather than tuple
-        else:                                          # Else return a tuple for optimization
+    def _mestimation_answer_no_subset_(self, theta):
+        """Internal function to evaluate the sum of the estimating equations. The summation must be internally evaluated
+        since the bread requires calculation of the sum of the derivatives. This function is used by the bread matrix
+        approximation procedure (since the subset should be ignored for the bread).
+
+        Parameters
+        ----------
+        theta : array
+            b-by-n matrix to sum over the values of n.
+
+        Returns
+        -------
+        array :
+            b-by-1 array, which is the sum over n for each b.
+        """
+        stacked_equations = np.asarray(self.stacked_equations(theta))       # Returning stacked equation
+        return self._mestimator_sum_(stacked_equations=stacked_equations,   # Passing to evaluating function
+                                     subset=None)                           # ... with always /no/ subset
+
+    @staticmethod
+    def _mestimator_sum_(stacked_equations, subset):
+        """Function to evaluate the sum of the M-estimator over the i units. This static method takes an optional
+        argument.
+
+        Note
+        ----
+        Added in v1.0 to replace the inner functionality of ``_mestimation_answer_`` for the new ``approx_fprime`` but
+        still support ``subset`` (without having to flip the subset flag
+
+        Parameters
+        ----------
+        stacked_equations
+        subset
+
+        Returns
+        -------
+
+        """
+        # IF stacked_equation returns 1 value, only return that 1 value
+        if len(stacked_equations.shape) == 1:          # Checking length
+            vals = np.sum(stacked_equations)           # ... avoid SciPy error by returning value rather than tuple
+        # ELSE need to return a tuple for the root-finding procedure
+        else:                                          # ... also considering how subset argument is handled
             # NOTE: switching to np.sum(..., axis=1) didn't speed things up versus a for-loop
             vals = ()                                  # ... create empty tuple
             rows = stacked_equations.shape[0]          # ... determine how many rows / parameters are present
-            if self._subset_ is None:                  # ... if no subset, then simple loop where
+            if subset is None:                         # ... if no subset, then simple loop where
                 for i in range(rows):                  # ... go through each individual theta in the stack
                     row = stacked_equations[i, :]      # ... extract corresponding row
                     vals += (np.sum(row), )            # ... then add the theta sum to the tuple of thetas
             else:                                      # ... if subset, then conditional loop (to speed up)
                 for i in range(rows):                  # ... go through each individual theta in the stack
-                    if i in self._subset_:             # ... if parameter is in subset then
+                    if i in subset:                    # ... if parameter is in subset then
                         row = stacked_equations[i, :]  # ... extract corresponding row
                         vals += (np.sum(row), )        # ... then add the theta sum to the tuple of thetas
+            vals = np.asarray(vals)                    # ... converting to a NumPy array for ease
 
         # Return the calculated values of theta
         return vals
@@ -464,40 +505,7 @@ class MEstimator:
         # Return optimized theta array
         return psi
 
-    @staticmethod
-    def _bread_individual_(theta, variable_index, output_index, stacked_equations, dx, order):
-        """Calculate the partial derivative for a cell of the bread matrix. Transforms the partial derivative by taking
-        the negative sum.
-
-        Parameters
-        ----------
-        theta
-            Solved values of theta to evaluate at
-        variable_index
-            Index of the input theta (e.g., variable_index=1 means that derivative of theta[1] is approximated).
-        output_index
-            Index of the output theta (e.g., out_index=1 means that theta[1] is output).
-        stacked_equations
-            Function containing the estimating equations
-        dx : float
-            Spacing to use to numerically approximate the partial derivatives of the bread matrix.
-        order : int
-            Number of points to use to evaluate the derivative. Must be an odd number
-
-        Returns
-        -------
-        float
-        """
-        # Calculate the partial derivatives for a single i,j of the bread matrix
-        d = partial_derivative(stacked_equations,    # ... stacked estimating equations
-                               var=variable_index,   # ... index for the theta of interest
-                               point=theta,          # ... point to evaluate the derivative at
-                               output=output_index,  # ... index location to output
-                               dx=dx,                # ... spacing for derivative approximation
-                               order=order)          # ... number of evals for derivative
-        return -1 * np.sum(d)                        # Calculate the bread for i,j
-
-    def _bread_matrix_(self, theta, stacked_equations, dx, order):
+    def _bread_matrix_(self, theta, dx):
         """Evaluate the bread matrix by taking all partial derivatives of the thetas in the estimating equation.
 
         Parameters
@@ -518,20 +526,14 @@ class MEstimator:
         # Check how many values of theta there is
         val_range = len(theta)
 
-        # Evaluate the bread matrix
+        # Calculating the bread
         if val_range == 1:                                       # When only a single theta is present
-            d = derivative(stacked_equations, theta, dx=dx)      # ... approximate the derivative
-            return np.array([[-1 * np.sum(d), ], ])              # ... then return negative sum as 2d array
+            d = derivative(self._mestimation_answer_no_subset_,  # ... approximate the derivative
+                           theta, dx=dx)                         # ... at the solved theta (input)
+            bread_matrix = np.array([[d, ], ])                   # ... return as 1-by-1 array object for inversion
         else:                                                    # Otherwise approximate the partial derivatives
-            bread_matrix = np.empty((val_range, val_range))      # ... create empty matrix
-            for i in range(val_range):                           # ... for each i in len(theta)
-                for j in range(val_range):                       # ... for each j in len(theta)
-                    b = self._bread_individual_(theta=theta,     # ... calculate the i,j cell value by -sum part-deriv
-                                                variable_index=i,
-                                                output_index=j,
-                                                stacked_equations=stacked_equations,
-                                                dx=dx,
-                                                order=order)
-                    # TODO potential consideration: can eval sum then derivative (right now deriv then sum). maybe fast?
-                    bread_matrix[j, i] = b                       # ... update bread matrix value with new
-            return bread_matrix                                  # Return completed bread matrix
+            bread_matrix = approx_fprime(xk=theta,               # ... use built-in jacobian functionality of SciPy
+                                         f=self._mestimation_answer_no_subset_,
+                                         epsilon=dx)             # ... order option removed in v1.0 since not in SciPy
+        # Return bread (multiplied by negative 1 as in Stefanski & Boos)
+        return -1 * bread_matrix
