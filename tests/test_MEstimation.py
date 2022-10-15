@@ -479,7 +479,9 @@ class TestMEstimation:
         npt.assert_allclose(ns.theta, ys.theta)
 
         # Check variance estimates are all close
-        npt.assert_allclose(ns.variance, ys.variance, rtol=1e-6)
+        npt.assert_allclose(ns.bread, ys.bread, atol=1e-8)
+        npt.assert_allclose(ns.meat, ys.meat, atol=1e-8)
+        npt.assert_allclose(ns.variance, ys.variance, atol=1e-8)
 
     def test_subset_params2(self):
         # Creating data set
@@ -512,15 +514,17 @@ class TestMEstimation:
         # Full solve
         init = [0, ] + [0, ]*x.shape[1]
         ns = MEstimator(psi, init=init)
-        ns.estimate(solver='lm')
+        ns.estimate(solver='lm', dx=1e-9)
 
         # Subset solve (using previous regression solutions)
         init = [0, 0, ] + list(ns.theta[2:4]) + [0, ]
         ys = MEstimator(psi, init=init, subset=[0, 1, 4])
-        ys.estimate(solver='lm')
+        ys.estimate(solver='lm', dx=1e-9)
 
         # Check point estimates are all close
         npt.assert_allclose(ns.theta, ys.theta)
 
         # Check variance estimates are all close
-        npt.assert_allclose(ns.variance, ys.variance, rtol=1e-6)
+        npt.assert_allclose(ns.bread, ys.bread, atol=1e-8)
+        npt.assert_allclose(ns.meat, ys.meat, atol=1e-8)
+        npt.assert_allclose(ns.variance, ys.variance, atol=1e-8)
