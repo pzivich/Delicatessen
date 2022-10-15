@@ -127,42 +127,6 @@ def ee_regression(theta, X, y, model, weights=None):
     return w*((y - pred_y) * X).T           # Return weighted regression score function
 
 
-def ee_linear_regression(theta, X, y, weights=None):
-    r"""Estimating equation for linear regression.
-
-    Note
-    ----
-    The function ``ee_linear_regression`` is deprecated. Please use ``ee_regression`` instead.
-    """
-    warnings.warn("Regression estimating equations should be implemented using `ee_regression`. The specific type of "
-                  "regression estimating equations will be removed in v1.0", DeprecationWarning)
-    return ee_regression(theta=theta, X=X, y=y, model='linear', weights=weights)
-
-
-def ee_logistic_regression(theta, X, y, weights=None):
-    r"""Estimating equation for logistic regression.
-
-    Note
-    ----
-    The function ``ee_linear_regression`` is deprecated. Please use ``ee_regression`` instead.
-    """
-    warnings.warn("Regression estimating equations should be implemented using `ee_regression`. The specific type of "
-                  "regression estimating equations will be removed in v1.0", DeprecationWarning)
-    return ee_regression(theta=theta, X=X, y=y, model='logistic', weights=weights)
-
-
-def ee_poisson_regression(theta, X, y, weights=None):
-    r"""Estimating equation for Poisson regression.
-
-    Note
-    ----
-    The function ``ee_linear_regression`` is deprecated. Please use ``ee_regression`` instead.
-    """
-    warnings.warn("Regression estimating equations should be implemented using `ee_regression`. The specific type of "
-                  "regression estimating equations will be removed in v1.0", DeprecationWarning)
-    return ee_regression(theta=theta, X=X, y=y, model='poisson', weights=weights)
-
-
 #################################################################
 # Robust Regression Estimating Equations
 
@@ -305,18 +269,6 @@ def ee_robust_regression(theta, X, y, model, k, loss='huber', weights=None, uppe
 
     # Output b-by-n matrix
     return w*(residual * X).T    # Score function
-
-
-def ee_robust_linear_regression(theta, X, y, k, weights=None):
-    r"""Estimating equations for robust linear regression.
-
-    Note
-    ----
-    The function ``ee_robust_linear_regression`` is deprecated. Please use ``ee_robust_regression`` instead.
-    """
-    warnings.warn("Robust regression estimating equations should be implemented using `ee_robust_regression`. The "
-                  "specific type of regression estimating equations will be removed in v1.0", DeprecationWarning)
-    return ee_robust_regression(theta=theta, X=X, y=y, model='linear', loss='huber', k=k, weights=weights)
 
 
 #################################################################
@@ -623,8 +575,8 @@ def ee_elasticnet_regression(theta, y, X, model, penalty, ratio, epsilon=3.e-3, 
 
     Note
     ----
-    As the derivative of the estimating equation for Elastic-Net is not defined, the bread (and sandwich) cannot be used to
-    estimate the variance in all settings.
+    As the derivative of the estimating equation for Elastic-Net is not defined, the bread (and sandwich) cannot be
+    used to estimate the variance in all settings.
 
 
     The estimating equation for Elastic-Net with the approximate L1 penalty is
