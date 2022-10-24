@@ -2,6 +2,7 @@ import warnings
 import numpy as np
 
 from delicatessen.utilities import logit, inverse_logit, identity, robust_loss_functions
+from delicatessen.estimating_equations.processing import generate_weights
 
 #################################################################
 # Basic Regression Estimating Equations
@@ -121,7 +122,7 @@ def ee_regression(theta, X, y, model, weights=None):
     pred_y = transform(np.dot(X, beta))          # Generating predicted values via speedy matrix calculation
 
     # Allowing for a weighted linear model
-    w = _generate_weights_(weights=weights, n_obs=X.shape[0])
+    w = generate_weights(weights=weights, n_obs=X.shape[0])
 
     # Output b-by-n matrix
     return w*((y - pred_y) * X).T           # Return weighted regression score function
@@ -253,7 +254,7 @@ def ee_robust_regression(theta, X, y, model, k, loss='huber', weights=None, uppe
     X, y, beta = _prep_inputs_(X=X, y=y, theta=theta, penalty=None)
 
     # Allowing for a weighted linear model
-    w = _generate_weights_(weights=weights, n_obs=X.shape[0])
+    w = generate_weights(weights=weights, n_obs=X.shape[0])
 
     # Determining transformation function to use for the regression model
     transform = _model_transform_(model=model,                # Looking up corresponding transformation
@@ -402,7 +403,7 @@ def ee_ridge_regression(theta, y, X, model, penalty, weights=None, center=0.):
     pred_y = transform(np.dot(X, beta))             # Generating predicted values
 
     # Allowing for a weighted penalized regression model
-    w = _generate_weights_(weights=weights, n_obs=X.shape[0])
+    w = generate_weights(weights=weights, n_obs=X.shape[0])
 
     # Creating penalty term for ridge regression (bridge with gamma=2 is the special case of ridge)
     penalty_terms = _bridge_penalty_(theta=theta, n_obs=X.shape[0], penalty=penalty, gamma=2, center=center)
@@ -557,7 +558,7 @@ def ee_lasso_regression(theta, y, X, model, penalty, epsilon=3.e-3, weights=None
     pred_y = transform(np.dot(X, beta))             # Generating predicted values
 
     # Allowing for a weighted penalized regression model
-    w = _generate_weights_(weights=weights, n_obs=X.shape[0])
+    w = generate_weights(weights=weights, n_obs=X.shape[0])
 
     # Creating penalty term for ridge regression (bridge with gamma=2 is the special case of ridge)
     if epsilon < 0:
@@ -713,7 +714,7 @@ def ee_elasticnet_regression(theta, y, X, model, penalty, ratio, epsilon=3.e-3, 
     pred_y = transform(np.dot(X, beta))  # Generating predicted values
 
     # Allowing for a weighted penalized regression model
-    w = _generate_weights_(weights=weights, n_obs=X.shape[0])
+    w = generate_weights(weights=weights, n_obs=X.shape[0])
 
     # Creating penalty term for ridge regression (bridge with gamma=2 is the special case of ridge)
     if epsilon < 0:
@@ -872,7 +873,7 @@ def ee_bridge_regression(theta, y, X, model, penalty, gamma, weights=None, cente
     pred_y = transform(np.dot(X, beta))  # Generating predicted values
 
     # Allowing for a weighted penalized regression model
-    w = _generate_weights_(weights=weights, n_obs=X.shape[0])
+    w = generate_weights(weights=weights, n_obs=X.shape[0])
 
     # Creating penalty term for ridge regression (bridge with gamma=2 is the special case of ridge)
     penalty_terms = _bridge_penalty_(theta=theta, n_obs=X.shape[0], penalty=penalty, gamma=gamma, center=center)
@@ -949,28 +950,6 @@ def _model_transform_(model, assert_linear_model=False):
         raise ValueError("Invalid input:", model,
                          ". Please select: 'linear', 'logistic', or 'poisson'.")
     return transform
-
-
-def _generate_weights_(weights, n_obs):
-    """Internal use function to return the weights assigned to each observation. Returns a vector of 1's when no
-    weights are provided. Otherwise, converts provided vector into a numpy array.
-
-    Parameters
-    ----------
-    weights : None, ndarray, list
-        Vector of weights, or None if no weights are provided
-    n_obs : int
-        Number of observations in the data
-
-    Returns
-    -------
-    ndarray
-    """
-    if weights is None:                     # If weights is unspecified
-        w = np.ones(n_obs)                      # ... assign weight of 1 to all observations
-    else:                                   # Otherwise
-        w = np.asarray(weights)                 # ... set weights as input vector
-    return w
 
 
 def _bridge_penalty_(theta, gamma, penalty, n_obs, center):
