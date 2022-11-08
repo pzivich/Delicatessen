@@ -105,12 +105,14 @@ class MEstimator:
     >>> estr = MEstimator(stacked_equations=psi, init=[0, 0, ])
     >>> estr.estimate()
 
-    Inspecting the parameter estimates, the variance, 95% confidence intervals, and the asymptotic variance
+    Inspecting the output results
 
-    >>> estr.theta                     # Point estimates
-    >>> estr.variance                  # Covariance matrix
-    >>> estr.confidence_intervals()    # Confidence intervals
-    >>> estr.asymptotic_variance       # Asymptotic covariance matrix
+    >>> estr.theta                                  # Point estimates
+    >>> estr.variance                               # Covariance
+    >>> estr.asymptotic_variance                    # Asymptotic covariance
+    >>> np.sqrt(np.diag(estr.asymptotic_variance))  # Standard deviation
+    >>> np.sqrt(np.diag(estr.variance))             # Standard error
+    >>> estr.confidence_intervals()                 # Confidence intervals
 
     Alternatively, a custom estimating equation can be specified. This is done by constructing a valid estimating
     equation for the ``MEstimator``. The ``MEstimator`` expects the ``psi`` function to return a b-by-n array, where b
