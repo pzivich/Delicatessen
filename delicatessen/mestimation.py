@@ -217,6 +217,9 @@ class MEstimator:
                                   ).T                             # ... transpose so N is always the 1st element
 
         # Error checking before running procedure
+        if np.sum(vals_at_init) is None:
+            raise ValueError("When evaluating the estimating equation, `None` was returned. Please check that the "
+                             "stacked_equations returns an array evaluated at theta.")
         if np.isnan(np.sum(vals_at_init)):         # Check to see if any np.nan's occur with the initial values
             # Identifying the bad columns
             nans_in_column = np.sum(np.isnan(vals_at_init), axis=0)        # Counting up all NAN's per estimating eq

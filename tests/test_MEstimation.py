@@ -16,6 +16,19 @@ np.random.seed(236461)
 
 class TestMEstimation:
 
+    def test_error_none_returned(self):
+        """Checks for an error when the estimating equations return None
+        """
+        # Data set
+        y = np.array([5, 1, 2, 4, 2, 4, 5, 7, 11, 1, 6, 3, 4, np.nan])
+
+        def psi(theta):
+            y - theta  # Nothing returned here
+
+        mestimator = MEstimator(psi, init=[0, ])
+        with pytest.raises(ValueError, match="returns an array evaluated"):
+            mestimator.estimate()
+
     def test_error_nan(self):
         """Checks for an error when estimating equations return a NaN at the init values
         """
