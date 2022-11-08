@@ -517,12 +517,8 @@ class MEstimator:
         ----------
         theta : ndarray, float
             Solved values of theta to evaluate at
-        stacked_equations : function
-            Function containing the estimating equations
         dx : float
             Spacing to use to numerically approximate the partial derivatives of the bread matrix.
-        order : int
-            Number of points to use to evaluate the derivative. Must be an odd number
 
         Returns
         -------
