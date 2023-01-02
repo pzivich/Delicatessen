@@ -7,7 +7,7 @@
 [![docs](https://readthedocs.org/projects/deli/badge/?version=latest)](https://deli.readthedocs.io/en/latest/?badge=latest)
 [![Downloads](https://pepy.tech/badge/delicatessen/month)](https://pepy.tech/project/delicatessen)
 
-The one-stop sandwich (variance) shop in Python. `delicatessen` is a Python 3.6+ library for the generalized calculus 
+The one-stop sandwich (variance) shop in Python. `delicatessen` is a Python 3.8+ library for the generalized calculus
 of M-estimation.
 
 **Citation**: Zivich PN, Klose M, Cole SR, Edwards JK, & Shook-Sa BE. (2022). Delicatessen: M-Estimation in Python.
@@ -41,9 +41,10 @@ The dependencies are: `numpy`, `scipy`
 
 To replicate the tests located in `tests/`, you will additionally need to install: `panda`, `statsmodels`, and `pytest`
 
-While `delicatessen` is expected to work with older versions of NumPy and SciPy, this has not been formally tested.
-Therefore, it is recommended to use `numpy >= 1.18.0` and `scipy >= 1.4.0` as there is no currently reported testing 
-on previous versions.
+While versions of `delicatessen` prior to v1.0 were compatible with older versions of Python 3 and NumPy and SciPy, the
+v1.0+ releases are only available for Python 3.8+ with NumPy v1.18.5+ and SciPy v1.9.0. This change was made to use
+a better numerical approximation procedure for the derivative. If you want to use with older versions of those packages
+or older versions of Python, install v0.6 instead.
 
 ## Getting started
 
@@ -71,3 +72,14 @@ print(estr.variance)  # Variance estimator for the mean
 
 For further details on using `delicatessen`, see the full documentation and worked examples available
 at [delicatessen website](https://deli.readthedocs.io/en/latest/) or in the examples folder.
+
+
+## References
+
+Boos DD, & Stefanski LA. (2013). M-estimation (estimating equations). In Essential Statistical Inference
+(pp. 297-337). Springer, New York, NY.
+
+Stefanski LA, & Boos DD. (2002). The calculus of M-estimation. *The American Statistician*, 56(1), 29-38.
+
+Zivich PN, Klose M, Cole SR, Edwards JK, & Shook-Sa BE. (2022). Delicatessen: M-Estimation in Python.
+*arXiv preprint arXiv:2203.11300*.
