@@ -1,8 +1,10 @@
 import numpy as np
 
+from delicatessen.estimating_equations.processing import generate_weights
+
 
 #################################################################
-# Survival Estimating Equations
+# Parametric Survival Estimating Equations
 
 
 def ee_exponential_model(theta, t, delta):
@@ -514,6 +516,10 @@ def ee_weibull_measure(theta, times, n, measure, scale, shape):
             metric_t = calculate_metric(time=t, theta_t=thet)    # ... ... calculate the transformation
             stacked_time_evals.append(metric_t)                  # ... ... stack transformation into storage
         return np.vstack(stacked_time_evals)                     # ... return a vstack of the equations
+
+
+#################################################################
+# Accelerated Failure Time Models
 
 
 def ee_aft_weibull(theta, X, t, delta, weights=None):

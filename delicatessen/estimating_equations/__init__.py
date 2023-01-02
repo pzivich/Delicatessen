@@ -12,5 +12,4 @@ from .regression import (ee_regression,
 
 from .survival import (ee_exponential_model, ee_weibull_model,
                        ee_exponential_measure, ee_weibull_measure,
-                       ee_aft_weibull,
-                       ee_aft_weibull_measure)
+                       ee_aft_weibull, ee_aft_weibull_measure)

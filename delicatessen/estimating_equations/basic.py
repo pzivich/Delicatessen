@@ -2,6 +2,7 @@ import warnings
 
 import numpy as np
 from delicatessen.utilities import robust_loss_functions
+from delicatessen.estimating_equations.processing import generate_weights
 
 
 #################################################################
