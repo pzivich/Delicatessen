@@ -117,3 +117,22 @@ class TestFunctions:
                            (4 - 3)/(4 - 2)*1])
 
         npt.assert_allclose(func, byhand)
+
+    def test_rloss_hampel_error(self):
+        residuals = np.array([-5, 1, 1.5, -1.3, 0.1, -2, 8, 3])
+
+        # All parameters are specified
+        with pytest.raises(ValueError, match="requires the optional"):
+            robust_loss_functions(residual=residuals, loss='hampel',
+                                  k=4)
+
+        # Ordering of parameters
+        with pytest.raises(ValueError, match="requires that a < b < k"):
+            robust_loss_functions(residual=residuals, loss='hampel',
+                                  k=-4, a=1, b=2)
+        with pytest.raises(ValueError, match="requires that a < b < k"):
+            robust_loss_functions(residual=residuals, loss='hampel',
+                                  k=4, a=1, b=-2)
+        with pytest.raises(ValueError, match="requires that a < b < k"):
+            robust_loss_functions(residual=residuals, loss='hampel',
+                                  k=1.5, a=1, b=2)

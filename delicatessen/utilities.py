@@ -160,8 +160,6 @@ def robust_loss_functions(residual, loss, k, a=None, b=None):
     if not isinstance(loss, str):
         raise ValueError("The provided loss function should be a string.")
 
-    # TODO add check that a < b < k for Hampel
-
     # Huber function
     elif loss.lower() == "huber":
         xr = np.clip(residual, a_min=-k, a_max=k)
@@ -181,6 +179,8 @@ def robust_loss_functions(residual, loss, k, a=None, b=None):
     elif loss.lower() == "hampel":
         if a is None or b is None:
             raise ValueError("The 'hampel' loss function requires the optional `a` and `b` arguments")
+        if not a < b < k:
+            raise ValueError("The 'hampel' loss function requires that a < b < k")
         xr = np.where(np.abs(residual) < a, residual, np.nan)
         xr = np.where((a <= residual) & (residual < b), a, xr)
         xr = np.where((-a >= residual) & (residual > -b), -a, xr)
