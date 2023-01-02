@@ -276,7 +276,7 @@ def ee_robust_regression(theta, X, y, model, k, loss='huber', weights=None, uppe
 # Penalized Regression Estimating Equations
 
 
-def ee_ridge_regression(theta, y, X, model, penalty, weights=None, center=0.):
+def ee_ridge_regression(theta, X, y, model, penalty, weights=None, center=0.):
     r"""Estimating equations for ridge regression. Ridge regression applies an L2-regularization through a squared
     magnitude penalty. The estimating equation(s) is
 
@@ -395,24 +395,13 @@ def ee_ridge_regression(theta, y, X, model, penalty, weights=None, center=0.):
 
     Fu WJ. (2003). Penalized estimating equations. Biometrics, 59(1), 126-132.
     """
-    # Preparation of input shapes and object types
-    X, y, beta, penalty, center = _prep_inputs_(X=X, y=y, theta=theta, penalty=penalty, center=center)
-
-    # Determining transformation function to use for the regression model
-    transform = _model_transform_(model=model)      # Looking up corresponding transformation
-    pred_y = transform(np.dot(X, beta))             # Generating predicted values
-
-    # Allowing for a weighted penalized regression model
-    w = generate_weights(weights=weights, n_obs=X.shape[0])
-
-    # Creating penalty term for ridge regression (bridge with gamma=2 is the special case of ridge)
-    penalty_terms = _bridge_penalty_(theta=theta, n_obs=X.shape[0], penalty=penalty, gamma=2, center=center)
-
-    # Output b-by-n matrix
-    return w*(((y - pred_y) * X).T - penalty_terms[:, None])    # Score function with penalty term subtracted off
+    # Calling internal bridge penalized regression for implementation
+    return ee_bridge_regression(theta=theta,
+                                X=X, y=y, model=model, weights=weights,
+                                penalty=penalty, gamma=2, center=center)
 
 
-def ee_lasso_regression(theta, y, X, model, penalty, epsilon=3.e-3, weights=None, center=0.):
+def ee_lasso_regression(theta, X, y, model, penalty, epsilon=3.e-3, weights=None, center=0.):
     r"""Estimating equation for an approximate LASSO (least absolute shrinkage and selection operator) regressor. LASSO
     regression applies an L1-regularization through a magnitude penalty.
 
@@ -550,26 +539,16 @@ def ee_lasso_regression(theta, y, X, model, penalty, epsilon=3.e-3, weights=None
 
     Fu WJ. (2003). Penalized estimating equations. Biometrics, 59(1), 126-132.
     """
-    # Preparation of input shapes and object types
-    X, y, beta, penalty, center = _prep_inputs_(X=X, y=y, theta=theta, penalty=penalty, center=center)
-
-    # Determining transformation function to use for the regression model
-    transform = _model_transform_(model=model)      # Looking up corresponding transformation
-    pred_y = transform(np.dot(X, beta))             # Generating predicted values
-
-    # Allowing for a weighted penalized regression model
-    w = generate_weights(weights=weights, n_obs=X.shape[0])
-
-    # Creating penalty term for ridge regression (bridge with gamma=2 is the special case of ridge)
     if epsilon < 0:
         raise ValueError("epsilon must be greater than zero for the approximate LASSO")
-    penalty_terms = _bridge_penalty_(theta=theta, n_obs=X.shape[0], penalty=penalty, gamma=1+epsilon, center=center)
 
-    # Output b-by-n matrix
-    return w*(((y - pred_y) * X).T - penalty_terms[:, None])    # Score function with penalty term subtracted off
+    # Calling internal bridge penalized regression for implementation
+    ee_bridge_regression(theta=theta,
+                         X=X, y=y, model=model, weights=weights,
+                         penalty=penalty, gamma=1+epsilon, center=center)
 
 
-def ee_elasticnet_regression(theta, y, X, model, penalty, ratio, epsilon=3.e-3, weights=None, center=0.):
+def ee_elasticnet_regression(theta, X, y, model, penalty, ratio, epsilon=3.e-3, weights=None, center=0.):
     r"""Estimating equations for Elastic-Net regression. Elastic-Net applies both L1- and L2-regularization at a
     pre-specified ratio. Notice that the L1 penalty is based on an approximation. See ``ee_lasso_regression`` for
     further details on the approximation for the L1 penalty.
@@ -730,7 +709,7 @@ def ee_elasticnet_regression(theta, y, X, model, penalty, ratio, epsilon=3.e-3, 
     return w * (((y - pred_y) * X).T - penalty_terms[:, None])  # Score function with penalty term subtracted off
 
 
-def ee_bridge_regression(theta, y, X, model, penalty, gamma, weights=None, center=0.):
+def ee_bridge_regression(theta, X, y, model, penalty, gamma, weights=None, center=0.):
     r"""Estimating equation for bridge penalized regression. The bridge penalty is a generalization of penalized
     regression, that includes L1 and L2-regularization as special cases.
 
