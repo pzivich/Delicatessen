@@ -3,7 +3,7 @@
 Delicatessen
 =====================================
 
-``delicatessen`` is a one-stop shop for all your sandwich (variance) needs. This Python 3.6+ library supports
+``delicatessen`` is a one-stop shop for all your sandwich (variance) needs. This Python 3.8+ library supports
 M-estimation, which is a general statistical framework for estimating unknown parameters. If you are an R user, I
 recommend looking into ``geex`` (`Saul & Hudgens (2020) <https://bsaul.github.io/geex/>`_).
 ``delicatessen`` supports a variety of pre-built estimating equations as well as custom, user built estimating
