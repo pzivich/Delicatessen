@@ -22,8 +22,9 @@ def ee_regression(theta, X, y, model, weights=None):
     Logistic regression uses the inverse-logit function, :math:`\text{expit}(u) = 1 / (1 + \exp(u))`. Finally, Poisson
     regression is :math:`\exp(u)`.
 
-    Here, theta is a 1-by-b array, where b is the distinct covariates included as part of X. For example, if X is a
-    3-by-n matrix, then theta will be a 1-by-3 array. The code is general to allow for an arbitrary number of X's.
+    Here, :math:`\theta` is a 1-by-b array, where b is the distinct covariates included as part of X. For example, if
+    X is a 3-by-n matrix, then :math:`\theta` will be a 1-by-3 array. The code is general to allow for an arbitrary
+    number of X's (as long as there is enough support in the data).
 
     Note
     ----
@@ -154,9 +155,9 @@ def ee_robust_regression(theta, X, y, model, k, loss='huber', weights=None, uppe
     occurring is zero.
 
 
-    Here, theta is a 1-by-b array, where b is the distinct covariates included as part of X. For example, if X is a
-    3-by-n matrix, then theta will be a 1-by-3 array. The code is general to allow for an arbitrary number of X's (as
-    long as there is enough support in the data).
+    Here, :math:`\theta` is a 1-by-b array, where b is the distinct covariates included as part of X. For example, if
+    X is a 3-by-n matrix, then :math:`\theta` will be a 1-by-3 array. The code is general to allow for an arbitrary
+    number of X's (as long as there is enough support in the data).
 
     Note
     ----
@@ -280,13 +281,17 @@ def ee_robust_regression(theta, X, y, model, k, loss='huber', weights=None, uppe
 
 def ee_ridge_regression(theta, X, y, model, penalty, weights=None, center=0.):
     r"""Estimating equations for ridge regression. Ridge regression applies an L2-regularization through a squared
-    magnitude penalty. The estimating equation(s) is
+    magnitude penalty. The estimating equation for Ridge linear regression is
 
     .. math::
 
         \sum_{i=1}^n \left{(Y_i - X_i^T \theta) X_i - \lambda \theta \right} = 0
 
     where :math:`\lambda` is the penalty term.
+
+    Here, :math:`\theta` is a 1-by-b array, where b is the distinct covariates included as part of X. For example, if
+    X is a 3-by-n matrix, then :math:`\theta` will be a 1-by-3 array. The code is general to allow for an arbitrary
+    number of X's (as long as there is enough support in the data).
 
     Note
     ----
@@ -392,10 +397,10 @@ def ee_ridge_regression(theta, X, y, model, penalty, weights=None, center=0.):
 
     References
     ----------
-    Fu WJ. (1998). Penalized regressions: the Bridge versus the LASSO. Journal of Computational and Graphical
-    Statistics, 7(3), 397-416.
+    Fu WJ. (1998). Penalized regressions: the Bridge versus the LASSO. *Journal of Computational and Graphical
+    Statistics*, 7(3), 397-416.
 
-    Fu WJ. (2003). Penalized estimating equations. Biometrics, 59(1), 126-132.
+    Fu WJ. (2003). Penalized estimating equations. *Biometrics*, 59(1), 126-132.
     """
     # Calling internal bridge penalized regression for implementation
     return ee_bridge_regression(theta=theta,
@@ -413,7 +418,7 @@ def ee_lasso_regression(theta, X, y, model, penalty, epsilon=3.e-3, weights=None
     estimate the variance in all settings.
 
 
-    The estimating equation for the approximate LASSO is
+    The estimating equation for the approximate LASSO linear regression is
 
     .. math::
 
@@ -427,8 +432,8 @@ def ee_lasso_regression(theta, X, y, model, penalty, epsilon=3.e-3, weights=None
     LASSO may not be possible to implement due to the existence of multiple solutions
 
     Here, :math:`\theta` is a 1-by-b array, where b is the distinct covariates included as part of X. For example, if
-    X is a 3-by-n matrix, then theta will be a 1-by-3 array. The code is general to allow for an arbitrary number of
-    X's (as long as there is enough support in the data).
+    X is a 3-by-n matrix, then :math:`\theta` will be a 1-by-3 array. The code is general to allow for an arbitrary
+    number of X's (as long as there is enough support in the data).
 
     Note
     ----
@@ -536,10 +541,10 @@ def ee_lasso_regression(theta, X, y, model, penalty, epsilon=3.e-3, weights=None
 
     References
     ----------
-    Fu WJ. (1998). Penalized regressions: the bridge versus the lasso. Journal of Computational and Graphical
-    Statistics, 7(3), 397-416.
+    Fu WJ. (1998). Penalized regressions: the Bridge versus the LASSO. *Journal of Computational and Graphical
+    Statistics*, 7(3), 397-416.
 
-    Fu WJ. (2003). Penalized estimating equations. Biometrics, 59(1), 126-132.
+    Fu WJ. (2003). Penalized estimating equations. *Biometrics*, 59(1), 126-132.
     """
     if epsilon < 0:
         raise ValueError("epsilon must be greater than zero for the approximate LASSO")
@@ -561,7 +566,7 @@ def ee_elasticnet_regression(theta, X, y, model, penalty, ratio, epsilon=3.e-3, 
     used to estimate the variance in all settings.
 
 
-    The estimating equation for Elastic-Net with the approximate L1 penalty is
+    The estimating equation for Elastic-Net linear regression with the approximate L1 penalty is
 
     .. math::
 
@@ -571,8 +576,8 @@ def ee_elasticnet_regression(theta, X, y, model, penalty, ratio, epsilon=3.e-3, 
     where :math:`\lambda` is the penalty term and :math:`r` is the ratio for the L1 vs L2 penalty.
 
     Here, :math:`\theta` is a 1-by-b array, where b is the distinct covariates included as part of X. For example, if
-    X is a 3-by-n matrix, then theta will be a 1-by-3 array. The code is general to allow for an arbitrary number of
-    X's (as long as there is enough support in the data).
+    X is a 3-by-n matrix, then :math:`\theta` will be a 1-by-3 array. The code is general to allow for an arbitrary
+    number of X's (as long as there is enough support in the data).
 
     Note
     ----
@@ -682,10 +687,10 @@ def ee_elasticnet_regression(theta, X, y, model, penalty, ratio, epsilon=3.e-3, 
 
     References
     ----------
-    Fu WJ. (1998). Penalized regressions: the bridge versus the lasso. Journal of Computational and Graphical
-    Statistics, 7(3), 397-416.
+    Fu WJ. (1998). Penalized regressions: the Bridge versus the LASSO. *Journal of Computational and Graphical
+    Statistics*, 7(3), 397-416.
 
-    Fu WJ. (2003). Penalized estimating equations. Biometrics, 59(1), 126-132.
+    Fu WJ. (2003). Penalized estimating equations. *Biometrics*, 59(1), 126-132.
     """
     # Preparation of input shapes and object types
     X, y, beta, penalty, center = _prep_inputs_(X=X, y=y, theta=theta, penalty=penalty, center=center)
@@ -722,7 +727,7 @@ def ee_bridge_regression(theta, X, y, model, penalty, gamma, weights=None, cente
     :math:`\gamma<2`. Therefore, the bread (and sandwich) cannot be used to estimate the variance in those settings.
 
 
-    The estimating equation for bridge penalized regression is
+    The estimating equation for bridge penalized linear regression is
 
     .. math::
 
@@ -731,8 +736,8 @@ def ee_bridge_regression(theta, X, y, model, penalty, gamma, weights=None, cente
     where :math:`\lambda` is the penalty term and :math:`\gamma` is a tuning parameter.
 
     Here, :math:`\theta` is a 1-by-b array, where b is the distinct covariates included as part of X. For example, if
-    X is a 3-by-n matrix, then theta will be a 1-by-3 array. The code is general to allow for an arbitrary number of
-    X's (as long as there is enough support in the data).
+    X is a 3-by-n matrix, then :math:`\theta` will be a 1-by-3 array. The code is general to allow for an arbitrary
+    number of X's (as long as there is enough support in the data).
 
     Note
     ----
@@ -841,10 +846,10 @@ def ee_bridge_regression(theta, X, y, model, penalty, gamma, weights=None, cente
 
     References
     ----------
-    Fu WJ. (1998). Penalized regressions: the bridge versus the lasso. Journal of Computational and Graphical
-    Statistics, 7(3), 397-416.
+    Fu WJ. (1998). Penalized regressions: the Bridge versus the LASSO. *Journal of Computational and Graphical
+    Statistics*, 7(3), 397-416.
 
-    Fu WJ. (2003). Penalized estimating equations. Biometrics, 59(1), 126-132.
+    Fu WJ. (2003). Penalized estimating equations. *Biometrics*, 59(1), 126-132.
     """
     # Preparation of input shapes and object types
     X, y, beta, penalty, center = _prep_inputs_(X=X, y=y, theta=theta, penalty=penalty, center=center)
@@ -871,6 +876,34 @@ def ee_additive_regression(theta, X, y, specifications, model, weights=None):
     r"""Estimating equation for Generalized Additive Models (GAMs). GAMs are an extension of generalized linear models
     that allow for [...]. This flexibility is accomplished via penalized regression with splines.
 
+    Note
+    ----
+    The implemented GAM uses L2-penalization (Ridge). This penalization only applies to the generated spline terms
+    (i.e., penalization decreases the 'wiggliness' of the estimated relationships).
+
+
+    The estimating equation for a generalized additive linear regression model is
+
+    .. math::
+
+        \sum_{i=1}^n \left{(Y_i - f(X_i)^T \theta) f(X_i) - \lambda \theta \right} = 0
+
+    where :math:`\lambda` is the penalty term.
+
+    While this looks similar to Ridge regression, there are two important differences: the function :math:`f()` and
+    how :math:`\lambda` is defined. First, the function :math:`f()` denotes a general vector function. For spline terms,
+    this function defines the basis functions for the splines (set via the ``specifications`` parameter). For non-spline
+    terms, this is the identity function (i.e., no changes are made to the input). This setup allows for only some terms
+    to be selectively modeled using splines (e.g., categorical features are not modeled using splines). Next, the
+    penalty term, :math:`\lambda`, is only non-zero for :math:`\theta` that correspond to parameters for splines (i.e.,
+    only the spline terms are penalized). This is distinction from default Ridge regression, which penalizes all terms
+    in the model.
+
+    Here, :math:`\theta` is a 1-by-(b+k) array, where b is the distinct covariates included as part of X and the k
+    distinct spline basis functions. For example, if X is a 2-by-n matrix with a 10-knot natural spline for the second
+    column in X, then :math:`\theta` will be a 1-by-(2+9) array. The code is general to allow for an arbitrary
+    number of X's and spline knots (as long as there is enough support in the data).
+
     Parameters
     ----------
     theta : ndarray, list, vector
@@ -881,7 +914,19 @@ def ee_additive_regression(theta, X, y, specifications, model, weights=None):
     y : ndarray, list, vector
         1-dimensional vector of n observed values.
     specifications : list, dict, None
-        A ... #TODO
+        A list of dictionaries that define the hyperparameters for the spline (e.g., number of knots, strength of
+        penalty). For terms that should not have splines, ``None`` should be specified instead (see examples below).
+        Each dictionary supports the following parameters:
+        "knots", "n_knots", "natural", "power", "penalty"
+        * knots (list): controls the position of the knots. Must be specified if n_knots is not specified.
+        * n_knots (int): controls the number of knots and places all knots at equidistant positions between the 2.5th
+            and 97.5th percentiles. Must be specified if knots is not specified
+        * natural (bool): controls whether to generate natural (restricted) or unrestricted splines.
+            Default is ``True``, which corresponds to natural splines.
+        * power (float): controls the power to raise the spline terms to. Default is 3, which corresponds to cubic
+            splines.
+        * penalty (float): penalty term (:math:`\lambda`) applied to each corresponding spline basis term. Default is 0,
+            which applies no penalty to the spline basis terms.
     model : str
         Type of regression model to estimate. Options are ``'linear'`` (linear regression), ``'logistic'`` (logistic
         regression), and ``'poisson'`` (Poisson regression).
@@ -890,13 +935,129 @@ def ee_additive_regression(theta, X, y, specifications, model, weights=None):
 
     Returns
     -------
+    array :
+        Returns a (b+k)-by-n NumPy array evaluated for the input ``theta``
 
     Examples
     --------
+    Construction of a estimating equation(s) with ``ee_additive_regression`` should be done similar to the following
+
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> from scipy.stats import logistic
+    >>> from delicatessen import MEstimator
+    >>> from delicatessen.estimating_equations import ee_additive_regression
+    >>> from delicatessen.utilities import additive_design_matrix
+
+    Some generic data to estimate a generalized additive model
+
+    >>> n = 2000
+    >>> data = pd.DataFrame()
+    >>> x = np.random.uniform(-5, 5, size=n)
+    >>> data['X'] = x
+    >>> data['Y1'] = np.exp(x+0.5)) + np.abs(x) + np.random.normal(scale=1.5, size=n)
+    >>> data['Y2'] = np.random.binomial(n=1, p=logistic.cdf(np.exp(np.sin(x+0.5)) + np.abs(x)), size=n)
+    >>> data['Y3'] = np.random.poisson(lam=np.exp(np.exp(np.sin(x+0.5)) + np.abs(x)), size=n)
+    >>> data['C'] = 1
+
+    Note that ``C`` here is set to all 1's. This will be the intercept in the regression. Further, notice that the
+    relationship between X and the various Y's is not linear.
+
+    The design matrix for linear regression would be ``X = np.asarray(d[['C', 'X']])``. As the intercept is a constant,
+    we only want spline terms to be applied to ``'X'`` column. To define the spline specifications, we create the
+    following list
+
+    >>> specs = [None, {"n_knots": 20, "penalty": 10}]
+
+    This tells ``ee_additive_regression`` to not generate a spline term for the first column in the input design matrix
+    and to generate a default spline with 20 knots and penalty of 10 for the second column in the input design matrix.
+    Interally, the design matrix processing is done by the ``additive_design_matrix`` utility function. We can see what
+    the output of that function looks like via
+
+    >>> Xa_design = additive_design_matrix(X=np.asarray(data[['C', 'X']]), specifications=specs)
+
+    That output matrix is the corresponding design matrix. Use of the ``additive_design_matrix`` utility will be
+    demonstrated later for generating predictions from the estimated parameters.
+
+    Now psi, or the stacked estimating equations.
+
+    >>> def psi(theta):
+    >>>     x, y = data[['C', 'X']], data['Y']
+    >>>     return ee_additive_regression(theta=theta, X=x, y=y, model='linear', specifications=specs)
+
+    Calling the M-estimator. Note that the input initial values depends on the number of splines being generated. To
+    easily determine the number of initial values, we can use the shape of the previously generated design matrix
+    (``Xa_design``)
+
+    >>> n_params = Xa_design.shape[1]
+    >>> estr = MEstimator(stacked_equations=psi, init=[0., ]*n_params)
+    >>> estr.estimate()
+
+    Inspecting the parameter estimates, variance, and confidence intervals
+
+    >>> estr.theta
+    >>> estr.variance
+    >>> estr.confidence_intervals()
+
+    While all these estimates can be easily inspected, interpretting them is not easy. Instead, we can generate
+    predictions from the GAM and plot the estimated regression line. To do this, we will first create a new design
+    matrix where ``'X'`` is evenly spaced over a range of values
+
+    >>> p = pd.DataFrame()
+    >>> p['X'] = np.linspace(-5, 5, 200)
+    >>> p['C'] = 1
+    >>> Xa_pred = additive_design_matrix(X=np.asarray(p[['C', 'X']]), specifications=specs)
+
+    To generate the predicted values of Y, we do the following
+
+    >>> p['Yhat'] = np.dot(Xa_pred, estr.theta)
+
+    Those predicted values can then be plotted against X.
+
+    # TODO demonstrate computing confidence intervals
+
+    Other optional specifications are available for the spline terms. Here, we will specify the exact locations of the
+    knots for an unrestricted quadratic spline with a penalty of 5.5 for the second column of the design matrix.
+
+    >>> specs = [None, {"knots": [-4, -2, 0, 2, 4], "natural": False, "power": 2, "penalty": 5.5}]
+
+    See the documentation of ``additive_design_matrix`` for additional examples of how to specify the additive design
+    matrix and corresponding splines.
+
+    Next, we can estimate the parameters for a logistic regression model as follows
+
+    >>> specs = [None, {"n_knots": 20, "penalty": 10}]
+    >>> Xa_design = additive_design_matrix(X=np.asarray(data[['C', 'X']]), specifications=specs)
+    >>> n_params = Xa_design.shape[1]
+
+    >>> def psi(theta):
+    >>>     x, y = data[['C', 'X']], data['Y2']
+    >>>     return ee_additive_regression(theta=theta, X=x, y=y, model='logistic', specifications=specs)
+
+    >>> estr = MEstimator(stacked_equations=psi, init=[0.]*n_params)
+    >>> estr.estimate(solver='lm', maxiter=5000)
+
+    Finally, we can estimate the parameters for a Poisson regression model as follows
+
+    >>> specs = [None, {"n_knots": 20, "penalty": 10}]
+    >>> Xa_design = additive_design_matrix(X=np.asarray(data[['C', 'X']]), specifications=specs)
+    >>> n_params = Xa_design.shape[1]
+
+    >>> def psi(theta):
+    >>>     x, y = data[['C', 'X']], data['Y3']
+    >>>     return ee_additive_regression(theta=theta, X=x, y=y, model='poisson', specifications=specs)
+
+    >>> estr = MEstimator(stacked_equations=psi, init=[0.]*n_params)
+    >>> estr.estimate(solver='lm', maxiter=5000)
+
+    Weighted models can be estimated by specifying the optional ``weights`` argument.
 
     References
     ----------
+    Fu WJ. (2003). Penalized estimating equations. *Biometrics*, 59(1), 126-132.
 
+    Wild CJ, & Yee TW. (1996). Additive extensions to generalized estimating equation methods.
+    *Journal of the Royal Statistical Society: Series B (Methodological)*, 58(4), 711-725.
     """
     # Compute the design matrix for the additive model
     Xa, penalty = additive_design_matrix(X=X, specifications=specifications, return_penalty=True)

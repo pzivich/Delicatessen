@@ -250,7 +250,8 @@ def spline(variable, knots, power=3, restricted=True):
 
 
 def additive_design_matrix(X, specifications, return_penalty=False):
-    r"""Generate an additive design matrix for generalized additive models (GAM).
+    r"""Generate an additive design matrix for generalized additive models (GAM) given a set of spline specifications to
+    apply.
 
     Note
     ----
@@ -262,18 +263,97 @@ def additive_design_matrix(X, specifications, return_penalty=False):
     X : ndarray, vector, list
         Input independent variable data.
     specifications : list, None,
-        Specifications for each variable in the input variable data.
+        A list of dictionaries that define the hyperparameters for the spline (e.g., number of knots, strength of
+        penalty). For terms that should not have splines, ``None`` should be specified instead (see examples below).
+        Each dictionary supports the following parameters:
+        "knots", "n_knots", "natural", "power", "penalty"
+        * knots (list): controls the position of the knots. Must be specified if n_knots is not specified.
+        * n_knots (int): controls the number of knots and places all knots at equidistant positions between the 2.5th
+            and 97.5th percentiles. Must be specified if knots is not specified
+        * natural (bool): controls whether to generate natural (restricted) or unrestricted splines.
+            Default is ``True``, which corresponds to natural splines.
+        * power (float): controls the power to raise the spline terms to. Default is 3, which corresponds to cubic
+            splines.
+        * penalty (float): penalty term (:math:`\lambda`) applied to each corresponding spline basis term. Default is 0,
+            which applies no penalty to the spline basis terms.
+    return_penalty : bool, optional
+        Whether the list of the corresponding penalty terms should also be returned. This functionality is used
+        internally to create the list of penalty terms to provide the Ridge regression model, where only the spline
+        terms are penalized. Default is False.
 
     Returns
     -------
+    array :
+        Returns a (b+k)-by-n design matrix as a NumPy array, where b is the number of columns in the input array and k
+        is determined by the specifications of the spline basis functions.
 
     Examples
     --------
+    Construction of a design matrix for an additive model should be done similar to the following
 
-    References
-    ----------
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> from delicatessen.utilities import additive_design_matrix
 
+    Some generic data to estimate a generalized additive model
+
+    >>> n = 200
+    >>> d = pd.DataFrame()
+    >>> d['X'] = np.random.normal(size=n)
+    >>> d['Z'] = np.random.normal(size=n)
+    >>> d['W'] = np.random.binomial(n=1, p=0.5, size=n)
+    >>> d['C'] = 1
+
+    To begin, consider the simple input design matrix of ``d[['C', 'X']]``. This initial design matrix consists of an
+    intercept term and a continuous term. Here, we will specify a natural spline with 20 knots for the second term only
+
+    >>> specs = [None, {"n_knots": 20, "penalty": 10}]
+    >>> Xa_design = additive_design_matrix(X=d[['C', 'X']], specifications=specs)
+
+    Rather than specify the number of knots, we can also assign the exact position of the knots
+
+    Note
+    ----
+    Either the number of knots or knot locations must be specified.
+
+
+    >>> specs = [None, {"knots": [-2, -1, 0, 1, 2], "penalty": 10}]
+    >>> Xa_design = additive_design_matrix(X=d[['C', 'X']], specifications=specs)
+
+    Note
+    ----
+    Internally, the input knots are always sorted in ascending order.
+
+
+    Other optional specifications are also available. Here, we will specify an unrestricted quadratic spline with a
+    penalty of 5.5 for the second column of the design matrix.
+
+    >>> specs = [None, {"knots": [-4, -2, 0, 2, 4], "natural": False, "power": 2, "penalty": 5.5}]
+    >>> Xa_design = additive_design_matrix(X=d[['C', 'X']], specifications=specs)
+
+    Now consider the input design matrix of ``d[['C', 'X', 'Z', 'W']]``. This initial design matrix consists of an
+    intercept, two continuous, and a categorical term. Here, we will specify splines for both continuous terms
+
+    >>> specs = [None,                         # Intercept term
+    >>>          {"knots": 20, "penalty": 25}, # X (continuous)
+    >>>          {"knots": 10, "penalty": 15}, # Z (continuous)
+    >>>          None]                         # W (categorical)
+    >>> Xa_design = additive_design_matrix(X=d[['C', 'X', 'Z', 'W']], specifications=specs)
+
+    Notice that the two continuous terms have different spline specifications.
+
+    Finally, we could opt to only generate a spline basis for one of the continuous variables
+
+    >>> specs = [None,                         # Intercept term
+    >>>          {"knots": 20, "penalty": 25}, # X (continuous)
+    >>>          None,                         # Z (continuous)
+    >>>          None]                         # W (categorical)
+    >>> Xa_design = additive_design_matrix(X=d[['C', 'X', 'Z', 'W']], specifications=specs)
+
+    Specification of splines can be modified and paired in a variety of ways. These are determined by the object type
+    in the specification list, and the input dictionary for the spline terms.
     """
+    # TODO consider replacing n_knots with integer detector...
 
     def generate_spline(variable, specification):
         return spline(variable=variable,
@@ -281,17 +361,29 @@ def additive_design_matrix(X, specifications, return_penalty=False):
                       power=specification["power"],
                       restricted=specification["natural"])
 
-    def generate_default_spline_parameters(specification):
+    def generate_default_spline_parameters(xvar, specification):
         keys = specification.keys()
-        expected_keys = ["knots", "natural", "power", "penalty"]
-        defaults = {"knots": 5,
+        expected_keys = ["knots", "n_knots", "natural", "power", "penalty", ]
+        defaults = {"knots": None,
+                    "n_knots": None,
                     "natural": True,
                     "power": 3,
                     "penalty": 0}
 
         if "knots" not in keys:
-            # TODO need to find percentiles here...
-            specification["knots"] = [-5, -4, -3, -2, 1, 4, 5]
+            if "n_knots" not in keys:
+                raise ValueError("For each spline, either `knots` or `n_knots` must be specified.")
+            else:
+                n_knots = specification["n_knots"]
+                if n_knots < 1:
+                    raise ValueError("The number of knots, `n_knots` must be a non-negative integer")
+                elif n_knots == 1:
+                    specification["knots"] = [np.median(xvar), ]
+                elif n_knots == 2:
+                    specification["knots"] = np.percentile(xvar, q=[100/3, 200/3]).tolist()
+                else:
+                    percentiles = np.linspace(2.5, 97.5, n_knots)
+                    specification["knots"] = np.percentile(xvar, q=percentiles).tolist()
         if "natural" not in keys:
             specification["natural"] = defaults["natural"]
         if "power" not in keys:
@@ -333,7 +425,8 @@ def additive_design_matrix(X, specifications, return_penalty=False):
         Xt.append(xvar.reshape(n_obs, 1))
         penalties.append(0)
         if xspec is not None:
-            spec_i = generate_default_spline_parameters(xspec)
+            spec_i = generate_default_spline_parameters(xvar=xvar,
+                                                        specification=xspec)
             spline_matrix = generate_spline(variable=X[:, col_id],
                                             specification=spec_i)
             Xt.append(spline_matrix)
