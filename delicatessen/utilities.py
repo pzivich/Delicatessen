@@ -1,3 +1,5 @@
+import warnings
+
 import numpy as np
 
 
@@ -247,16 +249,29 @@ def spline(variable, knots, power=3, restricted=True):
         return spline_terms[:, :-1]
 
 
-def transform_data_gam(X, specifications):
-    r"""
+def additive_design_matrix(X, specifications, return_penalty=False):
+    r"""Generate an additive design matrix for generalized additive models (GAM).
+
+    Note
+    ----
+    This function is interally called by ``ee_additive_regression``. This function can also be called to aid in easily
+    generating predicted values.
 
     Parameters
     ----------
-    X
-    specifications
+    X : ndarray, vector, list
+        Input independent variable data.
+    specifications : list, None,
+        Specifications for each variable in the input variable data.
 
     Returns
     -------
+
+    Examples
+    --------
+
+    References
+    ----------
 
     """
 
@@ -264,41 +279,68 @@ def transform_data_gam(X, specifications):
         return spline(variable=variable,
                       knots=specification["knots"],
                       power=specification["power"],
-                      restricted=specification["restrict"])
+                      restricted=specification["natural"])
 
     def generate_default_spline_parameters(specification):
         keys = specification.keys()
-        expected_keys = ["knots", "restrict", "power"]
+        expected_keys = ["knots", "natural", "power", "penalty"]
+        defaults = {"knots": 5,
+                    "natural": True,
+                    "power": 3,
+                    "penalty": 0}
 
         if "knots" not in keys:
             # TODO need to find percentiles here...
-            specification["knots"] = None
-        if "restrict" not in keys:
-            specification["restrict"] = False
+            specification["knots"] = [-5, -4, -3, -2, 1, 4, 5]
+        if "natural" not in keys:
+            specification["natural"] = defaults["natural"]
         if "power" not in keys:
-            specification["power"] = 3
+            specification["power"] = defaults["power"]
+        if "penalty" not in keys:
+            specification["penalty"] = defaults["penalty"]
 
         # Checking the keys in the input dictionary against the expected keys
         keys = specification.keys()
         extra_keys = [param for param in keys if param not in expected_keys]
         if len(extra_keys) != 0:
-            warn = []
-            # TODO add warning or error here!
+            warnings.warn("The following keys were found in the specification: " + str(extra_keys)
+                          + ". These keys are not supported and are being ignored.",
+                          UserWarning)
 
+        # Returning processed spline parameters dictionary
         return specification
 
     # Extract meta-data
-    n_cols = X.shape[1]
-    Xt = np.empty(X.shape)   # Creating the output spline array
+    X = np.asarray(X)
+    n_cols = X.shape[1]      # Number of columns in the input data
+    n_obs = X.shape[0]       # Number of observations in the input data
+    if isinstance(specifications, dict):
+        specifications = [specifications, ]*n_cols
+    elif specifications is None:
+        specifications = [specifications, ]*n_cols
+    else:
+        if len(specifications) != n_cols:
+            raise ValueError("The number of input specifications (" + str(len(specifications)) +
+                             ") and the number of columns (" + str(n_cols) + ") do not match")
 
     # Generate spline terms for each column
-    for col_id in n_cols:
+    Xt = []
+    penalties = []
+    for col_id in range(n_cols):
+        xvar = X[:, col_id]
+        xspec = specifications[col_id]
 
-        # TODO categorical logic
-        # TODO intercept logic
-
-        spec_i = generate_default_spline_parameters(specifications[col_id])
-        Xt[:, col_id] = generate_spline(variable=X[:, col_id],
-                                        specification=spec_i)
+        Xt.append(xvar.reshape(n_obs, 1))
+        penalties.append(0)
+        if xspec is not None:
+            spec_i = generate_default_spline_parameters(xspec)
+            spline_matrix = generate_spline(variable=X[:, col_id],
+                                            specification=spec_i)
+            Xt.append(spline_matrix)
+            penalties = penalties + [spec_i["penalty"], ]*spline_matrix.shape[1]
 
     # Return the transformed design matrix
+    if return_penalty:
+        return np.hstack(Xt), penalties
+    else:
+        return np.hstack(Xt)

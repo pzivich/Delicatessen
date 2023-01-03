@@ -8,7 +8,8 @@ from .dose_response import (ee_4p_logistic, ee_3p_logistic, ee_2p_logistic,
 
 from .regression import (ee_regression,
                          ee_robust_regression,
-                         ee_ridge_regression, ee_lasso_regression, ee_elasticnet_regression, ee_bridge_regression)
+                         ee_ridge_regression, ee_lasso_regression, ee_elasticnet_regression, ee_bridge_regression,
+                         ee_additive_regression)
 
 from .survival import (ee_exponential_model, ee_weibull_model,
                        ee_exponential_measure, ee_weibull_measure,
