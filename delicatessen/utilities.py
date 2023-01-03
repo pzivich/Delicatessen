@@ -194,3 +194,111 @@ def robust_loss_functions(residual, loss, k, a=None, b=None):
 
     # Returning the updated values
     return xr
+
+
+def spline(variable, knots, power=3, restricted=True):
+    r"""Generate generic polynomial spline terms for a given NumPy array and pre-specified knots. Default is restricted
+    cubic splines but unrestricted splines to different polynomial terms can also be specified.
+
+    Parameters
+    ----------
+    variable : ndarray, vector, list
+        1-dimensional vector of observed values. Input should consists of the variable to generate spline terms for
+    knots : ndarray, vector, list
+        1-dimensional vector of pre-specified knot locations. All knots should be between the minimum and maximum
+        values of the input variable
+    power : int, float, optional
+        Power or polynomial term to use for the splines. Default is 3, which corresponds to cubic splines
+    restricted : bool, optional
+        Whether to generate restricted or unrestricted splines. Default is True, which corresponds to restricted
+        splines. Restricted splines return one less column than the number of knots, whereas unrestricted splines
+        return the same number of columns as knots
+
+    Returns
+    -------
+    ndarray :
+        A 2-dimensional array of the spline terms in ascending order of the knots.
+
+    Examples
+    --------
+
+    References
+    ----------
+
+    """
+    # Processing input and output arrays
+    knots = sorted(knots)                           # Sorting the order of the knots
+    n_cols = len(knots)                             # Column number is based on the number of provided knots
+    x = np.asarray(variable)                        # Converting input variable to another array
+    spline_terms = np.empty((x.shape[0], n_cols))   # Creating the output spline array
+
+    # Generating each spline with it's corresponding term
+    for i in range(n_cols):
+        spline_terms[:, i] = np.where(x > knots[i], (x - knots[i])**power, 0)
+        spline_terms[:, i] = np.where(np.isnan(x), np.nan, spline_terms[:, i])
+
+    # Logic for unrestricted and restricted splines
+    if restricted is False:
+        return spline_terms
+    else:
+        for i in range(n_cols - 1):
+            spline_terms[:, i] = np.where(x > knots[i], spline_terms[:, i] - spline_terms[:, -1], 0)
+            spline_terms[:, i] = np.where(np.isnan(x), np.nan, spline_terms[:, i])
+        return spline_terms[:, :-1]
+
+
+def transform_data_gam(X, specifications):
+    r"""
+
+    Parameters
+    ----------
+    X
+    specifications
+
+    Returns
+    -------
+
+    """
+
+    def generate_spline(variable, specification):
+        return spline(variable=variable,
+                      knots=specification["knots"],
+                      power=specification["power"],
+                      restricted=specification["restrict"])
+
+    def generate_default_spline_parameters(specification):
+        keys = specification.keys()
+        expected_keys = ["knots", "restrict", "power"]
+
+        if "knots" not in keys:
+            # TODO need to find percentiles here...
+            specification["knots"] = None
+        if "restrict" not in keys:
+            specification["restrict"] = False
+        if "power" not in keys:
+            specification["power"] = 3
+
+        # Checking the keys in the input dictionary against the expected keys
+        keys = specification.keys()
+        extra_keys = [param for param in keys if param not in expected_keys]
+        if len(extra_keys) != 0:
+            warn = []
+            # TODO add warning or error here!
+
+        return specification
+
+    # Extract meta-data
+    n_cols = X.shape[1]
+    Xt = np.empty(X.shape)   # Creating the output spline array
+
+    # Generate spline terms for each column
+    for col_id in n_cols:
+
+        # TODO categorical logic
+        # TODO intercept logic
+
+        spec_i = generate_default_spline_parameters(specifications[col_id])
+        Xt[:, col_id] = generate_spline(variable=X[:, col_id],
+                                        specification=spec_i)
+
+    # Return the transformed design matrix

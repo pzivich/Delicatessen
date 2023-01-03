@@ -862,6 +862,49 @@ def ee_bridge_regression(theta, X, y, model, penalty, gamma, weights=None, cente
 
 
 #################################################################
+# Flexible Regression Estimating Equations
+
+
+def ee_additive_regression(theta, X, y, model, penalty, gamma, weights=None):
+    r"""Estimating equation for Generalized Additive Models (GAMs). GAMs are an extension of generalized linear models
+    that allow for [...]. This flexibility is accomplished via penalized regression with splines.
+
+    Parameters
+    ----------
+    theta : ndarray, list, vector
+        Theta in this case consists of b values. Therefore, initial values should consist of the same number as the
+        number of columns present. This can easily be implemented via ``[0, ] * X.shape[1]``.
+    X : ndarray, list, vector
+        2-dimensional vector of n observed values for b variables.
+    y : ndarray, list, vector
+        1-dimensional vector of n observed values.
+    model : str
+        Type of regression model to estimate. Options are ``'linear'`` (linear regression), ``'logistic'`` (logistic
+        regression), and ``'poisson'`` (Poisson regression).
+    penalty : int, float, ndarray, list, vector
+        Penalty term to apply to all coefficients (if only a integer or float is provided) or the corresponding
+        coefficient (if a list or vector of integers or floats is provided). Note that the penalty term should either
+        consists of a single value or b values (to match the length of ``theta``). The penalty is scaled by n.
+    gamma : float
+        Hyperparameter for the bridge penalty, defined for :math:`\gamma > 0`. However, only :math:`\gamma \ge 1` are
+        supported.
+    weights : ndarray, list, vector, None, optional
+        1-dimensional vector of n weights. Default is ``None``, which assigns a weight of 1 to all observations.
+
+    Returns
+    -------
+
+    Examples
+    --------
+
+    References
+    ----------
+
+    """
+    center = 0.
+
+
+#################################################################
 # Utility functions for regression equations
 
 def _prep_inputs_(X, y, theta, penalty=None, center=None):
