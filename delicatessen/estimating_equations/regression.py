@@ -285,7 +285,7 @@ def ee_ridge_regression(theta, X, y, model, penalty, weights=None, center=0.):
 
     .. math::
 
-        \sum_{i=1}^n \left{(Y_i - X_i^T \theta) X_i - \lambda \theta \right} = 0
+        \sum_{i=1}^n \left[(Y_i - X_i^T \theta) X_i - \lambda \theta \right] = 0
 
     where :math:`\lambda` is the penalty term.
 
@@ -422,7 +422,7 @@ def ee_lasso_regression(theta, X, y, model, penalty, epsilon=3.e-3, weights=None
 
     .. math::
 
-        \sum_{i=1}^n \left{(Y_i - X_i^T \theta) X_i - \lambda (1 + \epsilon) | \theta |^{\epsilon} sign(\theta) \right}
+        \sum_{i=1}^n \left[(Y_i - X_i^T \theta) X_i - \lambda (1 + \epsilon) | \theta |^{\epsilon} sign(\theta) \right]
         = 0
 
     where :math:`\lambda` is the penalty term.
@@ -570,8 +570,8 @@ def ee_elasticnet_regression(theta, X, y, model, penalty, ratio, epsilon=3.e-3, 
 
     .. math::
 
-        \sum_{i=1}^n \left{ (Y_i - X_i^T \theta) X_i - \lambda r (1 + \epsilon)
-        | \theta |^{\epsilon} sign(\theta) - \lambda (1-r) \theta \right} = 0
+        \sum_{i=1}^n \left[ (Y_i - X_i^T \theta) X_i - \lambda r (1 + \epsilon)
+        | \theta |^{\epsilon} sign(\theta) - \lambda (1-r) \theta \right] = 0
 
     where :math:`\lambda` is the penalty term and :math:`r` is the ratio for the L1 vs L2 penalty.
 
@@ -731,7 +731,7 @@ def ee_bridge_regression(theta, X, y, model, penalty, gamma, weights=None, cente
 
     .. math::
 
-        \sum_{i=1}^n \left{ (Y_i - X_i^T \theta) X_i - \lambda \gamma | \theta |^{\gamma - 1} sign(\theta) \right} = 0
+        \sum_{i=1}^n \left[ (Y_i - X_i^T \theta) X_i - \lambda \gamma | \theta |^{\gamma - 1} sign(\theta) \right] = 0
 
     where :math:`\lambda` is the penalty term and :math:`\gamma` is a tuning parameter.
 
@@ -888,7 +888,7 @@ def ee_additive_regression(theta, X, y, specifications, model, weights=None):
 
     .. math::
 
-        \sum_{i=1}^n \left{(Y_i - f(X_i)^T \theta) f(X_i) - \lambda \theta \right} = 0
+        \sum_{i=1}^n \left[ (Y_i - f(X_i)^T \theta) f(X_i) - \lambda \theta \right] = 0
 
     where :math:`\lambda` is the penalty term.
 

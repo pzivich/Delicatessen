@@ -15,3 +15,5 @@ Transformations
   inverse_logit
   identity
   robust_loss_functions
+  spline
+  additive_design_matrix
