@@ -262,14 +262,14 @@ def additive_design_matrix(X, specifications, return_penalty=False):
     ----------
     X : ndarray, vector, list
         Input independent variable data.
-    specifications : list, None,
+    specifications : ndarray, vector, list
         A list of dictionaries that define the hyperparameters for the spline (e.g., number of knots, strength of
         penalty). For terms that should not have splines, ``None`` should be specified instead (see examples below).
         Each dictionary supports the following parameters:
-        "knots", "n_knots", "natural", "power", "penalty"
-        * knots (list): controls the position of the knots. Must be specified if n_knots is not specified.
-        * n_knots (int): controls the number of knots and places all knots at equidistant positions between the 2.5th
-            and 97.5th percentiles. Must be specified if knots is not specified
+        "knots", "natural", "power", "penalty"
+        * knots (int, list): controls the number and/or position of the knots. If an integer is provided, then all knots
+            are placed at equidistant positions. If a list or array is provided, then knots are placed at those
+            locations. There is no default, so must be specified by the user.
         * natural (bool): controls whether to generate natural (restricted) or unrestricted splines.
             Default is ``True``, which corresponds to natural splines.
         * power (float): controls the power to raise the spline terms to. Default is 3, which corresponds to cubic
@@ -307,7 +307,7 @@ def additive_design_matrix(X, specifications, return_penalty=False):
     To begin, consider the simple input design matrix of ``d[['C', 'X']]``. This initial design matrix consists of an
     intercept term and a continuous term. Here, we will specify a natural spline with 20 knots for the second term only
 
-    >>> specs = [None, {"n_knots": 20, "penalty": 10}]
+    >>> specs = [None, {"knots": 20, "penalty": 10}]
     >>> Xa_design = additive_design_matrix(X=d[['C', 'X']], specifications=specs)
 
     Rather than specify the number of knots, we can also assign the exact position of the knots
@@ -353,87 +353,124 @@ def additive_design_matrix(X, specifications, return_penalty=False):
     Specification of splines can be modified and paired in a variety of ways. These are determined by the object type
     in the specification list, and the input dictionary for the spline terms.
     """
-    # TODO consider replacing n_knots with integer detector...
 
     def generate_spline(variable, specification):
-        return spline(variable=variable,
-                      knots=specification["knots"],
-                      power=specification["power"],
-                      restricted=specification["natural"])
+        """Internal function to call the spline functionality. This function merely calls the spline function with the
+        corresponding specifications. This was built as an internal function to simply future maintenance.
+
+        Parameters
+        ----------
+        variable : ndarray
+            Column of variables to generate the splines for
+        specification : dict
+            Dictionary of the processed spline specification for the corresponding variable.
+
+        Returns
+        -------
+        ndarray :
+            Returns the object returned by the spline (the basis matrix of the spline terms for the column)
+        """
+        return spline(variable=variable,                      # Pass variable to spline function
+                      knots=specification["knots"],           # ... with knot locations
+                      power=specification["power"],           # ... to the power
+                      restricted=specification["natural"])    # ... and whether to restrict
 
     def generate_default_spline_parameters(xvar, specification):
-        keys = specification.keys()
-        expected_keys = ["knots", "n_knots", "natural", "power", "penalty", ]
-        defaults = {"knots": None,
-                    "n_knots": None,
-                    "natural": True,
-                    "power": 3,
-                    "penalty": 0}
+        """Internal function to process the input specification dictionary of spline parameters. Namely, ensure that
+        'knots' is specified, fill in any other empty parameters, and check for additional keys given.
 
-        if "knots" not in keys:
-            if "n_knots" not in keys:
-                raise ValueError("For each spline, either `knots` or `n_knots` must be specified.")
-            else:
-                n_knots = specification["n_knots"]
-                if n_knots < 1:
-                    raise ValueError("The number of knots, `n_knots` must be a non-negative integer")
-                elif n_knots == 1:
-                    specification["knots"] = [np.median(xvar), ]
-                elif n_knots == 2:
-                    specification["knots"] = np.percentile(xvar, q=[100/3, 200/3]).tolist()
-                else:
-                    percentiles = np.linspace(2.5, 97.5, n_knots)
-                    specification["knots"] = np.percentile(xvar, q=percentiles).tolist()
-        if "natural" not in keys:
-            specification["natural"] = defaults["natural"]
-        if "power" not in keys:
-            specification["power"] = defaults["power"]
-        if "penalty" not in keys:
-            specification["penalty"] = defaults["penalty"]
+        Parameters
+        ----------
+        xvar :
+            The corresponding column. This is only used when a number of knots is given (otherwise ignored)
+        specification : dict
+            Dictionary of the input spline specifications to check and process.
+
+        Returns
+        -------
+        dict :
+            Processed dictionary of the spline hyperparameters
+        """
+        # Setup for dict processing
+        keys = specification.keys()                                   # Extract keys from the input dictionary
+        defaults = {"knots": None,                                    # Default values (knots must be provided)
+                    "natural": True,                                  # ... default to restricted splines
+                    "power": 3,                                       # ... default to cubic splines
+                    "penalty": 0}                                     # ... default to NO penalty on spline terms
 
         # Checking the keys in the input dictionary against the expected keys
-        keys = specification.keys()
+        expected_keys = ["knots", "natural", "power", "penalty", ]    # List of keys expected to occur in the dict
         extra_keys = [param for param in keys if param not in expected_keys]
         if len(extra_keys) != 0:
             warnings.warn("The following keys were found in the specification: " + str(extra_keys)
                           + ". These keys are not supported and are being ignored.",
                           UserWarning)
 
+        # Managing knot keyword
+        if "knots" not in keys:
+            raise ValueError("`knots` must be specified.")
+        knots = specification["knots"]
+        if isinstance(knots, int):
+            if knots < 1:                                             # Error if knots is non-positive
+                raise ValueError("For int(), `knots` must be a positive integer")
+            elif knots == 1:                                          # Mid-point (median) if single knot
+                specification["knots"] = [np.median(xvar), ]
+            elif knots == 2:                                          # 33rd and 66th percentiles if 2 knots
+                specification["knots"] = np.percentile(xvar, q=[100/3, 200/3]).tolist()
+            else:                                                     # Otherwise evenly spaced between 2.5th to 97.5th
+                percentiles = np.linspace(2.5, 97.5, knots)
+                specification["knots"] = np.percentile(xvar, q=percentiles).tolist()
+        # Managing keyword for natural / restricted splines
+        if "natural" not in keys:
+            specification["natural"] = defaults["natural"]
+        # Managing keyword for power to raise splines to
+        if "power" not in keys:
+            specification["power"] = defaults["power"]
+        # Managing keyword for penalty to apply to splines
+        if "penalty" not in keys:
+            specification["penalty"] = defaults["penalty"]
+
         # Returning processed spline parameters dictionary
         return specification
 
-    # Extract meta-data
-    X = np.asarray(X)
-    n_cols = X.shape[1]      # Number of columns in the input data
-    n_obs = X.shape[0]       # Number of observations in the input data
-    if isinstance(specifications, dict):
+    # Extract meta-data from input
+    X = np.asarray(X)                               # Convert to NumPy array (when user interacts directly with func)
+    n_cols = X.shape[1]                             # Number of columns in the input data
+    n_obs = X.shape[0]                              # Number of observations in the input data
+    if isinstance(specifications, dict):            # Expanding to list if only a single dict is provided
         specifications = [specifications, ]*n_cols
-    elif specifications is None:
+    elif specifications is None:                    # When None is given as specification, ignore splines (linear reg)
         specifications = [specifications, ]*n_cols
-    else:
+    else:                                           # Otherwise check dimensions of specifications and cols match
         if len(specifications) != n_cols:
             raise ValueError("The number of input specifications (" + str(len(specifications)) +
                              ") and the number of columns (" + str(n_cols) + ") do not match")
 
     # Generate spline terms for each column
-    Xt = []
-    penalties = []
-    for col_id in range(n_cols):
-        xvar = X[:, col_id]
-        xspec = specifications[col_id]
+    Xt = []                                              # Placeholder storage for generated spline terms
+    penalties = []                                       # Placeholder storage for corresponding penalty terms
+    for col_id in range(n_cols):                         # Loop through all the columns by their index number
+        xvar = X[:, col_id]                              # ... extract corresponding column by ID
+        xspec = specifications[col_id]                   # ... extract specification by ID
 
-        Xt.append(xvar.reshape(n_obs, 1))
-        penalties.append(0)
-        if xspec is not None:
+        # Linear term
+        Xt.append(xvar.reshape(n_obs, 1))                # ... always add the corresponding linear term
+        penalties.append(0)                              # ... always have penalty of zero for the linear term
+
+        # Spline generation
+        if xspec is not None:                            # ... when given a specification != None, generate splines
+            # Processing input spline specifications to adhere to conventions
             spec_i = generate_default_spline_parameters(xvar=xvar,
                                                         specification=xspec)
+            # Generate the spline matrix using the spline function and specification
             spline_matrix = generate_spline(variable=X[:, col_id],
                                             specification=spec_i)
-            Xt.append(spline_matrix)
-            penalties = penalties + [spec_i["penalty"], ]*spline_matrix.shape[1]
+            # Add spline terms to storage
+            Xt.append(spline_matrix)                                      # ... add matrix of splines to list
+            penalties += [spec_i["penalty"], ]*spline_matrix.shape[1]     # ... add penalty terms from specifications
 
     # Return the transformed design matrix
-    if return_penalty:
-        return np.hstack(Xt), penalties
-    else:
-        return np.hstack(Xt)
+    if return_penalty:                      # If return penalty
+        return np.hstack(Xt), penalties     # ... return additive design matrix AND list of penalty terms
+    else:                                   # Otherwise
+        return np.hstack(Xt)                # ... only return the additive design matrix

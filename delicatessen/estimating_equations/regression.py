@@ -874,7 +874,9 @@ def ee_bridge_regression(theta, X, y, model, penalty, gamma, weights=None, cente
 
 def ee_additive_regression(theta, X, y, specifications, model, weights=None):
     r"""Estimating equation for Generalized Additive Models (GAMs). GAMs are an extension of generalized linear models
-    that allow for [...]. This flexibility is accomplished via penalized regression with splines.
+    that allow for more flexible specifications of relationships of continuous variables. This flexibility is
+    accomplished via splines. To further control the flexibility, the spline terms are penalized using an L2 (Ridge)
+    penalization.
 
     Note
     ----
@@ -904,6 +906,14 @@ def ee_additive_regression(theta, X, y, specifications, model, weights=None):
     column in X, then :math:`\theta` will be a 1-by-(2+9) array. The code is general to allow for an arbitrary
     number of X's and spline knots (as long as there is enough support in the data).
 
+    Note
+    ----
+    ``ee_additive_regression`` is essentially a wrapper function consisting of both ``additive_design_matrix`` and
+    ``ee_ridge_regression``. In effect, ``ee_additive_regression`` calls ``additive_design_matrix`` each time it is run,
+    which is not strictly necessary (but is for how the wrapper function works). If computation time is a concern,
+    these functions can be paired manually to implement GAMs.
+
+
     Parameters
     ----------
     theta : ndarray, list, vector
@@ -917,10 +927,10 @@ def ee_additive_regression(theta, X, y, specifications, model, weights=None):
         A list of dictionaries that define the hyperparameters for the spline (e.g., number of knots, strength of
         penalty). For terms that should not have splines, ``None`` should be specified instead (see examples below).
         Each dictionary supports the following parameters:
-        "knots", "n_knots", "natural", "power", "penalty"
-        * knots (list): controls the position of the knots. Must be specified if n_knots is not specified.
-        * n_knots (int): controls the number of knots and places all knots at equidistant positions between the 2.5th
-            and 97.5th percentiles. Must be specified if knots is not specified
+        "knots", "natural", "power", "penalty"
+        * knots (int, list): controls the number and/or position of the knots. If an integer is provided, then all knots
+            are placed at equidistant positions. If a list or array is provided, then knots are placed at those
+            locations. There is no default, so must be specified by the user.
         * natural (bool): controls whether to generate natural (restricted) or unrestricted splines.
             Default is ``True``, which corresponds to natural splines.
         * power (float): controls the power to raise the spline terms to. Default is 3, which corresponds to cubic
@@ -961,13 +971,13 @@ def ee_additive_regression(theta, X, y, specifications, model, weights=None):
     >>> data['C'] = 1
 
     Note that ``C`` here is set to all 1's. This will be the intercept in the regression. Further, notice that the
-    relationship between X and the various Y's is not linear.
+    relationship between ``X`` and the various ``Y``'s is not linear.
 
     The design matrix for linear regression would be ``X = np.asarray(d[['C', 'X']])``. As the intercept is a constant,
     we only want spline terms to be applied to ``'X'`` column. To define the spline specifications, we create the
     following list
 
-    >>> specs = [None, {"n_knots": 20, "penalty": 10}]
+    >>> specs = [None, {"knots": 20, "penalty": 10}]
 
     This tells ``ee_additive_regression`` to not generate a spline term for the first column in the input design matrix
     and to generate a default spline with 20 knots and penalty of 10 for the second column in the input design matrix.
@@ -1026,7 +1036,7 @@ def ee_additive_regression(theta, X, y, specifications, model, weights=None):
 
     Next, we can estimate the parameters for a logistic regression model as follows
 
-    >>> specs = [None, {"n_knots": 20, "penalty": 10}]
+    >>> specs = [None, {"knots": 20, "penalty": 10}]
     >>> Xa_design = additive_design_matrix(X=np.asarray(data[['C', 'X']]), specifications=specs)
     >>> n_params = Xa_design.shape[1]
 
@@ -1039,7 +1049,7 @@ def ee_additive_regression(theta, X, y, specifications, model, weights=None):
 
     Finally, we can estimate the parameters for a Poisson regression model as follows
 
-    >>> specs = [None, {"n_knots": 20, "penalty": 10}]
+    >>> specs = [None, {"knots": 20, "penalty": 10}]
     >>> Xa_design = additive_design_matrix(X=np.asarray(data[['C', 'X']]), specifications=specs)
     >>> n_params = Xa_design.shape[1]
 
@@ -1060,12 +1070,15 @@ def ee_additive_regression(theta, X, y, specifications, model, weights=None):
     *Journal of the Royal Statistical Society: Series B (Methodological)*, 58(4), 711-725.
     """
     # Compute the design matrix for the additive model
-    Xa, penalty = additive_design_matrix(X=X, specifications=specifications, return_penalty=True)
+    Xa, penalty = additive_design_matrix(X=X,                               # Create the additive design matrix
+                                         specifications=specifications,     # ... with the provided specifications
+                                         return_penalty=True)               # ... and return corresponding penalties
 
-    # Apply bridge penalized regression
-    return ee_bridge_regression(theta=theta, y=y, X=Xa,
-                                model=model, penalty=penalty,
-                                gamma=2, weights=weights, center=0.)
+    # Apply spline-penalized regression
+    return ee_bridge_regression(theta=theta, y=y, X=Xa,                     # Call bridge reg with additive design
+                                model=model, penalty=penalty,               # ... matrix and processed penalties
+                                gamma=2, weights=weights,                   # ... and set gamma=2 (Ridge reg)
+                                center=0.)                                  # ... with splines ALWAYS penalized to zero
 
 
 #################################################################
