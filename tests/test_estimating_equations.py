@@ -11,6 +11,7 @@ from delicatessen import MEstimator
 from delicatessen.estimating_equations import (ee_mean, ee_mean_variance, ee_mean_robust,
                                                # Regression models
                                                ee_regression, ee_robust_regression, ee_ridge_regression,
+                                               ee_additive_regression,
                                                # Survival models
                                                ee_exponential_model, ee_exponential_measure, ee_weibull_model,
                                                ee_weibull_measure, ee_aft_weibull, ee_aft_weibull_measure,
@@ -19,6 +20,8 @@ from delicatessen.estimating_equations import (ee_mean, ee_mean_variance, ee_mea
                                                # Causal inference
                                                ee_gformula, ee_ipw, ee_aipw)
 from delicatessen.data import load_inderjit
+from delicatessen.utilities import additive_design_matrix
+
 
 np.random.seed(236461)
 
@@ -132,6 +135,41 @@ class TestEstimatingEquationsRegression:
 
         estr = MEstimator(psi, init=[5, 1, 1])
         with pytest.raises(ValueError, match="Invalid input"):
+            estr.estimate(solver='lm')
+
+    def test_error_robust(self):
+        n = 1000
+        data = pd.DataFrame()
+        data['x1'] = np.random.normal(size=n)
+        data['x2'] = data['x1'] + np.random.normal(scale=0.1, size=n)
+        data['c'] = 1
+        data['y'] = 5 + data['x1'] + np.random.normal(size=n)
+        Xvals = np.asarray(data[['c', 'x1', 'x2']])
+        yvals = np.asarray(data['y'])
+
+        def psi(theta):
+            return ee_robust_regression(theta, X=Xvals, y=yvals, model='logistic', k=5)
+
+        estr = MEstimator(psi, init=[5, 1, 1])
+        with pytest.raises(ValueError, match="only supports linear"):
+            estr.estimate(solver='lm')
+
+    def test_error_penalized(self):
+        n = 1000
+        data = pd.DataFrame()
+        data['x1'] = np.random.normal(size=n)
+        data['x2'] = data['x1'] + np.random.normal(scale=0.1, size=n)
+        data['c'] = 1
+        data['y'] = 5 + data['x1'] + np.random.normal(size=n)
+        Xvals = np.asarray(data[['c', 'x1', 'x2']])
+        yvals = np.asarray(data['y'])
+
+        def psi(theta):
+            return ee_ridge_regression(theta, X=Xvals, y=yvals, model='linear',
+                                       penalty=[0.5, 5.], weights=None)
+
+        estr = MEstimator(psi, init=[5, 1, 1])
+        with pytest.raises(ValueError, match="The penalty term must"):
             estr.estimate(solver='lm')
 
     def test_ols(self):
@@ -313,23 +351,60 @@ class TestEstimatingEquationsRegression:
                             np.asarray(wridge.params),
                             atol=1e-6)
 
-    def test_error_ridge(self):
+    def test_additive_ols(self):
         n = 1000
         data = pd.DataFrame()
         data['x1'] = np.random.normal(size=n)
-        data['x2'] = data['x1'] + np.random.normal(scale=0.1, size=n)
+        data['x2'] = np.random.normal(scale=0.1, size=n)
         data['c'] = 1
-        data['y'] = 5 + data['x1'] + np.random.normal(size=n)
+        data['y'] = 5 + data['x1'] + data['x2'] + 0.01*data['x2'] + np.random.normal(size=n)
         Xvals = np.asarray(data[['c', 'x1', 'x2']])
         yvals = np.asarray(data['y'])
+        spec = [None, {"knots": 3, "penalty": 3}, {"knots": 5, "penalty": 5}]
 
+        # Testing array of penalty terms
         def psi(theta):
-            return ee_ridge_regression(theta, X=Xvals, y=yvals, model='linear',
-                                       penalty=[0.5, 5.], weights=None)
+            return ee_additive_regression(theta, X=Xvals, y=yvals, model='linear', specifications=spec)
 
-        estr = MEstimator(psi, init=[5, 1, 1])
-        with pytest.raises(ValueError, match="The penalty term must"):
-            estr.estimate(solver='lm')
+        estr = MEstimator(psi, init=[5, 1, 0, 0, 1, 0, 0, 0, 0])
+        estr.estimate(solver='lm')
+
+        design, penalty = additive_design_matrix(X=Xvals, specifications=spec, return_penalty=True)
+        ridge = sm.OLS(yvals, design).fit_regularized(L1_wt=0., alpha=np.array(penalty)/Xvals.shape[0])
+
+        # Checking mean estimate
+        npt.assert_allclose(estr.theta,
+                            np.asarray(ridge.params),
+                            atol=1e-6)
+
+    def test_additive_wls(self):
+        n = 1000
+        data = pd.DataFrame()
+        data['x1'] = np.random.normal(size=n)
+        data['x2'] = np.random.normal(scale=0.1, size=n)
+        data['c'] = 1
+        data['y'] = 5 + data['x1'] + data['x2'] + 0.01*data['x2'] + np.random.normal(size=n)
+        Xvals = np.asarray(data[['c', 'x1', 'x2']])
+        yvals = np.asarray(data['y'])
+        spec = [None, {"knots": 3, "penalty": 3}, {"knots": 5, "penalty": 5}]
+        weights = np.random.uniform(0.1, 2.5, size=n)
+
+        # Testing array of penalty terms
+        def psi(theta):
+            return ee_additive_regression(theta, X=Xvals, y=yvals, model='linear',
+                                          specifications=spec, weights=weights)
+
+        estr = MEstimator(psi, init=[5, 1, 0, 0, 1, 0, 0, 0, 0])
+        estr.estimate(solver='lm')
+
+        design, penalty = additive_design_matrix(X=Xvals, specifications=spec, return_penalty=True)
+        ridge = sm.WLS(yvals, design, weights=weights).fit_regularized(L1_wt=0.,
+                                                                       alpha=np.array(penalty)/Xvals.shape[0])
+
+        # Checking mean estimate
+        npt.assert_allclose(estr.theta,
+                            np.asarray(ridge.params),
+                            atol=1e-6)
 
     def test_logistic(self):
         n = 1000
@@ -464,6 +539,35 @@ class TestEstimatingEquationsRegression:
         npt.assert_allclose(mestimator.theta,
                             np.asarray(lgt.params),
                             atol=1e-4)
+
+    def test_additive_logistic(self):
+        n = 1000
+        data = pd.DataFrame()
+        data['X'] = np.random.normal(size=n)
+        data['Z'] = np.random.normal(size=n)
+        data['Y'] = np.random.binomial(n=1, p=logistic.cdf(0.5 + 2*data['X'] - 1*data['Z']), size=n)
+        data['C'] = 1
+        Xvals = np.asarray(data[['C', 'X', 'Z']])
+        yvals = np.asarray(data['Y'])
+        spec = [None, {"knots": 3, "penalty": 3}, {"knots": 5, "penalty": 5}]
+
+        def psi_regression(theta):
+            return ee_additive_regression(theta, X=Xvals, y=yvals,
+                                          model='logistic',
+                                          specifications=spec)
+
+        mestimator = MEstimator(psi_regression, init=[0., 2., 0., 0., 1., 0., 0., 0., 0.])
+        mestimator.estimate(solver='lm', tolerance=1e-14)
+
+        design, penalty = additive_design_matrix(X=Xvals, specifications=spec, return_penalty=True)
+        f = sm.families.Binomial()
+        lgt = sm.GLM(yvals, design, family=f).fit_regularized(L1_wt=0., alpha=np.array(penalty)/Xvals.shape[0],
+                                                              tol=1e-14)
+
+        # Checking mean estimate
+        npt.assert_allclose(mestimator.theta,
+                            np.asarray(lgt.params),
+                            atol=1e-3)
 
     def test_poisson(self):
         """Tests Poisson regression by-hand with a single estimating equation.
@@ -661,6 +765,34 @@ class TestEstimatingEquationsRegression:
         npt.assert_allclose(mestimator.theta,
                             np.asarray(lgt.params),
                             atol=5e-4)
+
+    def test_additive_poisson(self):
+        n = 1000
+        data = pd.DataFrame()
+        data['X'] = np.random.normal(size=n)
+        data['Z'] = np.random.normal(size=n)
+        data['Y'] = np.random.poisson(lam=np.exp(1 + 2*data['X'] - 1*data['Z']), size=n)
+        data['C'] = 1
+        Xvals = np.asarray(data[['C', 'X', 'Z']])
+        yvals = np.asarray(data['Y'])
+        spec = [None, {"knots": 3, "penalty": 3}, {"knots": 5, "penalty": 5}]
+
+        def psi_regression(theta):
+            return ee_additive_regression(theta, X=Xvals, y=yvals,
+                                          model='poisson',
+                                          specifications=spec)
+
+        mestimator = MEstimator(psi_regression, init=[0., 2., 0., 0., 1., 0., 0., 0., 0.])
+        mestimator.estimate(solver='lm', tolerance=1e-12)
+
+        design, penalty = additive_design_matrix(X=Xvals, specifications=spec, return_penalty=True)
+        f = sm.families.Poisson()
+        lgt = sm.GLM(yvals, design, family=f).fit_regularized(L1_wt=0., alpha=np.array(penalty)/Xvals.shape[0])
+
+        # Checking mean estimate
+        npt.assert_allclose(mestimator.theta,
+                            np.asarray(lgt.params),
+                            atol=1e-6)
 
 
 class TestEstimatingEquationsSurvival:
