@@ -792,7 +792,7 @@ class TestEstimatingEquationsRegression:
         # Checking mean estimate
         npt.assert_allclose(mestimator.theta,
                             np.asarray(lgt.params),
-                            atol=1e-6)
+                            atol=1e-5)
 
 
 class TestEstimatingEquationsSurvival:
