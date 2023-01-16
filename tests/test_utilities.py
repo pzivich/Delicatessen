@@ -1,12 +1,21 @@
 import pytest
 import numpy as np
 import numpy.testing as npt
+import pandas as pd
+import statsmodels.api as sm
+import statsmodels.formula.api as smf
+from scipy.stats import logistic
 
+from delicatessen import MEstimator
+from delicatessen.estimating_equations import ee_regression
 from delicatessen.utilities import (identity, inverse_logit, logit,
                                     robust_loss_functions,
+                                    regression_predictions,
                                     spline,
                                     additive_design_matrix)
 
+
+np.random.seed(80958151)
 
 @pytest.fixture
 def design_matrix():
@@ -160,6 +169,89 @@ class TestFunctions:
         with pytest.raises(ValueError, match="requires that a < b < k"):
             robust_loss_functions(residual=residuals, loss='hampel',
                                   k=1.5, a=1, b=2)
+
+    def test_regression_predictions_linear(self):
+        n = 500
+        data = pd.DataFrame()
+        data['X'] = np.random.normal(size=n)
+        data['Y'] = 0.5 + 2*data['X'] + np.random.normal(loc=0, size=n)
+        data['C'] = 1
+
+        p = pd.DataFrame()
+        p['X'] = np.linspace(-2.5, 2.5, 20)
+        p['C'] = 1
+
+        def psi(theta):
+            return ee_regression(theta,
+                                 X=data[['C', 'X']], y=data['Y'],
+                                 model='linear')
+
+        estr = MEstimator(psi, init=[0., 0.])
+        estr.estimate(solver='lm')
+        returned = regression_predictions(X=p[['C', 'X']], theta=estr.theta, covariance=estr.variance)
+
+        # Statsmodels function equivalent
+        glm = smf.glm("Y ~ X", data).fit(cov_type="HC1")
+        expected = np.asarray(glm.get_prediction(p).summary_frame())
+        expected[:, 1] = expected[:, 1]**2
+
+        npt.assert_allclose(returned, expected, atol=1e-6)
+
+    def test_regression_predictions_logit(self):
+        n = 1000
+        data = pd.DataFrame()
+        data['X'] = np.random.normal(size=n)
+        data['Y'] = np.random.binomial(n=1, p=logistic.cdf(-0.5 + 2*data['X']), size=n)
+        data['C'] = 1
+
+        p = pd.DataFrame()
+        p['X'] = np.linspace(-2.5, 2.5, 20)
+        p['C'] = 1
+
+        def psi(theta):
+            return ee_regression(theta,
+                                 X=data[['C', 'X']], y=data['Y'],
+                                 model='logistic')
+
+        estr = MEstimator(psi, init=[0., 0.])
+        estr.estimate(solver='lm')
+        returned = regression_predictions(X=p[['C', 'X']], theta=estr.theta, covariance=estr.variance)
+
+        # Comparing to statsmodels GLM (with robust covariance)
+        glm = smf.glm("Y ~ X", data, family=sm.families.Binomial()).fit(cov_type="HC1")
+        expected = np.asarray(glm.get_prediction(p).summary_frame())
+
+        npt.assert_allclose(returned[:, 0], logit(expected[:, 0]), atol=1e-6)
+        npt.assert_allclose(returned[:, 2], logit(expected[:, 2]), atol=1e-6)
+        npt.assert_allclose(returned[:, 3], logit(expected[:, 3]), atol=1e-6)
+
+    def test_regression_predictions_poisson(self):
+        n = 500
+        data = pd.DataFrame()
+        data['X'] = np.random.normal(size=n)
+        data['Y'] = np.random.poisson(lam=np.exp(-1 + 2*data['X']), size=n)
+        data['C'] = 1
+
+        p = pd.DataFrame()
+        p['X'] = np.linspace(-2.5, 2.5, 20)
+        p['C'] = 1
+
+        def psi(theta):
+            return ee_regression(theta,
+                                 X=data[['C', 'X']], y=data['Y'],
+                                 model='poisson')
+
+        estr = MEstimator(psi, init=[0., 0.])
+        estr.estimate(solver='lm')
+        returned = regression_predictions(X=p[['C', 'X']], theta=estr.theta, covariance=estr.variance)
+
+        # Comparing to statsmodels GLM (with robust covariance)
+        glm = smf.glm("Y ~ X", data, family=sm.families.Poisson()).fit(cov_type="HC1")
+        expected = np.asarray(glm.get_prediction(p).summary_frame())
+
+        npt.assert_allclose(returned[:, 0], np.log(expected[:, 0]), atol=1e-6)
+        npt.assert_allclose(returned[:, 2], np.log(expected[:, 2]), atol=1e-6)
+        npt.assert_allclose(returned[:, 3], np.log(expected[:, 3]), atol=1e-6)
 
     def test_spline1(self):
         vars = [1, 5, 10, 15, 20]

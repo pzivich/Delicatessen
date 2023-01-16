@@ -281,8 +281,8 @@ def regression_predictions(X, theta, covariance, alpha=0.05):
 
     Finally, the predicted values can be plotted (using matplotlib)
 
-    >>> plt.plot(pred['Z'], yhat[0, :], '-', color='blue')
-    >>> plt.fill_between(pred['Z'], yhat[2, :], yhat[3, :], alpha=0.25, color='red')
+    >>> plt.plot(pred['Z'], yhat[:, 0], '-', color='blue')
+    >>> plt.fill_between(pred['Z'], yhat[:, 2], yhat[:, 3], alpha=0.25, color='red')
     >>> plt.show()
 
     For predicting with a Poisson or logistic model, one may want to transform the predicted values and confidence
@@ -313,7 +313,7 @@ def regression_predictions(X, theta, covariance, alpha=0.05):
     upper_ci = yhat + z_alpha*yhat_se                  # Upper CI
 
     # Return estimates and variance
-    return np.vstack([yhat, yhat_var, lower_ci, upper_ci])
+    return np.vstack([yhat, yhat_var, lower_ci, upper_ci]).T
 
 
 def spline(variable, knots, power=3, restricted=True):
