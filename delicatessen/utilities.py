@@ -1,6 +1,7 @@
 import warnings
 
 import numpy as np
+from scipy.stats import norm
 
 
 def logit(prob):
@@ -196,6 +197,123 @@ def robust_loss_functions(residual, loss, k, a=None, b=None):
 
     # Returning the updated values
     return xr
+
+
+def regression_predictions(X, theta, covariance, alpha=0.05):
+    r"""Compute :math:`\hat{Y}`, :math:`\hat{Var}\left(\hat{Y}\right)`, and corresponding Wald-type
+    :math:`(1 - \alpha) \times` 100% confidence intervals from estimated coefficients and covariance of a regression
+    model given a set of specific covariate values.
+
+    This function is a helper function to compute the predictions from a regression model for a set of given :math:`X`
+    values. Importantly, this method allows for the variance of :math:`\hat{Y}` to be estimated without having to expand
+    the estimating equations. As such, this functionality is meant to be used after ``MEstimator`` has been used to
+    estimate the coefficients (i.e., this function is for use after the M-estimator has computed the results for the
+    chosen regression model).
+
+    Note
+    ----
+    No tranformations are applied by this function. So, input from a logistic model will generate the *log-odds* of the
+    outcome (not probability).
+
+
+    Parameters
+    ----------
+    X : ndarray, list, vector
+        2-dimensional vector of values to generate predicted variances for. The number of columns must match the number
+        of coefficients / parameters in ``theta``.
+    theta : ndarray
+        Estimated coefficients from ``delicatessen.MEstimator.theta``.
+    covariance : ndarray
+        Estimated covariance matrix from ``delicatessen.MEstimator.variance``.
+    alpha : float, optional
+        The :math:`\alpha` level for the corresponding confidence intervals. Default is 0.05, which calculate the
+        95% confidence intervals. Notice that :math:`0<\alpha<1`.
+
+    Returns
+    -------
+    array :
+        Returns a 4-by-n NumPy array with the 4 columns correspond to the predicted outcome, variance of the predictied
+        outcome, lower confidence limit, and upper confidence limit.
+
+    Examples
+    --------
+    The following is a simple example demonstrating how this function can be used to plot a regression line and
+    corresponding 95% confidence intervals.
+
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> import matplotlib.pyplot as plt
+    >>> from scipy.stats import norm
+    >>> from delicatessen import MEstimator
+    >>> from delicatessen.estimating_equations import ee_regression
+    >>> from delicatessen.utilities import regression_predictions
+
+    Some generic data to estimate the regression model with
+
+    >>> n = 500
+    >>> data = pd.DataFrame()
+    >>> data['X'] = np.random.normal(size=n)
+    >>> data['Z'] = np.random.normal(size=n)
+    >>> data['Y'] = 0.5 + 2*data['X'] - 1*data['Z'] + np.random.normal(loc=0, size=n)
+    >>> data['C'] = 1
+
+    Estimating the corresponding regression model parameters
+
+    >>> def psi(theta):
+    >>>     return ee_regression(theta=theta, X=data[['C', 'X', 'Z']], y=data['Y'], model='linear')
+
+    >>> estr = MEstimator(stacked_equations=psi, init=[0., 0., 0.,])
+    >>> estr.estimate()
+
+    To create a line plot of our regression line, we need to first create a new set of covariate values that are evenly
+    spaced across the range of the predictor values. Here, we will plot the relationship between ``Z`` and ``Y`` while
+    holding ``X=0``.
+
+    >>> pred = pd.DataFrame()
+    >>> pred['Z'] = np.linspace(np.min(data['Z']), np.max(data['Z']), 200)
+    >>> pred['X'] = 0
+    >>> pred['C'] = 1
+
+    Now the predicted values of the outcome, and confidence intervals to plot
+
+    >>> Xp = pred[['C', 'X', 'Z']]
+    >>> yhat = regression_predictions(X=Xp, theta=estr.theta, covariance=estr.variance)
+
+    Finally, the predicted values can be plotted (using matplotlib)
+
+    >>> plt.plot(pred['Z'], yhat[0, :], '-', color='blue')
+    >>> plt.fill_between(pred['Z'], yhat[2, :], yhat[3, :], alpha=0.25, color='red')
+    >>> plt.show()
+
+    For predicting with a Poisson or logistic model, one may want to transform the predicted values and confidence
+    intervals to another measure. For the logistic model, the predicted log-odds can easily be transformed using
+    ``delicatessen.utilities.inverse_logit``. For the Poisson model, predictions can easily be transformed using
+    ``numpy.exp``.
+    """
+    # Check valid alpha value is being provided
+    if not 0 < alpha < 1:
+        raise ValueError("`alpha` must be 0 < a < 1")
+
+    # Setup inputs for matrix multiplications
+    x = np.asarray(X)
+    b = np.asarray(theta)
+    c = np.asarray(covariance)
+
+    # Predicted Y
+    yhat = np.dot(x, b)
+
+    # Predicted Y variance / standard error
+    yhat_var = np.sum(np.dot(x, c) * x,
+                      axis=1)
+
+    # Confidence limit of predictions
+    yhat_se = np.sqrt(yhat_var)                        # Taking square root to get SE
+    z_alpha = norm.ppf(1 - alpha/2, loc=0, scale=1)    # Z_alpha value for CI
+    lower_ci = yhat - z_alpha*yhat_se                  # Lower CI
+    upper_ci = yhat + z_alpha*yhat_se                  # Upper CI
+
+    # Return estimates and variance
+    return np.vstack([yhat, yhat_var, lower_ci, upper_ci])
 
 
 def spline(variable, knots, power=3, restricted=True):
