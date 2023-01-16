@@ -385,9 +385,8 @@ def additive_design_matrix(X, specifications, return_penalty=False):
         penalty). For terms that should not have splines, ``None`` should be specified instead (see examples below).
         Each dictionary supports the following parameters:
         "knots", "natural", "power", "penalty"
-        * knots (int, list): controls the number and/or position of the knots. If an integer is provided, then all knots
-            are placed at equidistant positions. If a list or array is provided, then knots are placed at those
-            locations. There is no default, so must be specified by the user.
+        * knots (list): controls the position of the knots, with knots are placed at given locations. There is no
+            default, so must be specified by the user.
         * natural (bool): controls whether to generate natural (restricted) or unrestricted splines.
             Default is ``True``, which corresponds to natural splines.
         * power (float): controls the power to raise the spline terms to. Default is 3, which corresponds to cubic
@@ -425,53 +424,45 @@ def additive_design_matrix(X, specifications, return_penalty=False):
     To begin, consider the simple input design matrix of ``d[['C', 'X']]``. This initial design matrix consists of an
     intercept term and a continuous term. Here, we will specify a natural spline with 20 knots for the second term only
 
-    >>> specs = [None, {"knots": 20, "penalty": 10}]
-    >>> Xa_design = additive_design_matrix(X=d[['C', 'X']], specifications=specs)
-
-    Rather than specify the number of knots, we can also assign the exact position of the knots
-
-    Note
-    ----
-    Either the number of knots or knot locations must be specified.
-
-
-    >>> specs = [None, {"knots": [-2, -1, 0, 1, 2], "penalty": 10}]
+    >>> x_knots = np.linspace(np.min(d['X'])+0.1, np.max(d['X'])-0.1, 20)
+    >>> specs = [None, {"knots": x_knots, "penalty": 10}]
     >>> Xa_design = additive_design_matrix(X=d[['C', 'X']], specifications=specs)
 
     Note
     ----
-    Internally, the input knots are always sorted in ascending order.
+    The knot locations must always be specified by the user.
 
 
     Other optional specifications are also available. Here, we will specify an unrestricted quadratic spline with a
     penalty of 5.5 for the second column of the design matrix.
 
-    >>> specs = [None, {"knots": [-4, -2, 0, 2, 4], "natural": False, "power": 2, "penalty": 5.5}]
+    >>> specs = [None, {"knots": [-2, -1, 0, 1, 2], "natural": False, "power": 2, "penalty": 5.5}]
     >>> Xa_design = additive_design_matrix(X=d[['C', 'X']], specifications=specs)
 
     Now consider the input design matrix of ``d[['C', 'X', 'Z', 'W']]``. This initial design matrix consists of an
     intercept, two continuous, and a categorical term. Here, we will specify splines for both continuous terms
 
-    >>> specs = [None,                         # Intercept term
-    >>>          {"knots": 20, "penalty": 25}, # X (continuous)
-    >>>          {"knots": 10, "penalty": 15}, # Z (continuous)
-    >>>          None]                         # W (categorical)
+    >>> x_knots = np.linspace(np.min(d['X'])+0.1, np.max(d['X'])-0.1, 20)
+    >>> z_knots = np.linspace(np.min(d['X'])+0.1, np.max(d['X'])-0.1, 10)
+    >>> specs = [None,                              # Intercept term
+    >>>          {"knots": x_knots, "penalty": 25}, # X (continuous)
+    >>>          {"knots": z_knots, "penalty": 15}, # Z (continuous)
+    >>>          None]                              # W (categorical)
     >>> Xa_design = additive_design_matrix(X=d[['C', 'X', 'Z', 'W']], specifications=specs)
 
     Notice that the two continuous terms have different spline specifications.
 
     Finally, we could opt to only generate a spline basis for one of the continuous variables
 
-    >>> specs = [None,                         # Intercept term
-    >>>          {"knots": 20, "penalty": 25}, # X (continuous)
-    >>>          None,                         # Z (continuous)
-    >>>          None]                         # W (categorical)
+    >>> specs = [None,                              # Intercept term
+    >>>          {"knots": x_knots, "penalty": 25}, # X (continuous)
+    >>>          None,                              # Z (continuous)
+    >>>          None]                              # W (categorical)
     >>> Xa_design = additive_design_matrix(X=d[['C', 'X', 'Z', 'W']], specifications=specs)
 
     Specification of splines can be modified and paired in a variety of ways. These are determined by the object type
     in the specification list, and the input dictionary for the spline terms.
     """
-
     def generate_spline(variable, specification):
         """Internal function to call the spline functionality. This function merely calls the spline function with the
         corresponding specifications. This was built as an internal function to simply future maintenance.
@@ -493,14 +484,12 @@ def additive_design_matrix(X, specifications, return_penalty=False):
                       power=specification["power"],           # ... to the power
                       restricted=specification["natural"])    # ... and whether to restrict
 
-    def generate_default_spline_parameters(xvar, specification):
+    def generate_default_spline_parameters(specification):
         """Internal function to process the input specification dictionary of spline parameters. Namely, ensure that
         'knots' is specified, fill in any other empty parameters, and check for additional keys given.
 
         Parameters
         ----------
-        xvar :
-            The corresponding column. This is only used when a number of knots is given (otherwise ignored)
         specification : dict
             Dictionary of the input spline specifications to check and process.
 
@@ -527,17 +516,6 @@ def additive_design_matrix(X, specifications, return_penalty=False):
         # Managing knot keyword
         if "knots" not in keys:
             raise ValueError("`knots` must be specified.")
-        knots = specification["knots"]
-        if isinstance(knots, int):
-            if knots < 1:                                             # Error if knots is non-positive
-                raise ValueError("For int(), `knots` must be a positive integer")
-            elif knots == 1:                                          # Mid-point (median) if single knot
-                specification["knots"] = [np.median(xvar), ]
-            elif knots == 2:                                          # 33rd and 66th percentiles if 2 knots
-                specification["knots"] = np.percentile(xvar, q=[100/3, 200/3]).tolist()
-            else:                                                     # Otherwise evenly spaced between 2.5th to 97.5th
-                percentiles = np.linspace(2.5, 97.5, knots)
-                specification["knots"] = np.percentile(xvar, q=percentiles).tolist()
         # Managing keyword for natural / restricted splines
         if "natural" not in keys:
             specification["natural"] = defaults["natural"]
@@ -578,8 +556,7 @@ def additive_design_matrix(X, specifications, return_penalty=False):
         # Spline generation
         if xspec is not None:                            # ... when given a specification != None, generate splines
             # Processing input spline specifications to adhere to conventions
-            spec_i = generate_default_spline_parameters(xvar=xvar,
-                                                        specification=xspec)
+            spec_i = generate_default_spline_parameters(specification=xspec)
             # Generate the spline matrix using the spline function and specification
             spline_matrix = generate_spline(variable=X[:, col_id],
                                             specification=spec_i)

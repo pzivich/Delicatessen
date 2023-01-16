@@ -14,8 +14,8 @@ from delicatessen.utilities import (identity, inverse_logit, logit,
                                     spline,
                                     additive_design_matrix)
 
-
 np.random.seed(80958151)
+
 
 @pytest.fixture
 def design_matrix():
@@ -295,9 +295,9 @@ class TestFunctions:
     def test_adm_error_negknots(self, design_matrix):
         # Testing error when dictionary with negative number of knots given
         specs = [None,
-                 {"knots": -2},
+                 {"knots": 2},
                  None]
-        with pytest.raises(ValueError, match="`knots` must be a pos"):
+        with pytest.raises(TypeError, match="not iterable"):
             additive_design_matrix(X=design_matrix,
                                    specifications=specs,
                                    return_penalty=False)
@@ -306,7 +306,7 @@ class TestFunctions:
         # Testing error matrix is misaligned
         # Testing warning for extra spline arguments
         specs = [None,
-                 {"knots": 2},
+                 {"knots": [-1, 1]},
                  None]
         with pytest.raises(ValueError, match="number of input"):
             additive_design_matrix(X=design_matrix.T,
@@ -316,7 +316,7 @@ class TestFunctions:
     def test_adm_warn_extras(self, design_matrix):
         # Testing warning for extra spline arguments
         specs = [None,
-                 {"knots": 2, "extra": 4},
+                 {"knots": [-1, 1], "extra": 4},
                  None]
         with pytest.warns(UserWarning, match="following keys"):
             additive_design_matrix(X=design_matrix,

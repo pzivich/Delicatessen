@@ -360,7 +360,7 @@ class TestEstimatingEquationsRegression:
         data['y'] = 5 + data['x1'] + data['x2'] + 0.01*data['x2'] + np.random.normal(size=n)
         Xvals = np.asarray(data[['c', 'x1', 'x2']])
         yvals = np.asarray(data['y'])
-        spec = [None, {"knots": 3, "penalty": 3}, {"knots": 5, "penalty": 5}]
+        spec = [None, {"knots": [-1, 0, 1], "penalty": 3}, {"knots": [-2, -1, 0, 1, 2], "penalty": 5}]
 
         # Testing array of penalty terms
         def psi(theta):
@@ -386,7 +386,7 @@ class TestEstimatingEquationsRegression:
         data['y'] = 5 + data['x1'] + data['x2'] + 0.01*data['x2'] + np.random.normal(size=n)
         Xvals = np.asarray(data[['c', 'x1', 'x2']])
         yvals = np.asarray(data['y'])
-        spec = [None, {"knots": 3, "penalty": 3}, {"knots": 5, "penalty": 5}]
+        spec = [None, {"knots": [-1, 0, 1], "penalty": 3}, {"knots": [-2, -1, 0, 1, 2], "penalty": 5}]
         weights = np.random.uniform(0.1, 2.5, size=n)
 
         # Testing array of penalty terms
@@ -549,7 +549,7 @@ class TestEstimatingEquationsRegression:
         data['C'] = 1
         Xvals = np.asarray(data[['C', 'X', 'Z']])
         yvals = np.asarray(data['Y'])
-        spec = [None, {"knots": 3, "penalty": 3}, {"knots": 5, "penalty": 5}]
+        spec = [None, {"knots": [-1, 0, 1], "penalty": 3}, {"knots": [-2, -1, 0, 1, 2], "penalty": 5}]
 
         def psi_regression(theta):
             return ee_additive_regression(theta, X=Xvals, y=yvals,
@@ -775,7 +775,7 @@ class TestEstimatingEquationsRegression:
         data['C'] = 1
         Xvals = np.asarray(data[['C', 'X', 'Z']])
         yvals = np.asarray(data['Y'])
-        spec = [None, {"knots": 3, "penalty": 3}, {"knots": 5, "penalty": 5}]
+        spec = [None, {"knots": [-1, 0, 1], "penalty": 3}, {"knots": [-2, -1, 0, 1, 2], "penalty": 5}]
 
         def psi_regression(theta):
             return ee_additive_regression(theta, X=Xvals, y=yvals,

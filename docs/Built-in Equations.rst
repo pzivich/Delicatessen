@@ -539,9 +539,10 @@ directly called
 
 .. code::
 
+    x_knots = np.linspace(-4.75, 4.75, 30)
     specs = [None,
              None,
-             {"knots": 30, "penalty": 20},
+             {"knots": x_knots, "penalty": 20},
              ]
     Xa = additive_design_matrix(X=data[['C', 'Z', 'X']], specifications=specs)
 
