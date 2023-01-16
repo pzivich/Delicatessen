@@ -200,7 +200,8 @@ def robust_loss_functions(residual, loss, k, a=None, b=None):
 
 
 def regression_predictions(X, theta, covariance, alpha=0.05):
-    r"""Compute :math:`\hat{Y}`, :math:`\hat{Var}\left(\hat{Y}\right)`, and corresponding Wald-type
+    r"""Generate predicted values of the outcome given a design matrix, point estimates, and covariance matrix.
+    This functionality computes :math:`\hat{Y}`, :math:`\hat{Var}\left(\hat{Y}\right)`, and corresponding Wald-type
     :math:`(1 - \alpha) \times` 100% confidence intervals from estimated coefficients and covariance of a regression
     model given a set of specific covariate values.
 
@@ -208,7 +209,7 @@ def regression_predictions(X, theta, covariance, alpha=0.05):
     values. Importantly, this method allows for the variance of :math:`\hat{Y}` to be estimated without having to expand
     the estimating equations. As such, this functionality is meant to be used after ``MEstimator`` has been used to
     estimate the coefficients (i.e., this function is for use after the M-estimator has computed the results for the
-    chosen regression model).
+    chosen regression model). Therefore, this function should be viewed as a post-processing functionality.
 
     Note
     ----
@@ -232,7 +233,7 @@ def regression_predictions(X, theta, covariance, alpha=0.05):
     Returns
     -------
     array :
-        Returns a 4-by-n NumPy array with the 4 columns correspond to the predicted outcome, variance of the predictied
+        Returns a n-by-4 NumPy array with the 4 columns correspond to the predicted outcome, variance of the predictied
         outcome, lower confidence limit, and upper confidence limit.
 
     Examples
@@ -243,14 +244,13 @@ def regression_predictions(X, theta, covariance, alpha=0.05):
     >>> import numpy as np
     >>> import pandas as pd
     >>> import matplotlib.pyplot as plt
-    >>> from scipy.stats import norm
     >>> from delicatessen import MEstimator
     >>> from delicatessen.estimating_equations import ee_regression
     >>> from delicatessen.utilities import regression_predictions
 
     Some generic data to estimate the regression model with
 
-    >>> n = 500
+    >>> n = 50
     >>> data = pd.DataFrame()
     >>> data['X'] = np.random.normal(size=n)
     >>> data['Z'] = np.random.normal(size=n)
@@ -263,7 +263,7 @@ def regression_predictions(X, theta, covariance, alpha=0.05):
     >>>     return ee_regression(theta=theta, X=data[['C', 'X', 'Z']], y=data['Y'], model='linear')
 
     >>> estr = MEstimator(stacked_equations=psi, init=[0., 0., 0.,])
-    >>> estr.estimate()
+    >>> estr.estimate(solver='lm')
 
     To create a line plot of our regression line, we need to first create a new set of covariate values that are evenly
     spaced across the range of the predictor values. Here, we will plot the relationship between ``Z`` and ``Y`` while
@@ -282,7 +282,7 @@ def regression_predictions(X, theta, covariance, alpha=0.05):
     Finally, the predicted values can be plotted (using matplotlib)
 
     >>> plt.plot(pred['Z'], yhat[:, 0], '-', color='blue')
-    >>> plt.fill_between(pred['Z'], yhat[:, 2], yhat[:, 3], alpha=0.25, color='red')
+    >>> plt.fill_between(pred['Z'], yhat[:, 2], yhat[:, 3], alpha=0.25, color='blue')
     >>> plt.show()
 
     For predicting with a Poisson or logistic model, one may want to transform the predicted values and confidence
