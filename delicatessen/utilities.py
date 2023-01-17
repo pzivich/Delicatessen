@@ -443,7 +443,7 @@ def additive_design_matrix(X, specifications, return_penalty=False):
     intercept, two continuous, and a categorical term. Here, we will specify splines for both continuous terms
 
     >>> x_knots = np.linspace(np.min(d['X'])+0.1, np.max(d['X'])-0.1, 20)
-    >>> z_knots = np.linspace(np.min(d['X'])+0.1, np.max(d['X'])-0.1, 10)
+    >>> z_knots = np.linspace(np.min(d['Z'])+0.1, np.max(d['Z'])-0.1, 10)
     >>> specs = [None,                              # Intercept term
     >>>          {"knots": x_knots, "penalty": 25}, # X (continuous)
     >>>          {"knots": z_knots, "penalty": 15}, # Z (continuous)
