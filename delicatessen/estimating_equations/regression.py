@@ -928,9 +928,8 @@ def ee_additive_regression(theta, X, y, specifications, model, weights=None):
         penalty). For terms that should not have splines, ``None`` should be specified instead (see examples below).
         Each dictionary supports the following parameters:
         "knots", "natural", "power", "penalty"
-        * knots (int, list): controls the number and/or position of the knots. If an integer is provided, then all knots
-            are placed at equidistant positions. If a list or array is provided, then knots are placed at those
-            locations. There is no default, so must be specified by the user.
+        * knots (list): controls the position of the knots, with knots are placed at given locations. There is no
+            default, so must be specified by the user.
         * natural (bool): controls whether to generate natural (restricted) or unrestricted splines.
             Default is ``True``, which corresponds to natural splines.
         * power (float): controls the power to raise the spline terms to. Default is 3, which corresponds to cubic
@@ -957,7 +956,7 @@ def ee_additive_regression(theta, X, y, specifications, model, weights=None):
     >>> from scipy.stats import logistic
     >>> from delicatessen import MEstimator
     >>> from delicatessen.estimating_equations import ee_additive_regression
-    >>> from delicatessen.utilities import additive_design_matrix
+    >>> from delicatessen.utilities import additive_design_matrix, regression_predictions
 
     Some generic data to estimate a generalized additive model
 
@@ -977,12 +976,12 @@ def ee_additive_regression(theta, X, y, specifications, model, weights=None):
     we only want spline terms to be applied to ``'X'`` column. To define the spline specifications, we create the
     following list
 
-    >>> specs = [None, {"knots": 20, "penalty": 10}]
+    >>> specs = [None, {"knots": [-4, -3, -2, -1, 0, 1, 2, 3, 4], "penalty": 10}]
 
     This tells ``ee_additive_regression`` to not generate a spline term for the first column in the input design matrix
-    and to generate a default spline with 20 knots and penalty of 10 for the second column in the input design matrix.
-    Interally, the design matrix processing is done by the ``additive_design_matrix`` utility function. We can see what
-    the output of that function looks like via
+    and to generate a default spline with knots at the specified locations and penalty of 10 for the second column in
+    the input design matrix. Interally, the design matrix processing is done by the ``additive_design_matrix`` utility
+    function. We can see what the output of that function looks like via
 
     >>> Xa_design = additive_design_matrix(X=np.asarray(data[['C', 'X']]), specifications=specs)
 
@@ -1018,16 +1017,14 @@ def ee_additive_regression(theta, X, y, specifications, model, weights=None):
     >>> p['C'] = 1
     >>> Xa_pred = additive_design_matrix(X=np.asarray(p[['C', 'X']]), specifications=specs)
 
-    To generate the predicted values of Y, we do the following
+    To generate the predicted values of Y (and the corresponding confidence intervals), we do the following
 
-    >>> p['Yhat'] = np.dot(Xa_pred, estr.theta)
+    >>> yhat = regression_predictions(Xa_pred, theta=estr.theta, covariance=estr.variance)
 
-    Those predicted values can then be plotted against X.
+    For further details, see the ``regression_predictions`` utility function documentation.
 
-    # TODO demonstrate computing confidence intervals
-
-    Other optional specifications are available for the spline terms. Here, we will specify the exact locations of the
-    knots for an unrestricted quadratic spline with a penalty of 5.5 for the second column of the design matrix.
+    Other optional specifications are available for the spline terms. Here, we will specify an unrestricted quadratic
+    spline with a penalty of 5.5 for the second column of the design matrix.
 
     >>> specs = [None, {"knots": [-4, -2, 0, 2, 4], "natural": False, "power": 2, "penalty": 5.5}]
 
@@ -1036,7 +1033,7 @@ def ee_additive_regression(theta, X, y, specifications, model, weights=None):
 
     Next, we can estimate the parameters for a logistic regression model as follows
 
-    >>> specs = [None, {"knots": 20, "penalty": 10}]
+    >>> specs = [None, {"knots": [-4, -3, -2, -1, 0, 1, 2, 3, 4], "penalty": 10}]
     >>> Xa_design = additive_design_matrix(X=np.asarray(data[['C', 'X']]), specifications=specs)
     >>> n_params = Xa_design.shape[1]
 
@@ -1049,7 +1046,7 @@ def ee_additive_regression(theta, X, y, specifications, model, weights=None):
 
     Finally, we can estimate the parameters for a Poisson regression model as follows
 
-    >>> specs = [None, {"knots": 20, "penalty": 10}]
+    >>> specs = [None, {"knots": [-4, -3, -2, -1, 0, 1, 2, 3, 4], "penalty": 10}]
     >>> Xa_design = additive_design_matrix(X=np.asarray(data[['C', 'X']]), specifications=specs)
     >>> n_params = Xa_design.shape[1]
 
