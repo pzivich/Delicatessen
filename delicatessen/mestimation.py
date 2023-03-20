@@ -33,7 +33,7 @@ class MEstimator:
 
     .. math::
 
-        B_n(Z, \hat{\theta})^{-1} F_n(Z, \hat{\theta}) \left(B_n(Z, \hat{\theta}^{-1})\right)^T
+        B_n(Z, \hat{\theta})^{-1} F_n(Z, \hat{\theta}) \left\{B_n(Z, \hat{\theta}^{-1})\right\}^T
 
     where :math:`B` is the 'bread' and :math:`F` is the 'filling'
 

@@ -18,7 +18,7 @@ def ee_gformula(theta, y, X, X1, X0=None, force_continuous=False):
 
     .. math::
 
-        \sum_{i=1}^n (Y_i - g(X_i^T \beta)) X_i = 0
+        \sum_{i=1}^n \left\{ Y_i - g(X_i^T \beta) \right\} X_i = 0
 
     where :math:`g` indicates a transformation function. For linear regression, :math:`g` is the identity function.
     Logistic regression uses the inverse-logit function. By default, `ee_gformula` detects whether `y` is all binary
@@ -30,7 +30,7 @@ def ee_gformula(theta, y, X, X1, X0=None, force_continuous=False):
 
     .. math::
 
-        \sum_{i=1}^n g({X_i^*}^T \beta) - \theta_1 = 0
+        \sum_{i=1}^n \left\{ g({X_i^*}^T \beta) - \theta_1 \right\} = 0
 
     Note
     ----
@@ -249,7 +249,7 @@ def ee_ipw(theta, y, A, W, truncate=None):
 
     .. math::
 
-        \sum_{i=1}^n (A_i - expit(W_i^T \alpha)) W_i = 0
+        \sum_{i=1}^n \left\{ A_i - \text{expit}(W_i^T \alpha) \right\} W_i = 0
 
     where A is the action and W is the set of confounders.
 
@@ -262,8 +262,8 @@ def ee_ipw(theta, y, A, W, truncate=None):
         \sum_{i=1}^n
         \begin{bmatrix}
             (\theta_1 - \theta_2) - \theta_0 \\
-            \frac{A_i \times Y_i}{\pi_i} - \theta_1 - \theta_1 \\
-            \frac{(1-A_i) \times Y_i}{1-\pi_i} - \theta_2
+            \frac{A_i Y_i}{\pi_i} - \theta_1 - \theta_1 \\
+            \frac{(1-A_i) Y_i}{1-\pi_i} - \theta_2
         \end{bmatrix}
         = 0
 
@@ -403,14 +403,14 @@ def ee_aipw(theta, y, A, W, X, X1, X0, truncate=None, force_continuous=False):
 
     .. math::
 
-        \sum_{i=1}^n (A_i - expit(W_i^T \alpha)) W_i = 0
+        \sum_{i=1}^n \left\{ A_i - \text{expit}(W_i^T \alpha) \right\} W_i = 0
 
     where ``A`` is the treatment and ``W`` is the set of confounders. The estimating equations for the outcome model
     are
 
     .. math::
 
-        \sum_{i=1}^n (Y_i - g(X_i^T \beta)) X_i = 0
+        \sum_{i=1}^n \left\{ Y_i - g(X_i^T \beta) \right\} X_i = 0
 
     By default, `ee_aipw` detects whether `y` is all binary (zero or one), and applies logistic regression. Notice that
     ``X`` here should consists of both ``A`` and ``W`` (with possible interaction terms or other differences in
@@ -424,8 +424,8 @@ def ee_aipw(theta, y, A, W, X, X1, X0, truncate=None, force_continuous=False):
         \sum_{i=1}^n
         \begin{bmatrix}
             (\theta_1 - \theta_2) - \theta_0 \\
-            \frac{A_i \times Y_i}{\pi_i} - \frac{\hat{Y^1}(A_i-\pi_i}{\pi_i} - \theta_1 \\
-            \frac{(1-A_i) \times Y_i}{1-\pi_i} + \frac{\hat{Y^0}(A_i-\pi_i}{1-\pi_i} - \theta_2
+            \frac{A_i Y_i}{\pi_i} - \frac{\hat{Y^1}(A_i-\pi_i}{\pi_i} - \theta_1 \\
+            \frac{(1-A_i) Y_i}{1-\pi_i} + \frac{\hat{Y^0}(A_i-\pi_i}{1-\pi_i} - \theta_2
         \end{bmatrix}
         = 0
 

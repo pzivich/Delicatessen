@@ -367,8 +367,8 @@ def ee_effective_dose_delta(theta, y, delta, steepness, ed50, lower, upper):
 
     .. math::
 
-        \sum_{i=1}^n \theta_1 + \frac{\theta_4 - \theta_1}{1 + (\theta_5 / \theta_2)^{\theta_3}} - \theta_4(1-\delta) -
-        \theta_1 \delta = 0
+        \sum_{i=1}^n \left\{ \theta_1 + \frac{\theta_4 - \theta_1}{1 + (\theta_5 / \theta_2)^{\theta_3}} -
+        \theta_4(1-\delta) - \theta_1 \delta \right\} = 0
 
     where :math:`\theta_5` is the :math:`ED(\delta)`, and the other :math:`\theta` are from a PL model (1: lower limit,
     2: steepness, 3: ED(50), 4: upper limit). For proper uncertainty estimation, this estimating equation should be

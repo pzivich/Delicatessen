@@ -14,7 +14,7 @@ def ee_mean(theta, y):
 
     .. math::
 
-        \sum_{i=1}^n Y_i - \theta = 0
+        \sum_{i=1}^n (Y_i - \theta) = 0
 
     Note
     ----
@@ -84,12 +84,6 @@ def ee_mean_robust(theta, y, k, loss='huber', lower=None, upper=None):
     where :math:`f_k(x)` is the corresponding robust loss function. Options for the loss function include: Huber,
     Tukey's biweight, Andrew's Sine, and Hampel. See ``robust_loss_function`` for further details on the loss
     functions for the robust mean.
-
-    Note
-    ----
-    The estimating-equation is not non-differentiable everywhere for some loss functions. Therefore, it is assumed that
-    no points occur exactly at the non-differentiable points. For truly continuous :math:`Y`, the probability of that
-    occurring is zero.
 
     Note
     ----
@@ -255,7 +249,7 @@ def ee_percentile(theta, y, q):
 
     .. math::
 
-        \sum_{i=1}^n q - I(Y_i \le \theta) = 0
+        \sum_{i=1}^n \left\{ q - I(Y_i \le \theta) \right\} = 0
 
     where :math:`0 < q < 1` is the percentile. Notice that this estimating equation is non-smooth. Therefore,
     root-finding is difficult.

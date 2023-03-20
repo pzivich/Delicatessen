@@ -14,7 +14,7 @@ def ee_exponential_model(theta, t, delta):
 
     .. math::
 
-        \sum_{i=1}^n \frac{\Delta_i}{\lambda} -  t_i = 0
+        \sum_{i=1}^n \left\{ \frac{\Delta_i}{\lambda} -  t_i \right\} = 0
 
     Here, :math:`\theta` is a single parameter that corresponds to the scale parameter for the exponential distribution.
     The hazard from the exponential model is parameterized as the following
@@ -209,13 +209,13 @@ def ee_exponential_measure(theta, times, n, measure, scale):
 
     .. math::
 
-        \sum_{i=1}^n \exp(- \lambda t) - \theta = 0
+        \sum_{i=1}^n \left\{ \exp(- \lambda t) - \theta \right\} = 0
 
     and the estimating equation for the hazard function at time :math:`t` is
 
     .. math::
 
-        \sum_{i=1}^n \lambda - \theta = 0
+        \sum_{i=1}^n \left\{ \lambda - \theta \right\} = 0
 
     For the other measures, we take advantage of the following transformations
 
@@ -349,13 +349,13 @@ def ee_weibull_measure(theta, times, n, measure, scale, shape):
 
     .. math::
 
-        \sum_{i=1}^n \exp(- \lambda t^{\gamma}) - \theta = 0
+        \sum_{i=1}^n \left\{ \exp(- \lambda t^{\gamma}) - \theta \right\} = 0
 
     and the estimating equation for the hazard function at time :math:`t` is
 
     .. math::
 
-        \sum_{i=1}^n \lambda \gamma t^{\gamma - 1} - \theta = 0
+        \sum_{i=1}^n \left\{ \lambda \gamma t^{\gamma - 1} - \theta \right\} = 0
 
     For the other measures, we take advantage of the following transformation between survival measures
 
@@ -676,13 +676,13 @@ def ee_aft_weibull_measure(theta, times, X, measure, mu, beta, sigma):
 
     .. math::
 
-        \sum_{i=1}^n \exp(-1 \lambda_i t^{\gamma}) - \theta = 0
+        \sum_{i=1}^n \left\{ \exp(-1 \lambda_i t^{\gamma}) - \theta \right\} = 0
 
     and the estimating equation for the hazard function at time :math:`t` is
 
     .. math::
 
-        \sum_{i=1}^n  \lambda_i \gamma t^{\gamma - 1} - \theta = 0
+        \sum_{i=1}^n  \left\{ \lambda_i \gamma t^{\gamma - 1} - \theta \right\} = 0
 
     where
 
