@@ -486,6 +486,96 @@ and :math:`\gamma=2` is the Ridge penalty. Here, we use a value larger than 2 fo
 Different penalty terms can be assigned to each coefficient. Furthermore, the ``center`` argument can be used to
 penalize towards non-zero values for all or some of the coefficients.
 
+Flexible Regression
+=============================
+The previous regression models generally rely on strong parametric assumptions (unless explicitly relaxed by the user
+through the specified design matrix). An alternative is to use more flexible regression models, which place less strict
+parametric assumptions on the model. Here, we will demonstrate flexible models for linear regression, but logistic and
+Poisson regression are also supported (through the :code:`model` argument).
+
+To demonstrate application of the flexible regression models, consider the following simulated data set
+
+.. code::
+
+    from delicatessen.estimating_equations import (ee_additive_regression,
+                                                   )
+    from delicatessen.utilities import additive_design_matrix
+
+    n = 2000
+    d = pd.DataFrame()
+    d['X'] = np.random.uniform(-5, 5, size=n)
+    d['Z'] = np.random.binomial(n=1, p=0.5, size=n)
+    d['Y'] = 2*d['Z'] + np.exp(np.sin(d['X'] + 0.5)) + np.abs(d['X']) + np.random.normal(size=n)
+    d['C'] = 1
+
+Here, there the relationship between X and Y is nonlinear. The flexible regression models will attempt to capture this
+flexibility without the user having to directly specify the functional form.
+
+Generalized Additive Model
+----------------------------
+Generalized Additive Models (GAMs) are an extension of Generalized Linear Models (GLMs) that replace linear terms
+in the model with an arbitrary (but user-specified) function. For the GLM, we might consider the following model
+
+.. math::
+
+    Y_i = \beta_0 + \beta_1 Z_i + \beta_2 X_i + \epsilon_i
+
+However, this model assumes that the relationship between X and Y is linear (which we known to be untrue in this case).
+GAMs work by replacing the linear term with a spline function. For the GAM, we might consider the following model
+
+.. math::
+
+    Y_i = \beta_0 + \beta_1 Z_i + \beta_2 X_i + \sum_k \beta_k f_k(X_k) + \epsilon_i
+
+Here, X was replaced with a set of function. Those functions define a pre-specified number of spline terms. These
+spline terms allow for the relationship between X and Y to be modeled in a flexible but smooth way. However, this
+flexibility is not free. If our splines are complex, the GAM can overfit the data. To help prevent this issue, GAMs
+generally use penalized splines, where the coefficients for the spline terms are penalized. ``delicatessen`` uses L2
+penalization and allows various specifications for the splines.
+
+The main trick of the GAM is to generate a new design matrix for the additive model based on some input design matrix
+and spline specifications. This is done (internally) by the ``additive_design_matrix`` function. This can also be
+directly called
+
+.. code::
+
+    x_knots = np.linspace(-4.75, 4.75, 30)
+    specs = [None,
+             None,
+             {"knots": x_knots, "penalty": 20},
+             ]
+    Xa = additive_design_matrix(X=data[['C', 'Z', 'X']], specifications=specs)
+
+Here, a design matrix is return where the first two columns (C and Z) have no spline terms generated. For the last
+column (X), a natural cubic spline with 30 evenly spaced knots and a penalty of 20 is generated. So the output design
+matrix will consist of the C,Z,X columns followed by the 29 column basis of the splines.
+
+To implement a GAM, the estimating equations can be specified as
+
+.. code::
+
+    def psi(theta):
+        return ee_additive_regression(theta=theta,
+                                      X=d[['C', 'X']], y=d['Y'],
+                                      specifications=specs,
+                                      model='linear')
+
+Here, the previously defined spline specifications are provided. Internally, ``ee_additive_regression`` calls the
+``additive_design_matrix``, so this design matrix does not have to be provided by the user. However, pre-computing the
+design matrix is helpful for determining the number of initial values. To determine the number of initial values to
+provide ``MEstimator``, we can check the number of columns in ``Xa``. In the following, we use the number of columns to
+generate a list of starting values.
+
+.. code::
+
+    estr = MEstimator(psi, init=[0, ]*Xa.shape[1])
+    estr.estimate(solver='lm', maxiter=10000)
+
+Multiple splines, different types of splines, or varying penalty strengths can also be specified. These specifications
+are all done through the list of dictionaries provided in the ``specifications`` arguments. Any element with a
+dictionary will have splines generated and any ``None`` element will only have the main term returned. See the
+``ee_additive_regression`` and ``additive_design_matrix`` reference pages for further examples.
+
 Survival
 =============================
 Suppose each person has two unique times: their event time (:math:`T_i`) and their censoring time (:math:`C_i`).

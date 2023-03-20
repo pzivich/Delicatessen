@@ -3,7 +3,6 @@ from scipy.optimize import newton, root
 from scipy.misc import derivative
 from scipy.optimize import approx_fprime
 from scipy.stats import norm
-from copy import copy
 
 
 class MEstimator:
@@ -364,7 +363,6 @@ class MEstimator:
             b-by-1 array, which is the sum over n for each b.
         """
         # Option for the subset argument
-        # TODO this subset breaks the bread matrix...
         if self._subset_ is None:                      # If NOT subset then,
             full_theta = theta                         # ... then use the full input theta
         else:                                          # If subset then,

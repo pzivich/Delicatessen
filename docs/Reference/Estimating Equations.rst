@@ -33,6 +33,7 @@ Regression
   ee_lasso_regression
   ee_elasticnet_regression
   ee_bridge_regression
+  ee_additive_regression
 
 
 Survival
