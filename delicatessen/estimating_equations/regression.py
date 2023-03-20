@@ -875,12 +875,11 @@ def ee_bridge_regression(theta, X, y, model, penalty, gamma, weights=None, cente
 def ee_additive_regression(theta, X, y, specifications, model, weights=None):
     r"""Estimating equation for Generalized Additive Models (GAMs). GAMs are an extension of generalized linear models
     that allow for more flexible specifications of relationships of continuous variables. This flexibility is
-    accomplished via splines. To further control the flexibility, the spline terms are penalized using an L2 (Ridge)
-    penalization.
+    accomplished via splines. To further control the flexibility, the spline terms are penalized.
 
     Note
     ----
-    The implemented GAM uses L2-penalization (Ridge). This penalization only applies to the generated spline terms
+    The implemented GAM uses L2-penalization. This penalization only applies to the generated spline terms
     (i.e., penalization decreases the 'wiggliness' of the estimated relationships).
 
 
@@ -895,30 +894,28 @@ def ee_additive_regression(theta, X, y, specifications, model, weights=None):
     While this looks similar to Ridge regression, there are two important differences: the function :math:`f()` and
     how :math:`\lambda` is defined. First, the function :math:`f()` denotes a general vector function. For spline terms,
     this function defines the basis functions for the splines (set via the ``specifications`` parameter). For non-spline
-    terms, this is the identity function (i.e., no changes are made to the input). This setup allows for only some terms
+    terms, this is the identity function (i.e., no changes are made to the input). This setup allows for terms
     to be selectively modeled using splines (e.g., categorical features are not modeled using splines). Next, the
     penalty term, :math:`\lambda`, is only non-zero for :math:`\theta` that correspond to parameters for splines (i.e.,
     only the spline terms are penalized). This is distinction from default Ridge regression, which penalizes all terms
     in the model.
 
+    Note
+    ----
+    Originally, GAMs were implemented via splines with a knot at each unique values of :math:`X`. More recently, GAMs
+    use a more moderate amount of knots to improve computationally efficiency. Both versions can be implemented by
+    ``ee_additive_regression`` through setting the knot locations.
+
+
     Here, :math:`\theta` is a 1-by-(b+k) array, where b is the distinct covariates included as part of X and the k
     distinct spline basis functions. For example, if X is a 2-by-n matrix with a 10-knot natural spline for the second
     column in X, then :math:`\theta` will be a 1-by-(2+9) array. The code is general to allow for an arbitrary
-    number of X's and spline knots (as long as there is enough support in the data).
-
-    Note
-    ----
-    ``ee_additive_regression`` is essentially a wrapper function consisting of both ``additive_design_matrix`` and
-    ``ee_ridge_regression``. In effect, ``ee_additive_regression`` calls ``additive_design_matrix`` each time it is run,
-    which is not strictly necessary (but is for how the wrapper function works). If computation time is a concern,
-    these functions can be paired manually to implement GAMs.
-
+    number of X variables and spline knots.
 
     Parameters
     ----------
     theta : ndarray, list, vector
-        Theta in this case consists of b values. Therefore, initial values should consist of the same number as the
-        number of columns present. This can easily be implemented via ``[0, ] * X.shape[1]``.
+        Parameter values. Number of values should match the number of columns in the additive design matrix.
     X : ndarray, list, vector
         2-dimensional vector of n observed values for b variables.
     y : ndarray, list, vector
@@ -1031,7 +1028,13 @@ def ee_additive_regression(theta, X, y, specifications, model, weights=None):
     See the documentation of ``additive_design_matrix`` for additional examples of how to specify the additive design
     matrix and corresponding splines.
 
-    Next, we can estimate the parameters for a logistic regression model as follows
+    Lastly, knots could be placed at each unique observation via
+
+    >>> specs = [None, {"knots": np.unique(data['X']), "penalty": 500}]
+
+    Note that the penalty is increased here (as the number of knots has dramatically increased).
+
+    A GAM for a binary outcome (i.e., logistic regression) can be implemented as follows
 
     >>> specs = [None, {"knots": [-4, -3, -2, -1, 0, 1, 2, 3, 4], "penalty": 10}]
     >>> Xa_design = additive_design_matrix(X=np.asarray(data[['C', 'X']]), specifications=specs)
@@ -1044,7 +1047,7 @@ def ee_additive_regression(theta, X, y, specifications, model, weights=None):
     >>> estr = MEstimator(stacked_equations=psi, init=[0.]*n_params)
     >>> estr.estimate(solver='lm', maxiter=5000)
 
-    Finally, we can estimate the parameters for a Poisson regression model as follows
+    A GAM for count outcomes (i.e., Poisson regression) can be implemented as follows
 
     >>> specs = [None, {"knots": [-4, -3, -2, -1, 0, 1, 2, 3, 4], "penalty": 10}]
     >>> Xa_design = additive_design_matrix(X=np.asarray(data[['C', 'X']]), specifications=specs)
@@ -1062,6 +1065,11 @@ def ee_additive_regression(theta, X, y, specifications, model, weights=None):
     References
     ----------
     Fu WJ. (2003). Penalized estimating equations. *Biometrics*, 59(1), 126-132.
+
+    Hastie TJ. (2017). Generalized additive models. *In Statistical models in S* (pp. 249-307). Routledge.
+
+    Marx BD, & Eilers PH. (1998). Direct generalized additive modeling with penalized likelihood.
+    *Computational Statistics & Data Analysis*, 28(2), 193-209.
 
     Wild CJ, & Yee TW. (1996). Additive extensions to generalized estimating equation methods.
     *Journal of the Royal Statistical Society: Series B (Methodological)*, 58(4), 711-725.
