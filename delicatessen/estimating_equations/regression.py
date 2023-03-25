@@ -1138,10 +1138,10 @@ def _prep_inputs_(X, y, theta, penalty=None, center=None, offset=None):
     beta = np.asarray(theta)[:, None]       # Convert to NumPy array and ensure correct shape for matrix algebra
 
     # Logic to determine the offset variable if requested
-    if offset is None:                  # When offset is None
-        offset = 0                      # ... modify by adding a zero (i.e., no mod)
-    else:                               # Otherwise
-        offset = np.asarray(offset)     # ... ensure that a NumPy array is passed forward
+    if offset is None:                           # When offset is None
+        offset = 0                               # ... modify by adding a zero (i.e., no mod)
+    else:                                        # Otherwise
+        offset = np.asarray(offset)[:, None]     # ... ensure that a NumPy array is passed forward
 
     # What to return if penalty is or is not given
     if penalty is None:                     # Return the transformed objects
