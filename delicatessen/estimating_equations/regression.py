@@ -10,7 +10,7 @@ from delicatessen.estimating_equations.processing import generate_weights
 # Basic Regression Estimating Equations
 
 
-def ee_regression(theta, X, y, model, weights=None):
+def ee_regression(theta, X, y, model, weights=None, offset=None):
     r"""Estimating equation for regression. Options include: linear, logistic, and Poisson regression. The general
     estimating equation is
 
@@ -48,6 +48,8 @@ def ee_regression(theta, X, y, model, weights=None):
         regression), and ``'poisson'`` (Poisson regression).
     weights : ndarray, list, vector, None, optional
         1-dimensional vector of n weights. Default is None, which assigns a weight of 1 to all observations.
+    offset : ndarray, list, vector, int, float, None, optional
+        A 1-dimensional offset to be included in the model. Default is None, which applies no offset term.
 
     Returns
     -------
@@ -118,11 +120,11 @@ def ee_regression(theta, X, y, model, weights=None):
     (pp. 297-337). Springer, New York, NY.
     """
     # Preparation of input shapes and object types
-    X, y, beta = _prep_inputs_(X=X, y=y, theta=theta, penalty=None)
+    X, y, beta, offset = _prep_inputs_(X=X, y=y, theta=theta, penalty=None, offset=offset)
 
     # Determining transformation function to use for the regression model
-    transform = _model_transform_(model=model)   # Looking up corresponding transformation
-    pred_y = transform(np.dot(X, beta))          # Generating predicted values via speedy matrix calculation
+    transform = _model_transform_(model=model)    # Looking up corresponding transformation
+    pred_y = transform(np.dot(X, beta) + offset)  # Generating predicted values via speedy matrix calculation
 
     # Allowing for a weighted linear model
     w = generate_weights(weights=weights, n_obs=X.shape[0])
@@ -135,7 +137,7 @@ def ee_regression(theta, X, y, model, weights=None):
 # Robust Regression Estimating Equations
 
 
-def ee_robust_regression(theta, X, y, model, k, loss='huber', weights=None, upper=None, lower=None):
+def ee_robust_regression(theta, X, y, model, k, loss='huber', weights=None, upper=None, lower=None, offset=None):
     r"""Estimating equations for (unscaled) robust regression. Robust linear regression is robust to outlying
     observations of the outcome variable. Currently, only linear regression is supported by
     ``ee_robust_regression``. The estimating equation is
@@ -188,6 +190,8 @@ def ee_robust_regression(theta, X, y, model, k, loss='huber', weights=None, uppe
     upper : int, float, None, optional
         Upper parameter for the 'hampel' loss function. This parameter does not impact the other loss functions.
         Default is ``None``.
+    offset : ndarray, list, vector, int, float, None, optional
+        A 1-dimensional offset to be included in the model. Default is None, which applies no offset term.
 
     Returns
     -------
@@ -254,7 +258,7 @@ def ee_robust_regression(theta, X, y, model, k, loss='huber', weights=None, uppe
     Huber PJ, Ronchetti EM. (2009) Robust Statistics 2nd Edition. Wiley. pgs 98-100
     """
     # Preparation of input shapes and object types
-    X, y, beta = _prep_inputs_(X=X, y=y, theta=theta, penalty=None)
+    X, y, beta, offset = _prep_inputs_(X=X, y=y, theta=theta, penalty=None, offset=offset)
 
     # Allowing for a weighted linear model
     w = generate_weights(weights=weights, n_obs=X.shape[0])
@@ -262,7 +266,7 @@ def ee_robust_regression(theta, X, y, model, k, loss='huber', weights=None, uppe
     # Determining transformation function to use for the regression model
     transform = _model_transform_(model=model,                # Looking up corresponding transformation
                                   assert_linear_model=True)   # ... and make sure it is a linear model
-    pred_y = transform(np.dot(X, beta))                       # Generating predicted values
+    pred_y = transform(np.dot(X, beta) + offset)              # Generating predicted values
 
     # Generating predictions and applying Huber function for robust
     residual = robust_loss_functions(residual=y - pred_y,     # Calculating robust residuals
@@ -279,7 +283,7 @@ def ee_robust_regression(theta, X, y, model, k, loss='huber', weights=None, uppe
 # Penalized Regression Estimating Equations
 
 
-def ee_ridge_regression(theta, X, y, model, penalty, weights=None, center=0.):
+def ee_ridge_regression(theta, X, y, model, penalty, weights=None, center=0., offset=None):
     r"""Estimating equations for ridge regression. Ridge regression applies an L2-regularization through a squared
     magnitude penalty. The estimating equation for Ridge linear regression is
 
@@ -321,6 +325,8 @@ def ee_ridge_regression(theta, X, y, model, penalty, weights=None, center=0.):
         coefficients towards the null. Other center values can be specified for all coefficients (by providing an
         integer or float) or covariate-specific centering values (by providing a vector of values of the same length as
         X).
+    offset : ndarray, list, vector, int, float, None, optional
+        A 1-dimensional offset to be included in the model. Default is None, which applies no offset term.
 
     Returns
     -------
@@ -404,11 +410,14 @@ def ee_ridge_regression(theta, X, y, model, penalty, weights=None, center=0.):
     """
     # Calling internal bridge penalized regression for implementation
     return ee_bridge_regression(theta=theta,
-                                X=X, y=y, model=model, weights=weights,
-                                penalty=penalty, gamma=2, center=center)
+                                X=X, y=y,
+                                model=model,
+                                weights=weights,
+                                penalty=penalty, gamma=2, center=center,
+                                offset=offset)
 
 
-def ee_lasso_regression(theta, X, y, model, penalty, epsilon=3.e-3, weights=None, center=0.):
+def ee_lasso_regression(theta, X, y, model, penalty, epsilon=3.e-3, weights=None, center=0., offset=None):
     r"""Estimating equation for an approximate LASSO (least absolute shrinkage and selection operator) regressor. LASSO
     regression applies an L1-regularization through a magnitude penalty.
 
@@ -467,6 +476,8 @@ def ee_lasso_regression(theta, X, y, model, penalty, epsilon=3.e-3, weights=None
         coefficients towards the null. Other center values can be specified for all coefficients (by providing an
         integer or float) or covariate-specific centering values (by providing a vector of values of the same length as
         X).
+    offset : ndarray, list, vector, int, float, None, optional
+        A 1-dimensional offset to be included in the model. Default is None, which applies no offset term.
 
     Returns
     -------
@@ -551,11 +562,14 @@ def ee_lasso_regression(theta, X, y, model, penalty, epsilon=3.e-3, weights=None
 
     # Calling internal bridge penalized regression for implementation
     ee_bridge_regression(theta=theta,
-                         X=X, y=y, model=model, weights=weights,
-                         penalty=penalty, gamma=1+epsilon, center=center)
+                         X=X, y=y,
+                         model=model,
+                         weights=weights,
+                         penalty=penalty, gamma=1+epsilon, center=center,
+                         offset=offset)
 
 
-def ee_elasticnet_regression(theta, X, y, model, penalty, ratio, epsilon=3.e-3, weights=None, center=0.):
+def ee_elasticnet_regression(theta, X, y, model, penalty, ratio, epsilon=3.e-3, weights=None, center=0., offset=None):
     r"""Estimating equations for Elastic-Net regression. Elastic-Net applies both L1- and L2-regularization at a
     pre-specified ratio. Notice that the L1 penalty is based on an approximation. See ``ee_lasso_regression`` for
     further details on the approximation for the L1 penalty.
@@ -613,6 +627,8 @@ def ee_elasticnet_regression(theta, X, y, model, penalty, ratio, epsilon=3.e-3, 
         coefficients towards the null. Other center values can be specified for all coefficients (by providing an
         integer or float) or covariate-specific centering values (by providing a vector of values of the same length as
         X).
+    offset : ndarray, list, vector, int, float, None, optional
+        A 1-dimensional offset to be included in the model. Default is None, which applies no offset term.
 
     Returns
     -------
@@ -693,11 +709,13 @@ def ee_elasticnet_regression(theta, X, y, model, penalty, ratio, epsilon=3.e-3, 
     Fu WJ. (2003). Penalized estimating equations. *Biometrics*, 59(1), 126-132.
     """
     # Preparation of input shapes and object types
-    X, y, beta, penalty, center = _prep_inputs_(X=X, y=y, theta=theta, penalty=penalty, center=center)
+    X, y, beta, penalty, center, offset = _prep_inputs_(X=X, y=y, theta=theta,
+                                                        penalty=penalty, center=center,
+                                                        offset=offset)
 
     # Determining transformation function to use for the regression model
-    transform = _model_transform_(model=model)  # Looking up corresponding transformation
-    pred_y = transform(np.dot(X, beta))  # Generating predicted values
+    transform = _model_transform_(model=model)    # Looking up corresponding transformation
+    pred_y = transform(np.dot(X, beta) + offset)  # Generating predicted values
 
     # Allowing for a weighted penalized regression model
     w = generate_weights(weights=weights, n_obs=X.shape[0])
@@ -716,7 +734,7 @@ def ee_elasticnet_regression(theta, X, y, model, penalty, ratio, epsilon=3.e-3, 
     return w * (((y - pred_y) * X).T - penalty_terms[:, None])  # Score function with penalty term subtracted off
 
 
-def ee_bridge_regression(theta, X, y, model, penalty, gamma, weights=None, center=0.):
+def ee_bridge_regression(theta, X, y, model, penalty, gamma, weights=None, center=0., offset=None):
     r"""Estimating equation for bridge penalized regression. The bridge penalty is a generalization of penalized
     regression, that includes L1 and L2-regularization as special cases.
 
@@ -770,6 +788,8 @@ def ee_bridge_regression(theta, X, y, model, penalty, gamma, weights=None, cente
         coefficients towards the null. Other center values can be specified for all coefficients (by providing an
         integer or float) or covariate-specific centering values (by providing a vector of values of the same length as
         X).
+    offset : ndarray, list, vector, int, float, None, optional
+        A 1-dimensional offset to be included in the model. Default is None, which applies no offset term.
 
     Returns
     -------
@@ -852,11 +872,13 @@ def ee_bridge_regression(theta, X, y, model, penalty, gamma, weights=None, cente
     Fu WJ. (2003). Penalized estimating equations. *Biometrics*, 59(1), 126-132.
     """
     # Preparation of input shapes and object types
-    X, y, beta, penalty, center = _prep_inputs_(X=X, y=y, theta=theta, penalty=penalty, center=center)
+    X, y, beta, penalty, center, offset = _prep_inputs_(X=X, y=y, theta=theta,
+                                                        penalty=penalty, center=center,
+                                                        offset=offset)
 
     # Determining transformation function to use for the regression model
-    transform = _model_transform_(model=model)  # Looking up corresponding transformation
-    pred_y = transform(np.dot(X, beta))  # Generating predicted values
+    transform = _model_transform_(model=model)    # Looking up corresponding transformation
+    pred_y = transform(np.dot(X, beta) + offset)  # Generating predicted values
 
     # Allowing for a weighted penalized regression model
     w = generate_weights(weights=weights, n_obs=X.shape[0])
@@ -872,7 +894,7 @@ def ee_bridge_regression(theta, X, y, model, penalty, gamma, weights=None, cente
 # Flexible Regression Estimating Equations
 
 
-def ee_additive_regression(theta, X, y, specifications, model, weights=None):
+def ee_additive_regression(theta, X, y, specifications, model, weights=None, offset=None):
     r"""Estimating equation for Generalized Additive Models (GAMs). GAMs are an extension of generalized linear models
     that allow for more flexible specifications of relationships of continuous variables. This flexibility is
     accomplished via splines. To further control the flexibility, the spline terms are penalized.
@@ -938,6 +960,8 @@ def ee_additive_regression(theta, X, y, specifications, model, weights=None):
         regression), and ``'poisson'`` (Poisson regression).
     weights : ndarray, list, vector, None, optional
         1-dimensional vector of n weights. Default is ``None``, which assigns a weight of 1 to all observations.
+    offset : ndarray, list, vector, int, float, None, optional
+        A 1-dimensional offset to be included in the model. Default is None, which applies no offset term.
 
     Returns
     -------
@@ -1083,13 +1107,14 @@ def ee_additive_regression(theta, X, y, specifications, model, weights=None):
     return ee_bridge_regression(theta=theta, y=y, X=Xa,                     # Call bridge reg with additive design
                                 model=model, penalty=penalty,               # ... matrix and processed penalties
                                 gamma=2, weights=weights,                   # ... and set gamma=2 (Ridge reg)
-                                center=0.)                                  # ... with splines ALWAYS penalized to zero
+                                center=0.,                                  # ... with splines ALWAYS penalized to zero
+                                offset=offset)                              # ... and provided offset
 
 
 #################################################################
 # Utility functions for regression equations
 
-def _prep_inputs_(X, y, theta, penalty=None, center=None):
+def _prep_inputs_(X, y, theta, penalty=None, center=None, offset=None):
     """Internal use function to simplify variable transformations for regression. This function is used on the inputs
     to ensure they are the proper shapes
 
@@ -1112,12 +1137,19 @@ def _prep_inputs_(X, y, theta, penalty=None, center=None):
     y = np.asarray(y)[:, None]              # Convert to NumPy array and ensure correct shape for matrix algebra
     beta = np.asarray(theta)[:, None]       # Convert to NumPy array and ensure correct shape for matrix algebra
 
+    # Logic to determine the offset variable if requested
+    if offset is None:                  # When offset is None
+        offset = 0                      # ... modify by adding a zero (i.e., no mod)
+    else:                               # Otherwise
+        offset = np.asarray(offset)     # ... ensure that a NumPy array is passed forward
+
+    # What to return if penalty is or is not given
     if penalty is None:                     # Return the transformed objects
-        return X, y, beta
+        return X, y, beta, offset
     else:                                   # Convert penalty term then return all
         penalty = np.asarray(penalty)       # Convert to NumPy array
         center = np.asarray(center)         # Convert to NumPy array
-        return X, y, beta, penalty, center
+        return X, y, beta, penalty, center, offset
 
 
 def _model_transform_(model, assert_linear_model=False):
