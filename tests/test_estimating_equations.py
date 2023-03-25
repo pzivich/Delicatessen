@@ -11,7 +11,7 @@ from delicatessen import MEstimator
 from delicatessen.estimating_equations import (ee_mean, ee_mean_variance, ee_mean_robust,
                                                # Regression models
                                                ee_regression, ee_robust_regression, ee_ridge_regression,
-                                               ee_additive_regression,
+                                               ee_additive_regression, ee_elasticnet_regression,
                                                # Survival models
                                                ee_exponential_model, ee_exponential_measure, ee_weibull_model,
                                                ee_weibull_measure, ee_aft_weibull, ee_aft_weibull_measure,
@@ -208,8 +208,45 @@ class TestEstimatingEquationsRegression:
                             np.asarray(glm.conf_int()),
                             atol=1e-6)
 
+    def test_ols_offset(self):
+        """Tests linear regression with the built-in estimating equation and an offset term.
+        """
+        n = 500
+        data = pd.DataFrame()
+        data['X'] = np.random.normal(size=n)
+        data['Z'] = np.random.normal(size=n)
+        data['Y'] = 0.5 + 2*data['X'] - 1*data['Z'] + np.random.normal(loc=0, size=n)
+        data['C'] = 1
+
+        def psi_builtin_regression(theta):
+            return ee_regression(theta,
+                                 X=data[['C', 'X', 'Z']], y=data['Y'],
+                                 offset=1,
+                                 model='linear')
+
+        mpee = MEstimator(psi_builtin_regression, init=[0.1, 0.1, 0.1])
+        mpee.estimate()
+
+        # Statsmodels function equivalent
+        glm = smf.glm("Y ~ X + Z", data, offset=data['C']).fit(cov_type="HC1")
+
+        # Checking mean estimate
+        npt.assert_allclose(mpee.theta,
+                            np.asarray(glm.params),
+                            atol=1e-6)
+
+        # Checking variance estimates
+        npt.assert_allclose(mpee.variance,
+                            np.asarray(glm.cov_params()),
+                            atol=1e-6)
+
+        # Checking confidence interval estimates
+        npt.assert_allclose(mpee.confidence_intervals(),
+                            np.asarray(glm.conf_int()),
+                            atol=1e-6)
+
     def test_wls(self):
-        """Tests weighted linear regression by-hand with a single estimating equation.
+        """Tests weighted linear regression
         """
         n = 500
         data = pd.DataFrame()
@@ -231,6 +268,46 @@ class TestEstimatingEquationsRegression:
         glm = smf.glm("Y ~ X + Z", data, freq_weights=data['w']).fit(cov_type="cluster",
                                                                      cov_kwds={"groups": data.index,
                                                                                "use_correction": False})
+
+        # Checking mean estimate
+        npt.assert_allclose(mestimator.theta,
+                            np.asarray(glm.params),
+                            atol=1e-6)
+
+        # Checking variance estimates
+        npt.assert_allclose(mestimator.variance,
+                            np.asarray(glm.cov_params()),
+                            atol=1e-6)
+
+        # Checking confidence interval estimates
+        npt.assert_allclose(mestimator.confidence_intervals(),
+                            np.asarray(glm.conf_int()),
+                            atol=1e-6)
+
+    def test_wls_offset(self):
+        """Tests weighted linear regression with an offset term
+        """
+        n = 500
+        data = pd.DataFrame()
+        data['X'] = np.random.normal(size=n)
+        data['Z'] = np.random.normal(size=n)
+        data['Y'] = 0.5 + 2 * data['X'] - 1 * data['Z'] + np.random.normal(loc=0, size=n)
+        data['C'] = 1
+        data['w'] = np.random.uniform(1, 10, size=n)
+
+        def psi_regression(theta):
+            return ee_regression(theta,
+                                 X=data[['C', 'X', 'Z']], y=data['Y'],
+                                 model='linear', weights=data['w'], offset=data['C'])
+
+        mestimator = MEstimator(psi_regression, init=[0.1, 0.1, 0.1])
+        mestimator.estimate()
+
+        # Comparing to statsmodels GLM (with robust covariance)
+        glm = smf.glm("Y ~ X + Z", data, freq_weights=data['w'],
+                      offset=data['C']).fit(cov_type="cluster",
+                                            cov_kwds={"groups": data.index,
+                                                      "use_correction": False})
 
         # Checking mean estimate
         npt.assert_allclose(mestimator.theta,
@@ -292,6 +369,37 @@ class TestEstimatingEquationsRegression:
         estr = MEstimator(psi, init=[5, 1, 1])
         estr.estimate(solver='lm')
         ridge = sm.OLS(yvals, Xvals).fit_regularized(L1_wt=0., alpha=np.array([0., 5., 2.]) / Xvals.shape[0])
+
+        # Checking mean estimate
+        npt.assert_allclose(estr.theta,
+                            np.asarray(ridge.params),
+                            atol=1e-6)
+
+    def test_ridge_ols_offset(self):
+        """Tests the ridge (L2) variation of the linear regression built-in estimating equation with an offset term
+        """
+        n = 10000
+        data = pd.DataFrame()
+        data['x1'] = np.random.normal(size=n)
+        data['x2'] = data['x1'] + np.random.normal(scale=0.1, size=n)
+        data['c'] = 1
+        data['y'] = 5 + data['x1'] + np.random.normal(size=n)
+        data['off'] = np.random.uniform(0.4, 0.6, size=n)
+        # data['off'] = 1
+        Xvals = np.asarray(data[['c', 'x1', 'x2']])
+        yvals = np.asarray(data['y'])
+
+        # Penalty of 0.5
+        def psi(theta):
+            return ee_ridge_regression(theta, X=Xvals, y=yvals, model='linear',
+                                       penalty=[0., 5., 2.],
+                                       weights=None, offset=data['off']
+                                       )
+
+        estr = MEstimator(psi, init=[5, 1, 1])
+        estr.estimate(solver='lm')
+        ridge = sm.OLS(yvals - data['off'], Xvals,).fit_regularized(L1_wt=0.,
+                                                                    alpha=np.array([0., 5., 2.]) / Xvals.shape[0])
 
         # Checking mean estimate
         npt.assert_allclose(estr.theta,
@@ -424,6 +532,41 @@ class TestEstimatingEquationsRegression:
 
         # Comparing to statsmodels GLM (with robust covariance)
         glm = smf.glm("Y ~ X + Z", data, family=sm.families.Binomial()).fit(cov_type="HC1")
+
+        # Checking mean estimate
+        npt.assert_allclose(mpee.theta,
+                            np.asarray(glm.params),
+                            atol=1e-6)
+
+        # Checking variance estimates
+        npt.assert_allclose(mpee.variance,
+                            np.asarray(glm.cov_params()),
+                            atol=1e-6)
+
+        # Checking confidence interval estimates
+        npt.assert_allclose(mpee.confidence_intervals(),
+                            np.asarray(glm.conf_int()),
+                            atol=1e-6)
+
+    def test_logistic_offset(self):
+        n = 1000
+        data = pd.DataFrame()
+        data['X'] = np.random.normal(size=n)
+        data['Z'] = np.random.normal(size=n)
+        data['Y'] = np.random.binomial(n=1, p=logistic.cdf(0.5 + 2*data['X'] - 1*data['Z']), size=n)
+        data['C'] = 1
+        data['off'] = np.random.uniform(0.4, 0.6, size=n)
+
+        def psi_builtin_regression(theta):
+            return ee_regression(theta,
+                                 X=data[['C', 'X', 'Z']], y=data['Y'],
+                                 model='logistic', offset=data['off'])
+
+        mpee = MEstimator(psi_builtin_regression, init=[0., 0., 0.])
+        mpee.estimate()
+
+        # Comparing to statsmodels GLM (with robust covariance)
+        glm = smf.glm("Y ~ X + Z", data, family=sm.families.Binomial(), offset=data['off']).fit(cov_type="HC1")
 
         # Checking mean estimate
         npt.assert_allclose(mpee.theta,
@@ -793,6 +936,130 @@ class TestEstimatingEquationsRegression:
         npt.assert_allclose(mestimator.theta,
                             np.asarray(lgt.params),
                             atol=1e-5)
+
+    def test_elasticnet(self):
+        n = 1000
+        data = pd.DataFrame()
+        data['X'] = np.random.normal(size=n)
+        data['Z'] = np.random.normal(size=n)
+        data['Y'] = 1 + 2*data['X'] - 1*data['Z'] + np.random.normal(size=n)
+        data['C'] = 1
+        Xvals = np.asarray(data[['C', 'X', 'Z']])
+        yvals = np.asarray(data['Y'])
+
+        def psi_ridge(theta):
+            return ee_ridge_regression(theta, X=Xvals, y=yvals,
+                                       model='linear',
+                                       penalty=[0., 5., 2.])
+
+        ridge = MEstimator(psi_ridge, init=[0., 0., 0.])
+        ridge.estimate(solver='lm')
+
+        def psi_elastic(theta):
+            return ee_elasticnet_regression(theta, X=Xvals, y=yvals,
+                                            model='linear',
+                                            penalty=[0., 5., 2.], ratio=0)
+
+        elastic = MEstimator(psi_elastic, init=[0., 0., 0.])
+        elastic.estimate(solver='lm')
+
+        # Checking mean estimate
+        npt.assert_allclose(ridge.theta,
+                            elastic.theta,
+                            atol=1e-5)
+
+    def test_elasticnet_offset(self):
+        n = 1000
+        data = pd.DataFrame()
+        data['X'] = np.random.normal(size=n)
+        data['Z'] = np.random.normal(size=n)
+        data['Y'] = 1 + 2*data['X'] - 1*data['Z'] + np.random.normal(size=n)
+        data['C'] = 1
+        data['off'] = np.random.uniform(0.4, 0.6, size=n)
+        Xvals = np.asarray(data[['C', 'X', 'Z']])
+        yvals = np.asarray(data['Y'])
+
+        def psi_ridge(theta):
+            return ee_ridge_regression(theta, X=Xvals, y=yvals,
+                                       model='linear',
+                                       penalty=[0., 5., 2.],
+                                       offset=data['off'])
+
+        ridge = MEstimator(psi_ridge, init=[0., 0., 0.])
+        ridge.estimate(solver='lm')
+
+        def psi_elastic(theta):
+            return ee_elasticnet_regression(theta, X=Xvals, y=yvals,
+                                            model='linear',
+                                            penalty=[0., 5., 2.], ratio=0,
+                                            offset=data['off'])
+
+        elastic = MEstimator(psi_elastic, init=[0., 0., 0.])
+        elastic.estimate(solver='lm')
+
+        # Checking mean estimate
+        npt.assert_allclose(ridge.theta,
+                            elastic.theta,
+                            atol=1e-5)
+
+    def test_robust_linear(self):
+        n = 1000
+        data = pd.DataFrame()
+        data['X'] = np.random.normal(size=n)
+        data['Z'] = np.random.normal(size=n)
+        data['Y'] = 1 + 2*data['X'] - 1*data['Z'] + np.random.normal(size=n)
+        data['C'] = 1
+        Xvals = np.asarray(data[['C', 'X', 'Z']])
+        yvals = np.asarray(data['Y'])
+
+        def psi_linear(theta):
+            return ee_regression(theta, X=Xvals, y=yvals,
+                                 model='linear')
+
+        linear = MEstimator(psi_linear, init=[0., 0., 0.])
+        linear.estimate(solver='lm')
+
+        def psi_robust(theta):
+            return ee_robust_regression(theta, X=Xvals, y=yvals,
+                                        model='linear', k=20)
+
+        robust = MEstimator(psi_robust, init=[0., 0., 0.])
+        robust.estimate(solver='lm')
+
+        # Checking mean estimate
+        npt.assert_allclose(linear.theta,
+                            robust.theta,
+                            atol=1e-6)
+
+    def test_robust_linear_offset(self):
+        n = 1000
+        data = pd.DataFrame()
+        data['X'] = np.random.normal(size=n)
+        data['Z'] = np.random.normal(size=n)
+        data['Y'] = 1 + 2*data['X'] - 1*data['Z'] + np.random.normal(size=n)
+        data['C'] = 1
+        data['off'] = np.random.uniform(0.4, 0.6, size=n)
+        Xvals = np.asarray(data[['C', 'X', 'Z']])
+        yvals = np.asarray(data['Y'])
+
+        def psi_linear(theta):
+            return ee_regression(theta, X=Xvals, y=yvals,
+                                 model='linear', offset=data['off'])
+
+        linear = MEstimator(psi_linear, init=[0., 0., 0.])
+        linear.estimate(solver='lm')
+
+        def psi_robust(theta):
+            return ee_robust_regression(theta, X=Xvals, y=yvals,
+                                        model='linear', k=20, offset=data['off'])
+
+        robust = MEstimator(psi_robust, init=[0., 0., 0.])
+        robust.estimate(solver='lm')
+
+        # Checking mean estimate
+        npt.assert_allclose(linear.theta,
+                            robust.theta,
+                            atol=1e-6)
 
 
 class TestEstimatingEquationsSurvival:
