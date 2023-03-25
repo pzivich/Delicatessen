@@ -221,7 +221,7 @@ class TestEstimatingEquationsRegression:
         def psi_builtin_regression(theta):
             return ee_regression(theta,
                                  X=data[['C', 'X', 'Z']], y=data['Y'],
-                                 offset=1,
+                                 offset=data['C'],
                                  model='linear')
 
         mpee = MEstimator(psi_builtin_regression, init=[0.1, 0.1, 0.1])

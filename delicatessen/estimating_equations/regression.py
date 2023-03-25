@@ -48,7 +48,7 @@ def ee_regression(theta, X, y, model, weights=None, offset=None):
         regression), and ``'poisson'`` (Poisson regression).
     weights : ndarray, list, vector, None, optional
         1-dimensional vector of n weights. Default is None, which assigns a weight of 1 to all observations.
-    offset : ndarray, list, vector, int, float, None, optional
+    offset : ndarray, list, vector, None, optional
         A 1-dimensional offset to be included in the model. Default is None, which applies no offset term.
 
     Returns
@@ -190,7 +190,7 @@ def ee_robust_regression(theta, X, y, model, k, loss='huber', weights=None, uppe
     upper : int, float, None, optional
         Upper parameter for the 'hampel' loss function. This parameter does not impact the other loss functions.
         Default is ``None``.
-    offset : ndarray, list, vector, int, float, None, optional
+    offset : ndarray, list, vector, None, optional
         A 1-dimensional offset to be included in the model. Default is None, which applies no offset term.
 
     Returns
@@ -325,7 +325,7 @@ def ee_ridge_regression(theta, X, y, model, penalty, weights=None, center=0., of
         coefficients towards the null. Other center values can be specified for all coefficients (by providing an
         integer or float) or covariate-specific centering values (by providing a vector of values of the same length as
         X).
-    offset : ndarray, list, vector, int, float, None, optional
+    offset : ndarray, list, vector, None, optional
         A 1-dimensional offset to be included in the model. Default is None, which applies no offset term.
 
     Returns
@@ -476,7 +476,7 @@ def ee_lasso_regression(theta, X, y, model, penalty, epsilon=3.e-3, weights=None
         coefficients towards the null. Other center values can be specified for all coefficients (by providing an
         integer or float) or covariate-specific centering values (by providing a vector of values of the same length as
         X).
-    offset : ndarray, list, vector, int, float, None, optional
+    offset : ndarray, list, vector, None, optional
         A 1-dimensional offset to be included in the model. Default is None, which applies no offset term.
 
     Returns
@@ -627,7 +627,7 @@ def ee_elasticnet_regression(theta, X, y, model, penalty, ratio, epsilon=3.e-3, 
         coefficients towards the null. Other center values can be specified for all coefficients (by providing an
         integer or float) or covariate-specific centering values (by providing a vector of values of the same length as
         X).
-    offset : ndarray, list, vector, int, float, None, optional
+    offset : ndarray, list, vector, None, optional
         A 1-dimensional offset to be included in the model. Default is None, which applies no offset term.
 
     Returns
@@ -788,7 +788,7 @@ def ee_bridge_regression(theta, X, y, model, penalty, gamma, weights=None, cente
         coefficients towards the null. Other center values can be specified for all coefficients (by providing an
         integer or float) or covariate-specific centering values (by providing a vector of values of the same length as
         X).
-    offset : ndarray, list, vector, int, float, None, optional
+    offset : ndarray, list, vector, None, optional
         A 1-dimensional offset to be included in the model. Default is None, which applies no offset term.
 
     Returns
@@ -960,7 +960,7 @@ def ee_additive_regression(theta, X, y, specifications, model, weights=None, off
         regression), and ``'poisson'`` (Poisson regression).
     weights : ndarray, list, vector, None, optional
         1-dimensional vector of n weights. Default is ``None``, which assigns a weight of 1 to all observations.
-    offset : ndarray, list, vector, int, float, None, optional
+    offset : ndarray, list, vector, None, optional
         A 1-dimensional offset to be included in the model. Default is None, which applies no offset term.
 
     Returns
