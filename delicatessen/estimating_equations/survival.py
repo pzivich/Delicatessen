@@ -596,13 +596,13 @@ def ee_aft_weibull(theta, X, t, delta, weights=None):
     Defining psi, or the stacked estimating equations
 
     >>> def psi(theta):
-    >>>         return ee_aft_weibull(theta=theta, X=d_obs[['C', 'X', 'Z']],
+    >>>         return ee_aft_weibull(theta=theta, X=d_obs[['X', 'W']],
     >>>                               t=d_obs['t'], delta=d_obs['delta'])
 
     Calling the M-estimator (note that `init` has 4 values now, since ``X.shape[1]`` is 2).
 
     >>> estr = MEstimator(stacked_equations=psi, init=[0., 0., 0., 0.])
-    >>> estr.estimate(solver='lm')
+    >>> estr.estimate(solver='hybr')
 
     Inspecting the parameter estimates, variance, and confidence intervals
 
