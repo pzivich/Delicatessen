@@ -198,7 +198,7 @@ def robust_loss_functions(residual, loss, k, a=None, b=None):
     return xr
 
 
-def regression_predictions(X, theta, covariance, alpha=0.05):
+def regression_predictions(X, theta, covariance, offset=None, alpha=0.05):
     r"""Generate predicted values of the outcome given a design matrix, point estimates, and covariance matrix.
     This functionality computes :math:`\hat{Y}`, :math:`\hat{Var}\left(\hat{Y}\right)`, and corresponding Wald-type
     :math:`(1 - \alpha) \times` 100% confidence intervals from estimated coefficients and covariance of a regression
@@ -225,6 +225,8 @@ def regression_predictions(X, theta, covariance, alpha=0.05):
         Estimated coefficients from ``delicatessen.MEstimator.theta``.
     covariance : ndarray
         Estimated covariance matrix from ``delicatessen.MEstimator.variance``.
+    offset : ndarray, None, optional
+        A 1-dimensional offset to be included in the model. Default is None, which applies no offset term.
     alpha : float, optional
         The :math:`\alpha` level for the corresponding confidence intervals. Default is 0.05, which calculate the
         95% confidence intervals. Notice that :math:`0<\alpha<1`.
@@ -293,13 +295,19 @@ def regression_predictions(X, theta, covariance, alpha=0.05):
     if not 0 < alpha < 1:
         raise ValueError("`alpha` must be 0 < a < 1")
 
+    # Process offset term
+    if offset is None:                                 # When offset is None
+        offset = 0                                     # ... modify by adding a zero (i.e., no mod)
+    else:                                              # Otherwise
+        offset = np.asarray(offset)[:, None]           # ... ensure that a NumPy array is passed forward
+
     # Setup inputs for matrix multiplications
     x = np.asarray(X)
     b = np.asarray(theta)
     c = np.asarray(covariance)
 
     # Predicted Y
-    yhat = np.dot(x, b)
+    yhat = np.dot(x, b) + offset
 
     # Predicted Y variance / standard error
     yhat_var = np.sum(np.dot(x, c) * x,
