@@ -2,7 +2,7 @@ Built-in Estimating Equations
 '''''''''''''''''''''''''''''''''''''
 
 Here, we provide an overview of some of the built-in estimating equations with ``delicatessen``. This documentation is
-split into three sections, corresponding to basic, regression, and causal estimating equations.
+split into several sections based on topic areas.
 
 All built-in estimating equations need to be 'wrapped' inside an outer function. Below is a generic example of an outer
 function, where ``psi`` is the wrapper function and ``ee`` is the generic estimating equation example (``ee`` is not a
@@ -55,9 +55,9 @@ this wrapper function
     def psi(theta):
         return ee_mean(theta=theta, y=obs_vals)
 
-Note that ``obs_vals`` must be available in the scope of this defined function.
+Note that ``obs_vals`` must be available in the scope of the defined function.
 
-After creating the wrapper function, the M-Estimator can be called like the following
+After creating the wrapper function, the corresponding M-Estimator can be called like the following
 
 .. code::
 
@@ -76,7 +76,7 @@ Robust Mean
 Sometimes extreme observations, termed outliers, occur. The mean is generally sensitive to these outliers. A common
 approach to handling outliers is to exclude them. However, exclusion ignores all information contributed by outliers,
 and should only be done when outliers are a result of experimental error. Robust statistics have been proposed as
-middle ground, whereby outliers contribute to estimation but their influence is constrained.
+middle ground, whereby outliers contribute to estimation but their overall influence is constrained.
 
 .. code::
 
@@ -100,7 +100,7 @@ the available robust loss functions.
     estr = MEstimator(stacked_equations=psi, init=[0, ])
     estr.estimate()
 
-    print(estr.theta)  # [2.0, ]
+    print(estr.theta)
 
 
 Mean and Variance
@@ -113,7 +113,7 @@ Returning to the previous data,
 
     obs_vals = [1, 2, 1, 4, 1, 4, 2, 4, 2, 3]
 
-The mean-variance estimating equation can be implemented as follows (remember the wrapper function!)
+The mean-variance estimating equation can be implemented as follows
 
 .. code::
 
@@ -183,7 +183,7 @@ and their variance
     estr.estimate(solver='lm')
 
 Note that there are 3 independent variables, meaning ``init`` needs 3 starting values. The linear regression done here
-should match the ``statsmodels`` generalized linear model with a robust variance estimate. Below is code on how to
+should match the ``statsmodels`` generalized linear model with their robust covariance estimate. Below is code on how to
 compare to ``statsmodels.glm``.
 
 .. code::
@@ -196,8 +196,7 @@ compare to ``statsmodels.glm``.
     print(np.asarray(glm.cov_params()))   # Covariance matrix
 
 While ``statsmodels`` likely runs faster, the benefit of M-estimation and ``delicatessen`` is that multiple estimating
-equations can be stacked together (including multiple regression models). This advantage will become clearer in the
-causal section.
+equations can be stacked together (including multiple regression models).
 
 Logistic Regression
 ----------------------------
@@ -278,9 +277,9 @@ Note that there are 3 independent variables, meaning ``init`` needs 3 starting v
 Robust Regression
 =============================
 
-Similar to the mean, regression can also be made robust to outliers. This is simply accomplished by placing a loss
-function on the residuals. Again, several loss functions are available. Robust regression is only available for linear
-regression models. The following is a plot showcasing the influence functions for the available robust loss functions.
+Similar to the mean, linear regression can also be made robust to outliers. This is simply accomplished by placing a
+loss function on the residuals. Several loss functions are available. The following is a plot showcasing the influence
+functions for the available robust loss functions.
 
 .. image:: images/robust_loss.png
 
@@ -307,11 +306,13 @@ After creating the wrapper function, we can now call the M-Estimation procedure
 Note: to help the root-finding procedure, we generally recommend using the simple linear regression values as the
 initial values for robust linear regression.
 
+Robust regression is only available for linear regression models.
+
 Penalized Regression
 =============================
 
 There is also penalized regression models available. Here, we will demonstrate for linear regression, but logistic and
-Poisson penalized regression are also supported (through the :code:`model` argument).
+Poisson penalized regression are also supported.
 
 To demonstrate application of the penalized regression models, consider the following simulated data set
 
@@ -365,92 +366,6 @@ Here, :math:`\lambda=10` for all coefficients, besides the intercept. The M-esti
 Different penalty terms can be assigned to each coefficient. Furthermore, the ``center`` argument can be used to
 penalize towards non-zero values for all or some of the coefficients.
 
-LASSO Penalty
-----------------------------
-The LASSO or :math:`L_1` penalty is intended to penalize collinear terms. The penalty term in the estimating equations
-is
-
-.. math::
-
-    \frac{\lambda}{n} \text{sign}(\beta)
-
-Here, we use an approximation to the LASSO (rather than the LASSO itself). Specifically, no root may exist for LASSO.
-Instead, we approximate the LASSO by using the bridge penalty with :math:`\gamma \rightarrow 1^+`. See the bridge
-penalty for further details.
-
-To implement LASSO regression, the estimating equations can be specified as
-
-.. code::
-
-    penalty_vals = [0., 10., 10., 10., 10.]
-    def psi(theta):
-        x, y = data[['C', 'V', 'W', 'X', 'Z']], data['Y1']
-        return ee_lasso_regression(theta=theta, X=x, y=y, model='linear',
-                                   penalty=penalty_vals)
-
-The approximation can be updated via the optional :code:`epsilon` argument. However, note that smaller values will not
-necessarily result in better approximations. The approximation value needs to be balanced against the strength of the
-penalty terms.
-
-Here, :math:`\lambda=10` for all coefficients, besides the intercept. The M-estimator is then implemented via
-
-.. code::
-
-    estr = MEstimator(stacked_equations=psi, init=[0., 0., 0., 0., 0.])
-    estr.estimate(solver='lm', maxiter=20000)  # NOTE increase in maxiter
-
-Notice the increase in the maximum number of iterations for the root-finder (and the use of :code:`'lm'`). These two
-choices will help the root-finder converge since the LASSO penalty can be difficult to solve for root-finding
-algorithms. Judicious selection of starting values can also help (e.g., starting values from an unpenalized linear
-model).
-
-Different penalty terms can be assigned to each coefficient. Furthermore, the ``center`` argument can be used to
-penalize towards non-zero values for all or some of the coefficients.
-
-Note: the derivative does not always exist for LASSO. Therefore, the sandwich variance estimator may not be valid. When
-using LASSO, a nonparametric bootstrap should be used to estimate the variance instead.
-
-Elastic-Net Penalty
-----------------------------
-The elastic-net penalty applies both the :math:`L_1` and :math:`L_2` penalties in a user-specified ratio. The
-elastic-net penalty in the estimating equation is
-
-.. math::
-
-    r \times \text{sign}(\theta) - (1-r) \times 2 | \theta |^{1} \text{sign}(\theta)
-
-where :math:`r` is the ratio between the :math:`L_1` and :math:`L_2` penalties. Setting :math:`r=1` is the LASSO penalty
-and :math:`r=0` is the Ridge penalty. As with LASSO, the approximation procedure is used instead of the 'true' LASSO.
-
-To implement elastic-net regression, the estimating equations can be specified as
-
-.. code::
-
-    penalty_vals = [0., 10., 10., 10., 10.]
-    def psi(theta):
-        x, y = data[['C', 'V', 'W', 'X', 'Z']], data['Y1']
-        return ee_elasticnet_regression(theta=theta, X=x, y=y,
-                                        model='linear',
-                                        ratio=0.5, penalty=penalty_vals)
-
-Here, :math:`\lambda=10` for all coefficients, besides the intercept. The M-estimator is then implemented via
-
-.. code::
-
-    estr = MEstimator(stacked_equations=psi, init=[0., 0., 0., 0., 0.])
-    estr.estimate(solver='lm', maxiter=20000)  # NOTE increase in maxiter
-
-Notice the increase in the maximum number of iterations for the root-finder (and the use of :code:`'lm'`). These two
-choices will help the root-finder converge since the LASSO penalty can be difficult to solve for root-finding
-algorithms. Judicious selection of starting values can also help (e.g., starting values from an unpenalized linear
-model).
-
-Different penalty terms can be assigned to each coefficient. Furthermore, the ``center`` argument can be used to
-penalize towards non-zero values for all or some of the coefficients.
-
-Note: the derivative does not always exist for elastic-net. Therefore, the sandwich variance estimator may not be valid.
-When using elastic-net, a nonparametric bootstrap should be used to estimate the variance instead.
-
 Bridge Penalty
 ----------------------------
 The bridge penalty is a generalization of the :math:`L_p` penalty, with the Ridge (:math:`p=2`) and LASSO (:math:`p=1`)
@@ -461,7 +376,7 @@ as special cases. In the estimating equations, the bridge penalty is
     \gamma \frac{\lambda}{n} | \beta |^{\gamma - 1} \text{sign}(\beta)
 
 where :math:`\gamma>0`. However, only :math:`\gamma \ge 1` is supported in ``delicatessen`` (due to the no roots
-potentially existing when :math:`\gamma<1`). Additionally, the sandwich variance estimator is not valid when
+potentially existing when :math:`\gamma<1`). Additionally, the empirical sandwich variance estimator is not valid when
 :math:`\gamma<2`, and a nonparametric bootstrap should be used to estimate the variance instead
 
 To implement bridge regression, the estimating equations can be specified as
@@ -491,14 +406,13 @@ Flexible Regression
 The previous regression models generally rely on strong parametric assumptions (unless explicitly relaxed by the user
 through the specified design matrix). An alternative is to use more flexible regression models, which place less strict
 parametric assumptions on the model. Here, we will demonstrate flexible models for linear regression, but logistic and
-Poisson regression are also supported (through the :code:`model` argument).
+Poisson regression are also supported.
 
 To demonstrate application of the flexible regression models, consider the following simulated data set
 
 .. code::
 
-    from delicatessen.estimating_equations import (ee_additive_regression,
-                                                   )
+    from delicatessen.estimating_equations import ee_additive_regression
     from delicatessen.utilities import additive_design_matrix
 
     n = 2000
@@ -540,9 +454,9 @@ directly called
 .. code::
 
     x_knots = np.linspace(-4.75, 4.75, 30)
-    specs = [None,
-             None,
-             {"knots": x_knots, "penalty": 20},
+    specs = [None,                               # No spline for intercept
+             None,                               # No spline for Z
+             {"knots": x_knots, "penalty": 20},  # Spline specs for X
              ]
     Xa = additive_design_matrix(X=data[['C', 'Z', 'X']], specifications=specs)
 
@@ -556,7 +470,7 @@ To implement a GAM, the estimating equations can be specified as
 
     def psi(theta):
         return ee_additive_regression(theta=theta,
-                                      X=d[['C', 'X']], y=d['Y'],
+                                      X=d[['C', 'Z', 'X']], y=d['Y'],
                                       specifications=specs,
                                       model='linear')
 
@@ -602,7 +516,7 @@ data (``t`` and ``delta`` here).
 Exponential
 -----------------------------
 The exponential model is a one-parameter model, that stipulates the hazard of the event of interest is constant. While
-often too restrictive of an assumption for widespread use, we demonstrate application here.
+often too restrictive of an assumption, we demonstrate application here.
 
 .. code::
 
@@ -624,8 +538,8 @@ exponential model
     estr = MEstimator(psi, init=[1., ])
     estr.estimate(solver='lm')
 
-Here, the parameter for the exponential model should be non-negative (the optimizer does not know this), so a positive
-value should be given to help the root-finding procedure along.
+Here, the parameter for the exponential model should be non-negative, so a positive value should be given to help the
+root-finding procedure.
 
 While the parameter for the exponential model may be of interest, we are often more interested in the one of the
 functions over time. For example, we may want to plot the estimated survival function over time. ``delicatessen``
@@ -664,12 +578,10 @@ values, it is important to help the root-finder along by providing good starting
 between [0,1], we have all the initial values for those start at 0.5 (the middle). Furthermore, we could also consider
 pre-washing the exponential model parameter (i.e., use the solution from the previous estimating equation).
 
-
 Weibull
 -----------------------------
-The Weibull model is a generalization of the exponential model to two-parameters. Therefore, we now allow for the hazard
-to vary over time (it can increase or decrease monotonically). While this assumption is also quite restrictive, it may
-be more useful.
+The Weibull model is a generalization of the exponential model. The Weibull model allows for the hazard to vary over
+time (it can increase or decrease monotonically).
 
 .. code::
 
@@ -733,13 +645,11 @@ values, it is important to help the root-finder along by providing good starting
 between [0,1], we have all the initial values for those start at 0.5 (the middle). Furthermore, we could also consider
 pre-washing the Weibull model parameter (i.e., use the solution from the previous estimating equation).
 
-
 Accelerated Failure Time
 -----------------------------
-Currently, only an AFT model with a Weibull (Weibull-AFT) is available for use. Plans are to add support for other
-AFT distributions. Unlike the previous exponential and Weibull models, the AFT models can further include covariates,
-where the effect of a covariate is interpreted as an 'acceleration' factor. In the two sample case, the AFT can be
-thought of as the following
+Currently, only an AFT model with a Weibull (Weibull-AFT) is available for use. Unlike the previous exponential and
+Weibull models, the AFT models can further include covariates, where the effect of a covariate is interpreted as an
+'acceleration' factor. In the two sample case, the AFT can be thought of as the following
 
 .. math::
 
@@ -747,9 +657,9 @@ thought of as the following
 
 where :math:`\sigma^{-1} > 0` and is interpreted as the acceleration factor. One way to describe is that the risk of
 the event in group 1 at :math:`t=1` is equivalent to group 0  at :math:`t=\sigma^{-1}`. Alternatively, you can interpret
-the the AFT coefficient as the ratio of the mean survival times comparing group 1 to group 0. While involving parametric
-assumptions, the AFT models have the advantage of providing a single summary measure (compared to nonparametric methods,
-like Kaplan-Meier) but also being relatively easy to interpret (compared to semiparametric Cox models).
+the the AFT coefficient as the ratio of the mean survival times comparing group 1 to group 0. While requiring strong
+parametric assumptions, AFT models have the advantage of providing a single summary measure (compared to nonparametric
+methods, like Kaplan-Meier) but also being relatively easy to interpret (compared to semiparametric Cox models).
 
 For the following examples, we generate some additional survival data with baseline covariates
 
@@ -803,13 +713,13 @@ can be input for the root-finding procedure.
 
 Here, ``theta[0]`` is the log-transformed intercept term for the shape parameter, and ``theta[-1]`` is the
 log-transformed scale parameter. The middle terms (``theta[1:3]`` in this case) corresponds to the acceleration factors
-for the covariates as the input order in ``X``. Therefore, ``theta[1]`` is the acceleration factor for ``'X'`` and
-``theta[2]`` is the acceleration factor for ``'W'``.
+for the covariates in their input order. Therefore, ``theta[1]`` is the acceleration factor for ``'X'`` and ``theta[2]``
+is the acceleration factor for ``'W'``.
 
 While the parameters for the Weibull model may be of interest, we are often more interested in the one of the
 functions over time. For example, we may want to plot the estimated survival function over time. ``delicatessen``
 provides a function to estimate the survival (or other measures like density, risk, hazard, cumulative hazard) at
-provided time points.
+specified time points.
 
 Below is how we could further generate a plot of the survival function from the estimated Weibull AFT model. Unlike the
 other survival models, we also need to specify the covariate pattern of interest. Here, we will generate the survival
@@ -848,8 +758,8 @@ Here, we set the ``resolution`` to be 50. The resolution determines how many poi
 evaluating (and thus determines how 'smooth' our plot will appear).
 
 As this involves the root-finding of multiple values, it is important to help the root-finder along by providing good
-starting values. Since survival is bounded between [0,1], we have all the initial values for those start at 0.5 (the
-middle). Furthermore, models like Weibull AFT should be used with pre-washing the AFT model parameters (i.e., use the
+starting values. Since survival is bounded between [0,1], we have all the initial values for those start at 0.5.
+Furthermore, models like Weibull AFT should be used with pre-washing the AFT model parameters (i.e., use the
 solution from the previous estimating equation).
 
 
@@ -1005,7 +915,7 @@ for the root-finding procedure.
 ED(:math:`\delta`)
 ----------------------------
 
-In addition to the :math:`X`-parameter logistic models, an estimating equation to estimate a corresponding
+In addition to the :math:`x`-parameter logistic models, an estimating equation to estimate a corresponding
 :math:`\delta` effective dose is available. Notice that this estimating equation should be stacked with one of
 the :math:`x`-PL models. Here, we demonstrate with the 3PL model.
 
@@ -1069,16 +979,16 @@ starting point for each being the mid-point of the response values.
 Causal Inference
 =============================
 
-This next section describes available estimators for the causal mean. These estimators all rely on specific
-identification conditions to be able to interpret the estimate of the mean (or mean difference) as an estimate of the
-causal mean. For information on these assumptions, I recommend this
-`this paper <https://www.ncbi.nlm.nih.gov/labs/pmc/articles/PMC2652882/>`_ as a general introduction.
+This next section describes available estimators for the average causal effect. These estimators all rely on specific
+identification conditions to be able to interpret the mean difference as an estimate of the causal mean. For
+information on these assumptions, I recommend this
+`this paper <https://www.ncbi.nlm.nih.gov/labs/pmc/articles/PMC2652882/>`_ as an introduction.
 
-This section procedures that the identification conditions have been previously deliberated, and the causal mean is
-identified and is estimable (see `arXiv2108.11342 <https://arxiv.org/abs/2108.11342>`_ or
-`arXiv1904.02826 <https://arxiv.org/abs/1904.02826>`_ for more information on this concept).
+This section proceeds under the assumption that the identification conditions have been previously deliberated, and the
+average causal effect is identified and is estimable (see `arXiv2108.11342 <https://arxiv.org/abs/2108.11342>`_ or
+`arXiv1904.02826 <https://arxiv.org/abs/1904.02826>`_ for more information on estimability).
 
-With that aside, let's proceed through the available estimators of the causal means. In the following examples, we will
+With that aside, let's proceed through the available estimators of the causal mean. In the following examples, we will
 use the generic data example here, where :math:`Y(a)` is independent of :math:`A` conditional on :math:`W`. Below is
 a sample data set
 
@@ -1093,14 +1003,15 @@ a sample data set
     d['Y'] = (1-d['A'])*d['Ya0'] + d['A']*d['Ya1']
     d['C'] = 1
 
-Here, we don't get to see the potential outcomes :math:`Y(a)`, but instead estimate the mean under different plans
-using the observed data, :math:`Y,A,W`.
+Here, we don't get to see the potential outcomes :math:`Ya0` or :math:`Ya1`, but instead estimate the mean under
+different plans using the observed data, :math:`Y,A,W`.
 
 Inverse probability weighting
 -------------------------------------
 
 First, we use the inverse probability weighting (IPW) estimator, which models the probability of :math:`A` conditional
-on :math:`W`. In general, the Horvitz-Thompson IPW estimator for the mean difference can be written as
+on :math:`W` in order to estimate the average causal effect. In general, the Horvitz-Thompson IPW estimator for the
+mean difference can be written as
 
 .. math::
 
@@ -1117,7 +1028,7 @@ where :math:`\theta_1` is the average causal effect, :math:`\theta_2` is the mea
 :math:`A=1` for everyone, :math:`\theta_3` is the mean under the plan where :math:`A=0` for everyone, and
 :math:`\alpha` is the parameters for the logistic model used to estimate the propensity scores.
 
-To load the estimating equations,
+To load the pre-built IPW estimating equations,
 
 .. code::
 
@@ -1133,7 +1044,7 @@ scores with.
         return ee_ipw(theta,                 # Parameters
                       y=d['Y'],              # Outcome
                       A=d['A'],              # Action (exposure, treatment, etc.)
-                      W=d[['C', 'W']])       # Covariates for PS model
+                      W=d[['C', 'W']])       # Design matrix for PS model
 
 Note that we add an intercept to the logistic model by adding a column of 1's via ``d['C']``.
 
@@ -1159,17 +1070,16 @@ After successful optimization, we can inspect the estimated values.
     estr.theta[2]    # causal mean under X0
     estr.theta[3:]   # logistic regression coefficients
 
-The IPW estimators demonstrates a key advantage of M-estimators. The stacked estimating equations means that the
-sandwich variance correctly incorporates the uncertainty in estimation of the propensity scores into the parameter(s)
-of interest (e.g., average causal effect). Therefore, we do not have to rely on the nonparametric bootstrap
+The IPW estimators demonstrates a key advantage of M-estimators. By stacking estimating equations, the sandwich variance
+estimator correctly incorporates the uncertainty in estimation of the propensity scores into the parameter(s) of
+interest (e.g., average causal effect). Therefore, we do not have to rely on the nonparametric bootstrap
 (computationally cumbersome) or the GEE-trick (conservative estimate of the variance for the average causal effect).
-
 
 G-computation
 ----------------------------
 
-Second, we use g-computation, which models :math:`Y` conditional on :math:`A` and :math:`W`. In general, g-computation
-for the mean difference can be written as
+Second, we use g-computation, which instead models :math:`Y` conditional on :math:`A` and :math:`W`. In general,
+g-computation for the average causal effect can be written as
 
 .. math::
 
@@ -1195,7 +1105,7 @@ where :math:`\theta_0` is the average causal effect, :math:`\theta_1` is the mea
 is the mean under the second, and :math:`\beta` is the parameters for the regression model used to predict the
 outcomes.
 
-To load the estimating equations,
+To load the pre-built g-computation estimating equations,
 
 .. code::
 
@@ -1222,9 +1132,9 @@ Specifically, we need to create a copy of the data set where ``A`` is set to the
     def psi(theta):
         return ee_gformula(theta,                        # Parameters
                            y=d['Y'],                     # Outcome
-                           X=d[['C', 'A', 'W', 'AxW']],  # Observed
-                           X=d1[['C', 'A', 'W', 'AxW']], # Plan 1
-                           X=d0[['C', 'A', 'W', 'AxW']]) # Plan 2
+                           X=d[['C', 'A', 'W', 'AxW']],  # Design matrix - observed
+                           X=d1[['C', 'A', 'W', 'AxW']], # Design matrix - plan 1
+                           X=d0[['C', 'A', 'W', 'AxW']]) # Design matrix - plan 2
 
 Note that we add an intercept to the outcome model by adding a column of 1's via ``d['C']``.
 
@@ -1257,52 +1167,17 @@ The variance and Wald-type confidence intervals can also be output via
     estr.variance
     estr.confidence_intervals()
 
-Again, a key advantage of M-Estimation is demonstrated here. The stacked estimating equations means that the
-sandwich variance correctly incorporates the uncertainty in estimation of the outcome model into the parameter(s)
-of interest (e.g., average causal effect). Therefore, we do not have to rely on the nonparametric bootstrap
-(computationally cumbersome).
-
-As a second example, we now demonstrate the flexbility of ``ee_gformula`` to estimate other plans. Here, we estimate
-the causal mean under the plan where only those with :math:`W=1` have :math:`A=1`. As before, we need to generate
-this distribution of covariates and wrap the built-in estimating equations.
-
-.. code::
-
-    # Creating data under the plans
-    da = d.copy()
-    da['A'] = np.where(da['W'] == 1, 1, 0)
-
-    # Creating interaction terms
-    d['AxW'] = d['A'] * d['W']
-    da['AxW'] = da['A'] * da['W']
-
-    def psi(theta):
-        return ee_gformula(theta,                        # Parameters
-                           y=d['Y'],                     # Outcome
-                           X=d[['C', 'A', 'W', 'AxW']],  # Observed
-                           X=da[['C', 'A', 'W', 'AxW']]) # Plan
-
-Now we can call the M-estimator to solve for the values and the variance.
-
-.. code::
-
-    estr = MEstimator(psi, init=[0., 0.5, 0.5, 0., 0., 0., 0.])
-    estr.estimate(solver='lm')
-
-After successful optimization, we can inspect the estimated values.
-
-.. code::
-
-    estr.theta[0]    # causal mean under X1
-    estr.theta[1:]   # regression coefficients
-
+Again, a key advantage of M-Estimation is demonstrated here. By stacking the estimating equations, the sandwich variance
+estimator correctly incorporates the uncertainty in estimation of the outcome model into the parameter(s) of interest
+(e.g., average causal effect). Therefore, we do not have to rely on the nonparametric bootstrap.
 
 Augmented inverse probability weighting
 ----------------------------------------------
 
 Finally, we use the augmented inverse probability weighting (AIPW) esitmator, which incorporates both a model for
-:math:`Y` conditional on :math:`A` and :math:`W`, and a model for :math:`A` conditional on :math:`W`. The AIPW estimator
-for the mean difference can be written as
+:math:`Y` conditional on :math:`A` and :math:`W`, and a model for :math:`A` conditional on :math:`W`. In other words,
+the AIPW estimator combines the g-computation and IPW estimators together in a clever way (which has some desireable
+statistical properties not reviewed here). The AIPW estimator for the average causal effect can be written as
 
 .. math::
 
@@ -1324,7 +1199,7 @@ is the mean under the second, :math:`\alpha` is the parameters for the propensit
 :math:`\beta` is the parameters for the regression model used to predict the outcomes. For binary outcomes, the final
 estimating equation is replaced with the logistic model analog.
 
-To load the estimating equations,
+To load the pre-built AIPW estimating equations,
 
 .. code::
 
@@ -1351,10 +1226,10 @@ copy where :math:`A=0` for everyone. Below is code that does this step and creat
         return ee_gformula(theta,                        # Parameters
                            y=d['Y'],                     # Outcome
                            A=d['A'],                     # Action
-                           W=d[['C', 'W']],              # PS model
-                           X=d[['C', 'A', 'W', 'AxW']],  # Outcome model
-                           X=d1[['C', 'A', 'W', 'AxW']], # Plan A=1
-                           X=d0[['C', 'A', 'W', 'AxW']]) # Plan A=0
+                           W=d[['C', 'W']],              # Design matrix - PS
+                           X=d[['C', 'A', 'W', 'AxW']],  # Design matrix - observed
+                           X=d1[['C', 'A', 'W', 'AxW']], # Design matrix - plan A=1
+                           X=d0[['C', 'A', 'W', 'AxW']]) # Design matrix - plan A=0
 
 Note that we add an intercept to the outcome model by adding a column of 1's via ``d['C']``.
 
@@ -1390,14 +1265,11 @@ The variance and Wald-type confidence intervals can also be output via
     estr.variance
     estr.confidence_intervals()
 
-Here, the M-Estimation sandwich variance is the same as the influence-curve-based variance estimator. Either of these
-approaches correctly incorporates the uncertainty in estimation of the outcome model into the parameter(s) of interest
-(e.g., average causal effect). Therefore, we do not have to rely on the nonparametric bootstrap (computationally
-cumbersome).
 
 Additional Examples
 -------------------------------
 Additional examples are provided `here <https://github.com/pzivich/Delicatessen/tree/main/tutorials>`_.
+
 
 References and Further Readings
 ===============================

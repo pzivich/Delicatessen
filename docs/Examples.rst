@@ -3,7 +3,7 @@ Examples
 
 Here, we will implement some of the examples described in Chapter 7 of Boos & Stefanski (2013). If you have the book
 (or access to it), then reading along with each section may be helpful. Here, we code each of the estimating equations
-by-hand (rather than using the pre-built options).
+by-hand (rather than using the pre-built options offered).
 
 Boos DD, & Stefanski LA. (2013). M-estimation (estimating equations). In Essential Statistical Inference
 (pp. 297-337). Springer, New York, NY.
@@ -64,10 +64,10 @@ Once we have written up our stacked estimating equations, ``MEstimator`` can be 
 
 
 The M-Estimator solves for :math:`\hat{\theta}` via a root finding procedure given the initial values in ``init``.
-Since the variance must be >0, we provide a positive initial value. For the sandwich variance, ``delicatessen`` uses a
-numerical approximation procedure for the bread matrix. This is different from the closed-form variance estimator
+Since the variance must be :math:`>0`, we provide a positive initial value. For the sandwich variance, ``delicatessen``
+uses a numerical approximation procedure for the bread matrix. This is different from the closed-form variance estimator
 provided in Chapter 7, but both should return approximately the same answer. The advantage of the numerically
-approximating the derivatives is that this process can be done for arbitrary estimating equations.
+approximating the derivatives is that this process can be done for arbitrary estimating functions.
 
 Ratio (7.2.3)
 -------------------------------
@@ -77,7 +77,7 @@ following estimating equation
 
 .. image:: images/ee_example_ratio1.PNG
 
-We can translate the estimating equation from math into python as
+We can translate the estimating equation from math into Python code as
 
 .. code::
 
@@ -96,7 +96,7 @@ Now, we can pass this estimating equation and data to ``MEstimator``
     print(estr.asymptotic_variance)  # 0.338
 
 As you may notice, only a single initial value is provided (since only a single array is being returned). Furthermore,
-we provide an initial value >0 since we are estimating a ratio.
+we provide an initial value :math:`>0` since we are estimating a ratio.
 
 There is another set of stacked estimating equations we can consider for the ratio. Specifically, we can estimate each
 of the means and then take the ratio of those means (rather than doing everything simultaneously). Below is this
@@ -134,8 +134,8 @@ Delta Method (7.2.4)
 The delta method has been used in a variety of contexts, including estimating the variance for transformations of
 parameters. Instead of separately estimating the parameters, transforming the parameters, and then using the delta
 method to estimate the variance of the transformed parameters; we can apply the transformation in an estimating
-equation and automatically estimate the variance for the transformed parameter(s) via the sandwich variance. To do this,
-we stack the estimating equation for the transformation into our set of estimating equations. Below is the
+equation and automatically estimate the variance for the transformed parameter(s) via the sandwich variance estimator.
+To do this, we stack the estimating equation for the transformation into our set of estimating equations. Below is the
 mean-variance estimating equations stacked with two transformations of the variance
 
 .. image:: images/ee_example_delta.PNG
@@ -151,7 +151,7 @@ These equations can be expressed programmatically as
                     - theta[2])
         log_var = (np.ones(data.shape[0])*np.log(theta[1])
                    - theta[3])
-        return (mean, variance, sqrt_var, log_var)
+        return np.asarray([mean, variance, sqrt_var, log_var])
 
 Notice the use of the ``np.ones`` trick to ensure that the final equations are the correct shapes.
 
@@ -267,10 +267,9 @@ It is this section, that we need to talk about different root-finding methods, a
 derivatives. In the previous examples, we had smooth function that were both easy to find the roots of and had smooth
 functions for derivatives. However, that is not the case for quantile estimation.
 
-In general, root-finding with estimating equations not smooth at :math:`\hat{\theta}` is extremely difficult. It may
-require judicious selection of a root-finding algorithm, adjusting the error tolerance, and using smoothing methods to
-evaluate the bread matrix. As such, I generally do not recommend using ``delicatessen`` with non-smooth estimating
-equations, which are not smooth at :math:`\hat{\theta}` (like percentiles).
+In general, root-finding with estimating equations not smooth at :math:`\hat{\theta}` is difficult. As such, I
+generally do not recommend using ``delicatessen`` with non-smooth estimating equations, which are not smooth at
+:math:`\hat{\theta}` (like percentiles).
 
 Positive Mean Deviation (7.4.3)
 -------------------------------
@@ -282,7 +281,7 @@ are
 
 where :math:`\theta_1` is the positive mean deviation and :math:`\theta_2` is the median.
 
-As before, this estimating equation is not smooth at :math:`\hat{\theta}_2`
+As before, this estimating equation is not smooth at :math:`\hat{\theta}_2` so we do not compute it here.
 
 Linear Regression (7.5.1)
 -------------------------------
@@ -291,7 +290,7 @@ For linear regression, the estimating equation is
 
 .. image:: images/ee_example_reg.PNG
 
-For the following examples, the following generic simulated data is used
+For the next examples, the following simulated data is used
 
 .. code::
 
@@ -302,9 +301,9 @@ For the following examples, the following generic simulated data is used
     data['Y'] = 0.5 + 2*data['X'] - 1*data['Z'] + np.random.normal(loc=0, size=n)
     data['C'] = 1
 
-As with all the preceding estimating equations, there are multiple ways to code these. Since linear regression involes
-matrix manipulations for the programmed estimating equations to return the correct format for
-``delicatessen``, we highlight two variations here.
+As with all the preceding estimating equations, there are multiple ways to code these. Since linear regression involves
+matrix manipulations for the programmed estimating equations to return the correct format for ``delicatessen``, we
+highlight two variations here.
 
 First, we present a for-loop implementation of the estimating equation
 

@@ -5,8 +5,8 @@ Documentation for all available functions and arguments for those functions are 
 documentation for the general M-Estimator procedure. *Estimating Equations* details the built-in estimating equations
 that come with ``delicatessen``.
 
-For a more narrative-driven description of M-Estimation and how to use ``delicatessen``, please see the corresponding
-sections.
+For a more narrative-driven description of M-Estimation and how to use ``delicatessen``, please see the sections
+provided in the side-bar.
 
 
 .. toctree::

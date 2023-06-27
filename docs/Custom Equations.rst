@@ -1,21 +1,20 @@
 Custom Estimating Equations
 =====================================
 
-One of the key advantages of ``delicatessen`` is that it has a lot of flexibility in the estimating equations that can
-be specified. Here, I provide an overview and tips for how to build your own estimating equation with ``delicatessen``.
+A key advantages of ``delicatessen`` is the flexibility in the estimating equations that can be specified. Here, I
+provide an overview and tips for how to build your own estimating equations using ``delicatessen``.
 
-In general, it will be best if you find an explicit paper or book that directly provides the estimating equation(s) to
+In general, it will be best if you find an paper or book that directly provides the estimating equation(s) to
 you. Alternatively, if you can find the score function or gradient for a regression model, that is the corresponding
 estimating equation. This section does *not* address how to derive your own  estimating equation(s). Rather, this
-section provides information on how to construct an estimating equation within ``delicatessen``, as ``delicatessen``
-assumes you are giving it a valid estimating equation.
+section provides information on how to translate an estimating equation into code that is compatible with
+``delicatessen``, as ``delicatessen`` assumes you are giving it a valid estimating equation.
 
 Building from scratch
 -------------------------------------
 
-First, we will go through the case of building an estimating equation completely from scratch. To do this, I will
-go through an example with linear regression. This is how I went about building the ``ee_linear_regression``
-functionality.
+First, we will go through the case of building an estimating equation completely from scratch. To do this, we will
+go through an example with linear regression.
 
 First, we have the estimating equation (which is the score function) provided in Boos & Stefanski (2013)
 
@@ -37,35 +36,34 @@ We will demonstrate using the following simulated data set
 
 
 First, we can build the estimating equation using a for-loop where each ``i`` piece will be stacked together. While this
-for-loop approach will be slow, it is often a good strategy to implement a for-loop version that is easier to debug
+for-loop approach will be 'slow', it is often a good strategy to implement a for-loop version that is easier to debug
 first.
 
 Below calculates the estimating equation for each ``i`` in the for-loop. This function returns a stacked array of each
-``i`` observation as a 3-by-n array. That array can be validly passed to the ``MEstimator`` for optimization and
-calculations.
+``i`` observation as a 3-by-n array. That array can then be passed to the ``MEstimator``
 
 .. code::
 
     def psi(theta):
         # Transforming to arrays
-        X = np.asarray(d[['C', 'X', 'W']])
-        y = np.asarray(d['Y'])
-        beta = np.asarray(theta)[:, None]
-        n = X.shape[0]
+        X = np.asarray(d[['C', 'X', 'W']])   # Design matrix
+        y = np.asarray(d['Y'])               # Dependent variable
+        beta = np.asarray(theta)[:, None]    # Parameters
+        n = X.shape[0]                       # Number of observations
 
-        # Where to store each of the resulting estimates
+        # Where to store each of the resulting estimating functions
         est_vals = []
 
-        # Looping through each observation
+        # Looping through each observation from 1 to n
         for i in range(n):
             v_i = (y[i] - np.dot(X[i], beta)) * X[i]
             est_vals.append(v_i)
 
-        # returning 3-by-n object
+        # returning 3-by-n NumPy array
         return np.asarray(est_vals).T
 
 
-We can then run this estimating equation with
+We can then apply this estimating equation via
 
 .. code::
 
@@ -73,34 +71,35 @@ We can then run this estimating equation with
     mest.estimate()
 
 for which the coefficients match the coefficients from a ordinary least squares model (variance estimates may differ,
-since most OLS software use the inverse of the information matrix to estimate the variance). Here, we can further
-vectorize the estimating equation. In the vector-form, this code will run much faster.
+since most OLS software use the inverse of the information matrix to estimate the variance, which is equivalent to the
+inverse of the bread matrix).
 
-With some careful experimentation, the following is a vectorized version. Remember that ``delicatessen`` is expecting a
+Here, we can vectorize the operations. The advantage of the vectorized-form is that it will run much faster. With some
+careful experimentation, the following is a vectorized version. Remember that ``delicatessen`` is expecting a
 3-by-n array to be given by the ``psi`` function in this example. Failure to provide this is a common mistake when
 building custom estimating equations.
 
 .. code::
 
     def psi(theta):
-        X = np.asarray(d[['C', 'X', 'W']])
-        y = np.asarray(d['Y'])[:, None]
-        beta = np.asarray(theta)[:, None]
-        return ((y - np.dot(X, beta)) * X).T
+        X = np.asarray(d[['C', 'X', 'W']])    # Design matrix
+        y = np.asarray(d['Y'])[:, None]       # Dependent variable
+        beta = np.asarray(theta)[:, None]     # Parameters
+        return ((y - np.dot(X, beta)) * X).T  # Computes all estimating functions
 
 
 As before, we can run this chunk of code. Vectorizing (even parts of an estimating equation) can help to improve
-run-times if you find the M-estimator taking too long.
+run-times if you find a M-estimator taking too long to solve.
 
 Building with basics
 -------------------------------------
 
-Instead of building everything from scratch, you can also piece together the built-in estimating equations with your
-own code. To demonstrate this, we will go through how we developed the code for inverse probability weighting.
+Instead of building everything from scratch, you can also piece together built-in estimating equations with your
+custom estimating equations code. To demonstrate this, we will go through inverse probability weighting.
 
 The inverse probability weighting estimator consists of four estimating equations: the difference between the weighted
 means, the weighted mean under :math:`A=1`, the weighted mean under :math:`A=0`, and the propensity score model. We
-can write this as
+can express this mathematically as
 
 .. math::
 
@@ -113,21 +112,23 @@ can write this as
     \end{bmatrix}
     = 0
 
+where :math:`A` is the action of interest, :math:`Y` is the outcome of interest, and :math:`W` is the set of confounding
+variables.
 
 Rather than re-code the logistic regression model (to estimate the propensity scores), we will use the built-in
 logistic regression functionality. Below is a stacked estimating equation for the inverse probability weighting
-estimator
+estimator above
 
 .. code::
 
     def psi(theta):
         # Ensuring correct typing
-        W = np.asarray(d['W'])
-        A = np.asarray(d['A'])
-        y = np.asarray(y)
-        beta = theta[3:]   # Extracting out theta's for the regression model
+        W = np.asarray(d['C', 'W'])     # Design matrix of confounders
+        A = np.asarray(d['A'])          # Action
+        y = np.asarray(y)               # Outocome
+        beta = theta[3:]                # Regression parameters
 
-        # Estimating propensity score using delicatessen
+        # Estimating propensity score
         preds_reg = ee_regression(theta=beta,        # Built-in regression
                                   X=W,               # Plug-in covariates for X
                                   y=A,               # Plug-in treatment for Y
@@ -155,10 +156,9 @@ This example demonstrates how estimating equations can easily be stacked togethe
 both built-in and user-specified functions can be specified together seamlessly. All it requires is specifying both in
 the estimating equation and returning a stacked array of the estimates.
 
-One important piece to note here is that the returned array should be in the *same* order as the theta's are input. As
+One important piece to note here is that the returned array needs to be in the *same* order as the theta's are input. As
 done here, all the ``theta`` values are the 3rd are for the propensity score model. Therefore, the propensity score
-model values are last in the returned stack. Returning the values in a different order than expected by :math:`\theta`
-is a common mistake and will lead to failed root-finding.
+model values are last in the returned stack. Returning the values in a different order than input is a common mistake.
 
 Handling ``np.nan``
 -------------------------------------
@@ -243,7 +243,7 @@ nan's to be zero's prior to subtracting off the mean. This is shown below:
 
 This will result in an estimate close to the truth (5). If we were to instead use ``np.where(r, y/pi - theta[0], 0)``,
 then the wrong answer will be returned. When in doubt about the form to use (and where the subtraction should go), go
-back to the formula. Here, the IPW mean is
+back to the formula for the estimating function or estimator. Here, the IPW mean is
 
 .. math::
 
@@ -265,10 +265,10 @@ Here is a list of common mistakes, most of which I have done myself.
 
 1. The ``psi`` function doesn't return a NumPy array.
 2. The ``psi`` function returns the wrong shape. Remember, it should be a b-by-n NumPy array!
-3. The ``psi`` function is summing over n. ``delicatessen`` needs to do the sum internally (for the bread), so do not
-   sum over n!
+3. The ``psi`` function is summing over n. ``delicatessen`` needs to do the sum internally (in order to compute the
+   bread and filling), so do not sum over n in ``psi``!
 4. The ``theta`` values and ``b`` *must* be in the same order. If ``theta[0]`` is the mean, the 1st row of the returned
-   array better be the mean!
+   array better be the estimating function for that mean!
 
 If you still have trouble, please open an issue at
 `pzivich/Delicatessen <https://github.com/pzivich/Delicatessen/issues>`_. This will help me to add other common
