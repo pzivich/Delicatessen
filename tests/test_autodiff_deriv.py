@@ -7,7 +7,7 @@ from delicatessen.utilities import inverse_logit, identity
 from delicatessen.derivative import auto_differentiation
 
 
-class TestEstimatingEquationsBase:
+class TestAutoDifferentiation:
 
     def test_compare_elementary_operators(self):
         # Defining the functions to check
