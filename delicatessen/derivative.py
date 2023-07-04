@@ -279,9 +279,26 @@ class PrimalTangentPairs:
                                   np.exp(self.primal) * self.tangent)
 
     def log(self):
-        # Logarithm
+        # Logarithm base-e
         return PrimalTangentPairs(np.log(self.primal),
                                   self.tangent / self.primal)
+
+    def log2(self):
+        # Logarithm base-2
+        pair = self.log()
+        return PrimalTangentPairs(pair.primal / np.log(2),
+                                  pair.tangent / np.log(2))
+
+    def log10(self):
+        # Logarithm base-10
+        pair = self.log()
+        return PrimalTangentPairs(pair.primal / np.log(10),
+                                  pair.tangent / np.log(10))
+
+    def sqrt(self):
+        # Square root
+        return PrimalTangentPairs(np.sqrt(self.primal),
+                                  self.tangent / (2 * np.sqrt(self.primal)))
 
     # NumPy trigonometry operators
 
@@ -298,7 +315,22 @@ class PrimalTangentPairs:
     def tan(self):
         # Tangent function
         return PrimalTangentPairs(np.tan(self.primal),
-                                  self.tangent / np.cos(self.primal))
+                                  self.tangent / np.cos(self.primal)**2)
+
+    def arcsin(self):
+        # Inverse sine function
+        return PrimalTangentPairs(np.arcsin(self.primal),
+                                  self.tangent / np.sqrt(1 - self.primal**2))
+
+    def arccos(self):
+        # Inverse cosine function
+        return PrimalTangentPairs(np.arccos(self.primal),
+                                  -1 * self.tangent / np.sqrt(1 - self.primal**2))
+
+    def arctan(self):
+        # Inverse tangent function
+        return PrimalTangentPairs(np.arctan(self.primal),
+                                  self.tangent / (1 + self.primal**2))
 
     def sinh(self):
         # Hyperbolic sine function
@@ -313,7 +345,20 @@ class PrimalTangentPairs:
     def tanh(self):
         # Hyperbolic tangent function
         return PrimalTangentPairs(np.tanh(self.primal),
-                                  (1 / (np.cosh(self.primal) ** 2)) * self.tangent)
+                                  self.tangent / (np.cosh(self.primal) ** 2))
 
-    # TODO add arc trig functions
+    def arcsinh(self):
+        # Inverse hyperbolic sine function
+        return PrimalTangentPairs(np.arcsinh(self.primal),
+                                  self.tangent / np.sqrt(self.primal**2 + 1))
+
+    def arccosh(self):
+        # Inverse hyperbolic cosine function
+        return PrimalTangentPairs(np.arccosh(self.primal),
+                                  self.tangent / np.sqrt(self.primal**2 - 1))
+
+    def arctanh(self):
+        # Inverse hyperbolic tangent function
+        return PrimalTangentPairs(np.arctanh(self.primal),
+                                  self.tangent / (1 - self.primal**2))
 
