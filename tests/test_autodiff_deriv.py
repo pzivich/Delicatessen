@@ -1,12 +1,16 @@
 import pytest
 import numpy as np
 import numpy.testing as npt
+import pandas as pd
+from scipy.stats import logistic
 from scipy.optimize import approx_fprime
 
 from delicatessen.utilities import inverse_logit, identity
 from delicatessen.derivative import auto_differentiation
 from delicatessen import MEstimator
-from delicatessen.estimating_equations import ee_mean, ee_mean_variance
+from delicatessen.estimating_equations import ee_mean_variance, ee_regression
+
+np.random.seed(20230704)
 
 
 class TestAutoDifferentiation:
@@ -292,6 +296,11 @@ class TestSandwichAutoDiff:
         mestr = MEstimator(psi, init=[0, ])
         mestr.estimate(deriv_method='exact')
 
+        # Checking bread estimates
+        npt.assert_allclose(mestr.bread,
+                            [[1]],
+                            atol=1e-6)
+
         # Checking variance estimates
         npt.assert_allclose(mestr.asymptotic_variance,
                             np.var(y, ddof=0),
@@ -321,3 +330,39 @@ class TestSandwichAutoDiff:
         npt.assert_allclose(var_approx,
                             var_exact,
                             atol=1e-5)
+
+    def test_exact_bread_logit_reg(self):
+        n = 500
+        data = pd.DataFrame()
+        data['X'] = np.random.normal(size=n)
+        data['Z'] = np.random.normal(size=n)
+        data['Y'] = np.random.binomial(n=1, p=logistic.cdf(0.5 + 2*data['X'] - 1*data['Z']), size=n)
+        data['C'] = 1
+        data['w'] = np.random.uniform(1, 10, size=n)
+
+        def psi_regression(theta):
+            return ee_regression(theta,
+                                 X=data[['C', 'X', 'Z']], y=data['Y'],
+                                 model='logistic', weights=data['w'])
+
+        mestr = MEstimator(psi_regression, init=[0., 0., 0.])
+
+        # Auto-differentation
+        mestr.estimate(deriv_method='exact')
+        bread_exact = mestr.bread
+        var_exact = mestr.variance
+
+        # Central difference method
+        mestr.estimate(deriv_method='approx')
+        bread_approx = mestr.bread
+        var_approx = mestr.variance
+
+        # Checking bread estimates
+        npt.assert_allclose(bread_approx,
+                            bread_exact,
+                            atol=1e-6)
+
+        # Checking variance estimates
+        npt.assert_allclose(var_approx,
+                            var_exact,
+                            atol=1e-6)
