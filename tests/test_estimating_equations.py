@@ -599,8 +599,8 @@ class TestEstimatingEquationsRegression:
                                  X=data[['C', 'X', 'Z']], y=data['Y'],
                                  model='logistic', weights=data['w'])
 
-        mestimator = MEstimator(psi_regression, init=[0., 0., 0.])
-        mestimator.estimate()
+        mestimator = MEstimator(psi_regression, init=[0., 2., -1.])
+        mestimator.estimate(solver='lm')
 
         # Comparing to statsmodels GLM (with robust covariance)
         glm = smf.glm("Y ~ X + Z", data, freq_weights=data['w'],
