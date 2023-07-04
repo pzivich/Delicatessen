@@ -164,8 +164,7 @@ class TestMEstimationExamples:
         estr = MEstimator(psi_quantile, init=[0., 0., 0., ])
         estr.estimate(solver='hybr',
                       tolerance=1e-4,
-                      dx=1,
-                      order=9)
+                      dx=1)
 
         # Verify using built-in equations
         mest25 = MEstimator(lambda theta: ee_percentile(theta=theta, y=y, q=0.25), init=[-0.1, ])
@@ -173,16 +172,13 @@ class TestMEstimationExamples:
         mest75 = MEstimator(lambda theta: ee_percentile(theta=theta, y=y, q=0.75), init=[0.1, ])
         mest25.estimate(solver='hybr',
                         tolerance=1e-3,
-                        dx=1,
-                        order=15)
+                        dx=1)
         mest50.estimate(solver='hybr',
                         tolerance=1e-3,
-                        dx=1,
-                        order=15)
+                        dx=1)
         mest75.estimate(solver='hybr',
                         tolerance=1e-3,
-                        dx=1,
-                        order=15)
+                        dx=1)
 
         assert estr.theta[0] - mest25.theta[0] < 1e-2
         assert estr.theta[1] - mest50.theta[0] < 1e-2
@@ -206,8 +202,7 @@ class TestMEstimationExamples:
         estr = MEstimator(psi_deviation, init=[0., 0., ])
         estr.estimate(solver='hybr',
                       tolerance=1e-3,
-                      dx=1,
-                      order=9)
+                      dx=1)
 
         assert estr.theta[0] - md < 0.1
         assert estr.theta[1] - np.median(y) < 0.1
@@ -216,7 +211,7 @@ class TestMEstimationExamples:
         mest = MEstimator(lambda theta: ee_positive_mean_deviation(theta, y), init=[0., 0., ])
         mest.estimate(solver='hybr',
                       tolerance=1e-3,
-                      dx=1, order=9)
+                      dx=1)
 
         assert estr.theta[0] - mest.theta[0] < 0.1
         assert estr.theta[1] - mest.theta[1] < 0.1
