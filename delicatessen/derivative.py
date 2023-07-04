@@ -50,10 +50,16 @@ def auto_differentiation(xk, f):
         By adding zero, we ensure that the final operation applied is an addition, and thus an float is returned
         after the boolean is evaluated. Essentially, we deny the call to ``__bool__`` being the last operation.
         """
-        eval = function(x)                 # Short-name for function
-        eval_no_bool_end = []              # Empty list for storage
-        for e in eval:                     # For each evaluation in the function
-            eval_no_bool_end.append(e+0)   # ... adding zero in a loop
+        evalued = function(x)              # Short-name for evaluated function
+
+        # Handling whether a single input (non-tuple like SciPy) is provided
+        if isinstance(evalued, PrimalTangentPairs):     # If not a tuple, gives back the Pair object
+            eval_no_bool_end = evalued + 0              # ... then just add zero in this case
+        else:                                           # Otherwise,
+            eval_no_bool_end = []                       # ... empty list for storage
+            for e in evalued:                           # ... for each evaluation in the function
+                eval_no_bool_end.append(e+0)            # ... adding zero in a loop
+
         return eval_no_bool_end            # Return the evaluation with the final addition
 
     # Meta-information about function and inputs
@@ -73,11 +79,14 @@ def auto_differentiation(xk, f):
 
     # Processing function output into gradient value or matrix
     evaluated_gradient = []                                            # List storage for the computed gradient
-    for pair in evaluated_pair:                                        # For each evaluated primal,tangent pair
-        if isinstance(pair, PrimalTangentPairs):                       # ... if that pair is the key type
-            evaluated_gradient.append(pair.tangent)                    # ... then give back the derivative
-        else:                                                          # ... otherwise row has no xk operations
-            evaluated_gradient.append([0 for j in range(xshape)])      # ... so derivative is always zero
+    if isinstance(evaluated_pair, PrimalTangentPairs):                 # Handle case where only single input
+        evaluated_gradient.append([evaluated_pair.tangent, ])          # ... evaluate tangent and put list in list
+    else:                                                              # In all other cases
+        for pair in evaluated_pair:                                    # ... for each evaluated primal, tangent pair
+            if isinstance(pair, PrimalTangentPairs):                   # ... if that pair is the key type
+                evaluated_gradient.append(pair.tangent)                # ... then give back the derivative
+            else:                                                      # ... otherwise row has no xk operations
+                evaluated_gradient.append([0 for j in range(xshape)])  # ... so derivative is always zero
 
     # Return evaluated gradient as a NumPy array
     if len(evaluated_gradient) == 1:                                   # If only consists of 1 item
