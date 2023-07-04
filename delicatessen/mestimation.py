@@ -4,6 +4,8 @@ from scipy.misc import derivative
 from scipy.optimize import approx_fprime
 from scipy.stats import norm
 
+from delicatessen.derivative import auto_differentiation
+
 
 class MEstimator:
     r"""M-Estimator for stacked estimating equations.
@@ -172,7 +174,7 @@ class MEstimator:
         self.variance = None              # Covariance matrix for theta values (calculated later)
         self.asymptotic_variance = None   # Asymptotic covariance matrix for theta values (calculated later)
 
-    def estimate(self, solver='newton', maxiter=1000, tolerance=1e-9, dx=1e-9, order=3, allow_pinv=True):
+    def estimate(self, solver='newton', maxiter=1000, tolerance=1e-9, deriv_method='approx', dx=1e-9, allow_pinv=True):
         """Function to carry out the point and variance estimation of theta. After this procedure, the point estimates
         (in ``theta``) and the covariance matrix (in ``variance``) can be extracted.
 
@@ -193,13 +195,14 @@ class MEstimator:
         tolerance : float, optional
             Maximum tolerance for errors in the root finding. This argument is passed ``scipy.optimize`` via the
             ``tol`` parameter. Default is 1e-9.
+        deriv_method : str, optional
+            Method to compute the derivative of the estimating equations for the bread matrix. Options include numerical
+            approximation with the central difference method (``'approx'``) and forward-mode automatic differentiation
+            (``'exact'``). Default is numerical approximation.
         dx : float, optional
             Spacing to use to numerically approximate the partial derivatives of the bread matrix. Default is 1e-9. It
             is generally not recommended to have a large ``dx``, since some large values can poorly approximate
             derivatives.
-        order : int, optional
-            Number of points to use to numerically approximate the partial derivative (must be an odd number). Default
-            is 3.
         allow_pinv : bool, optional
             The default is ``True`` which uses ``numpy.linalg.pinv`` to find the inverse (or pseudo-inverse if matrix is
             non-invertible) for the bread. This default option is more robust to the possible matrices. If you want
@@ -290,6 +293,7 @@ class MEstimator:
         # STEP 2: calculating Variance
         # STEP 2.1: baking the Bread
         self.bread = self._bread_matrix_(theta=self.theta,                           # Provide theta-hat
+                                         method=deriv_method,                        # Method to use
                                          dx=dx) / self.n_obs                         # Derivative approximation value
 
         # STEP 2.2: slicing the meat
@@ -508,7 +512,7 @@ class MEstimator:
         # Return optimized theta array
         return psi
 
-    def _bread_matrix_(self, theta, dx):
+    def _bread_matrix_(self, theta, method, dx):
         """Evaluate the bread matrix by taking all partial derivatives of the thetas in the estimating equation.
 
         Parameters
@@ -525,14 +529,26 @@ class MEstimator:
         # Check how many values of theta there is
         val_range = len(theta)
 
-        # Calculating the bread
-        if val_range == 1:                                       # When only a single theta is present
-            d = derivative(self._mestimation_answer_no_subset_,  # ... approximate the derivative
-                           theta, dx=dx)                         # ... at the solved theta (input)
-            bread_matrix = np.array([[d, ], ])                   # ... return as 1-by-1 array object for inversion
-        else:                                                    # Otherwise approximate the partial derivatives
-            bread_matrix = approx_fprime(xk=theta,               # ... use built-in jacobian functionality of SciPy
-                                         f=self._mestimation_answer_no_subset_,
-                                         epsilon=dx)             # ... order option removed in v1.0 since not in SciPy
+        # Calculating the bread via numerical approximation
+        if method.lower() == "approx":
+            if val_range == 1:                                       # When only a single theta is present
+                d = derivative(self._mestimation_answer_no_subset_,  # ... approximate the derivative
+                               theta, dx=dx)                         # ... at the solved theta (input)
+                bread_matrix = np.array([[d, ], ])                   # ... return as 1-by-1 array object for inversion
+            else:                                                    # Otherwise approximate the partial derivatives
+                bread_matrix = approx_fprime(xk=theta,               # ... use built-in jacobian functionality of SciPy
+                                             f=self._mestimation_answer_no_subset_,
+                                             epsilon=dx)             # ... order option removed in v1.0
+
+        # Calculating the bread via automatic differentiation
+        elif method.lower() == "exact":
+            bread_matrix = auto_differentiation(xk=theta,
+                                                f=self._mestimation_answer_no_subset_)
+
+        # Error for invalid derivative option
+        else:
+            raise ValueError("Input for deriv_method was " + str(method)
+                             + ", but only 'approx' and 'exact' are available.")
+
         # Return bread (multiplied by negative 1 as in Stefanski & Boos)
         return -1 * bread_matrix
