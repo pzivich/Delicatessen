@@ -345,7 +345,7 @@ class TestSandwichAutoDiff:
                                  X=data[['C', 'X', 'Z']], y=data['Y'],
                                  model='logistic', weights=data['w'])
 
-        mestr = MEstimator(psi_regression, init=[0., 0., 0.])
+        mestr = MEstimator(psi_regression, init=[0., 2., -1.])
 
         # Auto-differentation
         mestr.estimate(deriv_method='exact')
