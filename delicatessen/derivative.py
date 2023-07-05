@@ -125,7 +125,7 @@ class PrimalTangentPairs:
         # To get np.where working properly, I need to have the internal boolean function for this class return
         #   only the primal part. This is a bool object type, which is what is expected and has np.where operate as
         #   expected. This only seems to be called for np.where and not the other operators (they work directly).
-        return self.primal
+        return bool(self.primal)
 
     # Equality operators
 
