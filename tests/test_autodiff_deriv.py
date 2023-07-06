@@ -26,6 +26,10 @@ class TestAutoDifferentiation:
                     -32 + x[0]**x[2] + x[1]**x[3],
                     (x[0] + x[1])**(x[2] + x[3]) + 6,
                     5*x[1]**2 + (x[2]**2)*5,
+                    x[1] / 10 + (10/x[2])**2,
+                    x[0]**x[1],
+                    0.9**x[2],
+                    (x[3] + 0.9)**(x[1] * x[0] - 0.1),
                     ]
 
         # Points to Evaluate at
@@ -51,7 +55,6 @@ class TestAutoDifferentiation:
 
         # Checking
         npt.assert_allclose(dx_approx, dx_exact, atol=1e-5)
-
 
     def test_compare_equality1_operators(self):
         # Defining the functions to check
