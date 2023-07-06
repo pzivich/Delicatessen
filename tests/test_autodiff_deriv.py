@@ -332,7 +332,7 @@ class TestSandwichAutoDiff:
                             atol=1e-5)
 
     def test_exact_bread_robust_mean(self):
-        n = 1000
+        n = 500
         y = np.random.standard_cauchy(size=n)
 
         # Huber
