@@ -2,7 +2,7 @@ import numpy as np
 
 
 def auto_differentiation(xk, f):
-    """Forward-mode automatic differentiation. Automatic differentiation offers a way to compute the exact derivative,
+    r"""Forward-mode automatic differentiation. Automatic differentiation offers a way to compute the exact derivative,
     rather than numerically approximated (i.e., the central difference method). Automatic differentiation iteratively
     applies the chain rule through recursive calls to evaluate the derivative.
 
