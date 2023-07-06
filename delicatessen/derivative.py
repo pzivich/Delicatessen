@@ -2,14 +2,19 @@ import numpy as np
 
 
 def auto_differentiation(xk, f):
-    """Forward mode automatic differentiation. Automatic differentiation offers a way to compute the derivative exactly,
-    rather than numerically approximated (unlike the central difference method). Automatic differentiation iteratively
-    applies the chain rule into order to evaluate the derivative.
+    """Forward-mode automatic differentiation. Automatic differentiation offers a way to compute the exact derivative,
+    rather than numerically approximated (i.e., the central difference method). Automatic differentiation iteratively
+    applies the chain rule through recursive calls to evaluate the derivative.
 
     Note
     ----
     This functionality is only intended for use behind the scenes in ``delicatessen``. I wrote this functionality to
     avoid additional dependencies.
+
+    This is accomplished by the ``PrimalTangentPairs`` class, which is a special data type in ``delicatessen`` that
+    stores pairs of the original evaluation and the corresponding derivative for a variety of different mathematical
+    operations. This is what allows for the exact derivative calculation. The ``auto_differentiation`` function is
+    a wrapper to access and use this class object as it is intended for derivative computations.
 
     Parameters
     ----------
@@ -20,15 +25,71 @@ def auto_differentiation(xk, f):
 
     Returns
     -------
-    ndarray
+    ndarray :
+        Corresponding array of the pairwise derivatives for all different input x values.
 
     Examples
     --------
+    Loading necessary functions and building a generic data set for estimation of the mean
+
+    >>> import numpy as np
+    >>> from delicatessen.derivative import auto_differentiation
+
+    To illustrate use, we will compute the derivative of the following function
+
+    .. math::
+
+        f(x) = x^2 - x^1 + sin(x + \sqrt{x})
+
+    >>> def f(x):
+    >>>     return x**2 - x + np.sin(x + np.sqrt(x))
+
+    If you work out the deriative by-hand, you will end up with the following
+
+    .. math::
+
+        2x - 1 + \left( \frac{1}{2 \sqrt{x}} + 1 \right) \cos(x + \sqrt{x})
+
+    Instead, we can use automatic differentiation to evaluate the derivative at a specific point. Here, we will
+    evaluate the derivative at :math:`x=1`
+
+    >>> dy = auto_differentiation(xk=[1, ], f=f)
+
+    which returns :math:`dy=0.3757795`. This is the same as if you plugged in :math:`x=1` into the previous equation.
+
+    Note
+    ----
+    If a derivative is not defined, then the function will return a ``NaN``.
+
+
+    The derivative of a function with multiple inputs and multiple outputs can also be evaluated. Consider the following
+    example with three inputs and two outputs
+
+    >>> def f(x):
+    >>>     return [x[0]**2 - x, np.sin(np.sqrt(x[1]) + x[2]) + x[2]*(x[1]**2)]
+
+    >>> dy = auto_differentiation(xk=[0.7, 1.2, -0.9], f=f)
+
+    which will return a 2-by-3 array of all the x-y pair derivatives. Here, the rows correspond to the output and the
+    columns correspond to the inputs.
 
     References
     ----------
-
+    Baydin AG, Pearlmutter BA, Radul AA, & Siskind JM. (2018). Automatic differentiation in machine learning: a survey.
+    *Journal of Marchine Learning Research*, 18, 1-43.
     """
+    # Meta-information about function and inputs
+    xshape = len(xk)                                                   # The number of inputs into the function
+
+    # Set up Dual objects for evaluating gradient of function
+    pairs_for_gradient = []                                            # Storage for the pairs to provide function
+    for i in range(xshape):                                            # For each of the inputs
+        partial = np.zeros_like(xk)                                    # ... generate array of that size of all zeroes
+        partial[i] = 1                                                 # ... replace 0 with 1 for current index
+        pairs_for_gradient.append(PrimalTangentPairs(xk[i], partial))  # ... then store as a primal,tangent pair
+    x_to_eval = np.asarray(pairs_for_gradient)                         # Convert from list to NumPy array
+
+    # Internal function to handle some specific exceptions when computing derivatives
     def f_deny_bool(function, x):
         """This internal function re-evaluates the input function with an additional operator. Namely zero is added
         to the function. This causes no difference in the primal or tangent pair. The purpose of this function is to
@@ -61,17 +122,6 @@ def auto_differentiation(xk, f):
                 eval_no_bool_end.append(e+0)            # ... adding zero in a loop
 
         return eval_no_bool_end            # Return the evaluation with the final addition
-
-    # Meta-information about function and inputs
-    xshape = len(xk)                                                   # The number of inputs into the function
-
-    # Set up Dual objects for evaluating gradient of function
-    pairs_for_gradient = []                                            # Storage for the pairs to provide function
-    for i in range(xshape):                                            # For each of the inputs
-        partial = np.zeros_like(xk)                                    # ... generate array of that size of all zeroes
-        partial[i] = 1                                                 # ... replace 0 with 1 for current index
-        pairs_for_gradient.append(PrimalTangentPairs(xk[i], partial))  # ... then store as a primal,tangent pair
-    x_to_eval = np.asarray(pairs_for_gradient)                         # Convert from list to NumPy array
 
     # Evaluating the function for the primal,tangent pairs
     evaluated_pair = f_deny_bool(function=f,                           # Evaluate the primal,tangent pair with function
