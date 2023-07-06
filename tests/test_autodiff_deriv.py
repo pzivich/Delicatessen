@@ -8,7 +8,7 @@ from scipy.optimize import approx_fprime
 from delicatessen.utilities import inverse_logit, identity
 from delicatessen.derivative import auto_differentiation
 from delicatessen import MEstimator
-from delicatessen.estimating_equations import ee_mean_variance, ee_regression, ee_ridge_regression
+from delicatessen.estimating_equations import ee_mean_variance, ee_mean_robust, ee_regression, ee_ridge_regression
 
 np.random.seed(20230704)
 
@@ -330,6 +330,122 @@ class TestSandwichAutoDiff:
         npt.assert_allclose(var_approx,
                             var_exact,
                             atol=1e-5)
+
+    def test_exact_bread_robust_mean(self):
+        n = 1000
+        y = np.random.standard_cauchy(size=n)
+
+        # Huber
+        def psi(theta):
+            return ee_mean_robust(theta,
+                                  y=y,
+                                  k=3, loss='huber')
+
+        mestr = MEstimator(psi, init=[0.])
+
+        # Auto-differentation
+        mestr.estimate(deriv_method='exact')
+        bread_exact = mestr.bread
+        var_exact = mestr.variance
+
+        # Central difference method
+        mestr.estimate(deriv_method='approx')
+        bread_approx = mestr.bread
+        var_approx = mestr.variance
+
+        # Checking bread estimates
+        npt.assert_allclose(bread_approx,
+                            bread_exact,
+                            atol=1e-6)
+
+        # Checking variance estimates
+        npt.assert_allclose(var_approx,
+                            var_exact,
+                            atol=1e-6)
+
+        # Andrew
+        def psi(theta):
+            return ee_mean_robust(theta,
+                                  y=y,
+                                  k=1.339, loss='andrew')
+
+        mestr = MEstimator(psi, init=[0.])
+
+        # Auto-differentation
+        mestr.estimate(deriv_method='exact')
+        bread_exact = mestr.bread
+        var_exact = mestr.variance
+
+        # Central difference method
+        mestr.estimate(deriv_method='approx')
+        bread_approx = mestr.bread
+        var_approx = mestr.variance
+
+        # Checking bread estimates
+        npt.assert_allclose(bread_approx,
+                            bread_exact,
+                            atol=1e-6)
+
+        # Checking variance estimates
+        npt.assert_allclose(var_approx,
+                            var_exact,
+                            atol=1e-6)
+
+        # Tukey
+        def psi(theta):
+            return ee_mean_robust(theta,
+                                  y=y,
+                                  k=4.685, loss='tukey')
+
+        mestr = MEstimator(psi, init=[0.])
+
+        # Auto-differentation
+        mestr.estimate(deriv_method='exact')
+        bread_exact = mestr.bread
+        var_exact = mestr.variance
+
+        # Central difference method
+        mestr.estimate(deriv_method='approx')
+        bread_approx = mestr.bread
+        var_approx = mestr.variance
+
+        # Checking bread estimates
+        npt.assert_allclose(bread_approx,
+                            bread_exact,
+                            atol=1e-6)
+
+        # Checking variance estimates
+        npt.assert_allclose(var_approx,
+                            var_exact,
+                            atol=1e-6)
+
+        # Hampel
+        def psi(theta):
+            return ee_mean_robust(theta,
+                                  y=y,
+                                  k=8, loss='hampel', lower=2, upper=4)
+
+        mestr = MEstimator(psi, init=[0.])
+
+        # Auto-differentation
+        mestr.estimate(deriv_method='exact')
+        bread_exact = mestr.bread
+        var_exact = mestr.variance
+
+        # Central difference method
+        mestr.estimate(deriv_method='approx')
+        bread_approx = mestr.bread
+        var_approx = mestr.variance
+
+        # Checking bread estimates
+        npt.assert_allclose(bread_approx,
+                            bread_exact,
+                            atol=1e-6)
+
+        # Checking variance estimates
+        npt.assert_allclose(var_approx,
+                            var_exact,
+                            atol=1e-6)
 
     def test_exact_bread_linear_reg(self):
         n = 500
