@@ -66,7 +66,7 @@ def auto_differentiation(xk, f):
     example with three inputs and two outputs
 
     >>> def f(x):
-    >>>     return [x[0]**2 - x, np.sin(np.sqrt(x[1]) + x[2]) + x[2]*(x[1]**2)]
+    >>>     return [x[0]**2 - x[1], np.sin(np.sqrt(x[1]) + x[2]) + x[2]*(x[1]**2)]
 
     >>> dy = auto_differentiation(xk=[0.7, 1.2, -0.9], f=f)
 
@@ -81,7 +81,7 @@ def auto_differentiation(xk, f):
     # Meta-information about function and inputs
     xshape = len(xk)                                                   # The number of inputs into the function
 
-    # Set up Dual objects for evaluating gradient of function
+    # Set up Pair objects for evaluating gradient of function
     pairs_for_gradient = []                                            # Storage for the pairs to provide function
     for i in range(xshape):                                            # For each of the inputs
         partial = np.zeros_like(xk)                                    # ... generate array of that size of all zeroes
@@ -136,7 +136,8 @@ def auto_differentiation(xk, f):
             if isinstance(pair, PrimalTangentPairs):                   # ... if that pair is the key type
                 evaluated_gradient.append(pair.tangent)                # ... then give back the derivative
             else:                                                      # ... otherwise row has no xk operations
-                evaluated_gradient.append([0 for j in range(xshape)])  # ... so derivative is always zero
+                empty_array = np.array([0 for j in range(xshape)])     # ... create array of all zeroes
+                evaluated_gradient.append(empty_array)                 # ... so derivative is always zero
 
     # Return evaluated gradient as a NumPy array
     if len(evaluated_gradient) == 1:                                   # If only consists of 1 item
@@ -146,26 +147,34 @@ def auto_differentiation(xk, f):
 
 
 class PrimalTangentPairs:
-    """Unique class object for automatic differentiation. This process divides the inputs into 'primal' and 'tangent'
-    pairs. Operations on the pairs are then recurvsively called.
+    """Unique class object for automatic differentiation. This class divides the inputs into 'primal' and 'tangent'
+    pairs. The derivative is computed via operations on the pairs, which are then recurvsively called by this class.
+    This process allows use to successively apply the chain rule.
 
+    Note
+    ----
+    This class only handles how the data is setup (i.e., it does not automatically compute a derivative. The function
+    for the derivative computation then takes this as input.
+
+
+    This data class is only meant to interact with ``auto_differentiation`` and should not be used elsewhere.
 
     Parameters
     ----------
     primal :
-        B
+        The x values for which the derivative computation is desired. Must be the same length as ``tangent``.
     tangent :
-        A
+        Indicator for the location at which the derivatives is desired. Must be the same length as ``primal``.
     """
     def __init__(self, primal, tangent):
-        # Processing of the inputs
+        # Processing of the inputs into the class, both initial and recursive calls
         if isinstance(primal, PrimalTangentPairs):    # If given a PrimalTangentPair input
             self.primal = primal.primal               # ... extract the primal element from input
         else:                                         # Else
             self.primal = primal                      # ... directly save as new primal
         self.tangent = tangent                        # Store the tangent
 
-    # Basic operators
+    # Basic operators for the class object
 
     def __str__(self):
         # Conversion to string just to in case it gets called somehow
@@ -177,187 +186,187 @@ class PrimalTangentPairs:
         #   expected. This only seems to be called for np.where and not the other operators (they work directly).
         return bool(self.primal)
 
-    # Equality operators
+    # Equality operators for the class
 
     def __le__(self, other):
         # Less than or equal to operator
-        if isinstance(other, PrimalTangentPairs):                  #
-            comparison = (self.primal <= other.primal)             #
-        else:                                                      #
-            comparison = (self.primal <= other)                    #
-        return PrimalTangentPairs(comparison, 0)                   #
+        if isinstance(other, PrimalTangentPairs):                  # If the input is a PrimalTangentPairs
+            comparison = (self.primal <= other.primal)             # ... compare the primals
+        else:                                                      # Otherwise
+            comparison = (self.primal <= other)                    # ... directly compare primal with other
+        return PrimalTangentPairs(comparison, 0)                   # Return evaluated equality
 
     def __lt__(self, other):
         # Less than operator
-        if isinstance(other, PrimalTangentPairs):
-            comparison = (self.primal < other.primal)
-        else:
-            comparison = (self.primal < other)
-        return PrimalTangentPairs(comparison, 0)
+        if isinstance(other, PrimalTangentPairs):                  # If the input is a PrimalTangentPairs
+            comparison = (self.primal < other.primal)              # ... compare the primals
+        else:                                                      # Otherwise
+            comparison = (self.primal < other)                     # ... directly compare primal with other
+        return PrimalTangentPairs(comparison, 0)                   # Return evaluated equality
 
     def __ge__(self, other):
         # Greater than or equal to operator
-        if isinstance(other, PrimalTangentPairs):
-            comparison = (self.primal >= other.primal)
-        else:
-            comparison = (self.primal >= other)
-        return PrimalTangentPairs(comparison, 0)
+        if isinstance(other, PrimalTangentPairs):                  # If the input is a PrimalTangentPairs
+            comparison = (self.primal >= other.primal)             # ... compare the primals
+        else:                                                      # Otherwise
+            comparison = (self.primal >= other)                    # ... directly compare primal with other
+        return PrimalTangentPairs(comparison, 0)                   # Return evaluated equality
 
     def __gt__(self, other):
         # Greater than operator
-        if isinstance(other, PrimalTangentPairs):
-            comparison = (self.primal > other.primal)
-        else:
-            comparison = (self.primal > other)
-        return PrimalTangentPairs(comparison, 0)
+        if isinstance(other, PrimalTangentPairs):                  # If the input is a PrimalTangentPairs
+            comparison = (self.primal > other.primal)              # ... compare the primals
+        else:                                                      # Otherwise
+            comparison = (self.primal > other)                     # ... directly compare primal with other
+        return PrimalTangentPairs(comparison, 0)                   # Return evaluated equality
 
     def __eq__(self, other):
         # Equality operator
-        if isinstance(other, PrimalTangentPairs):
-            comparison = (self.primal == other.primal)
-        else:
-            comparison = (self.primal == other)
-        return PrimalTangentPairs(comparison, 0)
+        if isinstance(other, PrimalTangentPairs):                  # If the input is a PrimalTangentPairs
+            comparison = (self.primal == other.primal)             # ... compare the primals
+        else:                                                      # Otherwise
+            comparison = (self.primal == other)                    # ... directly compare primal with other
+        return PrimalTangentPairs(comparison, 0)                   # Return evaluated equality
 
     def __ne__(self, other):
         # Inequality operator
-        if isinstance(other, PrimalTangentPairs):
-            comparison = (self.primal != other.primal)
-        else:
-            comparison = (self.primal != other)
-        return PrimalTangentPairs(comparison, 0)
+        if isinstance(other, PrimalTangentPairs):                  # If the input is a PrimalTangentPairs
+            comparison = (self.primal != other.primal)             # ... compare the primals
+        else:                                                      # Otherwise
+            comparison = (self.primal != other)                    # ... directly compare primal with other
+        return PrimalTangentPairs(comparison, 0)                   # Return evaluated equality
 
     # Elementary mathematical operations
 
     def __neg__(self):
         # Negation operator
-        return PrimalTangentPairs(-self.primal,
-                                  -self.tangent)
+        return PrimalTangentPairs(-self.primal,                    # Negation is simply negation
+                                  -self.tangent)                   # ... and same for derivative
 
     def __add__(self, other):
         # Addition
-        if isinstance(other, PrimalTangentPairs):
-            return PrimalTangentPairs(self.primal + other.primal,
-                                      self.tangent + other.tangent)
-        else:
-            return PrimalTangentPairs(self.primal + other,
-                                      self.tangent)
+        if isinstance(other, PrimalTangentPairs):                     # When adding PrimalTangentPairs
+            return PrimalTangentPairs(self.primal + other.primal,     # ... add primals together
+                                      self.tangent + other.tangent)   # ... and add tangents together
+        else:                                                         # Otherwise
+            return PrimalTangentPairs(self.primal + other,            # ... add the primal and other
+                                      self.tangent)                   # ... tangent does not change by constants
 
     def __radd__(self, other):
         # Addition, reversed
-        return self.__add__(other)
+        return self.__add__(other)                                    # Reversed addition (order matters for process)
 
     def __sub__(self, other):
         # Subtraction
-        if isinstance(other, PrimalTangentPairs):
-            return PrimalTangentPairs(self.primal - other.primal,
-                                      self.tangent - other.tangent)
-        else:
-            return PrimalTangentPairs(self.primal - other,
-                                      self.tangent)
+        if isinstance(other, PrimalTangentPairs):                     # When subtracting PrimalTangentPairs
+            return PrimalTangentPairs(self.primal - other.primal,     # ... minus primals together
+                                      self.tangent - other.tangent)   # ... and minus tangets together
+        else:                                                         # Otherwise
+            return PrimalTangentPairs(self.primal - other,            # ... minus primal and other
+                                      self.tangent)                   # ... tangent does not change by constants
 
     def __rsub__(self, other):
         # Subtraction, reversed
-        return PrimalTangentPairs(other - self.primal,
-                                  -1 * self.tangent)
+        return PrimalTangentPairs(other - self.primal,                # Subtracting in reverse order (lead constant)
+                                  -1 * self.tangent)                  # ... simply multiply tangent by -1
 
     def __mul__(self, other):
         # Multiplication
-        if isinstance(other, PrimalTangentPairs):
-            return PrimalTangentPairs(self.primal * other.primal,
+        if isinstance(other, PrimalTangentPairs):                     # When multiplying PrimalTangentPairs
+            return PrimalTangentPairs(self.primal * other.primal,     # ... multiply primals
                                       self.tangent * other.primal + self.primal * other.tangent)
-        else:
-            return PrimalTangentPairs(self.primal * other,
-                                      self.tangent * other)
+        else:                                                         # Otherwise
+            return PrimalTangentPairs(self.primal * other,            # ... multiply primal and constant
+                                      self.tangent * other)           # ... multiply primal and constant
 
     def __rmul__(self, other):
         # Multiplication, reversed
-        return PrimalTangentPairs(self.primal * other,
-                                  self.tangent * other)
+        return PrimalTangentPairs(self.primal * other,                # Reversed order can evaluate the same
+                                  self.tangent * other)               # ... for primal and tangent pairs
 
     def __truediv__(self, other):
         # Division
-        if isinstance(other, PrimalTangentPairs):
-            return PrimalTangentPairs(self.primal / other.primal,
+        if isinstance(other, PrimalTangentPairs):                     # When dividing PrimalTangentPairs
+            return PrimalTangentPairs(self.primal / other.primal,     # ... divide primals
                                       (self.tangent * other.primal - self.primal * other.tangent) / (other.primal ** 2))
-        else:
-            return PrimalTangentPairs(self.primal / other,
-                                      self.tangent / other)
+        else:                                                         # Otherwise
+            return PrimalTangentPairs(self.primal / other,            # ... divide primal and constant
+                                      self.tangent / other)           # ... divide tangent and constant
 
     def __rtruediv__(self, other):
         # Division, reversed
-        return PrimalTangentPairs(other / self.primal,
+        return PrimalTangentPairs(other / self.primal,                # Reversed form of division
                                   (0 * self.primal - self.tangent * other) / (self.primal ** 2))
 
     def __pow__(self, other):
         # Power
-        if isinstance(other, PrimalTangentPairs):
-            fgx = other.primal * self.primal ** (other.primal - 1) * self.tangent
-            gx = self.primal ** other.primal * np.log(self.primal) * other.tangent
-            return PrimalTangentPairs(self.primal ** other.primal,
-                                      fgx + gx)
+        if isinstance(other, PrimalTangentPairs):                                    # For PrimalTangentPairs to powers
+            fgx = other.primal * self.primal ** (other.primal - 1) * self.tangent    # ... initial piece of rule
+            gx = self.primal ** other.primal * np.log(self.primal) * other.tangent   # ... secondary piece of rule
+            return PrimalTangentPairs(self.primal ** other.primal,                   # ... raise primal to primal
+                                      fgx + gx)                                      # ... apply the power rule
         else:
-            return PrimalTangentPairs(self.primal ** other,
+            return PrimalTangentPairs(self.primal ** other,                          # Otherwise compute directly
                                       other * self.primal ** (other - 1) * self.tangent)
 
     def __rpow__(self, other):
         # Power, reversed
-        return PrimalTangentPairs(other ** self.primal,
-                                  other ** self.primal * np.log(other))
+        return PrimalTangentPairs(other ** self.primal,                                 # Constant to primal
+                                  self.tangent * other ** self.primal * np.log(other))  # ... then power rule
 
     # Operators that sometimes have undefined derivatives
 
     def __abs__(self):
         # Absolute value
-        if self.primal > 0:
-            return PrimalTangentPairs(1 * self.primal, self.tangent)
-        elif self.primal < 0:
-            return PrimalTangentPairs(-1 * self.primal, -1 * self.tangent)
-        else:
-            return PrimalTangentPairs(0 * self.primal, np.nan * self.tangent)
+        if self.primal > 0:                                                            # Absolute value for positive
+            return PrimalTangentPairs(1 * self.primal, self.tangent)                   # ... primal, tangent
+        elif self.primal < 0:                                                          # Absolute value for negative
+            return PrimalTangentPairs(-1 * self.primal, -1 * self.tangent)             # ... -primal, -tangent
+        else:                                                                          # Absolute value at zero
+            return PrimalTangentPairs(0 * self.primal, np.nan * self.tangent)          # ... zero, undefined
 
     def __floor__(self):
         # Floor
-        if self.primal % 1 == 0:
-            return PrimalTangentPairs(np.floor(self.primal), np.nan * self.tangent)
-        else:
-            return PrimalTangentPairs(np.floor(self.primal), 0 * self.tangent)
+        if self.primal % 1 == 0:                                                       # Floor with integers
+            return PrimalTangentPairs(np.floor(self.primal), np.nan * self.tangent)    # ... floor, undefined
+        else:                                                                          # Floor with remainder
+            return PrimalTangentPairs(np.floor(self.primal), 0 * self.tangent)         # ... floor, 0
 
     def __ceil__(self):
         # Ceiling
-        if self.primal % 1 == 0:
-            return PrimalTangentPairs(np.ceil(self.primal), np.nan * self.tangent)
-        else:
-            return PrimalTangentPairs(np.ceil(self.primal), 0 * self.tangent)
+        if self.primal % 1 == 0:                                                       # Ceil with integers
+            return PrimalTangentPairs(np.ceil(self.primal), np.nan * self.tangent)     # ... ceil, undefined
+        else:                                                                          # Ceil with remainder
+            return PrimalTangentPairs(np.ceil(self.primal), 0 * self.tangent)          # ... ceil, 0
 
     # NumPy logarithm and exponent operators
 
     def exp(self):
         # Exponentiate
-        return PrimalTangentPairs(np.exp(self.primal),
-                                  np.exp(self.primal) * self.tangent)
+        return PrimalTangentPairs(np.exp(self.primal),                    # Exponentiate primal
+                                  np.exp(self.primal) * self.tangent)     # ... exponential rule
 
     def log(self):
         # Logarithm base-e
-        return PrimalTangentPairs(np.log(self.primal),
-                                  self.tangent / self.primal)
+        return PrimalTangentPairs(np.log(self.primal),                    # Natural logarithm primal
+                                  self.tangent / self.primal)             # ... logarithm rule
 
     def log2(self):
         # Logarithm base-2
-        pair = self.log()
-        return PrimalTangentPairs(pair.primal / np.log(2),
-                                  pair.tangent / np.log(2))
+        pair = self.log()                                                 # Compute natural log
+        return PrimalTangentPairs(pair.primal / np.log(2),                # Apply logarithm rule for primal
+                                  pair.tangent / np.log(2))               # ... and logarithm rule for tangent
 
     def log10(self):
         # Logarithm base-10
-        pair = self.log()
-        return PrimalTangentPairs(pair.primal / np.log(10),
-                                  pair.tangent / np.log(10))
+        pair = self.log()                                                 # Compute natural log
+        return PrimalTangentPairs(pair.primal / np.log(10),               # Apply logarithm rule for primal
+                                  pair.tangent / np.log(10))              # ... and logarithm rule for tangent
 
     def sqrt(self):
         # Square root
-        return PrimalTangentPairs(np.sqrt(self.primal),
-                                  self.tangent / (2 * np.sqrt(self.primal)))
+        return PrimalTangentPairs(np.sqrt(self.primal),                        # Compute square root of primal
+                                  self.tangent / (2 * np.sqrt(self.primal)))   # ... power rule for tangent
 
     # NumPy trigonometry operators
 
