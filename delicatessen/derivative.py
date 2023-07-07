@@ -26,7 +26,7 @@ def auto_differentiation(xk, f):
 
     Returns
     -------
-    ndarray :
+    numpy.array :
         Corresponding array of the pairwise derivatives for all different input x values.
 
     Examples

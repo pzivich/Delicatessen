@@ -11,8 +11,8 @@ class MEstimator:
     r"""M-Estimator for stacked estimating equations.
 
     M-Estimation, or loosely referred to as estimating equations, is a general approach to point and variance
-    estimation that consists of defining an estimator as the solution to an estimating equation (but does not require
-    the derivative of a log-likelihood function). M-estimators satisify the following
+    estimation that consists of defining an estimator as the solution to an estimating equation. M-estimators
+    satisify the following
 
     .. math::
 
@@ -25,7 +25,7 @@ class MEstimator:
     Note
     ----
     M-Estimation is advantageous in both theoretical and applied research. M-estimation simplifies proofs of
-    consistency and asymptotic normality of estimator sunder a large-sample approximation framework. In application,
+    consistency and asymptotic normality of estimators under a large-sample approximation framework. In application,
     M-estimators simplify estimation of the variance of parameters and automate the delta-method.
 
 
@@ -47,13 +47,14 @@ class MEstimator:
 
         F_n(O, \hat{\theta}) = n^{-1} \sum_{i=1}^{n} \psi(O_i, \hat{\theta}) \psi(O_i, \hat{\theta})^T
 
-    The partial derivatives for the bread are calculated using numerical approximation methods. Inverting the bread is
-    done via NumPy's ``linalg.pinv``. For the filling, the dot product is taken at :math:`\hat{\theta}`.
+    The partial derivatives for the bread are calculated using either numerical approximation (i.e., central difference
+    method) or forward-mode automatic differentiation. Inverting the bread is done via NumPy's ``linalg.pinv``. For
+    the filling, the dot product is taken at :math:`\hat{\theta}`.
 
     Note
     ----
-    A hard part (that must be done by the user) is to specify the stacked estimating equations. Be sure to check
-    the provided examples for the format. Pre-built estimating equations for common problems are made available.
+    A hard part, that must be done by the user, is to specify the estimating equations. Be sure to check the provided
+    examples for the expected format. Pre-built estimating equations for common problems are also made available.
 
 
     After completion of these steps, point and variance estimates are stored. These can be extracted from
@@ -61,8 +62,8 @@ class MEstimator:
 
     Note
     ----
-    For complex regression problems, the root-finding algorithms are not as robust relative to other approaches based
-    on higher-order derivatives. 'Pre-washed' values can be fed forward as the initial values.
+    For complex regression problems, the root-finding algorithms are not as robust relative to maximization approaches.
+    A solution for difficult problems is to 'pre-wash' the initial values.
 
     Parameters
     ----------
@@ -72,10 +73,10 @@ class MEstimator:
     init : list, set, array
         Initial values for the root-finding algorithm.
     subset : list, set, array, None, optional
-        Optional argument to conduct the root-finding procedure on a subset of parameters in the stacked estimating
-        equations. The input list is used to location index the parameter array via ``np.take()``. The subset list will
+        Optional argument to conduct the root-finding procedure on a subset of parameters in the estimating equations.
+        The input list is used to location index the parameter array via ``np.take()``. The subset list will
         only affect the root-finding procedure (i.e., the sandwich variance estimator ignores the subset argument).
-        Default is ``None``, which runs the root-finding procedure for all parameters in the stacked equations.
+        Default is ``None``, which runs the root-finding procedure for all parameters in the estimating equations.
 
     Note
     ----
@@ -133,16 +134,16 @@ class MEstimator:
 
     Note that ``len(init)`` should be equal to b. So in this case, two initial values are provided.
 
-    ``MEstimator`` can also be run with a user-provided root-finding algorithm. To specify a custom
-    root-finder, a function must be created by the user that consists of two keyword arguments (``stacked_equations``,
-    ``init``) and must return only the optimized values. The following is an example with SciPy's Levenberg-Marquardt
-    algorithm in ``root``.
+    ``MEstimator`` can also be run with a user-provided root-finding algorithm. To specify a custom root-finder, a
+    function must be created by the user that consists of two keyword arguments (``stacked_equations``, ``init``) and
+    must return only the optimized values. The following is an example with SciPy's Levenberg-Marquardt algorithm
+    implemented in ``root``.
 
     >>> def custom_solver(stacked_equations, init):
     >>>     options = {"maxiter": 1000}
     >>>     opt = root(stacked_equations,
-    >>>                x0=np.asarray(init), method='lm', tol=1e-9,
-    >>>                options=options)
+    >>>                x0=np.asarray(init),
+    >>>                method='lm', tol=1e-9, options=options)
     >>>     return opt.x
 
     The provided custom root-finder can then be implemented like the following (continuing with the estimating equation
@@ -161,10 +162,10 @@ class MEstimator:
     def __init__(self, stacked_equations, init=None, subset=None):
         self.stacked_equations = stacked_equations     # User-input stacked estimating equations
         self.init = init                               # User-input initial starting values for solving estimating eqs
-        if subset is None:
-            self._subset_ = subset
-        else:
-            self._subset_ = sorted(subset)
+        if subset is None:                             # Handling subset of parameters
+            self._subset_ = subset                     # ... when None, set as None
+        else:                                          # Otherwise
+            self._subset_ = sorted(subset)             # ... ensure it is sorted
 
         # Storage for results from the M-Estimation procedure
         self.n_obs = None                 # Number of unique observations (calculated later)
@@ -184,30 +185,29 @@ class MEstimator:
             Method to use for the root-finding procedure. Default is the secant method (``scipy.optimize.newton``).
             Other built-in option is the Levenberg-Marquardt algorithm (``scipy.optimize.root(method='lm')``), and
             a modification of the Powell hybrid method (``scipy.optimize.root(method='hybr')``). Finally, any generic
-            root-finding algorithm can be used via a user-provided callable object (function). The function should
+            root-finding algorithm can be used via a user-provided callable object. The function must
             consist of two keyword arguments: ``stacked_equations``, and ``init``. Additionally, the function should
-            return only the optimized values. Please review the example in the documentation for how to provide a
-            custom root-finding algorithm.
+            return only the optimized values. Please review the provided example in the documentation for how to
+            implement a custom root-finding algorithm.
         maxiter : int, optional
             Maximum iterations to consider for the root finding procedure. Default is 1000 iterations. For complex
             estimating equations (without preceding optimization), this value may need to be increased. This argument
-            is not used for user-specified solvers
+            is not used for user-specified solvers.
         tolerance : float, optional
             Maximum tolerance for errors in the root finding. This argument is passed ``scipy.optimize`` via the
-            ``tol`` parameter. Default is 1e-9.
+            ``tol`` parameter. This argument is not used for user-specified solvers. Default is 1e-9.
         deriv_method : str, optional
             Method to compute the derivative of the estimating equations for the bread matrix. Options include numerical
-            approximation with the central difference method (``'approx'``) and forward-mode automatic differentiation
-            (``'exact'``). Default is numerical approximation.
+            approximation via the central difference method (``'approx'``) and forward-mode automatic differentiation
+            (``'exact'``). Default is ``'approx'``.
         dx : float, optional
-            Spacing to use to numerically approximate the partial derivatives of the bread matrix. Default is 1e-9. It
-            is generally not recommended to have a large ``dx``, since some large values can poorly approximate
-            derivatives.
+            Spacing to use to numerically approximate the partial derivatives of the bread matrix. Here, a small value
+            for ``dx`` should be used, since some large values can result in poor approximations. This argument is only
+            used when ``deriv_method='approx'``. Default is 1e-9.
         allow_pinv : bool, optional
-            The default is ``True`` which uses ``numpy.linalg.pinv`` to find the inverse (or pseudo-inverse if matrix is
-            non-invertible) for the bread. This default option is more robust to the possible matrices. If you want
-            to use ``numpy.linalg.inv`` instead (which does not support pseudo-inverse), set this parameter to
-            ``False``.
+            Whether to allow for the pseudo-inverse (via ``numpy.linalg.pinv``) if the bread matrix is determined to be
+            non-invertible. If you want to disallow the pseudo-inverse (i.e., use ``numpy.linalg.inv``), set this
+            argument to ``False``. Default is ``True``, which  is more robust to the possible bread matrices.
 
         Returns
         -------
@@ -318,7 +318,7 @@ class MEstimator:
 
         .. math::
 
-            \hat{\theta} \pm Z_{\alpha / 2} \times \widehat{SE}(\hat{\theta})
+            \hat{\theta} \pm z_{\alpha / 2} \times \widehat{SE}(\hat{\theta})
 
         Note
         ----
@@ -327,8 +327,8 @@ class MEstimator:
         Parameters
         ----------
         alpha : float, optional
-            The :math:`\alpha` level for the corresponding confidence intervals. Default is 0.05, which calculate the
-            95% confidence intervals. Notice that :math:`0<\alpha<1`.
+            The :math:`0 < \alpha < 1` level for the corresponding confidence intervals. Default is 0.05, which
+            corresponds to 95% confidence intervals.
 
         Returns
         -------
@@ -352,9 +352,9 @@ class MEstimator:
         return np.asarray([lower_ci, upper_ci]).T
 
     def _mestimation_answer_(self, theta):
-        """Internal function to evaluate the sum of the estimating equations. The summation must be internally evaluated
-        since the bread requires calculation of the sum of the derivatives. This function is used by the root-finding
-        procedure (since we need the subset applied).
+        """Internal function to evaluate the sum of the estimating equations. The summation is internally evaluated
+        since access to the estimating functions is needed for the sandwich variance computations. This function is
+        used by the root-finding procedure (since we need the subset applied).
 
         Parameters
         ----------
@@ -380,9 +380,9 @@ class MEstimator:
                                      subset=self._subset_)                  # ... with specified subset
 
     def _mestimation_answer_no_subset_(self, theta):
-        """Internal function to evaluate the sum of the estimating equations. The summation must be internally evaluated
-        since the bread requires calculation of the sum of the derivatives. This function is used by the bread matrix
-        approximation procedure (since the subset should be ignored for the bread).
+        """Internal function to evaluate the sum of the estimating equations. The summation is internally evaluated
+        since access to the estimating functions is needed for the sandwich variance computations. This function is
+        used by the bread matrix computation procedure (since subset is ignored for the bread).
 
         Parameters
         ----------
@@ -400,22 +400,23 @@ class MEstimator:
 
     @staticmethod
     def _mestimator_sum_(stacked_equations, subset):
-        """Function to evaluate the sum of the M-estimator over the i units. This static method takes an optional
-        argument.
+        """Function to evaluate the sum of the M-estimator over the :math:`n` units.
 
         Note
         ----
         Added in v1.0 to replace the inner functionality of ``_mestimation_answer_`` for the new ``approx_fprime`` but
-        still support ``subset`` (without having to flip the subset flag
+        still support ``subset`` (without having to flip the subset flag).
 
         Parameters
         ----------
-        stacked_equations
-        subset
+        stacked_equations :
+            Estimating equations to evaluate
+        subset :
+            Whether to consider a subset of parameters
 
         Returns
         -------
-
+        numpy.array
         """
         # IF stacked_equation returns 1 value, only return that 1 value
         if len(stacked_equations.shape) == 1:          # Checking length
@@ -526,28 +527,27 @@ class MEstimator:
         -------
         numpy.array
         """
-        # Check how many values of theta there is
-        val_range = len(theta)
+        val_range = len(theta)                                       # Check how many values of theta there is
+        est_eq = self._mestimation_answer_no_subset_                 # Estimating equations to compute derivative of
 
-        # Calculating the bread via numerical approximation
-        if method.lower() == "approx":
+        # Compute the derivative
+        if method.lower() == "approx":                               # Numerical approximation method
             if val_range == 1:                                       # When only a single theta is present
-                d = derivative(self._mestimation_answer_no_subset_,  # ... approximate the derivative
+                d = derivative(est_eq,                               # ... approximate the derivative
                                theta, dx=dx)                         # ... at the solved theta (input)
                 bread_matrix = np.array([[d, ], ])                   # ... return as 1-by-1 array object for inversion
             else:                                                    # Otherwise approximate the partial derivatives
                 bread_matrix = approx_fprime(xk=theta,               # ... use built-in jacobian functionality of SciPy
-                                             f=self._mestimation_answer_no_subset_,
+                                             f=est_eq,               # ... with not-subset estimating equations
                                              epsilon=dx)             # ... order option removed in v1.0
 
-        # Calculating the bread via automatic differentiation
-        elif method.lower() == "exact":
-            bread_matrix = auto_differentiation(xk=theta,
-                                                f=self._mestimation_answer_no_subset_)
+        elif method.lower() == "exact":                              # Automatic Differentiation
+            bread_matrix = auto_differentiation(xk=theta,            # Compute the exact derivative at theta
+                                                f=est_eq)            # ... for the given estimating equations
 
-        # Error for invalid derivative option
-        else:
-            raise ValueError("Input for deriv_method was " + str(method)
+        else:                                                        # Error for unsupported option
+            raise ValueError("The input for deriv_method was "
+                             + str(method)
                              + ", but only 'approx' and 'exact' are available.")
 
         # Return bread (multiplied by negative 1 as in Stefanski & Boos)
