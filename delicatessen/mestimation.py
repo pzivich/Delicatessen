@@ -16,11 +16,11 @@ class MEstimator:
 
     .. math::
 
-        \sum_{i=1}^n \psi(Z_i, \hat{\theta}) = 0
+        \sum_{i=1}^n \psi(O_i, \hat{\theta}) = 0
 
     where :math:`\psi` is the :math:`v`-dimensional vector of estimating equation(s), :math:`\hat{\theta}` is the
-    :math:`v`-dimensional parameter vector, and :math:`O_i` is the observed data (independent but not necessarily
-    identically distributed).
+    :math:`v`-dimensional parameter vector, and :math:`O_i` is the observed data (where units are independent but not
+    necessarily identically distributed).
 
     Note
     ----
@@ -35,17 +35,17 @@ class MEstimator:
 
     .. math::
 
-        B_n(Z, \hat{\theta})^{-1} F_n(Z, \hat{\theta}) \left\{B_n(Z, \hat{\theta}^{-1})\right\}^T
+        B_n(O, \hat{\theta})^{-1} F_n(O, \hat{\theta}) \left\{B_n(O, \hat{\theta}^{-1})\right\}^T
 
     where :math:`B` is the 'bread' and :math:`F` is the 'filling'
 
     .. math::
 
-        B_n(Z, \hat{\theta}) = n^{-1} \sum_{i=1}^{n} - \psi'(Z_i, \hat{\theta})
+        B_n(O, \hat{\theta}) = n^{-1} \sum_{i=1}^{n} - \psi'(O_i, \hat{\theta})
 
     .. math::
 
-        F_n(Z, \hat{\theta}) = n^{-1} \sum_{i=1}^{n} \psi(Z_i, \hat{\theta}) \psi(Z_i, \hat{\theta})^T
+        F_n(O, \hat{\theta}) = n^{-1} \sum_{i=1}^{n} \psi(O_i, \hat{\theta}) \psi(O_i, \hat{\theta})^T
 
     The partial derivatives for the bread are calculated using numerical approximation methods. Inverting the bread is
     done via NumPy's ``linalg.pinv``. For the filling, the dot product is taken at :math:`\hat{\theta}`.
