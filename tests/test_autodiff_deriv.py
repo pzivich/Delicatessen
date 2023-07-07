@@ -627,6 +627,9 @@ class TestSandwichAutoDiff:
         bread_approx = mestr.bread
         var_approx = mestr.variance
 
+        print()
+        print(np.max(var_approx - var_exact))
+
         # Checking bread estimates
         npt.assert_allclose(bread_approx,
                             bread_exact,
