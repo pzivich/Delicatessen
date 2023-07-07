@@ -8,8 +8,9 @@ def auto_differentiation(xk, f):
 
     Note
     ----
-    This functionality is only intended for use behind the scenes in ``delicatessen``. I wrote this functionality to
-    avoid additional dependencies.
+    This functionality is only intended for use behind the scenes in ``delicatessen``. Automatic differentiation is
+    implemented from scratch to avoid additional dependencies.
+
 
     This is accomplished by the ``PrimalTangentPairs`` class, which is a special data type in ``delicatessen`` that
     stores pairs of the original evaluation and the corresponding derivative for a variety of different mathematical
@@ -30,7 +31,7 @@ def auto_differentiation(xk, f):
 
     Examples
     --------
-    Loading necessary functions and building a generic data set for estimation of the mean
+    Loading necessary functions
 
     >>> import numpy as np
     >>> from delicatessen.derivative import auto_differentiation
@@ -55,7 +56,7 @@ def auto_differentiation(xk, f):
 
     >>> dy = auto_differentiation(xk=[1, ], f=f)
 
-    which returns :math:`dy=0.3757795`. This is the same as if you plugged in :math:`x=1` into the previous equation.
+    which returns ``0.3757795``. This is the same as if you plugged in :math:`x=1` into the previous equation.
 
     Note
     ----
@@ -70,13 +71,16 @@ def auto_differentiation(xk, f):
 
     >>> dy = auto_differentiation(xk=[0.7, 1.2, -0.9], f=f)
 
-    which will return a 2-by-3 array of all the x-y pair derivatives. Here, the rows correspond to the output and the
-    columns correspond to the inputs.
+    which will return a 2-by-3 array of all the x-y pair derivatives at the given values. Here, the rows correspond to
+    the output and the columns correspond to the inputs.
 
     References
     ----------
     Baydin AG, Pearlmutter BA, Radul AA, & Siskind JM. (2018). Automatic differentiation in machine learning: a survey.
     *Journal of Marchine Learning Research*, 18, 1-43.
+
+    Rall LB & Corliss GF. (1996). An introduction to automatic differentiation. Computational Differentiation:
+    Techniques, Applications, and Tools, 89, 1-18.
     """
     # Meta-information about function and inputs
     xshape = len(xk)                                                   # The number of inputs into the function
