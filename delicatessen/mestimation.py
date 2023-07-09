@@ -479,10 +479,11 @@ class MEstimator:
                 print("Root-finding failed to converge...")
                 raise RuntimeError(opt.message)
         elif method in ['hybr', ]:
-            options = {"xtol": tolerance}
+            options = {"maxfev": maxiter}
             opt = root(stacked_equations,      # ... stacked equations to solve (should be written as sums)
                        x0=np.asarray(init),    # ... initial values for solver
                        method=method,          # ... allow for valid root-finding methods
+                       tol=tolerance,          # ... setting some tolerance values
                        options=options)        # ... allow for options in hybrid
             psi = opt.x                        # Error handling if fails to converge
             if opt.success == 0:
