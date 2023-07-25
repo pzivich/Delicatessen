@@ -1,7 +1,8 @@
 from .basic import (ee_mean, ee_mean_variance, ee_mean_robust,
                     ee_percentile, ee_positive_mean_deviation)
 
-from .causal import (ee_ipw, ee_gformula, ee_aipw)
+from .causal import (ee_ipw, ee_gformula, ee_aipw,
+                     ee_mean_sensitivity_analysis)
 
 from .dose_response import (ee_4p_logistic, ee_3p_logistic, ee_2p_logistic,
                             ee_effective_dose_delta)

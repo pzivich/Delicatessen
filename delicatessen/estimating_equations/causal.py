@@ -612,3 +612,195 @@ def ee_aipw(theta, y, A, W, X, X1, X0, truncate=None, force_continuous=False):
                       y0_star[None, :],  # theta[2] is for R0
                       pi_model,          # theta[b] is for the treatment model coefficients
                       m_model))          # theta[c] is for the outcome model coefficients
+
+
+def ee_mean_sensitivity_analysis(theta, y, delta, X, q_eval, H_function):
+    r"""Estimating equation for weighted sensitivity analysis estimator of the mean. This estimator can handle cases of
+    missing completely at random, missing at random, and missing not at random. The sensitivity analysis consists of
+    two sets of estimating equations. The first is for the mean of interest (:math:`\mu`), and the second is for the
+    sensitivity analysis model for the estimable parameters of the missingness model (:math:`\gamma`):
+
+    .. math::
+
+        \sum_{i=1}^n
+        \begin{bmatrix}
+            \frac{S_i Y_i}{H(\gamma X_i + q(Y_i, \alpha)} - \mu \\
+            \left( \frac{S_i}{H(\gamma X_i + q(Y_i, \alpha)} - 1 \right) X_i^T
+        \end{bmatrix}
+        = 0
+
+    where :math:`Y_i` is the outcome of interest with missing data, :math:`X_i` is the corresponding design matrix, and
+    :math:`H(b)` is a known, continuous, and monotone increasing distribution function that is bound by :math:`[0,1]`.
+    Here, :math:`q(Y_i, \alpha)` is a user-specified sensitivity function. For example,
+    :math:`q(Y_i, \alpha) = \alpha Y_i` Importantly, :math:`\alpha` is treated as known (i.e., this approach is not
+    possible when :math:`\alpha` needs to be estimated).
+
+    Note
+    ----
+    This estimator looks like the inverse probability weighting estimator, but the estimating equation for the mean
+    is slightly different. When :math:`q(Y, \alpha) = 0`, the estimates between this estimator and the inverse
+    probability weighting estimator will result in different (but similar) estimates.
+
+
+    The length of the parameter vector, :math:`\theta`, is 1+b, where b is the number of columns in ``X``. The *first*
+    value in the theta vector is the corrected mean of :math:`Y`. The remainder of the parameters correspond to the
+    regression model coefficients.
+
+    Parameters
+    ----------
+    theta : ndarray, list, vector
+        Theta in this case consists of 1+b values. Therefore, initial values should consist of one plus the number of
+        columns present in ``X``. This can easily be accomplished generally by ``[0, ] + [0, ] * X.shape[1]``.
+    y : ndarray, list, vector
+        1-dimensional vector of n values. Any values of ``y`` that are missing should be indicated by the ``delta``
+        parameter.
+    delta : ndarray, list, vector
+        1-dimensional vector of n observed values indicating whether the observation has a value for ``y`` observed,
+        where 1 indicates yes and 0 indicated no. This vector should not include any ``nan`` values.
+    X : ndarray, list, vector
+        2-dimensional vector of n observed values for b variables consider as predictors. At a minimum, a vector of ones
+        (intercept) should be included. This matrix should not include any ``nan`` values.
+    q_eval : ndarray, list, vector
+        1-dimensional vector of n values evaluated using the :math:`q(Y; \alpha)` function.
+    H_function : callable
+        Function use to bound the observations between 0,1. The function must be monotonic increasing and be bounded by
+        :math:`[0,1]`. For example, the expit (``delicatessen.utilities.inverse_logit``) function meets this criteria.
+
+    Returns
+    -------
+    array :
+        Returns a (1+b)-by-n NumPy array evaluated for the input theta
+
+    Examples
+    --------
+    Construction of a estimating equation(s) with ``ee_mean_sensitivity_analysis`` should be done similar to the
+    following
+
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> import matplotlib.pyplot as plt
+    >>> from delicatessen import MEstimator
+    >>> from delicatessen.estimating_equations import ee_mean_sensitivity_analysis
+    >>> from delicatessen.utilities import inverse_logit
+
+    Some generic data with missing values for :math:`Y`
+
+    >>> n = 200
+    >>> d = pd.DataFrame()
+    >>> d['W'] = np.random.binomial(1, p=0.5, size=n)
+    >>> d['Y'] = 200. - 35*d['W'] + np.random.normal(scale=5, size=n)
+    >>> d['M'] = np.random.binomial(1, p=inverse_logit(d['W'] - 0.01*d['Y']), size=n)
+    >>> d['Y'] = np.where(d['M'] == 1, np.nan, d['Y'])
+    >>> d['C'] = 1
+
+    To apply the sensitivity analysis, we need to specify the corresponding sensitivity analysis function. The following
+    is a simple model where missingness depends on a single parameter and the (possibly unobserved) outcome value. Note
+    that the function replaces missing observations with zero.
+
+    >>> def q_function(y_vals, alpha):
+    >>>     # q(Y_i; \alpha) = alpha * Y_i
+    >>>     y_no_miss = np.where(np.isnan(y_vals), 0, y_vals)
+    >>>     return alpha * y_no_miss
+
+    We can now define psi, or the stacked estimating equations.
+
+    >>> def psi(theta):
+    >>>     yhat = q_function(d['Y'], alpha=-0.1)
+    >>>     return ee_mean_sensitivity_analysis(theta=theta,
+    >>>                                         y=d['Y'], delta=d['M'], X=d[['C', 'W']],
+    >>>                                         q_eval=yhat, H_function=inverse_logit)
+
+    Calling the M-estimator.
+
+    >>> estr = MEstimator(psi, init=[200., 0., 0.])
+    >>> estr.estimate(solver='lm')
+
+    Inspecting the parameter estimates, variance, and 95% confidence intervals
+
+    >>> estr.theta
+    >>> estr.variance
+    >>> estr.confidence_intervals()
+
+    More specifically, the corresponding parameters are
+
+    >>> estr.theta[0]     # mean of interest
+    >>> estr.theta[1:]    # weighting model parameters given alpha
+
+    Proportions (binary outcomes) are also natively supported
+
+    >>> y_bin = np.where(y <= 200., 1, 0)    # Binary conversion of outcome
+    >>> def psi(theta):
+    >>>     yhat = q_function(d['Y'], alpha=-0.1)
+    >>>     return ee_mean_sensitivity_analysis(theta=theta,
+    >>>                                         y=y_bin, delta=d['M'], X=d[['C', 'W']],
+    >>>                                         q_eval=yhat, H_function=inverse_logit)
+
+    >>> estr = MEstimator(psi, init=[0.5, 0., 0.])
+    >>> estr.estimate(solver='lm')
+
+    Often, we will want to conduct the sensitivity analysis for a range of different values of alpha. The following is
+    code to accomplish this.
+
+    >>> def psi(theta):
+    >>>     yhat = q_function(d['Y'], alpha=alpha_current)
+    >>>     return ee_mean_sensitivity_analysis(theta=theta,
+    >>>                                         y=d['Y'], delta=d['M'], X=d[['C', 'W']],
+    >>>                                         q_eval=yhat, H_function=inverse_logit)
+
+    >>> alphas = np.linspace(0, 0.05, 20)
+    >>> est, lcl, ucl = [], [], []
+    >>> prev_optim = [200., 0., 0.]
+    >>> for alpha_current in alphas:
+    >>>     mest = MEstimator(psi, init=prev_optim)
+    >>>     mest.estimate(solver='lm')
+    >>>     prev_optim = mest.theta
+    >>>     est.append(mest.theta[0])
+    >>>     ci = mest.confidence_intervals()
+    >>>     lcl.append(ci[0][0])
+    >>>     ucl.append(ci[0][1])
+
+    >>> # plotting
+    >>> plt.fill_between(alphas, lcl, ucl, color='blue', alpha=0.2)
+    >>> plt.plot(alphas, est, '-', color='blue')
+    >>> plt.show()
+
+    Note
+    ----
+    Note that we use the previous iteration as the starting values for the next alpha as a computational trick to
+    speed up the root-finding process and prevent convergence issues.
+
+
+    The corresponding plot provides a visualization of how the estimated mean changes as :math:`\alpha` changes. This
+    can be useful to help judge the extent of bias for the mean due to data missing not at random for a specific model.
+
+    References
+    ----------
+    Cole SR, Zivich PN, Edwards JK, Shook-Sa BE, & Hudgens MG. (2023). Sensitivity Analyses for Means or Proportions
+    with Missing Outcome Data. *Epidemiology*
+
+    Robins JM, Rotnitzky A, & Scharfstein DO. (2000). Sensitivity analysis for selection bias and unmeasured
+    confounding in missing data and causal inference models. In
+    *Statistical models in epidemiology, the environment, and clinical trials* (pp. 1-94). New York, NY:
+    Springer New York.
+    """
+    delta = np.asarray(delta)[:, None]       # Convert to NumPy array and ensure correct shape for matrix algebra
+    y = np.asarray(y)[:, None]               # Convert to NumPy array and ensure correct shape for matrix algebra
+    X = np.asarray(X)                        # Convert to NumPy array
+    qy = np.asarray(q_eval)[:, None]         # Convert to NumPy array and ensure correct shape for matrix algebra
+    beta = np.asarray(theta[1:])[:, None]    # Convert to NumPy array and ensure correct shape for matrix algebra
+
+    # Predicted values from design matrix and nuisance coefficients
+    pred_values = np.dot(X, beta)                                # dot product for speed (like regression)
+
+    # Solving for the sensitivity analysis mean
+    numerator = delta * y                                        # Numerator for the mean estimating equation
+    denominator = H_function(pred_values + qy)                   # Denominator for the mean estimating equation
+    ym_ind = np.where(delta == 1, numerator / denominator, 0)    # Setting missing Y as zero (don't contribute to EE)
+    ef_mean = ym_ind - theta[0]                                  # Sensitivity analysis estimating equation
+
+    # Solving for intercept and coefficients of model
+    ef_H = (delta / H_function(pred_values + qy) - 1) * X        # Multiply by X at end to keep dims the same
+
+    # Returning stacked estimating equations
+    return np.vstack((ef_mean.T,                                 # theta[0] is the sensitivity analysis mean
+                      ef_H.T))                                   # theta[1:] is (are) the nuisance parameter(s)
