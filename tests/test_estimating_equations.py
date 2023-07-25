@@ -18,9 +18,9 @@ from delicatessen.estimating_equations import (ee_mean, ee_mean_variance, ee_mea
                                                # Dose-Response
                                                ee_2p_logistic, ee_3p_logistic, ee_4p_logistic, ee_effective_dose_delta,
                                                # Causal inference
-                                               ee_gformula, ee_ipw, ee_aipw)
+                                               ee_gformula, ee_ipw, ee_aipw, ee_mean_sensitivity_analysis)
 from delicatessen.data import load_inderjit
-from delicatessen.utilities import additive_design_matrix
+from delicatessen.utilities import additive_design_matrix, inverse_logit
 
 
 np.random.seed(236461)
@@ -2031,3 +2031,77 @@ class TestEstimatingEquationsCausal:
                             var_r0,
                             atol=1e-6)
 
+    def test_robins_sensitivity_mean(self):
+        d = pd.DataFrame()
+        d['I'] = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+        d['X'] = [0, 1, 2, 0, 1, 2, 0, 1, 2, 0]
+        d['Y'] = [7, 2, 5, np.nan, 1, 4, 8, np.nan, 1, np.nan]
+        d['delta'] = np.where(d['Y'].isna(), 0, 1)
+
+        def q_function(y_vals, alpha):
+            y_no_miss = np.where(np.isnan(y_vals), 0, y_vals)
+            return alpha * y_no_miss
+
+        ####
+        # Checking with alpha=0.5
+        def psi(theta):
+            return ee_mean_sensitivity_analysis(theta=theta,
+                                                y=d['Y'], delta=d['delta'], X=d[['I', 'X']],
+                                                q_eval=q_function(d['Y'], alpha=0.5),
+                                                H_function=inverse_logit)
+
+        mestr = MEstimator(psi, init=[0., 0., 0.])
+        mestr.estimate(solver='lm')
+
+        # Checking point estimates
+        npt.assert_allclose(mestr.theta,
+                            [4.42581577, -3.72866034, 3.74204493],
+                            atol=1e-6)
+
+        # Checking variance estimates
+        var_closed = [[0.77498021, 0.00455995, -0.04176666],
+                      [0.00455995, 1.0032351, -0.94005101],
+                      [-0.04176666, -0.94005101, 2.26235294]]
+        npt.assert_allclose(mestr.variance,
+                            var_closed,
+                            atol=1e-6)
+
+        ####
+        # Checking with alpha=-0.5
+        def psi(theta):
+            return ee_mean_sensitivity_analysis(theta=theta,
+                                                y=d['Y'], delta=d['delta'], X=d[['I', 'X']],
+                                                q_eval=q_function(d['Y'], alpha=-0.5),
+                                                H_function=inverse_logit)
+
+        mestr = MEstimator(psi, init=[0., 0., 0.])
+        mestr.estimate(solver='lm')
+
+        # Checking point estimates
+        npt.assert_allclose(mestr.theta,
+                            [4.876513, 3.579188, 0.140411],
+                            atol=1e-6)
+
+        # Checking variance estimates
+        var_closed = [[0.75110762, 0.05973157, -0.11159881],
+                      [0.05973157, 0.88333613, -0.36712181],
+                      [-0.11159881, -0.36712181, 0.52362185]]
+        npt.assert_allclose(mestr.variance,
+                            var_closed,
+                            atol=1e-6)
+
+        ####
+        # Checking complete-case analysis
+        def psi(theta):
+            return ee_mean_sensitivity_analysis(theta=theta,
+                                                y=d['Y'], delta=d['delta'], X=d[['I', ]],
+                                                q_eval=q_function(d['Y'], alpha=0.),
+                                                H_function=inverse_logit)
+
+        mestr = MEstimator(psi, init=[0., 0.])
+        mestr.estimate(solver='lm')
+
+        # Checking point estimates
+        npt.assert_allclose(mestr.theta[0],
+                            np.nanmean(d['Y']),
+                            atol=1e-6)
