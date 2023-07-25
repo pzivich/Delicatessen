@@ -624,8 +624,8 @@ def ee_mean_sensitivity_analysis(theta, y, delta, X, q_eval, H_function):
 
         \sum_{i=1}^n
         \begin{bmatrix}
-            \frac{S_i Y_i}{H(\gamma X_i + q(Y_i, \alpha)} - \mu \\
-            \left( \frac{S_i}{H(\gamma X_i + q(Y_i, \alpha)} - 1 \right) X_i^T
+            \frac{S_i Y_i}{H[\gamma X_i + q(Y_i, \alpha)]} - \mu \\
+            \left( \frac{S_i}{H[\gamma X_i + q(Y_i, \alpha)]} - 1 \right) X_i^T
         \end{bmatrix}
         = 0
 
@@ -689,8 +689,8 @@ def ee_mean_sensitivity_analysis(theta, y, delta, X, q_eval, H_function):
     >>> d = pd.DataFrame()
     >>> d['W'] = np.random.binomial(1, p=0.5, size=n)
     >>> d['Y'] = 200. - 35*d['W'] + np.random.normal(scale=5, size=n)
-    >>> d['M'] = np.random.binomial(1, p=inverse_logit(d['W'] - 0.01*d['Y']), size=n)
-    >>> d['Y'] = np.where(d['M'] == 1, np.nan, d['Y'])
+    >>> d['M'] = np.random.binomial(1, p=inverse_logit(2 + d['W'] - 0.01 * d['Y']), size=n)
+    >>> d['Y'] = np.where(d['M'] == 0, np.nan, d['Y'])
     >>> d['C'] = 1
 
     To apply the sensitivity analysis, we need to specify the corresponding sensitivity analysis function. The following
@@ -705,7 +705,7 @@ def ee_mean_sensitivity_analysis(theta, y, delta, X, q_eval, H_function):
     We can now define psi, or the stacked estimating equations.
 
     >>> def psi(theta):
-    >>>     yhat = q_function(d['Y'], alpha=-0.1)
+    >>>     yhat = q_function(d['Y'], alpha=-0.01)
     >>>     return ee_mean_sensitivity_analysis(theta=theta,
     >>>                                         y=d['Y'], delta=d['M'], X=d[['C', 'W']],
     >>>                                         q_eval=yhat, H_function=inverse_logit)
@@ -728,7 +728,7 @@ def ee_mean_sensitivity_analysis(theta, y, delta, X, q_eval, H_function):
 
     Proportions (binary outcomes) are also natively supported
 
-    >>> y_bin = np.where(y <= 200., 1, 0)    # Binary conversion of outcome
+    >>> y_bin = np.where(d['Y'] <= 200., 1, 0)    # Binary conversion of outcome
     >>> def psi(theta):
     >>>     yhat = q_function(d['Y'], alpha=-0.1)
     >>>     return ee_mean_sensitivity_analysis(theta=theta,
@@ -747,7 +747,7 @@ def ee_mean_sensitivity_analysis(theta, y, delta, X, q_eval, H_function):
     >>>                                         y=d['Y'], delta=d['M'], X=d[['C', 'W']],
     >>>                                         q_eval=yhat, H_function=inverse_logit)
 
-    >>> alphas = np.linspace(0, 0.05, 20)
+    >>> alphas = np.linspace(0, 0.5, 40)
     >>> est, lcl, ucl = [], [], []
     >>> prev_optim = [200., 0., 0.]
     >>> for alpha_current in alphas:
