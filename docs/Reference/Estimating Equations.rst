@@ -77,4 +77,5 @@ Causal Inference
   ee_gformula
   ee_ipw
   ee_aipw
+  ee_gestimation_snmm
   ee_mean_sensitivity_analysis
