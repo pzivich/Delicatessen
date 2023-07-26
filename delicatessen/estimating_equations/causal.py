@@ -476,7 +476,7 @@ def ee_aipw(theta, y, A, W, X, X1, X0, truncate=None, force_continuous=False):
     Returns
     -------
     array :
-        Returns a (3+b+c)-by-n NumPy array evaluated for the input theta and y
+        Returns a (3+b+c)-by-n NumPy array evaluated for the input ``theta``
 
     Examples
     --------
@@ -614,6 +614,177 @@ def ee_aipw(theta, y, A, W, X, X1, X0, truncate=None, force_continuous=False):
                       m_model))          # theta[c] is for the outcome model coefficients
 
 
+def ee_gestimation_snmm(theta, y, A, W, V, model='linear'):
+    r"""Estimating equations for g-estimation of structural nested mean models. The parameter(s) of interest are the
+    parameter(s) of the corresponding structural nested mean model (SNMM). Rather than estimating the causal effect of
+    treating everyone versus treating no one, g-estimation of SNMM estimates the causal effect within strata of a set
+    of covariates, :math:`V`. Options for the SNMM include the linear SNMM and the log-linear SNMM. The linear
+    structural nested mean model is defined as
+
+    .. math::
+
+        E[Y^a - Y^{a=0} | V] = \beta_1 a + \beta_2 a V
+
+    This model corresponds to the average casual effect or causal risk difference within strata of :math:`V`. The
+    log-linear structural nested mean model is defined as
+
+    .. math::
+
+        \frac{E[Y^a | A=a, V]}{E[Y^{a=0} | A=a, V]} = \exp(\beta_1 a + \beta_2 a V)
+
+    This model corresponds to the average casual mean ratio or causal risk ratio within strata of :math:`V`. Note that
+    the log-linear SNMM is only defined when :math:`Y > 0`.
+
+    Note
+    ----
+    While these SNMM looks similar to a marginal structural model, there is an important difference. The SNMM does not
+    include an intercept parameter or parameter for V.
+
+
+    Under the assumption of causal consistency, conditional exchangeability and positivity, we can solve for
+    :math:`\beta` using the following estimating equation
+
+    .. math::
+
+        \sum_{i=1}^n \left\{ H(\beta) \times (A - \Pr(A | W)) \right\}  \times \mathbb{V}_i = 0
+
+    where :math:`H(\beta) = Y - \beta A \mathbb{V}`, :math:`\mathbb{V}` is a design matrix for the SNMM (note: this
+    design matrix should be for the case of :math:`a=1`). Note that :math:`V \subseteq W`. This estimating equation
+    requires :math:`\Pr(A | W)` or the propensity scores, which must be estimated. This is done via the following
+    estimating equation
+
+    .. math::
+
+        \sum_{i=1}^n \left\{ A_i - \text{expit}(W_i^T \alpha) \right\} W_i = 0
+
+    These estimating equations are stacked together. Therefore, the length of the parameter vector is b+c, where b is
+    the number of columns in ``\mathbb{V}``, and c is the number of columns in ``W``. The *first* b values in theta
+    vector are the SNMM parameters. The *second* set are the parameters corresponding to the propensity score model.
+
+    Parameters
+    ----------
+    theta : ndarray, list, vector
+        Theta consists of 1+b values if ``X0`` is ``None``, and 3+b values if ``X0`` is not ``None``.
+    y : ndarray, list, vector
+        1-dimensional vector of n observed values.
+    A : ndarray, list, vector
+        1-dimensional vector of n observed values. The A values should all be 0 or 1.
+    W : ndarray, list, vector
+        2-dimensional vector of n observed values for b variables.
+    V : ndarray, list, vector
+        2-dimensional vector of n observed values for b variables.
+    model : str, optional
+        Type of structural nested mean model to fit.
+
+    Returns
+    -------
+    array :
+        Returns a (b+c)-by-n NumPy array evaluated for the input ``theta``
+
+    Examples
+    --------
+    Construction of a estimating equation(s) with ``ee_aipw`` should be done similar to the following
+
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> from delicatessen import MEstimator
+    >>> from delicatessen.estimating_equations import ee_gestimation_snmm
+
+    Some generic data
+
+    >>> n = 200
+    >>> d = pd.DataFrame()
+    >>> d['X'] = np.random.normal(size=n)
+    >>> d['W'] = np.random.binomial(1, p=0.5, size=n)
+    >>> d['A'] = np.random.binomial(1, p=(0.25 + 0.5*d['W'] + d['X']), size=n)
+    >>> d['Ya0'] = np.random.binomial(1, p=(0.75 - 0.5*d['W'] + d['X']), size=n)
+    >>> d['Ya1'] = np.random.binomial(1, p=(0.75 - 0.2*d['W'] + d['X'] - 0.1*1), size=n)
+    >>> d['Y'] = (1-d['A'])*d['Ya0'] + d['A']*d['Ya1']
+    >>> d['C'] = 1
+
+    Defining psi, or the stacked estimating equations. Note that ``A`` is the action of interest and ``Y`` is the
+    outcome of interest. Here, we are interested in estimating the following SNMM
+
+    .. math::
+
+        E[Y_i^a - Y_i^{a=0} | W_i] = \beta_1 a + \beta_2 a W_i
+
+    >>> def psi(theta):
+    >>>     return ee_gestimation_snmm(theta,
+    >>>                                y=d['Y'], A=d['A'],
+    >>>                                W=d[['C', 'W', 'X']],
+    >>>                                V=d[['C', 'W']])
+
+    Calling the M-estimator. AIPW has 2 coefficients in the SNMM, and 3 coefficients in the propensity score model. So,
+    the total number of initial values should be 2+3=5.
+
+    >>> estr = MEstimator(psi,
+    >>>                   init=[0., ]*5)
+    >>> estr.estimate(solver='lm')
+
+    Inspecting the parameter estimates, variance, and 95% confidence intervals
+
+    >>> estr.theta
+    >>> estr.variance
+    >>> estr.confidence_intervals()
+
+    More specifically, the corresponding parameters are
+
+    >>> estr.theta[0]     # beta_1 of SNMM
+    >>> estr.theta[1]     # beta_2 of SNMM
+    >>> estr.theta[2:]    # propensity score regression coefficients
+
+    The causal risk ratio in this example can be estimated by specifying ``model='log'``.
+
+    References
+    ----------
+    Dukes O, & Vansteelandt S (2018). A note on G-estimation of causal risk ratios. *American Journal of Epidemiology*,
+    187(5), 1079-1084.
+
+    Robins JM, Mark SD, Newey WK (1992). Estimating exposure effects by modelling the expectation of exposure
+    conditional on confounders. *Biometrics*, 48(2), 479–495.
+
+    Vansteelandt S, & Joffe M (2014). Structural nested models and G-estimation: the partially realized promise.
+    *Statist Sci*, 29(4), 707-731.
+    """
+    # Ensuring correct typing
+    y = np.asarray(y)[:, None]                  # Convert to NumPy array and converting shape
+    A = np.asarray(A)                           # Convert to NumPy array
+    W = np.asarray(W)                           # Convert to NumPy array
+    V = np.asarray(V)                           # Convert to NumPy array
+    pdiv = V.shape[1]                         # Extracting number of SNM parameters
+
+    # Extracting theta value for ease
+    beta = np.asarray(theta[0: pdiv])[:, None]  # theta parameters for the SNM
+    alpha = np.asarray(theta[pdiv:])            # theta parameters for the propensity score model
+
+    # Propensity Score Model
+    ee_log = ee_regression(theta=alpha,         # Propensity score parameters
+                           X=W, y=A,            # ... treatment and covariate design matrix
+                           model='logistic')    # ... logistic model
+    pi = inverse_logit(np.dot(W, alpha))        # Converting log-odds to probability
+
+    # Option for the variations on the structural nested mean model
+    if model == 'linear':                                      # Linear structural nested mean model
+        h_psi = y - identity(np.dot(V*A[:, None], beta))       # ... subtract and identity transformation
+    elif model == 'log':                                       # Log-linear structural nested mean model
+        h_psi = y * np.exp(-1 * np.dot(V*A[:, None], beta))    # ... multiplication and exp transformation
+    else:                                                      # Error checking
+        # Note: logistic SNMM are possible, but these require specifying an outcome model.
+        #   ... To keep the structure of SNMM as-is, I do not provide that option.
+        #   ... Further a double-robust g-estimation algorithm exists but is not implemented here.
+        raise ValueError("model='"+str(model)+"' is not a valid option. "
+                         "Only the following options are supported: "
+                         "linear, log")
+
+    # Computing estimating functions for the corresponding structural nested mean model
+    ee_snm = (h_psi * (A - pi)[:, None] * V).T     # Computing estimating function
+
+    # Output (b+c)-by-n array
+    return np.vstack([ee_snm,                        # SNMM parameters
+                      ee_log])                       # Propensity score parameters
+
+
 def ee_mean_sensitivity_analysis(theta, y, delta, X, q_eval, H_function):
     r"""Estimating equation for weighted sensitivity analysis estimator of the mean. This estimator can handle cases of
     missing completely at random, missing at random, and missing not at random. The sensitivity analysis consists of
@@ -669,7 +840,7 @@ def ee_mean_sensitivity_analysis(theta, y, delta, X, q_eval, H_function):
     Returns
     -------
     array :
-        Returns a (1+b)-by-n NumPy array evaluated for the input theta
+        Returns a (1+b)-by-n NumPy array evaluated for the input ``theta``
 
     Examples
     --------
