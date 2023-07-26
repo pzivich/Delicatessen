@@ -648,7 +648,7 @@ def ee_gestimation_snmm(theta, y, A, W, V, model='linear'):
 
         \sum_{i=1}^n \left\{ H(\beta) \times (A - \Pr(A | W)) \right\}  \times \mathbb{V}_i = 0
 
-    where :math:`H(\beta) = Y - \beta A \mathbb{V}`, :math:`\mathbb{V}` is a design matrix for the SNMM (note: this
+    where :math:`H(\beta) = Y - \beta A \mathbb{V}`, and :math:`\mathbb{V}` is a design matrix for the SNMM (note: this
     design matrix should be for the case of :math:`a=1`). Note that :math:`V \subseteq W`. This estimating equation
     requires :math:`\Pr(A | W)` or the propensity scores, which must be estimated. This is done via the following
     estimating equation
@@ -658,7 +658,7 @@ def ee_gestimation_snmm(theta, y, A, W, V, model='linear'):
         \sum_{i=1}^n \left\{ A_i - \text{expit}(W_i^T \alpha) \right\} W_i = 0
 
     These estimating equations are stacked together. Therefore, the length of the parameter vector is b+c, where b is
-    the number of columns in ``\mathbb{V}``, and c is the number of columns in ``W``. The *first* b values in theta
+    the number of columns in :math:`\mathbb{V}`, and c is the number of columns in ``W``. The *first* b values in theta
     vector are the SNMM parameters. The *second* set are the parameters corresponding to the propensity score model.
 
     Parameters
@@ -683,7 +683,7 @@ def ee_gestimation_snmm(theta, y, A, W, V, model='linear'):
 
     Examples
     --------
-    Construction of a estimating equation(s) with ``ee_aipw`` should be done similar to the following
+    Construction of a estimating equation(s) with ``ee_gestimation_snmm`` should be done similar to the following
 
     >>> import numpy as np
     >>> import pandas as pd
@@ -696,9 +696,9 @@ def ee_gestimation_snmm(theta, y, A, W, V, model='linear'):
     >>> d = pd.DataFrame()
     >>> d['X'] = np.random.normal(size=n)
     >>> d['W'] = np.random.binomial(1, p=0.5, size=n)
-    >>> d['A'] = np.random.binomial(1, p=(0.25 + 0.5*d['W'] + d['X']), size=n)
-    >>> d['Ya0'] = np.random.binomial(1, p=(0.75 - 0.5*d['W'] + d['X']), size=n)
-    >>> d['Ya1'] = np.random.binomial(1, p=(0.75 - 0.2*d['W'] + d['X'] - 0.1*1), size=n)
+    >>> d['A'] = np.random.binomial(1, p=logistic.cdf(0.25 + 0.5*d['W'] + d['X']), size=n)
+    >>> d['Ya0'] = np.random.binomial(1, p=logistic.cdf(0.75 - 0.5 * d['W'] + d['X']), size=n)
+    >>> d['Ya1'] = np.random.binomial(1, p=logistic.cdf(0.75 - 0.2 * d['W'] + d['X'] - 0.1 * 1), size=n)
     >>> d['Y'] = (1-d['A'])*d['Ya0'] + d['A']*d['Ya1']
     >>> d['C'] = 1
 
