@@ -18,7 +18,8 @@ from delicatessen.estimating_equations import (ee_mean, ee_mean_variance, ee_mea
                                                # Dose-Response
                                                ee_2p_logistic, ee_3p_logistic, ee_4p_logistic, ee_effective_dose_delta,
                                                # Causal inference
-                                               ee_gformula, ee_ipw, ee_aipw, ee_mean_sensitivity_analysis)
+                                               ee_gformula, ee_ipw, ee_aipw, ee_gestimation_snmm,
+                                               ee_mean_sensitivity_analysis)
 from delicatessen.data import load_inderjit
 from delicatessen.utilities import additive_design_matrix, inverse_logit
 
@@ -2029,6 +2030,46 @@ class TestEstimatingEquationsCausal:
                             atol=1e-6)
         npt.assert_allclose(mestimator.variance[2, 2],
                             var_r0,
+                            atol=1e-6)
+
+    def test_gestimaton_linear(self):
+        # Generating a simple test data set to compare with
+        d = pd.DataFrame()
+        d['W'] = [1, 2, 3, 1, 2, 3, 1, 2, 3]
+        d['V'] = [1, 1, 0, 0, 1, 1, 0, 0, 1]
+        d['A'] = [1, 1, 1, 1, 0, 0, 0, 0, 0]
+        d['Y'] = [3, 9, 1, 5, 2, 5, 2, 1, 8]
+        d['I'] = 1
+
+        # M-estimator
+        def psi(theta):
+            return ee_gestimation_snmm(theta=theta,
+                                       y=d['Y'], A=d['A'],
+                                       W=d[['I', 'V', 'W']],
+                                       V=d[['I', 'V']],
+                                       model='linear')
+
+        mestr = MEstimator(psi, init=[0., ] * 5)
+        mestr.estimate(solver='lm')
+
+        # Previously solved SNM using zEpid
+        snm_params = [0.81625399, 1.17753992]
+
+        # Previously solved variance
+        snm_var = [[0.90012508,  0.10321338, -0.00776704, 0.42820463,  -0.23345669],
+                   [0.10321338,  5.66161974,  1.10257782, 0.68691087,  -0.6726336 ],
+                   [-0.00776704, 1.10257782,  3.33354844, -0.22672362, -1.37813087],
+                   [0.42820463,  0.68691087, -0.22672362, 2.56295634,  -0.77152018],
+                   [-0.23345669, -0.6726336, -1.37813087, -0.77152018,  0.96170453]]
+
+        # Checking SNM parameters
+        npt.assert_allclose(mestr.theta[0:2],
+                            snm_params,
+                            atol=1e-6)
+
+        # Checking variance
+        npt.assert_allclose(mestr.variance,
+                            snm_var,
                             atol=1e-6)
 
     def test_robins_sensitivity_mean(self):
