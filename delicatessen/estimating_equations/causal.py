@@ -687,6 +687,7 @@ def ee_gestimation_snmm(theta, y, A, W, V, model='linear'):
 
     >>> import numpy as np
     >>> import pandas as pd
+    >>> from scipy.stats import logistic
     >>> from delicatessen import MEstimator
     >>> from delicatessen.estimating_equations import ee_gestimation_snmm
 
@@ -765,6 +766,7 @@ def ee_gestimation_snmm(theta, y, A, W, V, model='linear'):
     pi = inverse_logit(np.dot(W, alpha))        # Converting log-odds to probability
 
     # Option for the variations on the structural nested mean model
+    # Future consideration: add bias adjustment via b(A,W; \alpha) to h_psi from Vancak & Sjolander
     if model == 'linear':                                      # Linear structural nested mean model
         h_psi = y - identity(np.dot(V*A[:, None], beta))       # ... subtract and identity transformation
     elif model == 'log':                                       # Log-linear structural nested mean model
