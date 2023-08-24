@@ -1,6 +1,7 @@
 import warnings
 import numpy as np
 from scipy.stats import norm, cauchy
+from scipy.special import digamma
 
 from delicatessen.utilities import (logit, inverse_logit, identity,
                                     robust_loss_functions,
@@ -228,75 +229,40 @@ def ee_glm(theta, X, y, distribution, link, hyperparameter=None, weights=None, o
     ----------
     Boos DD, & Stefanski LA. (2013). M-estimation (estimating equations). In Essential Statistical Inference
     (pp. 297-337). Springer, New York, NY.
+
+    Nakashima E. (1997). Some methods for estimation in a Negative-Binomial model.
+    *Annals of the Institute of Statistical Mathematics*, 49, 101-115.
     """
-    # TODO break off gamma and negative-binomial since they have an extra parameter to estimate. Basic idea is similar
-
-    def _inverse_link_(betax, link):
-        # Distributions not implemented: power, inverse power
-        if link == 'identity':
-            py = identity(betax)                    # Inverse link
-            dpy = 1                                 # Derivative of inverse link
-        elif link == 'log':
-            py = np.exp(betax)                      # Inverse link
-            dpy = py                                # Derivative of inverse link
-        elif link in ['logistic', 'logit']:
-            py = inverse_logit(betax)               # Inverse link
-            dpy = py * (1 - py)                     # Derivative of inverse link
-        elif link == 'inverse':
-            py = 1 / betax                          # Inverse link
-            dpy = -1 / (betax**2)                   # Derivative of inverse link
-        elif link == 'loglog':
-            py = np.exp(-1*np.exp(-betax))          # Inverse link
-            dpy = -np.exp(-betax - np.exp(-betax))  # Derivative of inverse link
-        elif link == 'cloglog':
-            py = 1 - np.exp(-1*np.exp(betax))       # Inverse link
-            dpy = np.exp(betax - np.exp(betax))     # Derivative of inverse link
-        elif link == 'probit':
-            py = norm.cdf(betax)                    # Inverse link
-            dpy = norm.pdf(betax)                   # Derivative of inverse link
-        elif link in ['cauchit', 'cauchy']:
-            py = cauchy.cdf(betax)                  # Inverse link
-            dpy = cauchy.pdf(betax)                 # Derivative of inverse link
-        elif link in ['square_root', 'sqrt']:
-            py = betax**2                           # Inverse link
-            dpy = 2 * betax                         # Derivative of inverse link
-        else:
-            raise ValueError("invalid link")
-        return py, dpy
-
-    def _distribution_variance_(dist, mu):
-        if dist in ['normal', 'gaussian']:
-            v = 1
-        elif dist == 'poisson':
-            v = mu
-        elif dist in ['binomial', 'bin', 'bernoulli']:
-            v = mu - mu**2
-        elif dist == 'gamma':
-            v = mu**2
-        elif dist in ['negative_binomial', 'nb']:
-            v = mu + hyperparameter*(mu**2)
-        elif dist == 'tweedie':
-            if hyperparameter < 1 or hyperparameter > 2:
-                raise ValueError("The Tweedie distribution requires the "
-                                 "hyperparameter to be between [1,2].")
-            v = mu**hyperparameter
-        else:
-            raise ValueError("invalid distribution")
-        return v
+    distribution = distribution.lower()
+    if distribution in ['gamma', 'negative_binomial', 'nb']:
+        beta, alpha = theta[:-1], theta[-1]
+    else:
+        beta = theta
 
     # Preparation of input shapes and object types
-    X, y, beta, offset = _prep_inputs_(X=X, y=y, theta=theta, penalty=None, offset=offset)
+    X, y, beta, offset = _prep_inputs_(X=X, y=y, theta=beta, penalty=None, offset=offset)
 
     # Transforming data for score equations
     betaX = np.dot(X, beta) + offset                                  # Compute (X * B)
     pred_y, deriv = _inverse_link_(betax=betaX, link=link)            # Compute g^{-1}(X * B), d/dB g^{-1}(X * B)
-    variance = _distribution_variance_(dist=distribution, mu=pred_y)  # Compute v(g^{-1}(X * B))
+    variance = _distribution_variance_(dist=distribution, mu=pred_y,  # Compute v(g^{-1}(X * B))
+                                       hyperparameter=hyperparameter)
 
     # Allowing for a weighted generalized linear model
     w = generate_weights(weights=weights, n_obs=X.shape[0])           # Compute the corresponding weight vector
 
-    # Generic score function for GLM
-    return w*((y - pred_y) * deriv / variance * X).T                  # Return weighted regression score function
+    # Generic score functions for GLM
+    ee_beta = w*((y - pred_y) * deriv / variance * X).T
+
+    # Additional processing of regression models with additional parameters
+    if distribution == 'gamma':
+        ee_alpha = w*((1 - y / pred_y) + np.log(alpha * y / pred_y) - digamma(alpha)).T
+        return np.vstack([ee_beta, ee_alpha])
+    # elif distribution in ['negative_binomial', 'nb']:
+    #     ee_alpha = ...
+    #     return np.vstack([ee_beta, ee_alpha])
+    else:
+        return ee_beta
 
 
 #################################################################
@@ -1352,6 +1318,61 @@ def _model_transform_(model, assert_linear_model=False):
         raise ValueError("Invalid input:", model,
                          ". Please select: 'linear', 'logistic', or 'poisson'.")
     return transform
+
+
+def _inverse_link_(betax, link):
+    # Distributions not implemented: power, inverse power
+    if link == 'identity':
+        py = identity(betax)                    # Inverse link
+        dpy = 1                                 # Derivative of inverse link
+    elif link == 'log':
+        py = np.exp(betax)                      # Inverse link
+        dpy = py                                # Derivative of inverse link
+    elif link in ['logistic', 'logit']:
+        py = inverse_logit(betax)               # Inverse link
+        dpy = py * (1 - py)                     # Derivative of inverse link
+    elif link == 'inverse':
+        py = 1 / betax                          # Inverse link
+        dpy = -1 / (betax**2)                   # Derivative of inverse link
+    elif link == 'loglog':
+        py = np.exp(-1*np.exp(-betax))          # Inverse link
+        dpy = -np.exp(-betax - np.exp(-betax))  # Derivative of inverse link
+    elif link == 'cloglog':
+        py = 1 - np.exp(-1*np.exp(betax))       # Inverse link
+        dpy = np.exp(betax - np.exp(betax))     # Derivative of inverse link
+    elif link == 'probit':
+        py = norm.cdf(betax)                    # Inverse link
+        dpy = norm.pdf(betax)                   # Derivative of inverse link
+    elif link in ['cauchit', 'cauchy']:
+        py = cauchy.cdf(betax)                  # Inverse link
+        dpy = cauchy.pdf(betax)                 # Derivative of inverse link
+    elif link in ['square_root', 'sqrt']:
+        py = betax**2                           # Inverse link
+        dpy = 2 * betax                         # Derivative of inverse link
+    else:
+        raise ValueError("invalid link")
+    return py, dpy
+
+
+def _distribution_variance_(dist, mu, hyperparameter=None):
+    if dist in ['normal', 'gaussian']:
+        v = 1
+    elif dist == 'poisson':
+        v = mu
+    elif dist in ['binomial', 'bin', 'bernoulli']:
+        v = mu - mu**2
+    elif dist == 'gamma':
+        v = mu**2
+    elif dist in ['negative_binomial', 'nb']:
+        v = mu + hyperparameter*(mu**2)
+    elif dist == 'tweedie':
+        if hyperparameter < 1 or hyperparameter > 2:
+            raise ValueError("The Tweedie distribution requires the "
+                             "hyperparameter to be between [1,2].")
+        v = mu**hyperparameter
+    else:
+        raise ValueError("invalid distribution")
+    return v
 
 
 def _bridge_penalty_(theta, gamma, penalty, n_obs, center):
