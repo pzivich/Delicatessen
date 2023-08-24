@@ -74,7 +74,7 @@ pygments_style = "sphinx"
 # a list of builtin themes.
 
 
-# html_theme = "nature"
+html_theme = "sphinx_rtd_theme"
 add_module_names = False
 
 on_rtd = os.environ.get("READTHEDOCS", None) == "True"
