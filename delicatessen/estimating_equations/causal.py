@@ -635,12 +635,6 @@ def ee_gestimation_snmm(theta, y, A, W, V, model='linear'):
     This model corresponds to the average casual mean ratio or causal risk ratio within strata of :math:`V`. Note that
     the log-linear SNMM is only defined when :math:`Y > 0`.
 
-    Note
-    ----
-    While these SNMM looks similar to a marginal structural model, there is an important difference. The SNMM does not
-    include an intercept parameter or parameter for V.
-
-
     Under the assumption of causal consistency, conditional exchangeability and positivity, we can solve for
     :math:`\beta` using the following estimating equation
 
@@ -674,7 +668,8 @@ def ee_gestimation_snmm(theta, y, A, W, V, model='linear'):
     V : ndarray, list, vector
         2-dimensional vector of n observed values for b variables.
     model : str, optional
-        Type of structural nested mean model to fit.
+        Type of structural nested mean model to fit. Options are currently only ``linear``, with a default
+        of ``linear``.
 
     Returns
     -------
@@ -769,15 +764,16 @@ def ee_gestimation_snmm(theta, y, A, W, V, model='linear'):
     # Future consideration: add bias adjustment via b(A,W; \alpha) to h_psi from Vancak & Sjolander
     if model == 'linear':                                      # Linear structural nested mean model
         h_psi = y - identity(np.dot(V*A[:, None], beta))       # ... subtract and identity transformation
-    elif model == 'log':                                       # Log-linear structural nested mean model
-        h_psi = y * np.exp(-1 * np.dot(V*A[:, None], beta))    # ... multiplication and exp transformation
+    # Holding off on releasing the log-linear since I can't find a good external comparison yet...
+    # elif model == 'log':                                       # Log-linear structural nested mean model
+    #     h_psi = y * np.exp(-1 * np.dot(V*A[:, None], beta))    # ... multiplication and exp transformation
     else:                                                      # Error checking
         # Note: logistic SNMM are possible, but these require specifying an outcome model.
         #   ... To keep the structure of SNMM as-is, I do not provide that option.
         #   ... Further a double-robust g-estimation algorithm exists but is not implemented here.
-        raise ValueError("model='"+str(model)+"' is not a valid option. "
+        raise ValueError("model='"+str(model)+"' is not a supported option. "
                          "Only the following options are supported: "
-                         "linear, log")
+                         "linear")
 
     # Computing estimating functions for the corresponding structural nested mean model
     ee_snm = (h_psi * (A - pi)[:, None] * V).T     # Computing estimating function
