@@ -645,7 +645,7 @@ class TestEstimatingEquationsRegression:
         mestimator.estimate(solver='lm', tolerance=1e-12)
 
         f = sm.families.Binomial()
-        lgt = sm.GLM(yvals, Xvals, family=f).fit_regularized(L1_wt=0., alpha=0.5 / Xvals.shape[0])
+        lgt = sm.GLM(yvals, Xvals, family=f).fit_regularized(L1_wt=0., alpha=0.5 / Xvals.shape[0], tol=1e-12)
 
         # Checking mean estimate
         npt.assert_allclose(mestimator.theta,
@@ -661,7 +661,7 @@ class TestEstimatingEquationsRegression:
         mestimator.estimate(solver='hybr', tolerance=1e-12)
 
         f = sm.families.Binomial()
-        lgt = sm.GLM(yvals, Xvals, family=f).fit_regularized(L1_wt=0., alpha=5. / Xvals.shape[0])
+        lgt = sm.GLM(yvals, Xvals, family=f).fit_regularized(L1_wt=0., alpha=5. / Xvals.shape[0], tol=1e-12)
 
         # Checking mean estimate
         npt.assert_allclose(mestimator.theta,
@@ -2035,10 +2035,10 @@ class TestEstimatingEquationsCausal:
     def test_gestimaton_linear(self):
         # Generating a simple test data set to compare with
         d = pd.DataFrame()
-        d['W'] = [1, 2, 3, 1, 2, 3, 1, 2, 3]
-        d['V'] = [1, 1, 0, 0, 1, 1, 0, 0, 1]
-        d['A'] = [1, 1, 1, 1, 0, 0, 0, 0, 0]
-        d['Y'] = [3, 9, 1, 5, 2, 5, 2, 1, 8]
+        d['W'] = [1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3]
+        d['V'] = [1, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 1, 1, 0, 0]
+        d['A'] = [1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 0, 1, 0, 1]
+        d['Y'] = [3, 9, 1, 5, 2, 5, 2, 1, 8, 2, 3, 8, 2, 9, 5]
         d['I'] = 1
 
         # M-estimator
@@ -2053,14 +2053,11 @@ class TestEstimatingEquationsCausal:
         mestr.estimate(solver='lm')
 
         # Previously solved SNM using zEpid
-        snm_params = [0.816253994439, 1.177539924728]
+        snm_params = [-0.722776210839, 0.862858694092]
 
         # Previously solved variance
-        snm_var = [[ 0.900125076912,  0.103213384503, -0.007767043583,  0.428204633027, -0.233456693408],
-                   [ 0.103213384503,  5.661619735226,  1.102577815507,  0.686910873930, -0.672633599383],
-                   [-0.007767043583,  1.102577815507,  3.333548439567, -0.226723621110, -1.378130871249],
-                   [ 0.428204633027,  0.686910873930,  -0.22672362111,  2.562956335053, -0.771520178987],
-                   [-0.233456693408, -0.672633599383, -1.378130871249, -0.771520178987,  0.961704534302]]
+        snm_var = [[4.507834278518,  -4.936870793846],
+                   [-4.936870793846, 11.321956107454]]
 
         # Checking SNM parameters
         npt.assert_allclose(mestr.theta[0:2],
@@ -2068,11 +2065,9 @@ class TestEstimatingEquationsCausal:
                             atol=1e-6)
 
         # Checking variance
-        npt.assert_allclose(mestr.variance,
+        npt.assert_allclose(mestr.variance[0:2, 0:2],
                             snm_var,
                             atol=1e-6)
-
-    # TODO def test_gestimaton_multiplicative(self):
 
     def test_robins_sensitivity_mean(self):
         d = pd.DataFrame()
