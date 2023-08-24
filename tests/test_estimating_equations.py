@@ -2060,8 +2060,18 @@ class TestEstimatingEquationsCausal:
         mestr = MEstimator(psi, init=[0., ] * 5)
         mestr.estimate(solver='lm')
         print("")
-        print(mestr.bread)
+        print(mestr.bread[2:, 2:])
         print(mestr.variance[2:, 2:])
+
+        def psi2(theta):
+            return ee_regression(theta=theta, X=d[['I', 'V', 'W']],
+                                 y=d['A'], model='logistic')
+
+        estr = MEstimator(psi, init=[0., ] * 3)
+        estr.estimate(solver='lm')
+        print("")
+        print(estr.bread)
+        print(estr.variance)
 
         # Previously solved SNM using zEpid
         snm_params = [0.499264398938, -0.400700107829]
