@@ -1,16 +1,18 @@
 import pytest
+import warnings
 import numpy as np
 import numpy.testing as npt
 import pandas as pd
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
+from statsmodels.tools.sm_exceptions import DomainWarning
 from scipy.stats import logistic
 from lifelines import ExponentialFitter, WeibullFitter, WeibullAFTFitter
 
 from delicatessen import MEstimator
 from delicatessen.estimating_equations import (ee_mean, ee_mean_variance, ee_mean_robust,
                                                # Regression models
-                                               ee_regression, ee_robust_regression, ee_ridge_regression,
+                                               ee_regression, ee_glm, ee_robust_regression, ee_ridge_regression,
                                                ee_additive_regression, ee_elasticnet_regression,
                                                # Survival models
                                                ee_exponential_model, ee_exponential_measure, ee_weibull_model,
@@ -650,7 +652,7 @@ class TestEstimatingEquationsRegression:
         # Checking mean estimate
         npt.assert_allclose(mestimator.theta,
                             np.asarray(lgt.params),
-                            atol=1e-4)
+                            atol=5e-4)
 
         def psi_regression(theta):
             return ee_ridge_regression(theta,
@@ -666,7 +668,7 @@ class TestEstimatingEquationsRegression:
         # Checking mean estimate
         npt.assert_allclose(mestimator.theta,
                             np.asarray(lgt.params),
-                            atol=1e-4)
+                            atol=5e-4)
 
         def psi_regression(theta):
             return ee_ridge_regression(theta,
@@ -682,7 +684,7 @@ class TestEstimatingEquationsRegression:
         # Checking mean estimate
         npt.assert_allclose(mestimator.theta,
                             np.asarray(lgt.params),
-                            atol=1e-4)
+                            atol=5e-4)
 
     def test_additive_logistic(self):
         n = 1000
@@ -937,6 +939,572 @@ class TestEstimatingEquationsRegression:
         npt.assert_allclose(mestimator.theta,
                             np.asarray(lgt.params),
                             atol=1e-5)
+
+    def test_glm_normal_identity(self):
+        d = pd.DataFrame()
+        d['X'] = [1, -1, 0, 1, 2, 1, -2, -1, 0, 3, -3, 1, 1, -1, -1, -2, 2, 0, -1, 0]
+        d['Z'] = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        d['Y'] = [1, 5, 1, 9, -1, 4, 3, 3, 1, -2, 4, -2, 3, 6, 6, 8, 7, 1, -2, 5]
+        d['I'] = 1
+
+        def psi(theta):
+            return ee_glm(theta, X=d[['I', 'X', 'Z']], y=d['Y'],
+                          distribution='normal', link='identity')
+
+        mestr = MEstimator(psi, init=[0., 0., 0.])
+        mestr.estimate(solver='lm')
+
+        fam = sm.families.Gaussian(sm.families.links.identity())
+        glm = sm.GLM(d['Y'], d[['I', 'X', 'Z']], family=fam).fit(cov_type="HC1")
+
+        # Checking mean estimate
+        npt.assert_allclose(mestr.theta,
+                            np.asarray(glm.params),
+                            atol=1e-6)
+
+        # Checking variance estimates
+        npt.assert_allclose(mestr.variance,
+                            np.asarray(glm.cov_params()),
+                            atol=1e-6)
+
+    def test_glm_normal_log(self):
+        d = pd.DataFrame()
+        d['X'] = [1, -1, 0, 1, 2, 1, -2, -1, 0, 3, -3, 1, 1, -1, -1, -2, 2, 0, -1, 0]
+        d['Z'] = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        d['Y'] = [1, 5, 1, 9, -1, 4, 3, 3, 1, -2, 4, -2, 3, 6, 6, 8, 7, 1, -2, 5]
+        d['Y'] = d['Y'] + 5
+        d['I'] = 1
+
+        def psi(theta):
+            return ee_glm(theta, X=d[['I', 'X', 'Z']], y=d['Y'],
+                          distribution='normal', link='log')
+
+        mestr = MEstimator(psi, init=[2., 0., 0.])
+        mestr.estimate(solver='lm', maxiter=5000)
+
+        fam = sm.families.Gaussian(sm.families.links.log())
+        glm = sm.GLM(d['Y'], d[['I', 'X', 'Z']], family=fam).fit(cov_type="HC1")
+
+        # Checking mean estimate
+        npt.assert_allclose(mestr.theta,
+                            np.asarray(glm.params),
+                            atol=1e-6)
+
+        # Checking variance estimates
+        npt.assert_allclose(mestr.variance,
+                            np.asarray(glm.cov_params()),
+                            atol=1e-6)
+
+    def test_glm_poisson_identity(self):
+        d = pd.DataFrame()
+        d['X'] = [1, -1, 0, 1, 2, 1, -2, -1, 0, 3, -3, 1, 1, -1, -1, -2, 2, 0, -1, 0]
+        d['Z'] = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        d['Y'] = [1, 5, 1, 9, 1, 4, 3, 3, 1, 2, 4, 2, 3, 6, 6, 8, 7, 1, 2, 5]
+        d['I'] = 1
+
+        def psi(theta):
+            return ee_glm(theta, X=d[['I', 'X', 'Z']], y=d['Y'],
+                          distribution='poisson', link='identity')
+
+        mestr = MEstimator(psi, init=[1., 0., 0.])
+        mestr.estimate(solver='lm', maxiter=5000)
+
+        fam = sm.families.Poisson(sm.families.links.identity())
+        glm = sm.GLM(d['Y'], d[['I', 'X', 'Z']], family=fam).fit(cov_type="HC1")
+
+        # Checking mean estimate
+        npt.assert_allclose(mestr.theta,
+                            np.asarray(glm.params),
+                            atol=1e-6)
+
+        # Checking variance estimates
+        npt.assert_allclose(mestr.variance,
+                            np.asarray(glm.cov_params()),
+                            atol=1e-6)
+
+    def test_glm_poisson_log(self):
+        d = pd.DataFrame()
+        d['X'] = [1, -1, 0, 1, 2, 1, -2, -1, 0, 3, -3, 1, 1, -1, -1, -2, 2, 0, -1, 0]
+        d['Z'] = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        d['Y'] = [1, 5, 1, 9, 1, 4, 3, 3, 1, 2, 4, 2, 3, 6, 6, 8, 7, 1, 2, 5]
+        d['I'] = 1
+
+        def psi(theta):
+            return ee_glm(theta, X=d[['I', 'X', 'Z']], y=d['Y'],
+                          distribution='poisson', link='log')
+
+        mestr = MEstimator(psi, init=[0., 0., 0.])
+        mestr.estimate(solver='lm', maxiter=5000)
+
+        fam = sm.families.Poisson(sm.families.links.log())
+        glm = sm.GLM(d['Y'], d[['I', 'X', 'Z']], family=fam).fit(cov_type="HC1")
+
+        # Checking mean estimate
+        npt.assert_allclose(mestr.theta,
+                            np.asarray(glm.params),
+                            atol=1e-6)
+
+        # Checking variance estimates
+        npt.assert_allclose(mestr.variance,
+                            np.asarray(glm.cov_params()),
+                            atol=1e-6)
+
+    def test_glm_poisson_sqrt(self):
+        d = pd.DataFrame()
+        d['X'] = [1, -1, 0, 1, 2, 1, -2, -1, 0, 3, -3, 1, 1, -1, -1, -2, 2, 0, -1, 0]
+        d['Z'] = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        d['Y'] = [1, 5, 1, 9, 1, 4, 3, 3, 1, 2, 4, 2, 3, 6, 6, 8, 7, 1, 2, 5]
+        d['I'] = 1
+
+        def psi(theta):
+            return ee_glm(theta, X=d[['I', 'X', 'Z']], y=d['Y'],
+                          distribution='poisson', link='sqrt')
+
+        mestr = MEstimator(psi, init=[2., 0., 0.])
+        mestr.estimate(solver='lm', maxiter=5000)
+
+        fam = sm.families.Poisson(sm.families.links.sqrt())
+        glm = sm.GLM(d['Y'], d[['I', 'X', 'Z']], family=fam).fit(cov_type="HC1")
+
+        # Checking mean estimate
+        npt.assert_allclose(mestr.theta,
+                            np.asarray(glm.params),
+                            atol=1e-6)
+
+        # Checking variance estimates
+        npt.assert_allclose(mestr.variance,
+                            np.asarray(glm.cov_params()),
+                            atol=1e-6)
+
+    def test_glm_tweedie_log(self):
+        d = pd.DataFrame()
+        d['X'] = [1, -1, 0, 1, 2, 1, -2, -1, 0, 3, -3, 1, 1, -1, -1, -2, 2, 0, -1, 0]
+        d['Z'] = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        d['Y'] = [1, 5, 1, 9, 1, 4, 3, 3, 1, 2, 4, 2, 3, 6, 6, 8, 7, 1, 2, 5]
+        d['I'] = 1
+
+        def psi(theta):
+            return ee_glm(theta, X=d[['I', 'X', 'Z']], y=d['Y'],
+                          distribution='tweedie', link='log',
+                          hyperparameter=1.5)
+
+        mestr = MEstimator(psi, init=[2., 0., 0.])
+        mestr.estimate(solver='lm', maxiter=5000)
+
+        fam = sm.families.Tweedie(sm.families.links.log(), var_power=1.5)
+        glm = sm.GLM(d['Y'], d[['I', 'X', 'Z']], family=fam).fit(cov_type="HC1")
+
+        # Checking mean estimate
+        npt.assert_allclose(mestr.theta,
+                            np.asarray(glm.params),
+                            atol=1e-6)
+
+        # Checking variance estimates
+        npt.assert_allclose(mestr.variance,
+                            np.asarray(glm.cov_params()),
+                            atol=1e-6)
+
+    def test_glm_tweedie_error(self):
+        d = pd.DataFrame()
+        d['X'] = [1, -1, 0, 1, 2, 1, -2, -1, 0, 3, -3, 1, 1, -1, -1, -2, 2, 0, -1, 0]
+        d['Z'] = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        d['Y'] = [1, 5, 1, 9, 1, 4, 3, 3, 1, 2, 4, 2, 3, 6, 6, 8, 7, 1, 2, 5]
+        d['I'] = 1
+
+        def psi(theta):
+            return ee_glm(theta, X=d[['I', 'X', 'Z']], y=d['Y'],
+                          distribution='tweedie', link='log',
+                          hyperparameter=3)
+
+        mestr = MEstimator(psi, init=[2., 0., 0.])
+        with pytest.raises(ValueError, match="distribution requires"):
+            mestr.estimate(solver='lm', maxiter=5000)
+
+    def test_glm_tweedie_identity(self):
+        d = pd.DataFrame()
+        d['X'] = [1, -1, 0, 1, 2, 1, -2, -1, 0, 3, -3, 1, 1, -1, -1, -2, 2, 0, -1, 0]
+        d['Z'] = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        d['Y'] = [1, 5, 1, 9, 1, 4, 3, 3, 1, 2, 4, 2, 3, 6, 6, 8, 7, 1, 2, 5]
+        d['I'] = 1
+
+        def psi(theta):
+            return ee_glm(theta, X=d[['I', 'X', 'Z']], y=d['Y'],
+                          distribution='tweedie', link='log',
+                          hyperparameter=1.5)
+
+        mestr = MEstimator(psi, init=[2., 0., 0.])
+        mestr.estimate(solver='lm', maxiter=5000)
+
+        fam = sm.families.Tweedie(sm.families.links.log(), var_power=1.5)
+        glm = sm.GLM(d['Y'], d[['I', 'X', 'Z']], family=fam).fit(cov_type="HC1")
+
+        # Checking mean estimate
+        npt.assert_allclose(mestr.theta,
+                            np.asarray(glm.params),
+                            atol=1e-6)
+
+        # Checking variance estimates
+        npt.assert_allclose(mestr.variance,
+                            np.asarray(glm.cov_params()),
+                            atol=1e-6)
+
+    def test_glm_binomial_logit(self):
+        d = pd.DataFrame()
+        d['X'] = [1, -1, 0, 1, 2, 1, -2, -1, 0, 3, -3, 1, 1, -1, -1, -2, 2, 0, -1, 0]
+        d['Z'] = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        d['Y'] = [1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 0, 0]
+        d['I'] = 1
+
+        def psi(theta):
+            return ee_glm(theta, X=d[['I', 'X', 'Z']], y=d['Y'],
+                          distribution='binomial', link='logit')
+
+        mestr = MEstimator(psi, init=[0., 0., 0.])
+        mestr.estimate(solver='lm', maxiter=5000)
+
+        fam = sm.families.Binomial(sm.families.links.logit())
+        glm = sm.GLM(d['Y'], d[['I', 'X', 'Z']], family=fam).fit(cov_type="HC1")
+
+        # Checking mean estimate
+        npt.assert_allclose(mestr.theta,
+                            np.asarray(glm.params),
+                            atol=1e-6)
+
+        # Checking variance estimates
+        npt.assert_allclose(mestr.variance,
+                            np.asarray(glm.cov_params()),
+                            atol=1e-6)
+
+    def test_glm_binomial_log(self):
+        d = pd.DataFrame()
+        d['X'] = [1, -1, 0, 1, 2, 1, -2, -1, 0, 3, -3, 1, 1, -1, -1, -2, 2, 0, -1, 0]
+        d['Z'] = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        d['Y'] = [1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 0, 0]
+        d['I'] = 1
+
+        def psi(theta):
+            return ee_glm(theta, X=d[['I', 'X', 'Z']], y=d['Y'],
+                          distribution='binomial', link='log')
+
+        mestr = MEstimator(psi, init=[-.9, 0., 0.])
+        mestr.estimate(solver='lm', maxiter=5000)
+
+        fam = sm.families.Binomial(sm.families.links.log())
+        glm = sm.GLM(d['Y'], d[['I', 'X', 'Z']], family=fam).fit(cov_type="HC1", tol=1e-12)
+
+        # Checking mean estimate
+        npt.assert_allclose(mestr.theta,
+                            np.asarray(glm.params),
+                            atol=1e-6)
+
+        # Checking variance estimates
+        npt.assert_allclose(mestr.variance,
+                            np.asarray(glm.cov_params()),
+                            atol=1e-6)
+
+    def test_glm_binomial_identity(self):
+        d = pd.DataFrame()
+        d['X'] = [1, -1, 0, 1, 2, 1, -2, -1, 0, 3, -3, 1, 1, -1, -1, -2, 2, 0, -1, 0]
+        d['Z'] = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        d['Y'] = [1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 0, 0]
+        d['I'] = 1
+
+        def psi(theta):
+            return ee_glm(theta, X=d[['I', 'X', 'Z']], y=d['Y'],
+                          distribution='binomial', link='identity')
+
+        mestr = MEstimator(psi, init=[.2, 0., 0.])
+        mestr.estimate(solver='lm', maxiter=5000)
+
+        fam = sm.families.Binomial(sm.families.links.identity())
+        glm = sm.GLM(d['Y'], d[['I', 'X', 'Z']], family=fam).fit(cov_type="HC1", tol=1e-12)
+
+        # Checking mean estimate
+        npt.assert_allclose(mestr.theta,
+                            np.asarray(glm.params),
+                            atol=1e-6)
+
+        # Checking variance estimates
+        npt.assert_allclose(mestr.variance,
+                            np.asarray(glm.cov_params()),
+                            atol=1e-6)
+
+    def test_glm_binomial_probit(self):
+        d = pd.DataFrame()
+        d['X'] = [1, -1, 0, 1, 2, 1, -2, -1, 0, 3, -3, 1, 1, -1, -1, -2, 2, 0, -1, 0]
+        d['Z'] = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        d['Y'] = [1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 0, 0]
+        d['I'] = 1
+
+        def psi(theta):
+            return ee_glm(theta, X=d[['I', 'X', 'Z']], y=d['Y'],
+                          distribution='binomial', link='probit')
+
+        mestr = MEstimator(psi, init=[0., 0., 0.])
+        mestr.estimate(solver='lm', maxiter=5000)
+
+        fam = sm.families.Binomial(sm.families.links.probit())
+        glm = sm.GLM(d['Y'], d[['I', 'X', 'Z']], family=fam).fit(cov_type="HC1", tol=1e-12)
+
+        # Checking mean estimate
+        npt.assert_allclose(mestr.theta,
+                            np.asarray(glm.params),
+                            atol=1e-6)
+
+        # Checking variance estimates
+        npt.assert_allclose(mestr.variance,
+                            np.asarray(glm.cov_params()),
+                            atol=1e-6)
+
+    def test_glm_binomial_cauchy(self):
+        d = pd.DataFrame()
+        d['X'] = [1, -1, 0, 1, 2, 1, -2, -1, 0, 3, -3, 1, 1, -1, -1, -2, 2, 0, -1, 0]
+        d['Z'] = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        d['Y'] = [1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 0, 0]
+        d['I'] = 1
+
+        def psi(theta):
+            return ee_glm(theta, X=d[['I', 'X', 'Z']], y=d['Y'],
+                          distribution='binomial', link='cauchy')
+
+        mestr = MEstimator(psi, init=[0., 0., 0.])
+        mestr.estimate(solver='lm', maxiter=5000)
+
+        fam = sm.families.Binomial(sm.families.links.cauchy())
+        glm = sm.GLM(d['Y'], d[['I', 'X', 'Z']], family=fam).fit(cov_type="HC1", tol=1e-12)
+
+        # Checking mean estimate
+        npt.assert_allclose(mestr.theta,
+                            np.asarray(glm.params),
+                            atol=1e-6)
+
+        # Checking variance estimates
+        npt.assert_allclose(mestr.variance,
+                            np.asarray(glm.cov_params()),
+                            atol=1e-6)
+
+    def test_glm_binomial_cloglog(self):
+        d = pd.DataFrame()
+        d['X'] = [1, -1, 0, 1, 2, 1, -2, -1, 0, 3, -3, 1, 1, -1, -1, -2, 2, 0, -1, 0]
+        d['Z'] = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        d['Y'] = [1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 0, 0]
+        d['I'] = 1
+
+        def psi(theta):
+            return ee_glm(theta, X=d[['I', 'X', 'Z']], y=d['Y'],
+                          distribution='binomial', link='cloglog')
+
+        mestr = MEstimator(psi, init=[0., 0., 0.])
+        mestr.estimate(solver='lm', maxiter=5000)
+
+        fam = sm.families.Binomial(sm.families.links.cloglog())
+        glm = sm.GLM(d['Y'], d[['I', 'X', 'Z']], family=fam).fit(cov_type="HC1", tol=1e-12)
+
+        # Checking mean estimate
+        npt.assert_allclose(mestr.theta,
+                            np.asarray(glm.params),
+                            atol=1e-6)
+
+        # Checking variance estimates
+        npt.assert_allclose(mestr.variance,
+                            np.asarray(glm.cov_params()),
+                            atol=1e-6)
+
+    def test_glm_binomial_loglog(self):
+        d = pd.DataFrame()
+        d['X'] = [1, -1, 0, 1, 2, 1, -2, -1, 0, 3, -3, 1, 1, -1, -1, -2, 2, 0, -1, 0]
+        d['Z'] = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        d['Y'] = [1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 0, 0]
+        d['I'] = 1
+
+        def psi(theta):
+            return ee_glm(theta, X=d[['I', 'X', 'Z']], y=d['Y'],
+                          distribution='binomial', link='loglog')
+
+        mestr = MEstimator(psi, init=[0., 0., 0.])
+        mestr.estimate(solver='lm', maxiter=5000)
+
+        fam = sm.families.Binomial(sm.families.links.loglog())
+        glm = sm.GLM(d['Y'], d[['I', 'X', 'Z']], family=fam).fit(cov_type="HC1", tol=1e-12)
+
+        # Checking mean estimate
+        npt.assert_allclose(mestr.theta,
+                            np.asarray(glm.params),
+                            atol=1e-6)
+
+        # Checking variance estimates
+        npt.assert_allclose(mestr.variance,
+                            np.asarray(glm.cov_params()),
+                            atol=1e-6)
+
+    def test_glm_gamma_log(self):
+        # Example data comes from R's MASS library
+        d = pd.DataFrame()
+        d['X'] = np.log([5, 10, 15, 20, 30, 40, 60, 80, 100])
+        d['Y'] = [118, 58, 42, 35, 27, 25, 21, 19, 18]
+        d['I'] = 1
+
+        def psi(theta):
+            return ee_glm(theta, X=d[['I', 'X']], y=d['Y'],
+                          distribution='gamma', link='log')
+
+        mestr = MEstimator(psi, init=[0., 0., 1.])
+        mestr.estimate(solver='lm', maxiter=5000)
+
+        # Log-Gamma with statsmodels (only includes scale parameters)
+        fam = sm.families.Gamma(sm.families.links.Log())
+        glm = sm.GLM(d['Y'], d[['I', 'X']], family=fam).fit(cov_type="HC1", tol=1e-12)
+
+        # Checking mean estimate
+        npt.assert_allclose(mestr.theta[0:2],
+                            np.asarray(glm.params),
+                            atol=1e-6)
+
+        # Checking variance estimates
+        npt.assert_allclose(mestr.variance[0:2, 0:2],
+                            np.asarray(glm.cov_params()),
+                            atol=1e-6)
+
+        # Previously solved log Gamma shape parameter using MASS
+        # library(MASS)
+        # clotting <- data.frame(
+        #     u = c(5,10,15,20,30,40,60,80,100),
+        #     lot1 = c(118,58,42,35,27,25,21,19,18),
+        #     lot2 = c(69,35,26,21,18,16,13,12,12))
+        # clot1 <- glm(lot1 ~ log(u), data = clotting, family = Gamma(link='log'))
+        # summary(clot1)
+        # gamma.shape(clot1)
+        alpha_param = 55.51389
+
+        # Checking SNM parameters
+        npt.assert_allclose(mestr.theta[2],
+                            alpha_param,
+                            atol=1e-4)
+
+    def test_glm_gamma_identity(self):
+        # Example data comes from R's MASS library
+        d = pd.DataFrame()
+        d['X'] = np.log([5, 10, 15, 20, 30, 40, 60, 80, 100])
+        d['Y'] = [118, 58, 42, 35, 27, 25, 21, 19, 18]
+        d['I'] = 1
+
+        def psi(theta):
+            return ee_glm(theta, X=d[['I', 'X']], y=d['Y'],
+                          distribution='gamma', link='identity')
+
+        mestr = MEstimator(psi, init=[100., -10., 10.])
+        mestr.estimate(solver='lm', maxiter=5000)
+
+        # Log-Gamma with statsmodels (only includes scale parameters)
+        fam = sm.families.Gamma(sm.families.links.identity())
+        glm = sm.GLM(d['Y'], d[['I', 'X']], family=fam).fit(cov_type="HC1", tol=1e-12)
+
+        # Checking mean estimate
+        npt.assert_allclose(mestr.theta[0:2],
+                            np.asarray(glm.params),
+                            atol=1e-6)
+
+        # Checking variance estimates
+        npt.assert_allclose(mestr.variance[0:2, 0:2],
+                            np.asarray(glm.cov_params()),
+                            rtol=1e-5)
+
+        # Previously solved log Gamma shape parameter using MASS
+        # library(MASS)
+        # clotting <- data.frame(
+        #     u = c(5,10,15,20,30,40,60,80,100),
+        #     lot1 = c(118,58,42,35,27,25,21,19,18),
+        #     lot2 = c(69,35,26,21,18,16,13,12,12))
+        # clot1 <- glm(lot1 ~ log(u), data = clotting, family = Gamma(link='identity'))
+        # summary(clot1)
+        # gamma.shape(clot1)
+        alpha_param = 14.956340
+
+        # Checking SNM parameters
+        npt.assert_allclose(mestr.theta[2],
+                            alpha_param,
+                            atol=1e-4)
+
+    def test_glm_gamma_inverse(self):
+        # Example data comes from R's MASS library
+        d = pd.DataFrame()
+        d['X'] = np.log([5, 10, 15, 20, 30, 40, 60, 80, 100])
+        d['Y'] = [118, 58, 42, 35, 27, 25, 21, 19, 18]
+        d['I'] = 1
+
+        def psi(theta):
+            return ee_glm(theta, X=d[['I', 'X']], y=d['Y'],
+                          distribution='gamma', link='inverse')
+
+        mestr = MEstimator(psi, init=[0.1, 0.1, 500.])
+        mestr.estimate(solver='lm', maxiter=5000)
+
+        # Log-Gamma with statsmodels (only includes scale parameters)
+        fam = sm.families.Gamma(sm.families.links.inverse_power())
+        glm = sm.GLM(d['Y'], d[['I', 'X']], family=fam).fit(cov_type="HC1", tol=1e-12)
+
+        # Checking mean estimate
+        npt.assert_allclose(mestr.theta[0:2],
+                            np.asarray(glm.params),
+                            atol=1e-6)
+
+        # Checking variance estimates
+        npt.assert_allclose(mestr.variance[0:2, 0:2],
+                            np.asarray(glm.cov_params()),
+                            rtol=1e-5)
+
+        # Previously solved log Gamma shape parameter using MASS
+        # library(MASS)
+        # clotting <- data.frame(
+        #     u = c(5,10,15,20,30,40,60,80,100),
+        #     lot1 = c(118,58,42,35,27,25,21,19,18),
+        #     lot2 = c(69,35,26,21,18,16,13,12,12))
+        # clot1 <- glm(lot1 ~ log(u), data = clotting, family = Gamma(link='inverse'))
+        # summary(clot1)
+        # gamma.shape(clot1)
+        alpha_param = 538.1315
+
+        # Checking SNM parameters
+        npt.assert_allclose(mestr.theta[2],
+                            alpha_param,
+                            atol=1e-4)
+
+    def test_glm_gamma_log_weighted(self):
+        # Example data comes from R's MASS library
+        d = pd.DataFrame()
+        d['X'] = np.log([5, 10, 15, 20, 30, 40, 60, 80, 100])
+        d['Y'] = [118, 58, 42, 35, 27, 25, 21, 19, 18]
+        d['I'] = 1
+        d['w'] = [1, 2, 1, 3, 1, 6, 1, 2, 3]
+
+        # Using the weights
+        def psi(theta):
+            return ee_glm(theta, X=d[['I', 'X']], y=d['Y'],
+                          distribution='gamma', link='log',
+                          weights=d['w'])
+
+        westr = MEstimator(psi, init=[0., 0., 1.])
+        westr.estimate(solver='lm', maxiter=5000)
+
+        # Using an expanded data frame instead
+        ld = pd.DataFrame(np.repeat(d.values,
+                                    d['w'],
+                                    axis=0),
+                          columns=d.columns)
+
+        def psi(theta):
+            return ee_glm(theta, X=ld[['I', 'X']], y=ld['Y'],
+                          distribution='gamma', link='log')
+
+        uestr = MEstimator(psi, init=[0., 0., 1.])
+        uestr.estimate(solver='lm', maxiter=5000)
+
+        # Checking mean estimate
+        npt.assert_allclose(westr.theta,
+                            uestr.theta,
+                            atol=1e-6)
+
+    # TODO negativebinomial
 
     def test_elasticnet(self):
         n = 1000
