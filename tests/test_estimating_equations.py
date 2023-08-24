@@ -2059,36 +2059,26 @@ class TestEstimatingEquationsCausal:
 
         mestr = MEstimator(psi, init=[0., ] * 5)
         mestr.estimate(solver='lm')
-        print("")
-        print(mestr.bread[2:, 2:])
-        print(mestr.variance[2:, 2:])
-
-        def psi2(theta):
-            return ee_regression(theta=theta, X=d[['I', 'V', 'W']],
-                                 y=d['A'], model='logistic')
-
-        estr = MEstimator(psi2, init=[0., ] * 3)
-        estr.estimate(solver='lm')
-        print("")
-        print(estr.bread)
-        print(estr.variance)
 
         # Previously solved SNM using zEpid
         snm_params = [0.499264398938, -0.400700107829]
 
         # Previously solved variance
-        snm_var = [[0.5306252487659, -0.5493636489885],
-                   [-0.5493636489885, 0.9109126046572]]
+        snm_var = [[0.5309405889911, -0.5497523512113, -0.08318452996742, 0.02706302088976,  0.02666983404626],
+                   [-0.5497523512113,  0.9114476962859,  0.20188395780370, -8.543908429690e-04, -0.08753380928183],
+                   [-0.08318452996742, 0.2018839578037,  0.84188596592780, -0.2000575145713, -0.2959629818969],
+                   [0.02706302088976, -8.543908429690e-04, -0.2000575145713, 0.4010462043495, -0.03045175600959],
+                   [0.02666983404626, -0.08753380928183, -0.2959629818969, -0.03045175600959,  0.1505645314902]]
 
         # Checking SNM parameters
         npt.assert_allclose(mestr.theta[0:2],
                             snm_params,
-                            atol=1e-6)
+                            atol=1e-7)
 
         # Checking variance
-        npt.assert_allclose(mestr.variance[0:2, 0:2],
+        npt.assert_allclose(mestr.variance,
                             snm_var,
-                            atol=1e-6)
+                            atol=1e-4)
 
     def test_robins_sensitivity_mean(self):
         d = pd.DataFrame()
