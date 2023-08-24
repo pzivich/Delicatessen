@@ -2050,7 +2050,7 @@ class TestEstimatingEquationsCausal:
                                        model='linear')
 
         mestr = MEstimator(psi, init=[0., ] * 5)
-        mestr.estimate(solver='lm')
+        mestr.estimate(solver='lm', dx=1e-9)
 
         # Previously solved SNM using zEpid
         snm_params = [-0.722776210839, 0.862858694092]
