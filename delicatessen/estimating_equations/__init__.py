@@ -7,7 +7,7 @@ from .causal import (ee_ipw, ee_gformula, ee_aipw, ee_gestimation_snmm,
 from .dose_response import (ee_4p_logistic, ee_3p_logistic, ee_2p_logistic,
                             ee_effective_dose_delta)
 
-from .regression import (ee_regression,
+from .regression import (ee_regression, ee_glm,
                          ee_robust_regression,
                          ee_ridge_regression, ee_lasso_regression, ee_elasticnet_regression, ee_bridge_regression,
                          ee_additive_regression)
