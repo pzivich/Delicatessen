@@ -2067,7 +2067,7 @@ class TestEstimatingEquationsCausal:
             return ee_regression(theta=theta, X=d[['I', 'V', 'W']],
                                  y=d['A'], model='logistic')
 
-        estr = MEstimator(psi, init=[0., ] * 3)
+        estr = MEstimator(psi2, init=[0., ] * 3)
         estr.estimate(solver='lm')
         print("")
         print(estr.bread)
