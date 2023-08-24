@@ -2051,6 +2051,11 @@ class TestEstimatingEquationsCausal:
 
         mestr = MEstimator(psi, init=[0., ] * 5)
         mestr.estimate(solver='lm', dx=1e-9)
+        print("")
+        print(mestr.theta)
+        print(mestr.bread)
+        print(mestr.meat)
+        print(mestr.variance)
 
         # Previously solved SNM using zEpid
         snm_params = [-0.722776210839, 0.862858694092]
