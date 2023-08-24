@@ -176,7 +176,6 @@ def ee_glm(theta, X, y, distribution, link, hyperparameter=None, weights=None, o
     distribution : str
         Distribution for the generalized linear model. Options are
         ``'normal'`` (alias: ``gaussian``),
-        ``'inverse_normal'`` (alias: ``inverse_gaussian``),
         ``'binomial'`` (aliases: ``bernoulli``, ``bin``),
         ``'poisson'``,
         ``'gamma'``,
@@ -235,32 +234,32 @@ def ee_glm(theta, X, y, distribution, link, hyperparameter=None, weights=None, o
     def _inverse_link_(betax, link):
         # Distributions not implemented: power, inverse power
         if link == 'identity':
-            py = identity(betax)                   # Inverse link
-            dpy = 1                                # Derivative of inverse link
+            py = identity(betax)                    # Inverse link
+            dpy = 1                                 # Derivative of inverse link
         elif link == 'log':
-            py = np.exp(betax)                     # Inverse link
-            dpy = py                               # Derivative of inverse link
+            py = np.exp(betax)                      # Inverse link
+            dpy = py                                # Derivative of inverse link
         elif link in ['logistic', 'logit']:
-            py = inverse_logit(betax)              # Inverse link
-            dpy = py * (1 - py)                    # Derivative of inverse link
+            py = inverse_logit(betax)               # Inverse link
+            dpy = py * (1 - py)                     # Derivative of inverse link
         elif link == 'inverse':
-            py = 1 / betax                         # Inverse link
-            dpy = -1 / (betax**2)                  # Derivative of inverse link
+            py = 1 / betax                          # Inverse link
+            dpy = -1 / (betax**2)                   # Derivative of inverse link
         elif link == 'loglog':
-            py = 1 - np.exp(-1*np.exp(-betax))     # Inverse link
-            dpy = np.exp(betax - np.exp(betax))    # Derivative of inverse link
+            py = np.exp(-1*np.exp(-betax))          # Inverse link
+            dpy = -np.exp(-betax - np.exp(-betax))  # Derivative of inverse link
         elif link == 'cloglog':
-            py = 1 - np.exp(-1*np.exp(betax))      # Inverse link
-            dpy = np.exp(betax - np.exp(-betax))   # Derivative of inverse link
+            py = 1 - np.exp(-1*np.exp(betax))       # Inverse link
+            dpy = np.exp(betax - np.exp(betax))     # Derivative of inverse link
         elif link == 'probit':
-            py = norm.cdf(betax)                   # Inverse link
-            dpy = norm.pdf(betax)                  # Derivative of inverse link
+            py = norm.cdf(betax)                    # Inverse link
+            dpy = norm.pdf(betax)                   # Derivative of inverse link
         elif link in ['cauchit', 'cauchy']:
-            py = cauchy.cdf(betax)                 # Inverse link
-            dpy = cauchy.pdf(betax)                # Derivative of inverse link
+            py = cauchy.cdf(betax)                  # Inverse link
+            dpy = cauchy.pdf(betax)                 # Derivative of inverse link
         elif link in ['square_root', 'sqrt']:
-            py = betax**2                          # Inverse link
-            dpy = 2 * betax                        # Derivative of inverse link
+            py = betax**2                           # Inverse link
+            dpy = 2 * betax                         # Derivative of inverse link
         else:
             raise ValueError("invalid link")
         return py, dpy
@@ -268,8 +267,6 @@ def ee_glm(theta, X, y, distribution, link, hyperparameter=None, weights=None, o
     def _distribution_variance_(dist, mu):
         if dist in ['normal', 'gaussian']:
             v = 1
-        elif dist in ['inverse_normal', 'inverse_gaussian']:
-            v = mu**3
         elif dist == 'poisson':
             v = mu
         elif dist in ['binomial', 'bin', 'bernoulli']:
@@ -279,6 +276,9 @@ def ee_glm(theta, X, y, distribution, link, hyperparameter=None, weights=None, o
         elif dist in ['negative_binomial', 'nb']:
             v = mu + hyperparameter*(mu**2)
         elif dist == 'tweedie':
+            if hyperparameter < 1 or hyperparameter > 2:
+                raise ValueError("The Tweedie distribution requires the "
+                                 "hyperparameter to be between [1,2].")
             v = mu**hyperparameter
         else:
             raise ValueError("invalid distribution")
