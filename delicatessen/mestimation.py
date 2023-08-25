@@ -347,6 +347,36 @@ class MEstimator:
         # Return 2D array of lower and upper confidence intervals
         return np.asarray([lower_ci, upper_ci]).T
 
+    def p_values(self, null=0):
+        r"""Calculate two-sided Wald-type P-values using the point estimates and the sandwich variance. The formula for
+        the test statistic, the Z score, is
+
+        .. math::
+
+            \frac{\hat{\theta} - \theta}{\widehat{SE}(\hat{\theta})}
+
+        where :math:`\theta` is the null. Once the test statistic is computed, the corresponding P-value is obtained
+        by comparing to the standard normal distribution.
+
+        Note
+        ----
+        The ``.estimate()`` function must be called before the confidence intervals can be calculated.
+
+        Parameters
+        ----------
+        null: int, float, ndarray, optional
+            Null or reference for the the corresponding P-values. Default is 0.
+
+        Returns
+        -------
+        array :
+            b-by-0 array, where row 1 is the P-value for :math:`\theta_1, ..., \theta_b`
+        """
+        se = np.sqrt(np.diag(self.variance))       # Extract the standard error estimates from the sandwich
+        z_score = (self.theta - null) / se         # Compute the Z-score
+        p_value = norm.sf(np.abs(z_score)) * 2     # Compute the corresponding P-values
+        return p_value                             # Return P-values to the user
+
     def _mestimation_answer_(self, theta):
         """Internal function to evaluate the sum of the estimating equations. The summation must be internally evaluated
         since the bread requires calculation of the sum of the derivatives. This function is used by the root-finding

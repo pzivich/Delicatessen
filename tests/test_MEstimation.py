@@ -359,6 +359,11 @@ class TestMEstimation:
                             np.asarray(glm.conf_int()),
                             atol=1e-6)
 
+        # Checking P-values
+        npt.assert_allclose(mestimator.p_values(null=0),
+                            np.asarray(glm.pvalues),
+                            atol=1e-6)
+
     def test_logistic(self):
         """Tests linear regression by-hand with a single estimating equation.
         """
@@ -394,6 +399,11 @@ class TestMEstimation:
         # Checking confidence interval estimates
         npt.assert_allclose(mestimator.confidence_intervals(),
                             np.asarray(glm.conf_int()),
+                            atol=1e-6)
+
+        # Checking P-values
+        npt.assert_allclose(mestimator.p_values(null=0),
+                            np.asarray(glm.pvalues),
                             atol=1e-6)
 
     def test_custom_solver(self):
