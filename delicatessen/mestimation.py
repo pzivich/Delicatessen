@@ -332,6 +332,10 @@ class MEstimator:
             b-by-2 array, where row 1 is the confidence intervals for :math:`\theta_1`, ..., and row b is the confidence
             intervals for :math:`\theta_b`
         """
+        # Check that estimate() has been called
+        if self.theta is None:
+            raise ValueError("theta has not been estimated yet. "
+                             "estimate() must be called before confidence_intervals()")
         # Check valid alpha value is being provided
         if not 0 < alpha < 1:
             raise ValueError("`alpha` must be 0 < a < 1")
@@ -370,8 +374,14 @@ class MEstimator:
         Returns
         -------
         array :
-            b-by-0 array, where row 1 is the P-value for :math:`\theta_1, ..., \theta_b`
+            Array of P-values for :math:`\theta_1, ..., \theta_b`, respectively
         """
+        # Check that estimate() has been called
+        if self.theta is None:
+            raise ValueError("theta has not been estimated yet. "
+                             "estimate() must be called before confidence_intervals()")
+        
+        # Calculating P-values
         se = np.sqrt(np.diag(self.variance))       # Extract the standard error estimates from the sandwich
         z_score = (self.theta - null) / se         # Compute the Z-score
         p_value = norm.sf(np.abs(z_score)) * 2     # Compute the corresponding P-values
