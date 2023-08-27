@@ -1,7 +1,7 @@
 import warnings
 import numpy as np
 from scipy.stats import norm, cauchy
-from scipy.special import digamma
+from scipy.special import digamma, polygamma
 
 from delicatessen.utilities import (logit, inverse_logit, identity,
                                     robust_loss_functions,
@@ -230,39 +230,47 @@ def ee_glm(theta, X, y, distribution, link, hyperparameter=None, weights=None, o
     Boos DD, & Stefanski LA. (2013). M-estimation (estimating equations). In Essential Statistical Inference
     (pp. 297-337). Springer, New York, NY.
 
+    Hilbe JM. (2011). *Negative Binomial Regression*. Cambridge University Press.
+
     Nakashima E. (1997). Some methods for estimation in a Negative-Binomial model.
     *Annals of the Institute of Statistical Mathematics*, 49, 101-115.
     """
     distribution = distribution.lower()
     if distribution in ['gamma', 'negative_binomial', 'nb']:
-        beta, alpha = theta[:-1], theta[-1]
+        beta, alpha = theta[:-1], np.exp(theta[-1])
     else:
         beta = theta
+        alpha = None
 
     # Preparation of input shapes and object types
     X, y, beta, offset = _prep_inputs_(X=X, y=y, theta=beta, penalty=None, offset=offset)
 
     # Transforming data for score equations
-    betaX = np.dot(X, beta) + offset                                  # Compute (X * B)
-    pred_y, deriv = _inverse_link_(betax=betaX, link=link)            # Compute g^{-1}(X * B), d/dB g^{-1}(X * B)
-    variance = _distribution_variance_(dist=distribution, mu=pred_y,  # Compute v(g^{-1}(X * B))
-                                       hyperparameter=hyperparameter)
+    betaX = np.dot(X, beta) + offset                                   # Compute (X * B)
+    pred_y, deriv = _inverse_link_(betax=betaX, link=link)             # Compute g^{-1}(X * B), d/dB g^{-1}(X * B)
+    variance = _distribution_variance_(dist=distribution, mu=pred_y,   # Compute v(g^{-1}(X * B))
+                                       hyperparameter=hyperparameter,  # ... hyperparameter for tweedie distribution
+                                       alpha=alpha)                    # ... hyperparameter for negative-binomial
 
     # Allowing for a weighted generalized linear model
-    w = generate_weights(weights=weights, n_obs=X.shape[0])           # Compute the corresponding weight vector
+    w = generate_weights(weights=weights, n_obs=X.shape[0])            # Compute the corresponding weight vector
 
     # Generic score functions for GLM
     ee_beta = w*((y - pred_y) * deriv / variance * X).T
 
     # Additional processing of regression models with additional parameters
-    if distribution == 'gamma':
-        ee_alpha = w*((1 - y / pred_y) + np.log(alpha * y / pred_y) - digamma(alpha)).T
-        return np.vstack([ee_beta, ee_alpha])
-    # elif distribution in ['negative_binomial', 'nb']:
-    #     ee_alpha = ...
-    #     return np.vstack([ee_beta, ee_alpha])
-    else:
-        return ee_beta
+    if distribution == 'gamma':                                                          # Gamma model
+        ee_alpha = w*((1 - y / pred_y) + np.log(alpha * y / pred_y) - digamma(alpha)).T  # ... nuisance for gamma
+        return np.vstack([ee_beta, ee_alpha])                                            # ... return stacked EE
+    elif distribution in ['negative_binomial', 'nb']:                                    # Negative Binomial model
+        p1 = - alpha ** -2 * polygamma(0, y + 1 / alpha)                                 # ... breaking equation into
+        p2 = alpha ** -2 * polygamma(0, 1 / alpha)                                       # ... simpler pieces
+        p3 = y / (alpha ** 2 * pred_y + alpha)
+        p4 = - (alpha*pred_y / (alpha*pred_y + 1) + np.log(1 / (alpha*pred_y + 1))) / alpha**2
+        ee_alpha = (p1 + p2 + p3 + p4).T
+        return np.vstack([ee_beta, ee_alpha])                                            # ... return stacked EE
+    else:                                                                                # All other models
+        return ee_beta                                                                   # ... only beta EE
 
 
 #################################################################
@@ -1354,7 +1362,7 @@ def _inverse_link_(betax, link):
     return py, dpy
 
 
-def _distribution_variance_(dist, mu, hyperparameter=None):
+def _distribution_variance_(dist, mu, hyperparameter=None, alpha=None):
     if dist in ['normal', 'gaussian']:
         v = 1
     elif dist == 'poisson':
@@ -1364,11 +1372,12 @@ def _distribution_variance_(dist, mu, hyperparameter=None):
     elif dist == 'gamma':
         v = mu**2
     elif dist in ['negative_binomial', 'nb']:
-        v = mu + hyperparameter*(mu**2)
+        v = mu + alpha*(mu**2)
     elif dist == 'tweedie':
-        if hyperparameter < 1 or hyperparameter > 2:
+        if 0 < hyperparameter < 1:
             raise ValueError("The Tweedie distribution requires the "
-                             "hyperparameter to be between [1,2].")
+                             "hyperparameter to be 0 or >=1.")
+        # TODO technically tweedie can handle this but ends up causing issues with root-finding
         v = mu**hyperparameter
     else:
         raise ValueError("invalid distribution")
