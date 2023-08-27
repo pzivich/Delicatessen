@@ -401,6 +401,11 @@ class TestMEstimation:
                             np.asarray(glm.conf_int()),
                             atol=1e-6)
 
+        # Checking Z-scores
+        npt.assert_allclose(mestimator.z_scores(null=0),
+                            np.asarray(glm.tvalues),
+                            atol=1e-6)
+
         # Checking P-values
         npt.assert_allclose(mestimator.p_values(null=0),
                             np.asarray(glm.pvalues),

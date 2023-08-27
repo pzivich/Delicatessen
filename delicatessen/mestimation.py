@@ -351,19 +351,41 @@ class MEstimator:
         # Return 2D array of lower and upper confidence intervals
         return np.asarray([lower_ci, upper_ci]).T
 
-    def p_values(self, null=0):
-        r"""Calculate two-sided Wald-type P-values using the point estimates and the sandwich variance. The formula for
-        the test statistic, the Z score, is
+    def z_scores(self, null=0):
+        r"""Calculate the Z-score using the point estimates and the sandwich variance. The formula for the Z score is
 
         .. math::
 
             \frac{\hat{\theta} - \theta}{\widehat{SE}(\hat{\theta})}
 
-        where :math:`\theta` is the null. Once the test statistic is computed, the corresponding P-value is obtained
-        by comparing to the standard normal distribution.
+        where :math:`\theta` is the null. The ``.estimate()`` function must be called before the Z-scores can be
+        calculated.
 
-        Note
-        ----
+        Parameters
+        ----------
+        null: int, float, ndarray, optional
+            Null or reference for the the corresponding P-values. Default is 0.
+
+        Returns
+        -------
+        array :
+            Array of Z-scores for :math:`\theta_1, ..., \theta_b`, respectively
+        """
+        # Check that self.estimate() has been called
+        if self.theta is None:
+            raise ValueError("theta has not been estimated yet. "
+                             "estimate() must be called before confidence_intervals()")
+
+        # Calculating Z-scores
+        se = np.sqrt(np.diag(self.variance))       # Extract the standard error estimates from the sandwich
+        z_score = (self.theta - null) / se         # Compute the Z-score
+        return z_score                             # Return the Z-score to the user
+
+    def p_values(self, null=0):
+        r"""Calculate two-sided Wald-type P-values using the Z-scores compute using the point and the sandwich variance
+        estimates. Once the Z-scores are computed, the corresponding P-values are obtained by comparing to the standard
+        normal distribution.
+
         The ``.estimate()`` function must be called before the P-values can be calculated.
 
         Parameters
@@ -376,24 +398,18 @@ class MEstimator:
         array :
             Array of P-values for :math:`\theta_1, ..., \theta_b`, respectively
         """
-        # Check that estimate() has been called
-        if self.theta is None:
-            raise ValueError("theta has not been estimated yet. "
-                             "estimate() must be called before confidence_intervals()")
-        
-        # Calculating P-values
-        se = np.sqrt(np.diag(self.variance))       # Extract the standard error estimates from the sandwich
-        z_score = (self.theta - null) / se         # Compute the Z-score
+        z_score = self.z_scores(null=null)         # Calculating the Z-scores
         p_value = norm.sf(np.abs(z_score)) * 2     # Compute the corresponding P-values
         return p_value                             # Return P-values to the user
 
     def s_values(self, null=0):
         r"""Calculate two-sided Wald-type S-values using the point estimates and the sandwich variance. The S-value,
         or Shannon Information value, is a transformation of the P-values that has been argued to be more easily
-        interpretable as it can be related back to simple coin-flipping scenarios. Suppose the S-value is :math:`s`.
-        Then :math:`s` corresponds to the number of heads in a row with a fair coin (equal chances heads or tails). As
-        :math:`s` increases, one would be more 'surprised' by the result (e.g., it might not be surprising to have two
-        heads in a row, but it would be surprising for 10 in a row).
+        interpretable as it can be related back to simple coin-flipping scenarios.
+
+        Suppose the S-value is :math:`s`. Then :math:`s` corresponds to the number of heads in a row with a fair coin
+        (equal chances heads or tails). As :math:`s` increases, one would be more 'surprised' by the result (e.g., it
+        might not be surprising to have two heads in a row, but it would be surprising for 10 in a row).
 
         The transformation from a P-value into a S-value is.
 
@@ -401,11 +417,8 @@ class MEstimator:
 
             S = - \log_2(P)
 
-        where :math:`P` is the corresponding P-value.
-
-        Note
-        ----
-        The ``.estimate()`` function must be called before the S-values can be calculated.
+        where :math:`P` is the corresponding P-value. The ``.estimate()`` function must be called before the S-values
+        can be calculated.
 
         Parameters
         ----------
