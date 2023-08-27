@@ -1600,9 +1600,81 @@ class TestEstimatingEquationsRegression:
                             sestr.variance[0:3, 0:3],
                             atol=1e-6)
 
-    # TODO negativebinomial
-    # Need to figure out other parameter and then add tests
-    # I can use MASS glm.nb to check against (except variance)
+    def test_glm_nb_log(self):
+        d = pd.DataFrame()
+        d['X'] = [1, -1, 0, 1, 2, 1, -2, -1, 0, 3, -3, 1, 1, -1, -1, -2, 2, 0, -1, 0]
+        d['Z'] = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        d['Y'] = [0, 0, 0, 0, 0, 15, 15, 25, 25, 45, 0, 0, 0, 0, 15, 15, 15, 25, 25, 35]
+        d['I'] = 1
+
+        # M-estimation negative binomial
+        def psi(theta):
+            ef_glm = ee_glm(theta[:-1], X=d[['I', 'X', 'Z']], y=d['Y'],
+                            distribution='nb', link='log')
+            # Transform with exponentiation to compare back to statsmodels
+            ef_ta = np.ones(d.shape[0])*(np.exp(theta[-2]) - theta[-1])
+            return np.vstack([ef_glm, ef_ta])
+
+        mestr = MEstimator(psi, init=[0., 0., 0., -2., 1.])
+        mestr.estimate(solver='lm', maxiter=5000)
+
+        # Negative Binomial using statsmodels
+        nb = sm.NegativeBinomial(d['Y'], d[['I', 'X', 'Z']],
+                                 loglike_method='nb2').fit(cov_type="HC1",
+                                                           tol=1e-10,
+                                                           method='newton')
+
+        # Checking mean estimate
+        npt.assert_allclose(list(mestr.theta[:3]) + [mestr.theta[-1], ],
+                            np.asarray(nb.params),
+                            atol=1e-6)
+
+        # Checking variance estimates
+        cov_mat = np.asarray(nb.cov_params())
+        npt.assert_allclose(mestr.variance[:3, :3],
+                            np.asarray(cov_mat[:3, :3]),
+                            atol=1e-6)
+
+        # Checking covariance for nuisance parameters (since there is an extra transform)
+        npt.assert_allclose(mestr.variance[-1, -1],
+                            np.asarray(cov_mat[-1, -1]),
+                            atol=1e-4)
+        npt.assert_allclose(mestr.variance[0, -1],
+                            np.asarray(cov_mat[0, -1]),
+                            atol=1e-4)
+        npt.assert_allclose(mestr.variance[1, -1],
+                            np.asarray(cov_mat[1, -1]),
+                            atol=1e-4)
+        npt.assert_allclose(mestr.variance[2, -1],
+                            np.asarray(cov_mat[2, -1]),
+                            atol=1e-4)
+
+    def test_glm_nb_identity(self):
+        d = pd.DataFrame()
+        d['X'] = [1, -1, 0, 1, 2, 1, -2, -1, 0, 3, -3, 1, 1, -1, -1, -2, 2, 0, -1, 0]
+        d['Z'] = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        d['Y'] = [0, 0, 0, 0, 0, 15, 15, 25, 25, 45, 0, 0, 0, 0, 15, 15, 15, 25, 25, 35]
+        d['I'] = 1
+
+        # M-estimation negative binomial
+        def psi(theta):
+            return ee_glm(theta, X=d[['I', 'X', 'Z']], y=d['Y'],
+                          distribution='nb', link='identity')
+
+        mestr = MEstimator(psi, init=[20., 0., 0., 1.])
+        mestr.estimate(solver='lm', maxiter=5000)
+
+        # Negative Binomial using statsmodels
+        fam = sm.families.NegativeBinomial(sm.families.links.identity(), alpha=np.exp(mestr.theta[-1]))
+        glm = sm.GLM(d['Y'], d[['I', 'X', 'Z']], family=fam).fit(cov_type="HC1", tol=1e-12)
+
+        # Checking mean estimate
+        npt.assert_allclose(mestr.theta[:3],
+                            np.asarray(glm.params),
+                            atol=1e-5)
+
+        # Checking variance estimates
+        # Can't check variances since statsmodels NB ignores the uncertainty in alpha
 
     def test_elasticnet(self):
         n = 1000
