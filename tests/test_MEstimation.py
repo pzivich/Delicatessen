@@ -406,6 +406,11 @@ class TestMEstimation:
                             np.asarray(glm.pvalues),
                             atol=1e-6)
 
+        # Checking S-values
+        npt.assert_allclose(mestimator.s_values(null=0),
+                            -1*np.log2(np.asarray(glm.pvalues)),
+                            atol=1e-6)
+
     def test_custom_solver(self):
         """Test the use of a user-specified root-finding algorithm.
         """
