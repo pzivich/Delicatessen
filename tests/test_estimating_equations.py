@@ -1500,7 +1500,7 @@ class TestEstimatingEquationsRegression:
         def psi(theta):
             return ee_glm(theta, X=d[['I', 'X', 'Z']], y=d['Y'],
                           distribution='tweedie', link='log',
-                          hyperparameter=3)
+                          hyperparameter=0.5)
 
         mestr = MEstimator(psi, init=[2., 0., 0.])
         with pytest.raises(ValueError, match="distribution requires"):
