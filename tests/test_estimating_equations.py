@@ -1490,7 +1490,6 @@ class TestEstimatingEquationsRegression:
                             atol=1e-6)
 
     def test_glm_tweedie_error(self):
-        # TODO do I want this error to happen?
         d = pd.DataFrame()
         d['X'] = [1, -1, 0, 1, 2, 1, -2, -1, 0, 3, -3, 1, 1, -1, -1, -2, 2, 0, -1, 0]
         d['Z'] = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
@@ -1500,11 +1499,39 @@ class TestEstimatingEquationsRegression:
         def psi(theta):
             return ee_glm(theta, X=d[['I', 'X', 'Z']], y=d['Y'],
                           distribution='tweedie', link='log',
+                          hyperparameter=-1)
+
+        mestr = MEstimator(psi, init=[2., 0., 0.])
+        with pytest.raises(ValueError, match="non-negative"):
+            mestr.estimate(solver='lm', maxiter=5000)
+
+    def test_glm_tweedie_lessthan1(self):
+        d = pd.DataFrame()
+        d['X'] = [1, -1, 0, 1, 2, 1, -2, -1, 0, 3, -3, 1, 1, -1, -1, -2, 2, 0, -1, 0]
+        d['Z'] = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        d['Y'] = [0, 0, 0, 0, 0, 15, 15, 25, 25, 45, 0, 0, 0, 0, 15, 15, 15, 25, 25, 35]
+        d['I'] = 1
+
+        def psi(theta):
+            return ee_glm(theta, X=d[['I', 'X', 'Z']], y=d['Y'],
+                          distribution='tweedie', link='log',
                           hyperparameter=0.5)
 
         mestr = MEstimator(psi, init=[2., 0., 0.])
-        with pytest.raises(ValueError, match="distribution requires"):
-            mestr.estimate(solver='lm', maxiter=5000)
+        mestr.estimate(solver='lm', maxiter=5000)
+
+        fam = sm.families.Tweedie(sm.families.links.log(), var_power=0.5)
+        glm = sm.GLM(d['Y'], d[['I', 'X', 'Z']], family=fam).fit(cov_type="HC1")
+
+        # Checking mean estimate
+        npt.assert_allclose(mestr.theta,
+                            np.asarray(glm.params),
+                            atol=1e-6)
+
+        # Checking variance estimates
+        npt.assert_allclose(mestr.variance,
+                            np.asarray(glm.cov_params()),
+                            atol=1e-6)
 
     def test_glm_tweedie_identity(self):
         d = pd.DataFrame()
