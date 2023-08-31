@@ -1374,7 +1374,7 @@ def _distribution_variance_(dist, mu, hyperparameter=None, alpha=None):
     elif dist in ['negative_binomial', 'nb']:
         v = mu + alpha*(mu**2)
     elif dist == 'tweedie':
-        if 0 < hyperparameter:
+        if 0 > hyperparameter:
             raise ValueError("The Tweedie distribution requires the "
                              "hyperparameter to be non-negative, i.e., >0.")
         v = mu**hyperparameter
