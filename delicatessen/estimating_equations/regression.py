@@ -1,5 +1,7 @@
 import warnings
 import numpy as np
+from scipy.stats import norm, cauchy
+from scipy.special import digamma, polygamma
 
 from delicatessen.utilities import (logit, inverse_logit, identity,
                                     robust_loss_functions,
@@ -131,6 +133,146 @@ def ee_regression(theta, X, y, model, weights=None, offset=None):
 
     # Output b-by-n matrix
     return w*((y - pred_y) * X).T           # Return weighted regression score function
+
+
+def ee_glm(theta, X, y, distribution, link, hyperparameter=None, weights=None, offset=None):
+    r"""Estimating equation for regression with a generalized linear model. Unlike ``ee_regression``, this functionality
+    supports generic distribution and link specifications. The general estimating equation for the outcome :math:`Y_i`
+    with the design matrix :math:`X_i`
+
+    .. math::
+
+        \sum_{i=1}^n W_i \left\{ Y_i - g^{-1}(X_i^T \theta) \times \frac{D(\theta)}{v(\theta)} \right\} X_i = 0
+
+    where :math:`g` is the link function, :math:`g^{-1}` is the inverse link function, :math:`D(\theta)` is the
+    derivative of the inverse link function by :math:`\theta`, and :math:`v(\theta)` is the variance function for the
+    specified distribution.
+
+    Note
+    ----
+    Some distributions (i.e., negative-binomial, gamma) involve additional parameters. These are estimated using
+    additional parameter-specific estimating equations.
+
+
+    Here, :math:`\theta` is a 1-by-b array, where b is the distinct covariates included as part of X. For example, if
+    X is a 3-by-n matrix, then :math:`\theta` will be a 1-by-3 array. The code is general to allow for an arbitrary
+    number of X's (as long as there is enough support in the data).
+
+    Note
+    ----
+    All provided estimating equations are meant to be wrapped inside a user-specified function. Throughout, these
+    user-defined functions are defined as ``psi``.
+
+
+    Here, :math:`\theta` corresponds to the coefficients in the corresponding regression model
+
+    Parameters
+    ----------
+    theta : ndarray, list, vector
+        Theta in this case consists of b values. Therefore, initial values should consist of the same number as the
+        number of columns present. This can easily be implemented by ``[0, ] * X.shape[1]``.
+    X : ndarray, list, vector
+        2-dimensional vector of n observed values for b variables.
+    y : ndarray, list, vector
+        1-dimensional vector of n observed values.
+    distribution : str
+        Distribution for the generalized linear model. Options are
+        ``'normal'`` (alias: ``gaussian``),
+        ``'binomial'`` (aliases: ``bernoulli``, ``bin``),
+        ``'poisson'``,
+        ``'gamma'``,
+        ``'inverse_normal'`` (alias: ``inverse_gaussian``),
+        ``'negative_binomial'`` (alias: ``nb``),
+        and ``'tweedie'``.
+    link : str
+        Link function for the generalized linear model. Options are
+        ``identity``,
+        ``log``,
+        ``logistic`` (alias: ``logit``),
+        ``probit``,
+        ``cauchit`` (alias: ``cauchy``),
+        ``loglog``,
+        ``cloglog``,
+        ``inverse``,
+        and ``square_root`` (alias: ``sqrt``).
+    hyperparameter : None, int, float
+        Hyperparameter specification. Default is None. This option is only used by the tweedie and negative-binomial
+        distributions.
+    weights : ndarray, list, vector, None, optional
+        1-dimensional vector of n weights. Default is None, which assigns a weight of 1 to all observations.
+    offset : ndarray, list, vector, None, optional
+        A 1-dimensional offset to be included in the model. Default is None, which applies no offset term.
+
+    Note
+    ----
+    Link and distribution combinations are not checked for their validity. Some pairings may not converge or may
+    produce nonsensical results. Please check the combination you are using is valid.
+
+    Returns
+    -------
+    array :
+        Returns a b-by-n NumPy array evaluated for the input ``theta``
+
+    Examples
+    --------
+    Construction of a estimating equation(s) with ``ee_regression`` should be done similar to the following
+
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> from scipy.stats import logistic
+    >>> from delicatessen import MEstimator
+    >>> from delicatessen.estimating_equations import ee_glm
+
+    Some generic data to estimate the regression models
+
+    >>>
+
+    References
+    ----------
+    Boos DD, & Stefanski LA. (2013). M-estimation (estimating equations). In Essential Statistical Inference
+    (pp. 297-337). Springer, New York, NY.
+
+    Hilbe JM. (2011). *Negative Binomial Regression*. Cambridge University Press.
+
+    Nakashima E. (1997). Some methods for estimation in a Negative-Binomial model.
+    *Annals of the Institute of Statistical Mathematics*, 49, 101-115.
+    """
+    distribution = distribution.lower()
+    if distribution in ['gamma', 'negative_binomial', 'nb']:
+        beta, alpha = theta[:-1], np.exp(theta[-1])
+    else:
+        beta = theta
+        alpha = None
+
+    # Preparation of input shapes and object types
+    X, y, beta, offset = _prep_inputs_(X=X, y=y, theta=beta, penalty=None, offset=offset)
+
+    # Transforming data for score equations
+    betaX = np.dot(X, beta) + offset                                   # Compute (X * B)
+    pred_y, deriv = _inverse_link_(betax=betaX, link=link)             # Compute g^{-1}(X * B), d/dB g^{-1}(X * B)
+    variance = _distribution_variance_(dist=distribution, mu=pred_y,   # Compute v(g^{-1}(X * B))
+                                       hyperparameter=hyperparameter,  # ... hyperparameter for tweedie distribution
+                                       alpha=alpha)                    # ... hyperparameter for negative-binomial
+
+    # Allowing for a weighted generalized linear model
+    w = generate_weights(weights=weights, n_obs=X.shape[0])            # Compute the corresponding weight vector
+
+    # Generic score functions for GLM
+    ee_beta = w*((y - pred_y) * deriv / variance * X).T
+
+    # Additional processing of regression models with additional parameters
+    if distribution == 'gamma':                                                          # Gamma model
+        ee_alpha = w*((1 - y / pred_y) + np.log(alpha * y / pred_y) - digamma(alpha)).T  # ... nuisance for gamma
+        return np.vstack([ee_beta, ee_alpha])                                            # ... return stacked EE
+    elif distribution in ['negative_binomial', 'nb']:                                    # Negative Binomial model
+        p1 = - alpha ** -2 * polygamma(0, y + 1 / alpha)                                 # ... breaking equation into
+        p2 = alpha ** -2 * polygamma(0, 1 / alpha)                                       # ... simpler pieces
+        p3 = y / (alpha ** 2 * pred_y + alpha)
+        p4 = - (alpha*pred_y / (alpha*pred_y + 1) + np.log(1 / (alpha*pred_y + 1))) / alpha**2
+        ee_alpha = (p1 + p2 + p3 + p4).T
+        return np.vstack([ee_beta, ee_alpha])                                            # ... return stacked EE
+    else:                                                                                # All other models
+        return ee_beta                                                                   # ... only beta EE
 
 
 #################################################################
@@ -1186,6 +1328,63 @@ def _model_transform_(model, assert_linear_model=False):
         raise ValueError("Invalid input:", model,
                          ". Please select: 'linear', 'logistic', or 'poisson'.")
     return transform
+
+
+def _inverse_link_(betax, link):
+    # Distributions not implemented: power, inverse power
+    if link == 'identity':
+        py = identity(betax)                    # Inverse link
+        dpy = 1                                 # Derivative of inverse link
+    elif link == 'log':
+        py = np.exp(betax)                      # Inverse link
+        dpy = py                                # Derivative of inverse link
+    elif link in ['logistic', 'logit']:
+        py = inverse_logit(betax)               # Inverse link
+        dpy = py * (1 - py)                     # Derivative of inverse link
+    elif link == 'inverse':
+        py = 1 / betax                          # Inverse link
+        dpy = -1 / (betax**2)                   # Derivative of inverse link
+    elif link == 'loglog':
+        py = np.exp(-1*np.exp(-betax))          # Inverse link
+        dpy = -np.exp(-betax - np.exp(-betax))  # Derivative of inverse link
+    elif link == 'cloglog':
+        py = 1 - np.exp(-1*np.exp(betax))       # Inverse link
+        dpy = np.exp(betax - np.exp(betax))     # Derivative of inverse link
+    elif link == 'probit':
+        py = norm.cdf(betax)                    # Inverse link
+        dpy = norm.pdf(betax)                   # Derivative of inverse link
+    elif link in ['cauchit', 'cauchy']:
+        py = cauchy.cdf(betax)                  # Inverse link
+        dpy = cauchy.pdf(betax)                 # Derivative of inverse link
+    elif link in ['square_root', 'sqrt']:
+        py = betax**2                           # Inverse link
+        dpy = 2 * betax                         # Derivative of inverse link
+    else:
+        raise ValueError("invalid link")
+    return py, dpy
+
+
+def _distribution_variance_(dist, mu, hyperparameter=None, alpha=None):
+    if dist in ['normal', 'gaussian']:
+        v = 1
+    elif dist == 'poisson':
+        v = mu
+    elif dist in ['binomial', 'bin', 'bernoulli']:
+        v = mu - mu**2
+    elif dist == 'gamma':
+        v = mu**2
+    elif dist in ['negative_binomial', 'nb']:
+        v = mu + alpha*(mu**2)
+    elif dist in ['inverse_normal', 'inverse_gaussian']:
+        v = mu**3
+    elif dist == 'tweedie':
+        if 0 > hyperparameter:
+            raise ValueError("The Tweedie distribution requires the "
+                             "hyperparameter to be non-negative, i.e., >0.")
+        v = mu**hyperparameter
+    else:
+        raise ValueError("invalid distribution")
+    return v
 
 
 def _bridge_penalty_(theta, gamma, penalty, n_obs, center):

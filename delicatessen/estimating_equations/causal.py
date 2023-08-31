@@ -1,6 +1,6 @@
 import numpy as np
 
-from .regression import ee_regression
+from .regression import ee_regression, ee_glm
 from delicatessen.utilities import logit, inverse_logit, identity
 
 
@@ -243,7 +243,7 @@ def ee_gformula(theta, y, X, X1, X0=None, force_continuous=False):
                           preds_reg))     # theta[3:] is for the regression coefficients
 
 
-def ee_ipw(theta, y, A, W, truncate=None):
+def ee_ipw(theta, y, A, W, truncate=None, weights=None):
     r"""Estimating equation for inverse probability weighting estimator. For estimation of the weights (or propensity
     scores), a logistic model is used. The first estimating equations for the logistic regression model are
 
@@ -300,6 +300,10 @@ def ee_ipw(theta, y, A, W, truncate=None):
         below 0.01 can be set to 0.99 or 0.01, respectively. This is done by specifying ``truncate=(0.01, 0.99)``. Note
         this step is done via ``numpy.clip(.., a_min, a_max)``, so order is important. Default
         is ``None``, which applies no truncation.
+    weights : ndarray, list, vector, None, optional
+        1-dimensional vector of n weights. Default is None, which assigns a weight of 1 to all observations. This
+        argument is intended to support the use of missingness weights. The propensity score model is *not* fit using
+        these weights.
 
     Returns
     -------
@@ -382,10 +386,14 @@ def ee_ipw(theta, y, A, W, truncate=None):
             raise ValueError("truncate values must be specified in ascending order")
         pi = np.clip(pi, a_min=truncate[0], a_max=truncate[1])
 
+    # Processing external weights argument
+    if weights is None:
+        weights = 1
+
     # Calculating Y(a=1)
-    ya1 = (A * y) / pi - theta[1]                # i's contribution is (AY) / \pi
+    ya1 = (A * y) / pi * weights - theta[1]                # i's contribution is (AY) / \pi
     # Calculating Y(a=0)
-    ya0 = ((1-A) * y) / (1-pi) - theta[2]        # i's contribution is ((1-A)Y) / (1-\pi)
+    ya0 = ((1-A) * y) / (1-pi) * weights - theta[2]        # i's contribution is ((1-A)Y) / (1-\pi)
     # Calculating Y(a=1) - Y(a=0)
     ate = np.ones(y.shape[0]) * (theta[1] - theta[2]) - theta[0]
 
@@ -394,6 +402,154 @@ def ee_ipw(theta, y, A, W, truncate=None):
                       ya1[None, :],    # theta[1] is for R1
                       ya0[None, :],    # theta[2] is for R0
                       preds_reg))      # theta[3:] is for the regression coefficients
+
+
+def ee_ipw_msm(theta, y, A, W, V, distribution, link, hyperparameter=None, truncate=None, weights=None):
+    r"""Estimating equation for inverse probability weighting estimator of the parameters of a marginal structural
+    model. For estimation of the weights (or propensity scores), a logistic model is used. The first estimating
+    equations for the logistic regression model are
+
+    .. math::
+
+        \sum_{i=1}^n \left\{ A_i - \text{expit}(W_i^T \alpha) \right\} W_i = 0
+
+    where A is the action and W is the set of confounders. For the implementation of the inverse probability weighting
+    estimator of the marginal structural model, a weighted generalized linear model is used. See ``ee_glm`` for details
+    on this estimating equation.
+
+    Here, ``theta`` corresponds to multiple quantities. The *first* set of values correspond to the parameters of the
+    marginal structural model, and the *second* set correspond to the logistic regression model coefficients for the
+    propensity scores.
+
+    Note
+    ----
+    All provided estimating equations are meant to be wrapped inside a user-specified function. Throughtout, these
+    user-defined functions are defined as ``psi``.
+
+    Parameters
+    ----------
+    theta : ndarray, list, vector
+        Theta consists of 3+b values.
+    y : ndarray, list, vector
+        1-dimensional vector of n observed values.
+    A : ndarray, list, vector
+        1-dimensional vector of n observed values. The A values should all be 0 or 1.
+    W : ndarray, list, vector
+        2-dimensional vector of n observed values for b variables to model the probability of ``A`` with.
+    V : ndarray, list, vector
+        2-dimensional vector of n observed values for c variables in the marginal structural model.
+    distribution : str
+        Distribution for the generalized linear model. See ``ee_glm`` for options.
+    link : str
+        Link function for the generalized linear model. See ``ee_glm`` for options.
+    truncate : None, list, set, ndarray, optional
+        Bounds to truncate the estimated probabilities of ``A`` at. For example, estimated probabilities above 0.99 or
+        below 0.01 can be set to 0.99 or 0.01, respectively. This is done by specifying ``truncate=(0.01, 0.99)``. Note
+        this step is done via ``numpy.clip(.., a_min, a_max)``, so order is important. Default
+        is ``None``, which applies no truncation.
+    weights : ndarray, list, vector, None, optional
+        1-dimensional vector of n weights. Default is None, which assigns a weight of 1 to all observations. This
+        argument is intended to support the use of missingness weights. The propensity score model is *not* fit using
+        these weights.
+
+    Returns
+    -------
+    array :
+        Returns a (3+b)-by-n NumPy array evaluated for the input ``theta``
+
+    Examples
+    --------
+    Construction of a estimating equation(s) with ``ee_ipw_msm`` should be done similar to the following
+
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> from delicatessen import MEstimator
+    >>> from delicatessen.estimating_equations import ee_ipw_msm
+
+    Some generic data
+
+    >>> n = 200
+    >>> d = pd.DataFrame()
+    >>> d['W'] = np.random.binomial(1, p=0.5, size=n)
+    >>> d['A'] = np.random.binomial(1, p=(0.25 + 0.5*d['W']), size=n)
+    >>> d['Ya0'] = np.random.binomial(1, p=(0.75 - 0.5*d['W']), size=n)
+    >>> d['Ya1'] = np.random.binomial(1, p=(0.75 - 0.5*d['W'] - 0.1*1), size=n)
+    >>> d['Y'] = (1-d['A'])*d['Ya0'] + d['A']*d['Ya1']
+    >>> d['C'] = 1
+
+    Defining psi, or the stacked estimating equations for a logistic marginal structural model. Note that 'A' is the
+    action.
+
+    >>> def psi(theta):
+    >>>     return ee_ipw_msm(theta, y=d['Y'], A=d['A'],
+    >>>                       W=d[['C', 'W']], V=d[['C', 'A']],
+    >>>                       link='logit', distribution='binomial')
+
+    Calling the M-estimation procedure. Since ``W`` is 2-by-n here and the marginal structural model (``V``) consists
+    of 2 parameters, the initial values should be of length 2+2=4. Starting values for the marginal structural model
+    may need to be adjusted to lie within the domain of the chosen link-distribution functions.
+
+    >>> estr = MEstimator(stacked_equations=psi, init=[0., 0., 0., 0.])
+    >>> estr.estimate(solver='lm')
+
+    Inspecting the parameter estimates, variance, and 95% confidence intervals
+
+    >>> estr.theta
+    >>> estr.variance
+    >>> estr.confidence_intervals()
+
+    More specifically, the corresponding parameters are
+
+    >>> estr.theta[0:2]  # Marginal structural model paramters
+    >>> estr.theta[2:]   # Nuisance model parameters
+
+    If you want to see how truncating the probabilities works, try repeating the above code but specifying
+    ``truncate=(0.1, 0.9)`` as an optional argument in ``ee_ipw_msm``.
+
+    References
+    ----------
+    Hernán MA, & Robins JM. (2006). Estimating causal effects from epidemiological data.
+    *Journal of Epidemiology & Community Health*, 60(7), 578-586.
+
+    Cole SR, & Hernán MA. (2008). Constructing inverse probability weights for marginal structural models.
+    *American Journal of Epidemiology*, 168(6), 656-664.
+    """
+    # Ensuring correct typing
+    W = np.asarray(W)                            # Convert to NumPy array
+    V = np.asarray(V)                            # Convert to NumPy array
+    A = np.asarray(A)                            # Convert to NumPy array
+    y = np.asarray(y)                            # Convert to NumPy array
+    alpha = theta[:V.shape[1]]                   # Extracting out theta's for the MSM
+    beta = theta[V.shape[1]:]                    # Extracting out theta's for the PS model
+
+    # Estimating propensity score model
+    preds_reg = ee_regression(theta=beta,        # Using logistic regression
+                              X=W,               # ... plug-in covariates for X
+                              y=A,               # ... plug-in treatment for Y
+                              model='logistic',  # ... use a logistic model
+                              weights=None)      # ... and no weights here
+
+    # Estimating weights
+    pi = inverse_logit(np.dot(W, beta))          # Getting Pr(A|W) from model
+    if truncate is not None:                     # Truncating Pr(A|W) when requested
+        if truncate[0] > truncate[1]:
+            raise ValueError("truncate values must be specified in ascending order")
+        pi = np.clip(pi, a_min=truncate[0], a_max=truncate[1])
+
+    # Processing external weights argument
+    ipw = np.where(A == 1, 1/pi, 1/(1-pi))
+    if weights is not None:
+        ipw = ipw * weights
+
+    # Estimating the marginal structural model
+    ee_msm = ee_glm(theta=alpha, X=V, y=y,                  # Regressing specified MSM
+                    distribution=distribution, link=link,   # ... with given link, distribution
+                    hyperparameter=hyperparameter,          # ... and GLM hyperparameter
+                    weights=ipw, offset=None)               # ... weighted by the IPW
+
+    # Output (c+b)-by-n stacked array
+    return np.vstack((ee_msm,          # theta[:c] is the marginal structural model parameters
+                      preds_reg))      # theta[c:] is for the regression coefficients
 
 
 def ee_aipw(theta, y, A, W, X, X1, X0, truncate=None, force_continuous=False):
@@ -614,7 +770,7 @@ def ee_aipw(theta, y, A, W, X, X1, X0, truncate=None, force_continuous=False):
                       m_model))          # theta[c] is for the outcome model coefficients
 
 
-def ee_gestimation_snmm(theta, y, A, W, V, model='linear'):
+def ee_gestimation_snmm(theta, y, A, W, V, model='linear', weights=None):
     r"""Estimating equations for g-estimation of structural nested mean models. The parameter(s) of interest are the
     parameter(s) of the corresponding structural nested mean model (SNMM). Rather than estimating the causal effect of
     treating everyone versus treating no one, g-estimation of SNMM estimates the causal effect within strata of a set
@@ -670,6 +826,9 @@ def ee_gestimation_snmm(theta, y, A, W, V, model='linear'):
     model : str, optional
         Type of structural nested mean model to fit. Options are currently only ``linear``, with a default
         of ``linear``.
+    weights : ndarray, list, vector, None, optional
+        1-dimensional vector of n weights. Default is None, which assigns a weight of 1 to all observations. This
+        argument is intended to support the use of sampling or missingness weights.
 
     Returns
     -------
@@ -748,7 +907,7 @@ def ee_gestimation_snmm(theta, y, A, W, V, model='linear'):
     A = np.asarray(A)                           # Convert to NumPy array
     W = np.asarray(W)                           # Convert to NumPy array
     V = np.asarray(V)                           # Convert to NumPy array
-    pdiv = V.shape[1]                         # Extracting number of SNM parameters
+    pdiv = V.shape[1]                           # Extracting number of SNM parameters
 
     # Extracting theta value for ease
     beta = np.asarray(theta[0: pdiv])[:, None]  # theta parameters for the SNM
@@ -757,7 +916,8 @@ def ee_gestimation_snmm(theta, y, A, W, V, model='linear'):
     # Propensity Score Model
     ee_log = ee_regression(theta=alpha,         # Propensity score parameters
                            X=W, y=A,            # ... treatment and covariate design matrix
-                           model='logistic')    # ... logistic model
+                           model='logistic',    # ... logistic model
+                           weights=weights)     # ... with provided weights
     pi = inverse_logit(np.dot(W, alpha))        # Converting log-odds to probability
 
     # Option for the variations on the structural nested mean model
@@ -771,16 +931,22 @@ def ee_gestimation_snmm(theta, y, A, W, V, model='linear'):
         # Note: logistic SNMM are possible, but these require specifying an outcome model.
         #   ... To keep the structure of SNMM as-is, I do not provide that option.
         #   ... Further a double-robust g-estimation algorithm exists but is not implemented here.
-        raise ValueError("model='"+str(model)+"' is not a supported option. "
+        raise ValueError("model='" + str(model) + "' is not a supported option. "
                          "Only the following options are supported: "
                          "linear")
 
+    # Processing weights argument
+    if weights is None:
+        weight = 1
+    else:
+        weight = weights
+
     # Computing estimating functions for the corresponding structural nested mean model
-    ee_snm = (h_psi * (A - pi)[:, None] * V).T     # Computing estimating function
+    ee_snm = weight*(h_psi * (A - pi)[:, None] * V).T  # Computing estimating function
 
     # Output (b+c)-by-n array
-    return np.vstack([ee_snm,                        # SNMM parameters
-                      ee_log])                       # Propensity score parameters
+    return np.vstack([ee_snm,                          # SNMM parameters
+                      ee_log])                         # Propensity score parameters
 
 
 def ee_mean_sensitivity_analysis(theta, y, delta, X, q_eval, H_function):

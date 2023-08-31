@@ -28,6 +28,7 @@ Regression
   :toctree: generated/
 
   ee_regression
+  ee_glm
   ee_robust_regression
   ee_ridge_regression
   ee_lasso_regression
@@ -76,6 +77,7 @@ Causal Inference
 
   ee_gformula
   ee_ipw
+  ee_ipw_msm
   ee_aipw
   ee_gestimation_snmm
   ee_mean_sensitivity_analysis
