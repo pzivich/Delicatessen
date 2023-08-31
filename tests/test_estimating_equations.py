@@ -20,13 +20,15 @@ from delicatessen.estimating_equations import (ee_mean, ee_mean_variance, ee_mea
                                                # Dose-Response
                                                ee_2p_logistic, ee_3p_logistic, ee_4p_logistic, ee_effective_dose_delta,
                                                # Causal inference
-                                               ee_gformula, ee_ipw, ee_aipw, ee_gestimation_snmm,
+                                               ee_gformula, ee_ipw, ee_ipw_msm, ee_aipw, ee_gestimation_snmm,
                                                ee_mean_sensitivity_analysis)
 from delicatessen.data import load_inderjit
 from delicatessen.utilities import additive_design_matrix, inverse_logit
 
 
 np.random.seed(236461)
+
+# TODO write more compact data generation (as functions instead of unique creations in g-estimation)
 
 
 class TestEstimatingEquationsBase:
@@ -2576,6 +2578,24 @@ class TestEstimatingEquationsCausal:
         df['Y'] = (1 - df['A']) * df['Ya0'] + df['A'] * df['Ya1']
         return df
 
+    @pytest.fixture
+    def causal_miss_data(self):
+        d = pd.DataFrame()
+        d['W'] = [1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3,
+                  1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3,
+                  1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3]
+        d['V'] = [1, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 1, 1, 0, 0,
+                  1, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 1, 1, 0, 0,
+                  1, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 1, 1, 0, 0]
+        d['A'] = [1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 0, 1, 0, 1,
+                  1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 0, 1, 0, 1,
+                  1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 0, 1, 0, 1]
+        d['Y'] = [3, 5, 1, 5, 2, 5, 2, 1, 4, 2, 3, 4, 2, 5, 5,
+                  3, 5, 1, 5, 2, 5, 2, 1, 4, 2, 3, 4, 2, 5, 5,
+                  ] + [np.nan, ]*15
+        d['I'] = 1
+        return d
+
     def test_gformula(self, causal_data):
         d1 = causal_data.copy()
         d1['A'] = 1
@@ -2726,6 +2746,187 @@ class TestEstimatingEquationsCausal:
         with pytest.raises(ValueError, match="truncate values"):
             mestimator.estimate()
 
+    def test_ipw_weights(self, causal_miss_data):
+        # Setting up data
+        d = causal_miss_data
+        W = d[['I', 'V', 'W']]
+        X = d[['I', 'A']]
+        a = d['A']
+        y = d['Y']
+        r = np.where(d['Y'].isna(), 0, 1)
+
+        # M-estimation
+        def psi(theta):
+            # Separating parameters out
+            alpha = theta[:3 + W.shape[1]]  # MSM & PS
+            gamma = theta[3 + W.shape[1]:]  # Missing score
+
+            # Estimating equation for IPMW
+            ee_ms = ee_regression(theta=gamma,
+                                  X=X, y=r,
+                                  model='logistic')
+            pi_m = inverse_logit(np.dot(X, gamma))
+            ipmw = r / pi_m
+
+            # Estimating equations for MSM and PS
+            ee_msm = ee_ipw(theta=alpha, y=y, A=a, W=W,
+                            weights=ipmw)
+            ee_msm = np.nan_to_num(ee_msm, copy=False, nan=0.)
+            return np.vstack([ee_msm, ee_ms])
+
+        init_vals = [0., 3., 3., ] + [0., 0., 0.] + [0., 0.]
+        mestr = MEstimator(psi, init=init_vals)
+        mestr.estimate(solver='lm')
+
+        # By-hand IPW estimator with statsmodels
+        glm_ps = sm.GLM(a, W, family=sm.families.Binomial()).fit()
+        pi_a = glm_ps.predict()
+        glm_ms = sm.GLM(r, X, family=sm.families.Binomial()).fit()
+        pi_m = glm_ms.predict()
+        ipmw = r / pi_m
+
+        ya1 = d['A'] * d['Y'] / pi_a * ipmw
+        ya0 = (1-d['A']) * d['Y'] / (1-pi_a) * ipmw
+
+        # Checking logistic coefficients (nuisance model estimates)
+        npt.assert_allclose(mestr.theta[3:6],
+                            np.asarray(glm_ps.params),
+                            atol=1e-6)
+        npt.assert_allclose(mestr.theta[6:],
+                            np.asarray(glm_ms.params),
+                            atol=1e-6)
+        # Checking mean estimates
+        npt.assert_allclose(mestr.theta[0],
+                            np.mean(ya1) - np.mean(ya0),
+                            atol=1e-6)
+        npt.assert_allclose(mestr.theta[1],
+                            np.mean(ya1),
+                            atol=1e-6)
+        npt.assert_allclose(mestr.theta[2],
+                            np.mean(ya0),
+                            atol=1e-6)
+
+    def test_ipw_msm(self, causal_data):
+        # M-estimation
+        def psi(theta):
+            return ee_ipw_msm(theta,
+                              y=causal_data['Y'],
+                              A=causal_data['A'],
+                              W=causal_data[['C', 'W']],
+                              V=causal_data[['C', 'A']],
+                              link='logit', distribution='binomial')
+
+        mestimator = MEstimator(psi, init=[0., 0., 0., 0.])
+        mestimator.estimate(solver='lm')
+
+        # By-hand IPW estimator with statsmodels
+        glm = sm.GLM(causal_data['A'], causal_data[['C', 'W']],
+                     family=sm.families.Binomial()).fit()
+        pi = glm.predict()
+        ipw = np.where(causal_data['A'] == 1, 1/pi, 1/(1-pi))
+        msm = sm.GEE(causal_data['Y'], causal_data[['C', 'A']],
+                     family=sm.families.Binomial(), weights=ipw,
+                     groups=causal_data.index).fit()
+
+        # Checking logistic coefficients (nuisance model estimates)
+        npt.assert_allclose(mestimator.theta[2:],
+                            np.asarray(glm.params),
+                            atol=1e-6)
+        # Checking mean estimates
+        npt.assert_allclose(mestimator.theta[0:2],
+                            msm.params,
+                            atol=1e-6)
+
+    def test_ipw_msm_truncate(self, causal_data):
+        # M-estimation
+        def psi(theta):
+            return ee_ipw_msm(theta,
+                              y=causal_data['Y'], A=causal_data['A'],
+                              W=causal_data[['C', 'W']], V=causal_data[['C', 'A']],
+                              link='logit', distribution='binomial', truncate=(0.1, 0.5))
+
+        mestimator = MEstimator(psi, init=[0., 0., 0., 0.])
+        mestimator.estimate(solver='lm')
+
+        # By-hand IPW estimator with statsmodels
+        glm = sm.GLM(causal_data['A'], causal_data[['C', 'W']],
+                     family=sm.families.Binomial()).fit()
+        pi = glm.predict()
+        pi = np.clip(pi, 0.1, 0.5)
+        ipw = np.where(causal_data['A'] == 1, 1/pi, 1/(1-pi))
+        msm = sm.GEE(causal_data['Y'], causal_data[['C', 'A']],
+                     family=sm.families.Binomial(), weights=ipw,
+                     groups=causal_data.index).fit()
+
+        # Checking logistic coefficients (nuisance model estimates)
+        npt.assert_allclose(mestimator.theta[2:],
+                            np.asarray(glm.params),
+                            atol=1e-6)
+        # Checking mean estimates
+        npt.assert_allclose(mestimator.theta[0:2],
+                            msm.params,
+                            atol=1e-6)
+
+    def test_ipw_msm_weights(self, causal_miss_data):
+        # Setting up data
+        d = causal_miss_data.copy()
+        W = d[['I', 'V', 'W']]
+        X = d[['I', 'A']]
+        msm = d[['I', 'A']]
+        a = d['A']
+        y = d['Y']
+        r = np.where(d['Y'].isna(), 0, 1)
+
+        # M-estimation
+        def psi(theta):
+            # Separating parameters out
+            alpha = theta[:2 + W.shape[1]]  # MSM & PS
+            gamma = theta[2 + W.shape[1]:]  # Missing score
+
+            # Estimating equation for IPMW
+            ee_ms = ee_regression(theta=gamma,
+                                  X=X, y=r,
+                                  model='logistic')
+            pi_m = inverse_logit(np.dot(X, gamma))
+            ipmw = r / pi_m
+
+            # Estimating equations for MSM and PS
+            ee_msm = ee_ipw_msm(alpha,
+                                y=y, A=a, W=W, V=msm,
+                                link='log', distribution='poisson',
+                                weights=ipmw)
+            ee_msm = np.nan_to_num(ee_msm, copy=False, nan=0.)
+            return np.vstack([ee_msm, ee_ms])
+
+        init_vals = [0., 0., ] + [0., 0., 0.] + [0., 0.]
+        mestr = MEstimator(psi, init=init_vals)
+        mestr.estimate(solver='lm', maxiter=5000)
+
+        # By-hand IPW estimator with statsmodels
+        glm_ps = sm.GLM(a, W, family=sm.families.Binomial()).fit()
+        pi_a = glm_ps.predict()
+        iptw = np.where(a == 1, 1/pi_a, 1/(1-pi_a))
+        glm_ms = sm.GLM(r, X, family=sm.families.Binomial()).fit()
+        pi_m = glm_ms.predict()
+        ipmw = r / pi_m
+        d['ipw'] = ipmw*iptw
+
+        dcc = d.dropna()
+        msm = sm.GEE(dcc['Y'], dcc[['I', 'A']], weights=dcc['ipw'],
+                     family=sm.families.Poisson(), groups=dcc.index).fit()
+
+        # Checking logistic coefficients (nuisance model estimates)
+        npt.assert_allclose(mestr.theta[2:5],
+                            np.asarray(glm_ps.params),
+                            atol=1e-6)
+        npt.assert_allclose(mestr.theta[5:],
+                            np.asarray(glm_ms.params),
+                            atol=1e-6)
+        # Checking mean estimates
+        npt.assert_allclose(mestr.theta[0:2],
+                            msm.params,
+                            atol=1e-6)
+
     def test_aipw(self, causal_data):
         d1 = causal_data.copy()
         d1['A'] = 1
@@ -2842,6 +3043,69 @@ class TestEstimatingEquationsCausal:
 
         # Checking variance
         npt.assert_allclose(mestr.variance,
+                            snm_var,
+                            atol=1e-4)
+
+    def test_gestimation_linear_weighted(self, causal_miss_data):
+        # Setting up data for estimation equation
+        d = causal_miss_data
+        W = d[['I', 'V', 'W']]
+        X = d[['I', 'A']]
+        snm = d[['I', 'V']]
+        a = d['A']
+        y = d['Y']
+        r = np.where(d['Y'].isna(), 0, 1)
+
+        # M-estimator
+        def psi(theta):
+            # Dividing parameters into corresponding estimation equations
+            alpha = theta[:snm.shape[1] + W.shape[1]]  # SNM and PS
+            gamma = theta[snm.shape[1] + W.shape[1]:]  # Missing scores
+
+            # Estimating equation for IPMW
+            ee_ms = ee_regression(theta=gamma,  # Missing score
+                                  X=X, y=r,  # ... observed data
+                                  model='logistic')  # ... logit model
+            pi_m = inverse_logit(np.dot(X, gamma))  # Predicted prob
+            ipmw = r / pi_m  # Missing weights
+
+            # Estimating equations for PS
+            ee_snm = ee_gestimation_snmm(theta=alpha,
+                                         y=y, A=a,
+                                         W=W, V=snm,
+                                         model='linear',
+                                         weights=ipmw)
+            # Setting rows with missing Y's as zero (no contribution)
+            ee_snm = np.nan_to_num(ee_snm, copy=False, nan=0.)
+
+            return np.vstack([ee_snm, ee_ms])
+
+        init_values = [0., 0.] + [0., ]*3 + [0., ]*2
+        mestr = MEstimator(psi, init=init_values)
+        mestr.estimate(solver='lm')
+
+        # Comparison using zEpid
+        # from zepid.causal.snm import GEstimationSNM
+        # snm = GEstimationSNM(d, exposure='A', outcome='Y')
+        # snm.exposure_model("V + W")
+        # snm.missing_model("A", stabilized=False)
+        # snm.structural_nested_model("A + A:V")
+        # snm.fit()
+        snm_params = [0.478757884654, -0.366956950389,
+                      2.406293643425, -0.750506882472, -0.816256976888,
+                      1.252762968495, -0.878069519054]
+
+        # Previously solved variance
+        snm_var = [[0.833658518465, -0.863011204849],
+                   [-0.863011204849, 1.397401367295]]
+
+        # Checking SNM parameters
+        npt.assert_allclose(mestr.theta,
+                            snm_params,
+                            atol=1e-7)
+
+        # Checking variance
+        npt.assert_allclose(mestr.variance[:2, :2],
                             snm_var,
                             atol=1e-4)
 
