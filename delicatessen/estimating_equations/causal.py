@@ -413,21 +413,11 @@ def ee_ipw_msm(theta, y, A, W, V, distribution, link, hyperparameter=None, trunc
 
         \sum_{i=1}^n \left\{ A_i - \text{expit}(W_i^T \alpha) \right\} W_i = 0
 
-    where A is the action and W is the set of confounders.
+    where A is the action and W is the set of confounders. For the implementation of the inverse probability weighting
+    estimator of the marginal structural model, a weighted generalized linear model is used. See ``ee_glm`` for details
+    on this estimating equation.
 
-    For the implementation of the inverse probability weighting estimator of the marginal structural model, the
-    following weighted generalized linear model is used
-
-    .. math::
-
-        \sum_{i=1}^n \pi_i \left\{ Y_i - g^{-1}(V_i^T \theta) \times \frac{D(\theta)}{v(\theta)} \right\} V_i = 0
-
-    where :math:`\pi_i = expit(W_i^T \alpha)`, :math:`V` is the design matrix of the marginal structural model,
-    :math:`g` is the link function, :math:`g^{-1}` is the inverse link function, :math:`D(\theta)` is the
-    derivative of the inverse link function by :math:`\theta`, and :math:`v(\theta)` is the variance function for the
-    specified distribution.
-
-    Here, theta corresponds to multiple quantities. The *first* set of values correspond to the parameters of the
+    Here, ``theta`` corresponds to multiple quantities. The *first* set of values correspond to the parameters of the
     marginal structural model, and the *second* set correspond to the logistic regression model coefficients for the
     propensity scores.
 
@@ -469,7 +459,7 @@ def ee_ipw_msm(theta, y, A, W, V, distribution, link, hyperparameter=None, trunc
 
     Examples
     --------
-    Construction of a estimating equation(s) with ``ee_ipw`` should be done similar to the following
+    Construction of a estimating equation(s) with ``ee_ipw_msm`` should be done similar to the following
 
     >>> import numpy as np
     >>> import pandas as pd

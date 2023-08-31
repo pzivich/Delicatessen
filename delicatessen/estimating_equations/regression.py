@@ -150,7 +150,8 @@ def ee_glm(theta, X, y, distribution, link, hyperparameter=None, weights=None, o
 
     Note
     ----
-    Some distributions (i.e., negative-binomial, tweedie) involve additional parameters. These are [...] by default.
+    Some distributions (i.e., negative-binomial, gamma) involve additional parameters. These are estimated using
+    additional parameter-specific estimating equations.
 
 
     Here, :math:`\theta` is a 1-by-b array, where b is the distinct covariates included as part of X. For example, if
@@ -180,6 +181,7 @@ def ee_glm(theta, X, y, distribution, link, hyperparameter=None, weights=None, o
         ``'binomial'`` (aliases: ``bernoulli``, ``bin``),
         ``'poisson'``,
         ``'gamma'``,
+        ``'inverse_normal'`` (alias: ``inverse_gaussian``),
         ``'negative_binomial'`` (alias: ``nb``),
         and ``'tweedie'``.
     link : str
