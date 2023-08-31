@@ -1463,6 +1463,62 @@ class TestEstimatingEquationsRegression:
                             uestr.theta,
                             atol=1e-6)
 
+    def test_glm_invnormal_identity(self):
+        d = pd.DataFrame()
+        d['X'] = [1, -1, 0, 1, 2, 1, -2, -1, 0, 3, -3, 1, 1, -1, -1, -2, 2, 0, -1, 0]
+        d['Z'] = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        d['Y'] = [1, 5, 1, 9, 1, 4, 3, 3, 1, 2, 4, 2, 3, 6, 6, 8, 7, 1, 2, 5]
+        d['I'] = 1
+
+        def psi(theta):
+            return ee_glm(theta, X=d[['I', 'X', 'Z']], y=d['Y'],
+                          distribution='inverse_normal', link='identity',
+                          hyperparameter=1.5)
+
+        mestr = MEstimator(psi, init=[2., 0., 0.])
+        mestr.estimate(solver='lm', maxiter=5000)
+
+        fam = sm.families.InverseGaussian(sm.families.links.identity())
+        glm = sm.GLM(d['Y'], d[['I', 'X', 'Z']], family=fam).fit(cov_type="HC1")
+
+        # Checking mean estimate
+        npt.assert_allclose(mestr.theta,
+                            np.asarray(glm.params),
+                            atol=1e-6)
+
+        # Checking variance estimates
+        npt.assert_allclose(mestr.variance,
+                            np.asarray(glm.cov_params()),
+                            atol=1e-6)
+
+    def test_glm_invnormal_log(self):
+        d = pd.DataFrame()
+        d['X'] = [1, -1, 0, 1, 2, 1, -2, -1, 0, 3, -3, 1, 1, -1, -1, -2, 2, 0, -1, 0]
+        d['Z'] = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        d['Y'] = [1, 5, 1, 9, 1, 4, 3, 3, 1, 2, 4, 2, 3, 6, 6, 8, 7, 1, 2, 5]
+        d['I'] = 1
+
+        def psi(theta):
+            return ee_glm(theta, X=d[['I', 'X', 'Z']], y=d['Y'],
+                          distribution='inverse_normal', link='log',
+                          hyperparameter=1.5)
+
+        mestr = MEstimator(psi, init=[0., 0., 0.])
+        mestr.estimate(solver='lm', maxiter=5000)
+
+        fam = sm.families.InverseGaussian(sm.families.links.log())
+        glm = sm.GLM(d['Y'], d[['I', 'X', 'Z']], family=fam).fit(cov_type="HC1")
+
+        # Checking mean estimate
+        npt.assert_allclose(mestr.theta,
+                            np.asarray(glm.params),
+                            atol=1e-6)
+
+        # Checking variance estimates
+        npt.assert_allclose(mestr.variance,
+                            np.asarray(glm.cov_params()),
+                            atol=1e-6)
+
     def test_glm_tweedie_log(self):
         d = pd.DataFrame()
         d['X'] = [1, -1, 0, 1, 2, 1, -2, -1, 0, 3, -3, 1, 1, -1, -1, -2, 2, 0, -1, 0]
@@ -1628,6 +1684,39 @@ class TestEstimatingEquationsRegression:
         npt.assert_allclose(testr.variance,
                             sestr.variance[0:3, 0:3],
                             atol=1e-6)
+
+    def test_glm_tweedie_invnormal(self):
+        d = pd.DataFrame()
+        d['X'] = [1, -1, 0, 1, 2, 1, -2, -1, 0, 3, -3, 1, 1, -1, -1, -2, 2, 0, -1, 0]
+        d['Z'] = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        d['Y'] = [1, 5, 1, 9, 1, 4, 3, 3, 1, 2, 4, 2, 3, 6, 6, 8, 7, 1, 2, 5]
+        d['I'] = 1
+
+        # Using the weights
+        def psi(theta):
+            return ee_glm(theta, X=d[['I', 'X', 'Z']], y=d['Y'],
+                          distribution='tweedie', link='log',
+                          hyperparameter=3)
+
+        testr = MEstimator(psi, init=[0., 0., 0.])
+        testr.estimate(solver='lm', maxiter=5000)
+
+        def psi(theta):
+            return ee_glm(theta, X=d[['I', 'X', 'Z']], y=d['Y'],
+                          distribution='inverse_normal', link='log')
+
+        sestr = MEstimator(psi, init=[0., 0., 0.])
+        sestr.estimate(solver='lm', maxiter=5000)
+
+        # Checking mean estimate
+        npt.assert_allclose(testr.theta,
+                            sestr.theta,
+                            atol=1e-6)
+
+        # Checking variance estimates
+        npt.assert_allclose(testr.variance,
+                            sestr.variance,
+                            rtol=1e-6)
 
     def test_glm_nb_log(self):
         d = pd.DataFrame()
