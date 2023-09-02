@@ -1268,7 +1268,9 @@ The variance and Wald-type confidence intervals can also be output via
 
 Additional Examples
 -------------------------------
-Additional examples are provided `here <https://github.com/pzivich/Delicatessen/tree/main/tutorials>`_.
+For additional examples, we have replicated chapters 12-14 of the textbook "Causal Inference: What If" by Hernan
+and Robins (2023). These additional examples are provided
+`here <https://github.com/pzivich/Delicatessen/blob/main/examples/Hernan-Robins-2023.ipynb>`_.
 
 
 References and Further Readings

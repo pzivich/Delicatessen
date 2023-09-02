@@ -4,6 +4,7 @@
 
 ![tests](https://github.com/pzivich/Delicatessen/actions/workflows/python-package.yml/badge.svg)
 [![version](https://badge.fury.io/py/delicatessen.svg)](https://badge.fury.io/py/delicatessen)
+[![arXiv](https://img.shields.io/badge/arXiv-2203.11300-b31b1b.svg)](https://arxiv.org/abs/2203.11300)
 [![docs](https://readthedocs.org/projects/deli/badge/?version=latest)](https://deli.readthedocs.io/en/latest/?badge=latest)
 [![Downloads](https://pepy.tech/badge/delicatessen/month)](https://pepy.tech/project/delicatessen)
 

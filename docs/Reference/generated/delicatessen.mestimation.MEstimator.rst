@@ -16,6 +16,9 @@
       ~MEstimator.__init__
       ~MEstimator.confidence_intervals
       ~MEstimator.estimate
+      ~MEstimator.p_values
+      ~MEstimator.s_values
+      ~MEstimator.z_scores
    
    
 
