@@ -119,7 +119,7 @@ def auto_differentiation(xk, f):
         evalued = function(x)              # Short-name for evaluated function
 
         # Handling whether a single input (non-tuple like SciPy) is provided
-        if isinstance(evalued, PrimalTangentPairs):     # If not a tuple, gives back the Pair object
+        if isinstance(evalued, PrimalTangentPairs):     # If not a tuple, then gives back the Pair object
             eval_no_bool_end = evalued + 0              # ... then just add zero in this case
         else:                                           # Otherwise,
             eval_no_bool_end = []                       # ... empty list for storage
@@ -178,6 +178,18 @@ class PrimalTangentPairs:
         else:                                         # Else
             self.primal = primal                      # ... directly save as new primal
         self.tangent = tangent                        # Store the tangent
+
+    # Defining properties
+
+    def transpose(self):
+        storage = []
+        for p, t in zip(self.primal, self.tangent):
+            storage.append(PrimalTangentPairs(p, t))
+        return np.array(storage)
+
+    @property
+    def T(self):
+        return self.transpose()
 
     # Basic operators for the class object
 
@@ -279,7 +291,7 @@ class PrimalTangentPairs:
         # Multiplication
         if isinstance(other, PrimalTangentPairs):                     # When multiplying PrimalTangentPairs
             return PrimalTangentPairs(self.primal * other.primal,     # ... multiply primals
-                                      self.tangent * other.primal + self.primal * other.tangent)
+                                      self.tangent*other.primal + self.primal*other.tangent)
         else:                                                         # Otherwise
             return PrimalTangentPairs(self.primal * other,            # ... multiply primal and constant
                                       self.tangent * other)           # ... multiply primal and constant
@@ -434,6 +446,8 @@ class PrimalTangentPairs:
         # Inverse hyperbolic tangent function
         return PrimalTangentPairs(np.arctanh(self.primal),
                                   self.tangent / (1 - self.primal**2))
+
+    # SciPy special operators
 
     def polygamma(self, n):
         # Polygamma function
