@@ -2,13 +2,15 @@ import pytest
 import numpy as np
 import numpy.testing as npt
 import pandas as pd
+import scipy as sp
 from scipy.stats import logistic
 from scipy.optimize import approx_fprime
 
-from delicatessen.utilities import inverse_logit, identity
 from delicatessen.derivative import auto_differentiation
+from delicatessen.utilities import inverse_logit, identity, digamma, polygamma
 from delicatessen import MEstimator
-from delicatessen.estimating_equations import (ee_mean_variance, ee_mean_robust, ee_regression, ee_ridge_regression,
+from delicatessen.estimating_equations import (ee_mean_variance, ee_mean_robust,
+                                               ee_regression, ee_glm, ee_ridge_regression,
                                                ee_additive_regression)
 
 np.random.seed(20230704)
@@ -226,6 +228,46 @@ class TestAutoDifferentiation:
 
         # Checking
         npt.assert_allclose(dx_true, dx_exact, atol=1e-5)
+
+    def test_scipy_special(self):
+        def f(x):
+            return [polygamma(n=1, x=x[0]),
+                    polygamma(n=1, x=x[1]),
+                    polygamma(n=1, x=x[2]),
+                    polygamma(n=1, x=x[3]),
+                    ]
+
+        # Points to Evaluate at
+        xinput = [0.5, 1.9, -2.3, 2]
+
+        # True Derivatives
+        dx_true = sp.special.polygamma(n=2, x=xinput)
+
+        # Evaluating the derivatives at the points
+        dx_exact = auto_differentiation(xinput, f)
+
+        # Checking
+        npt.assert_allclose(dx_true, np.diag(dx_exact), atol=1e-5)
+
+    def test_scipy_special_numapprox(self):
+        def f(x):
+            return [polygamma(n=1, x=x[0]),
+                    polygamma(n=2, x=x[1]) + x[1]**2,
+                    polygamma(n=3, x=x[2]*x[3] + x[1]),
+                    polygamma(n=4, x=np.log(x[3] + x[1]) + x[0]**2) - x[3],
+                    ]
+
+        # Points to Evaluate at
+        xinput = [0.5, 1.9, -2.3, 2]
+
+        # True Derivatives
+        dx_approx = approx_fprime(xinput, f, epsilon=1e-9)
+
+        # Evaluating the derivatives at the points
+        dx_exact = auto_differentiation(xinput, f)
+
+        # Checking
+        npt.assert_allclose(dx_approx, dx_exact, atol=1e-5)
 
     def test_compare_deli_utilities(self):
         # Defining the functions to check
@@ -615,14 +657,14 @@ class TestSandwichAutoDiff:
                                           model='logistic',
                                           specifications=spec)
 
-        mestr = MEstimator(psi_regression, init=[0., 2., 0., 0., 1., 0., 0., 0., 0.])
-
         # Auto-differentation
+        mestr = MEstimator(psi_regression, init=[0., 2., 0., 0., 1., 0., 0., 0., 0.])
         mestr.estimate(solver='lm', deriv_method='exact')
         bread_exact = mestr.bread
         var_exact = mestr.variance
 
         # Central difference method
+        mestr = MEstimator(psi_regression, init=[0., 2., 0., 0., 1., 0., 0., 0., 0.])
         mestr.estimate(solver='lm', deriv_method='approx')
         bread_approx = mestr.bread
         var_approx = mestr.variance
@@ -637,3 +679,34 @@ class TestSandwichAutoDiff:
                             var_exact,
                             atol=1e-5)
 
+    def test_exact_bread_glm_loggamma(self):
+        d = pd.DataFrame()
+        d['X'] = np.log([5, 10, 15, 20, 30, 40, 60, 80, 100])
+        d['Y'] = [118, 58, 42, 35, 27, 25, 21, 19, 18]
+        d['I'] = 1
+
+        def psi(theta):
+            return ee_glm(theta, X=d[['I', 'X']], y=d['Y'],
+                          distribution='gamma', link='log')
+
+        # Auto-differentation
+        mestr = MEstimator(psi, init=[0., 0., 1.])
+        mestr.estimate(solver='lm', deriv_method='exact')
+        bread_exact = mestr.bread
+        var_exact = mestr.variance
+
+        # Central difference method
+        mestr = MEstimator(psi, init=[0., 0., 1.])
+        mestr.estimate(solver='lm', deriv_method='approx')
+        bread_approx = mestr.bread
+        var_approx = mestr.variance
+
+        # Checking bread estimates
+        npt.assert_allclose(bread_approx,
+                            bread_exact,
+                            atol=1e-6)
+
+        # Checking variance estimates
+        npt.assert_allclose(var_approx,
+                            var_exact,
+                            atol=5e-5)
