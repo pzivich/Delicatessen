@@ -1,4 +1,5 @@
 import numpy as np
+import scipy as sp
 
 
 def auto_differentiation(xk, f):
@@ -434,3 +435,7 @@ class PrimalTangentPairs:
         return PrimalTangentPairs(np.arctanh(self.primal),
                                   self.tangent / (1 - self.primal**2))
 
+    def polygamma(self, n):
+        # Polygamma function
+        return PrimalTangentPairs(sp.special.polygamma(n, self.primal),
+                                  self.tangent * sp.special.polygamma(n+1, self.primal))
