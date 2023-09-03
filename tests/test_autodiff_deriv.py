@@ -258,6 +258,34 @@ class TestAutoDifferentiation:
         # Checking
         npt.assert_allclose(dx_approx, dx_exact, atol=1e-4)
 
+    def test_some_other_issue(self):
+        d = pd.DataFrame()
+        d['X'] = np.log([5, 10, 15, 20, 25])
+        d['Y'] = [118, 58, 5, 30, 58]
+        d['I'] = 1
+        y = np.asarray(d['Y'])[:, None]
+        X = np.asarray(d[['I', 'X']])
+
+        def psi(theta):
+            beta, alpha = theta[:-1], np.exp(theta[-1])
+            beta = np.asarray(beta)[:, None]
+            pred_y = np.exp(np.dot(X, beta))
+            ee_beta = ((y - pred_y) * X).T
+
+            # Another problematic transpose example
+            ee_alpha = (alpha - y).T
+            return np.vstack([ee_beta, ee_alpha])
+
+        def internal_sum(theta):
+            return np.sum(psi(theta), axis=1)
+
+        # Evaluating the derivatives at the points
+        dx_exact = auto_differentiation([5.503, -0.6019, 0.0166], internal_sum)
+        dx_approx = approx_fprime([5.503, -0.6019, 0.0166], internal_sum, epsilon=1e-9)
+
+        # Checking
+        npt.assert_allclose(dx_approx, dx_exact, atol=1e-4)
+
     def test_scipy_special(self):
         def f(x):
             return [polygamma(n=1, x=x[0]),

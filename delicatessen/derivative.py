@@ -179,18 +179,6 @@ class PrimalTangentPairs:
             self.primal = primal                      # ... directly save as new primal
         self.tangent = tangent                        # Store the tangent
 
-    # Defining properties
-
-    def transpose(self):
-        storage = []
-        for p, t in zip(self.primal, self.tangent):
-            storage.append(PrimalTangentPairs(p, t))
-        return np.array(storage)
-
-    @property
-    def T(self):
-        return self.transpose()
-
     # Basic operators for the class object
 
     def __str__(self):
@@ -202,6 +190,26 @@ class PrimalTangentPairs:
         #   only the primal part. This is a bool object type, which is what is expected and has np.where operate as
         #   expected. This only seems to be called for np.where and not the other operators (they work directly).
         return bool(self.primal)
+
+    def transpose(self):
+        # Transpose operator is special
+        storage = []  # Create empty storage for the output
+
+        if self.tangent.ndim == 1:  # When tangent is of 1 dimension
+            for p in self.primal:  # ... then only the primal's are a stack
+                storage.append(PrimalTangentPairs(p,  # ... so we reshape the primal stack
+                                                  self.tangent))  # ... and keep all the corresponding tangent's
+        else:  # Otherwise, tangent is also 2 dimensions
+            for p, t in zip(self.primal, self.tangent):  # ... so both the primal and tangents
+                storage.append(PrimalTangentPairs(p, t))  # ... need to be re-paired
+
+        # Return the transposed array of the PrimalTangentPairs
+        return np.array(storage)
+
+    @property
+    def T(self):
+        # Giving the transpose() property the .T short-cut, like NumPy has (to be compatible with NumPy code)
+        return self.transpose()
 
     # Equality operators for the class
 
