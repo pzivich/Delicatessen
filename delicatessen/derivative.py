@@ -1,3 +1,4 @@
+import numpy
 import numpy as np
 import scipy as sp
 
@@ -171,11 +172,33 @@ class PrimalTangentPairs:
     tangent :
         Indicator for the location at which the derivatives is desired. Must be the same length as ``primal``.
     """
+    # After 3 days of debugging, this line is extremely important. Without it, the `test_numpy_operator_override`
+    #   test will fail. This issue that this single line solves is that it lowers the priority of the NumPy operators,
+    #   so that my __radd__ (or other reversed operators) will take precedence over numpy.ndarray.__add__
+    #   This is extremely important when trying to mix operators together that start with a numpy.ndarray, as otherwise
+    #   everything will default to a element-wise operation. However, we want it to stay as arrays up to that point.
+    # __array_priority__ = 2
+    # __array_ufunc__ = None
+    # Okay, neither of these are the solutions I want. My solution needs to be preventing arrays making it into .primal
+    #   in the first place...
+    # The issue remains that sometimes the operation order gives a NumPy array as the second object. This then defaults
+    #   to an array operation. While setting the priority above gets rid of this issue, it opens a new issue.
+    #   Specifically, the np.ones(...) trick then breaks when used in things like ee_gformula. So, setting the priority
+    #   fixes the issue but introduces a new one.
+    # The current solution is to raise an error any time we see a ndarray sneak into the primal object. I have not
+    #   figured out how to process this to avoid the objects stacking themselves. Right now, this can be coded around
+    #   though via ensuring that the ndarray comes first in more complicated operations. This is because ndarray goes
+    #   to use an element-wise procedure which gets us out of the whole array issue.
+
     def __init__(self, primal, tangent):
         # Processing of the inputs into the class, both initial and recursive calls
         if isinstance(primal, PrimalTangentPairs):    # If given a PrimalTangentPair input
+            if isinstance(primal.primal, np.ndarray):
+                raise ValueError("... order of operations issue... I am getting an array an input")
             self.primal = primal.primal               # ... extract the primal element from input
         else:                                         # Else
+            if isinstance(primal, np.ndarray):
+                raise ValueError("... order of operations issue... I am getting an array an input")
             self.primal = primal                      # ... directly save as new primal
         self.tangent = tangent                        # Store the tangent
 
@@ -459,5 +482,5 @@ class PrimalTangentPairs:
 
     def polygamma(self, n):
         # Polygamma function
-        return PrimalTangentPairs(sp.special.polygamma(n, self.primal),
+        return PrimalTangentPairs(float(sp.special.polygamma(n, self.primal)),
                                   self.tangent * sp.special.polygamma(n+1, self.primal))
