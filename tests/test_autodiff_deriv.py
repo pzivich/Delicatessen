@@ -258,33 +258,74 @@ class TestAutoDifferentiation:
         # Checking
         npt.assert_allclose(dx_approx, dx_exact, atol=1e-4)
 
-    def test_some_other_issue(self):
+    def test_numpy_operator_lead(self):
         d = pd.DataFrame()
-        d['X'] = np.log([5, 10, 15, 20, 25])
-        d['Y'] = [118, 58, 5, 30, 58]
+        d['X'] = [1, 2, 3]
+        d['Y'] = [2, 4, 6]
         d['I'] = 1
         y = np.asarray(d['Y'])[:, None]
-        X = np.asarray(d[['I', 'X']])
+        X = np.asarray(d[['X', ]])
 
         def psi(theta):
             beta, alpha = theta[:-1], np.exp(theta[-1])
             beta = np.asarray(beta)[:, None]
-            pred_y = np.exp(np.dot(X, beta))
+            pred_y = np.dot(X, beta)
             ee_beta = ((y - pred_y) * X).T
 
-            # Another problematic transpose example
-            ee_alpha = (alpha - y).T
-            return np.vstack([ee_beta, ee_alpha])
+            # Order of operations issues that can happen
+            ee_alpha1 = ((y + alpha) * alpha).T
+            ee_alpha2 = ((y - alpha) * alpha).T
+            ee_alpha3 = ((-y + alpha) * alpha).T
+            ee_alpha4 = ((y * alpha) + alpha).T
+            ee_alpha5 = ((y / alpha) + alpha).T
+
+            return np.vstack([ee_beta,
+                              ee_alpha1, ee_alpha2, ee_alpha3, ee_alpha4, ee_alpha5
+                              ])
 
         def internal_sum(theta):
             return np.sum(psi(theta), axis=1)
 
         # Evaluating the derivatives at the points
-        dx_exact = auto_differentiation([5.503, -0.6019, 0.0166], internal_sum)
-        dx_approx = approx_fprime([5.503, -0.6019, 0.0166], internal_sum, epsilon=1e-9)
+        dx_approx = approx_fprime([1.503, 0.2], internal_sum, epsilon=1e-9)
+        dx_exact = auto_differentiation([1.503, 0.2], internal_sum)
 
         # Checking
-        npt.assert_allclose(dx_approx, dx_exact, atol=1e-4)
+        npt.assert_allclose(dx_approx, dx_exact, rtol=1e-4)
+
+    def test_numpy_operator_tail(self):
+        d = pd.DataFrame()
+        d['X'] = [1, 2, 3]
+        d['Y'] = [2, 4, 6]
+        d['I'] = 1
+        y = np.asarray(d['Y'])[:, None]
+        X = np.asarray(d[['X', ]])
+
+        def psi(theta):
+            alpha = np.exp(theta[0])
+            # ee_alpha1 = (np.asarray(d['Y']) + alpha)*alpha
+            ee_alpha2 = (np.asarray(d['Y']) * alpha) + alpha
+
+            ee_alpha1 = alpha * (np.asarray(d['Y']) + alpha)
+            # ee_alpha2 = alpha + (np.asarray(d['Y']) * alpha)
+            # TODO okay, a potential fix is to always reverse the operation order
+
+            # Attempted solutions
+            # ee_alpha1 = np.zeros(d['Y'].shape)*alpha + alpha*(np.asarray(d['Y']) + alpha) over-write does not work
+            # ee_alpha1 = (alpha ** (np.asarray(d['Y']) + alpha))**np.ones(d['Y'].shape)  over-write power does not work
+
+            return np.vstack([ee_alpha1,
+                              ee_alpha2])
+
+        def internal_sum(theta):
+            return np.sum(psi(theta), axis=1)
+
+        # Evaluating the derivatives at the points
+        dx_approx = approx_fprime([0.2, ], internal_sum, epsilon=1e-9)
+        dx_exact = auto_differentiation([0.2, ], internal_sum)
+
+        # Checking
+        npt.assert_allclose(dx_approx, dx_exact, rtol=1e-4)
 
     def test_scipy_special(self):
         def f(x):
