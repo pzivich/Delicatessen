@@ -1,5 +1,6 @@
 import pytest
 import numpy as np
+import scipy as sp
 import numpy.testing as npt
 import pandas as pd
 import statsmodels.api as sm
@@ -9,6 +10,7 @@ from scipy.stats import logistic
 from delicatessen import MEstimator
 from delicatessen.estimating_equations import ee_regression
 from delicatessen.utilities import (identity, inverse_logit, logit,
+                                    polygamma, digamma,
                                     robust_loss_functions,
                                     regression_predictions,
                                     spline,
@@ -81,6 +83,45 @@ class TestFunctions:
         odds = np.array([0., -1.098612288668, 1.098612288668, 0.])
 
         npt.assert_allclose(logit(prbs), odds)
+
+    def test_polygamma(self):
+        """Checks the polygamma wrapper function
+        """
+        y = np.array([-1, 0, 2, 3, 12, -58101, 5091244])
+
+        # Single input check
+        npt.assert_allclose(polygamma(n=1, x=y[0]),
+                            sp.special.polygamma(n=1, x=y[0]))
+        npt.assert_allclose(polygamma(n=3, x=y[-1]),
+                            sp.special.polygamma(n=3, x=y[-1]))
+
+        # Multiple input check
+        npt.assert_allclose(polygamma(n=2, x=y),
+                            sp.special.polygamma(n=2, x=y))
+        npt.assert_allclose(polygamma(n=4, x=y),
+                            sp.special.polygamma(n=4, x=y))
+
+        # Multiple input check into 2D array
+        y = y[:, None]
+        npt.assert_allclose(polygamma(n=1, x=y),
+                            sp.special.polygamma(n=1, x=y))
+        npt.assert_allclose(polygamma(n=4, x=y),
+                            sp.special.polygamma(n=4, x=y))
+
+    def test_digamma(self):
+        """Checks the digamma wrapper function
+        """
+        y = np.array([-1, 0, 2, 3, 12, -58101, 5091244])
+
+        # Single input check
+        v2 = sp.special.digamma(y[0])
+        npt.assert_allclose(digamma(y[0]), v2)
+        v2 = sp.special.digamma(y[-1])
+        npt.assert_allclose(digamma(y[-1]), v2)
+
+        # Multiple input check
+        v2 = sp.special.digamma(y)
+        npt.assert_allclose(digamma(z=y), v2)
 
     def test_inverse_logit_array(self):
         """Checks the inverse inverse logit transformation of an array

@@ -35,7 +35,7 @@ def polygamma(n, x):
         return sp.special.polygamma(n=n, x=x)
 
 
-def digamma(x):
+def digamma(z):
     """Digamma function. This is a wrapper function of ``scipy.special.digamma`` meant to enable automatic
     differentation with ``delicatessen``. When the input is a ``PrimalTangentPairs`` object, then an internal function
     that implements the digamma function is called. Otherwise, ``scipy.special.digamma`` is called for the input
@@ -51,7 +51,7 @@ def digamma(x):
     Return type depends on the input type (``PrimalTangentPairs`` will return ``PrimalTangentPairs``, otherwise will
     return ``ndarray).
     """
-    return polygamma(n=0, x=x)
+    return polygamma(n=0, x=z)
 
 
 def logit(prob):
