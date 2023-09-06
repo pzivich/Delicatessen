@@ -1,7 +1,7 @@
 import warnings
 import numpy as np
 from scipy.stats import norm, cauchy
-from scipy.special import digamma, polygamma
+from delicatessen.utilities import digamma, polygamma
 
 from delicatessen.utilities import (logit, inverse_logit, identity,
                                     robust_loss_functions,
