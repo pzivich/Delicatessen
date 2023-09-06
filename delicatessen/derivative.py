@@ -172,23 +172,17 @@ class PrimalTangentPairs:
     tangent :
         Indicator for the location at which the derivatives is desired. Must be the same length as ``primal``.
     """
-    # After 3 days of debugging, this line is extremely important. Without it, the `test_numpy_operator_override`
-    #   test will fail. This issue that this single line solves is that it lowers the priority of the NumPy operators,
-    #   so that my __radd__ (or other reversed operators) will take precedence over numpy.ndarray.__add__
-    #   This is extremely important when trying to mix operators together that start with a numpy.ndarray, as otherwise
-    #   everything will default to a element-wise operation. However, we want it to stay as arrays up to that point.
+    # Some internal notes on handling ndarray's in this class (because there are some tricky issues). First, we do
+    #   not want to override the priority of the NumPy operators (in fact we rely on it to take precedence). This is
+    #   extremely important when trying to mix operators together that start with a numpy.ndarray, as we want
+    #   everything to go to element-wise operations. So, we must not do something like the following
     # __array_priority__ = 2
-    # __array_ufunc__ = None
-    # Okay, neither of these are the solutions I want. My solution needs to be preventing arrays making it into .primal
-    #   in the first place...
-    # The issue remains that sometimes the operation order gives a NumPy array as the second object. This then defaults
-    #   to an array operation. While setting the priority above gets rid of this issue, it opens a new issue.
-    #   Specifically, the np.ones(...) trick then breaks when used in things like ee_gformula. So, setting the priority
-    #   fixes the issue but introduces a new one.
-    # The current solution is to raise an error any time we see a ndarray sneak into the primal object. I have not
-    #   figured out how to process this to avoid the objects stacking themselves. Right now, this can be coded around
-    #   though via ensuring that the ndarray comes first in more complicated operations. This is because ndarray goes
-    #   to use an element-wise procedure which gets us out of the whole array issue.
+    # Instead, we have modified all the operations that include `other` to check if the input is a np.ndarray. If it is
+    #   (i.e., the np.ndarray is the second object in x [] y) then we manually reverse the operations so that the
+    #   np.ndarray leads (i.e., y [] x). This gets NumPy to decompose everything correctly to element-wise operations.
+    #   The downside is that this introduces floating point errors for powers, when it is being raised to a np.ndarray
+    #   power and everything is integers. This floating point error was determined to be acceptable to get everything
+    #   working for the automatic differentation.
 
     def __init__(self, primal, tangent):
         # Processing of the inputs into the class, both initial and recursive calls
@@ -296,6 +290,8 @@ class PrimalTangentPairs:
         if isinstance(other, PrimalTangentPairs):                     # When adding PrimalTangentPairs
             return PrimalTangentPairs(self.primal + other.primal,     # ... add primals together
                                       self.tangent + other.tangent)   # ... and add tangents together
+        elif isinstance(other, np.ndarray):
+            return other + self
         else:                                                         # Otherwise
             return PrimalTangentPairs(self.primal + other,            # ... add the primal and other
                                       self.tangent)                   # ... tangent does not change by constants
@@ -309,6 +305,8 @@ class PrimalTangentPairs:
         if isinstance(other, PrimalTangentPairs):                     # When subtracting PrimalTangentPairs
             return PrimalTangentPairs(self.primal - other.primal,     # ... minus primals together
                                       self.tangent - other.tangent)   # ... and minus tangets together
+        elif isinstance(other, np.ndarray):
+            return -1*other + self
         else:                                                         # Otherwise
             return PrimalTangentPairs(self.primal - other,            # ... minus primal and other
                                       self.tangent)                   # ... tangent does not change by constants
@@ -323,6 +321,8 @@ class PrimalTangentPairs:
         if isinstance(other, PrimalTangentPairs):                     # When multiplying PrimalTangentPairs
             return PrimalTangentPairs(self.primal * other.primal,     # ... multiply primals
                                       self.tangent*other.primal + self.primal*other.tangent)
+        elif isinstance(other, np.ndarray):                           # When comparing with np.ndarray
+            return other * self                                       # ... reverse the order to make operations work
         else:                                                         # Otherwise
             return PrimalTangentPairs(self.primal * other,            # ... multiply primal and constant
                                       self.tangent * other)           # ... multiply primal and constant
@@ -337,6 +337,8 @@ class PrimalTangentPairs:
         if isinstance(other, PrimalTangentPairs):                     # When dividing PrimalTangentPairs
             return PrimalTangentPairs(self.primal / other.primal,     # ... divide primals
                                       (self.tangent * other.primal - self.primal * other.tangent) / (other.primal ** 2))
+        elif isinstance(other, np.ndarray):                           # When comparing with np.ndarray
+            return (1/other) * self                                   # ... reverse the order to make operations work
         else:                                                         # Otherwise
             return PrimalTangentPairs(self.primal / other,            # ... divide primal and constant
                                       self.tangent / other)           # ... divide tangent and constant
@@ -353,6 +355,13 @@ class PrimalTangentPairs:
             gx = self.primal ** other.primal * np.log(self.primal) * other.tangent   # ... secondary piece of rule
             return PrimalTangentPairs(self.primal ** other.primal,                   # ... raise primal to primal
                                       fgx + gx)                                      # ... apply the power rule
+        elif isinstance(other, np.ndarray):
+            if self.primal >= 0:
+                return np.exp(other * np.log(self))
+            else:
+                return np.where(other % 2 == 1,
+                                -np.exp(other * np.log(-self)),
+                                np.exp(other * np.log(-self)))
         else:
             return PrimalTangentPairs(self.primal ** other,                          # Otherwise compute directly
                                       other * self.primal ** (other - 1) * self.tangent)

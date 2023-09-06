@@ -275,12 +275,14 @@ class TestAutoDifferentiation:
             # Order of operations issues that can happen
             ee_alpha1 = ((y + alpha) * alpha).T
             ee_alpha2 = ((y - alpha) * alpha).T
-            ee_alpha3 = ((-y + alpha) * alpha).T
+            ee_alpha3 = ((y + alpha) / alpha).T
             ee_alpha4 = ((y * alpha) + alpha).T
             ee_alpha5 = ((y / alpha) + alpha).T
+            ee_alpha6 = ((y ** alpha) + alpha).T
 
             return np.vstack([ee_beta,
-                              ee_alpha1, ee_alpha2, ee_alpha3, ee_alpha4, ee_alpha5
+                              ee_alpha1, ee_alpha2, ee_alpha3,
+                              ee_alpha4, ee_alpha5, ee_alpha6
                               ])
 
         def internal_sum(theta):
@@ -291,41 +293,43 @@ class TestAutoDifferentiation:
         dx_exact = auto_differentiation([1.503, 0.2], internal_sum)
 
         # Checking
-        npt.assert_allclose(dx_approx, dx_exact, rtol=1e-4)
+        npt.assert_allclose(dx_approx, dx_exact, rtol=1e-6)
 
     def test_numpy_operator_tail(self):
         d = pd.DataFrame()
-        d['X'] = [1, 2, 3]
-        d['Y'] = [2, 4, 6]
+        d['Y'] = [2, -4, -3]
         d['I'] = 1
         y = np.asarray(d['Y'])[:, None]
-        X = np.asarray(d[['X', ]])
 
         def psi(theta):
-            alpha = np.exp(theta[0])
-            # ee_alpha1 = (np.asarray(d['Y']) + alpha)*alpha
-            ee_alpha2 = (np.asarray(d['Y']) * alpha) + alpha
+            alpha = np.log(theta[0])
+            ee_alpha1 = (alpha + (y * alpha)).T
+            ee_alpha2 = (alpha - (y * alpha)).T
+            ee_alpha3 = (alpha * (y + alpha)).T
+            ee_alpha4 = (alpha / (y + alpha)).T
+            ee_alpha5 = (alpha ** y).T
 
-            ee_alpha1 = alpha * (np.asarray(d['Y']) + alpha)
-            # ee_alpha2 = alpha + (np.asarray(d['Y']) * alpha)
-            # TODO okay, a potential fix is to always reverse the operation order
-
-            # Attempted solutions
-            # ee_alpha1 = np.zeros(d['Y'].shape)*alpha + alpha*(np.asarray(d['Y']) + alpha) over-write does not work
-            # ee_alpha1 = (alpha ** (np.asarray(d['Y']) + alpha))**np.ones(d['Y'].shape)  over-write power does not work
-
-            return np.vstack([ee_alpha1,
-                              ee_alpha2])
+            return np.vstack([ee_alpha1, ee_alpha2,
+                              ee_alpha3, ee_alpha4,
+                              ee_alpha5])
 
         def internal_sum(theta):
             return np.sum(psi(theta), axis=1)
 
-        # Evaluating the derivatives at the points
+        # Evaluating the derivatives at the point less than zero
         dx_approx = approx_fprime([0.2, ], internal_sum, epsilon=1e-9)
         dx_exact = auto_differentiation([0.2, ], internal_sum)
 
         # Checking
-        npt.assert_allclose(dx_approx, dx_exact, rtol=1e-4)
+        npt.assert_allclose(dx_approx, dx_exact, rtol=1e-6)
+
+        # Evaluating the derivatives at the point greater than zero
+        #   We do both, since it matters for the __pow__ check
+        dx_approx = approx_fprime([1.2, ], internal_sum, epsilon=1e-9)
+        dx_exact = auto_differentiation([1.2, ], internal_sum)
+
+        # Checking
+        npt.assert_allclose(dx_approx, dx_exact, rtol=1e-6)
 
     def test_scipy_special(self):
         def f(x):
@@ -357,6 +361,32 @@ class TestAutoDifferentiation:
 
         # Points to Evaluate at
         xinput = [0.5, 1.9, -2.3, 2]
+
+        # Approximate Derivatives
+        dx_approx = approx_fprime(xinput, f, epsilon=1e-9)
+
+        # Evaluating the derivatives at the points
+        dx_exact = auto_differentiation(xinput, f)
+
+        # Checking
+        npt.assert_allclose(dx_approx, dx_exact, atol=1e-5)
+
+    def test_scipy_special_arrays(self):
+        # TODO this fails currently
+        d = pd.DataFrame()
+        d['Y'] = [2, 4, 6]
+        y = np.asarray(d['Y'])[:, None]
+
+        def f(x):
+            alpha = np.exp(x[0])
+            ee_alpha1 = (y + polygamma(n=1, x=alpha)).T
+            ee_alpha2 = (polygamma(n=2, x=y*alpha)).T
+            stack = np.vstack([ee_alpha1,
+                               ee_alpha2])
+            return np.sum(stack, axis=1)
+
+        # Points to Evaluate at
+        xinput = [0.5, ]
 
         # Approximate Derivatives
         dx_approx = approx_fprime(xinput, f, epsilon=1e-9)
@@ -786,6 +816,40 @@ class TestSandwichAutoDiff:
         def psi(theta):
             return ee_glm(theta, X=d[['I', 'X']], y=d['Y'],
                           distribution='gamma', link='log')
+
+        # Auto-differentation
+        mestr = MEstimator(psi, init=[0., 0., 1.])
+        mestr.estimate(solver='lm', deriv_method='exact')
+        bread_exact = mestr.bread
+        var_exact = mestr.variance
+
+        # Central difference method
+        mestr = MEstimator(psi, init=[0., 0., 1.])
+        mestr.estimate(solver='lm', deriv_method='approx')
+        bread_approx = mestr.bread
+        var_approx = mestr.variance
+
+        # Checking bread estimates
+        npt.assert_allclose(bread_approx,
+                            bread_exact,
+                            atol=1e-6)
+
+        # Checking variance estimates
+        npt.assert_allclose(var_approx,
+                            var_exact,
+                            atol=5e-5)
+
+    def test_exact_bread_glm_lognb(self):
+        # TODO this still fails due to the issue with the polygamma operator for arrays
+        d = pd.DataFrame()
+        d['X'] = [1, -1, 0, 1, 2, 1, -2, -1, 0, 3, -3, 1, 1, -1, -1, -2, 2, 0, -1, 0]
+        d['Z'] = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        d['Y'] = [0, 0, 0, 0, 0, 15, 15, 25, 25, 45, 0, 0, 0, 0, 15, 15, 15, 25, 25, 35]
+        d['I'] = 1
+
+        def psi(theta):
+            return ee_glm(theta, X=d[['I', 'X']], y=d['Y'],
+                          distribution='nb', link='log')
 
         # Auto-differentation
         mestr = MEstimator(psi, init=[0., 0., 1.])
