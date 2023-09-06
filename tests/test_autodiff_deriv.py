@@ -372,7 +372,6 @@ class TestAutoDifferentiation:
         npt.assert_allclose(dx_approx, dx_exact, atol=1e-5)
 
     def test_scipy_special_arrays(self):
-        # TODO this fails currently
         d = pd.DataFrame()
         d['Y'] = [2, 4, 6]
         y = np.asarray(d['Y'])[:, None]
@@ -840,7 +839,6 @@ class TestSandwichAutoDiff:
                             atol=5e-5)
 
     def test_exact_bread_glm_lognb(self):
-        # TODO this still fails due to the issue with the polygamma operator for arrays
         d = pd.DataFrame()
         d['X'] = [1, -1, 0, 1, 2, 1, -2, -1, 0, 3, -3, 1, 1, -1, -1, -2, 2, 0, -1, 0]
         d['Z'] = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
