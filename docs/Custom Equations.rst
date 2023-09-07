@@ -164,13 +164,13 @@ Handling ``np.nan``
 -------------------------------------
 
 Sometimes, ``np.nan`` will be necessary to include in your data set. However, ``delicatessen`` does not naturally
-handle ``np.nan``. In fact, ``delicatessen`` will return an error when there are ``np.nan``'s present (this is by
+handle ``np.nan``. In fact, ``delicatessen`` will return an error when there are ``np.nan``'s detected (this is by
 design). The following discusses how ``np.nan`` can be handled appropriately in the estimating equations.
 
 In the first case, we will consider handling ``np.nan`` with a built-in estimating equation. When trying to fit a
-regression model where there are ``np.nan``'s present, the estimating equation missing values must be manually set to
-zero. This can be done via the ``numpy.nan_to_num`` function. Below is an example using the built-in logistic
-regression estimating equations:
+regression model where there are ``np.nan``'s present, the missing values will be set to a placeholder value and their
+contributions will be manually removed using an indicator function for missingness. Below is an example using the
+built-in logistic regression estimating equations:
 
 .. code::
 
@@ -187,25 +187,29 @@ regression estimating equations:
 
     X = np.asarray(d[['C', 'X']])
     y = np.asarray(d['y'])
+    y_no_nan = np.asarray(d['y'].fillna(0.5))
+    r = np.where(d['Y'].isna(), 0, 1)
 
 
     def psi(theta):
-        # Estimating logistic model values
+        # Estimating logistic model values with filled-in Y's
         a_model = ee_logistic_regression(theta,
-                                         X=X, y=y)
-        # Setting
-        a_model = np.nan_to_num(a_model, copy=False, nan=0.)
+                                         X=X, y=y_no_nan)
+        # Setting contributions with missing to zero manually
+        a_model = a_model * r
         return a_model
 
 
     mest = MEstimator(psi, init=[0, 0, ])
     mest.estimate()
 
-If the ``numpy.nan_to_num`` function had not been included, the optimized points would have been ``nan``.
+If the contribution to the estimating function with missing Y's had not been included, the optimized points would have
+been ``nan``. Alternatively, had ``numpy.nan_to_num`` been used with ``deriv_method='exact'``, this would have also
+resulted in an error (``numpy.nan_to_num`` is okay to use with ``deriv_method='approx'``).
 
 As a second example, we will consider estimating the mean with missing data and correcting for informative missing
 by inverse probability weighting. To reduce random error, this example uses 10,000 observations. Here, we must set
-nan's to be zero's prior to subtracting off the mean. This is shown below:
+``nan``'s to be zero's prior to subtracting off the mean. This is shown below:
 
 .. code::
 
@@ -269,6 +273,9 @@ Here is a list of common mistakes, most of which I have done myself.
    bread and filling), so do not sum over n in ``psi``!
 4. The ``theta`` values and ``b`` *must* be in the same order. If ``theta[0]`` is the mean, the 1st row of the returned
    array better be the estimating function for that mean!
+5. Automatic differentiation with ``np.nan_to_num``. This will result in the bread matrix having `nan` values.
+6. Trying to use a SciPy function with automatic differentation (only some functionalities are supported. please open
+   an issue on GitHub if you have one you would like to see added).
 
 If you still have trouble, please open an issue at
 `pzivich/Delicatessen <https://github.com/pzivich/Delicatessen/issues>`_. This will help me to add other common
