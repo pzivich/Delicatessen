@@ -1,6 +1,7 @@
 import numpy
 import numpy as np
 import scipy as sp
+from scipy.stats import norm
 
 
 def auto_differentiation(xk, f):
@@ -493,3 +494,14 @@ class PrimalTangentPairs:
         # Polygamma function
         return PrimalTangentPairs(float(sp.special.polygamma(n, self.primal)),
                                   self.tangent * sp.special.polygamma(n+1, self.primal))
+
+    def normal_cdf(self):
+        # Cumulative Distribution Function (CDF) of the Normal Distribution
+        return PrimalTangentPairs(float(norm.cdf(self.primal)),
+                                  self.tangent * norm.pdf(self.primal))
+
+    def normal_pdf(self):
+        # Probability Density Function (PDF) of the Normal Distribution
+        dx_pdf = -(np.exp(-self.primal**2 / 2) * self.primal) / np.sqrt(2 * np.pi)
+        return PrimalTangentPairs(float(norm.pdf(self.primal)),
+                                  self.tangent * dx_pdf)
