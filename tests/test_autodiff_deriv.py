@@ -7,12 +7,16 @@ from scipy.stats import logistic
 from scipy.optimize import approx_fprime
 
 from delicatessen.derivative import auto_differentiation
-from delicatessen.utilities import inverse_logit, identity, digamma, polygamma
+from delicatessen.utilities import inverse_logit, identity, polygamma, standard_normal_cdf, standard_normal_pdf
 from delicatessen import MEstimator
+from delicatessen.data import load_inderjit
 from delicatessen.estimating_equations import (ee_mean_variance, ee_mean_robust,
-                                               ee_regression, ee_glm, ee_ridge_regression,
+                                               ee_regression, ee_glm, ee_robust_regression, ee_ridge_regression,
                                                ee_additive_regression,
-                                               ee_gformula, ee_gestimation_snmm)
+                                               ee_weibull_model, ee_aft_weibull,
+                                               ee_4p_logistic, ee_effective_dose_delta,
+                                               ee_gformula, ee_ipw, ee_ipw_msm, ee_aipw, ee_gestimation_snmm,
+                                               ee_mean_sensitivity_analysis)
 
 np.random.seed(20230704)
 
@@ -297,7 +301,7 @@ class TestAutoDifferentiation:
 
     def test_numpy_operator_tail(self):
         d = pd.DataFrame()
-        d['Y'] = [2, -4, -3]
+        d['Y'] = [2, -4, -3, 0]
         d['I'] = 1
         y = np.asarray(d['Y'])[:, None]
 
@@ -308,10 +312,11 @@ class TestAutoDifferentiation:
             ee_alpha3 = (alpha * (y + alpha)).T
             ee_alpha4 = (alpha / (y + alpha)).T
             ee_alpha5 = (alpha ** y).T
+            ee_alpha6 = np.where(alpha + (alpha*y) > 0, alpha*y, alpha**2 + y).T
 
             return np.vstack([ee_alpha1, ee_alpha2,
                               ee_alpha3, ee_alpha4,
-                              ee_alpha5])
+                              ee_alpha5, ee_alpha6])
 
         def internal_sum(theta):
             return np.sum(psi(theta), axis=1)
@@ -349,7 +354,7 @@ class TestAutoDifferentiation:
         dx_exact = auto_differentiation(xinput, f)
 
         # Checking
-        npt.assert_allclose(dx_true, np.diag(dx_exact), atol=1e-5)
+        npt.assert_allclose(dx_true, np.diag(dx_exact), atol=1e-7)
 
     def test_scipy_special_numapprox(self):
         def f(x):
@@ -357,6 +362,8 @@ class TestAutoDifferentiation:
                     polygamma(n=2, x=x[1]) + x[1]**2,
                     polygamma(n=3, x=x[2]*x[3] + x[1]),
                     polygamma(n=4, x=np.log(x[3] + x[1]) + x[0]**2) - x[3],
+                    standard_normal_cdf(x=x[1]),
+                    standard_normal_pdf(x=x[2]),
                     ]
 
         # Points to Evaluate at
@@ -459,6 +466,8 @@ class TestAutoDifferentiation:
 
 class TestSandwichAutoDiff:
 
+    # Basics
+
     def test_exact_bread_mean(self):
         # Data set
         y = np.array([5, 1, 2, 4, 2, 4, 5, 7, 11, 1, 6, 3, 4, 6])
@@ -495,14 +504,10 @@ class TestSandwichAutoDiff:
         var_approx = mestr.variance
 
         # Checking bread estimates
-        npt.assert_allclose(bread_approx,
-                            bread_exact,
-                            atol=1e-6)
+        npt.assert_allclose(bread_approx, bread_exact, atol=1e-6)
 
         # Checking variance estimates
-        npt.assert_allclose(var_approx,
-                            var_exact,
-                            atol=1e-5)
+        npt.assert_allclose(var_approx, var_exact, atol=1e-5)
 
     def test_exact_bread_robust_mean(self):
         n = 500
@@ -527,14 +532,10 @@ class TestSandwichAutoDiff:
         var_approx = mestr.variance
 
         # Checking bread estimates
-        npt.assert_allclose(bread_approx,
-                            bread_exact,
-                            atol=1e-6)
+        npt.assert_allclose(bread_approx, bread_exact, atol=1e-6)
 
         # Checking variance estimates
-        npt.assert_allclose(var_approx,
-                            var_exact,
-                            atol=1e-6)
+        npt.assert_allclose(var_approx, var_exact, atol=1e-6)
 
         # Andrew
         def psi(theta):
@@ -555,14 +556,10 @@ class TestSandwichAutoDiff:
         var_approx = mestr.variance
 
         # Checking bread estimates
-        npt.assert_allclose(bread_approx,
-                            bread_exact,
-                            atol=1e-6)
+        npt.assert_allclose(bread_approx, bread_exact, atol=1e-6)
 
         # Checking variance estimates
-        npt.assert_allclose(var_approx,
-                            var_exact,
-                            atol=1e-6)
+        npt.assert_allclose(var_approx, var_exact, atol=1e-6)
 
         # Tukey
         def psi(theta):
@@ -583,14 +580,10 @@ class TestSandwichAutoDiff:
         var_approx = mestr.variance
 
         # Checking bread estimates
-        npt.assert_allclose(bread_approx,
-                            bread_exact,
-                            atol=1e-6)
+        npt.assert_allclose(bread_approx, bread_exact, atol=1e-6)
 
         # Checking variance estimates
-        npt.assert_allclose(var_approx,
-                            var_exact,
-                            atol=1e-6)
+        npt.assert_allclose(var_approx, var_exact, atol=1e-6)
 
         # Hampel
         def psi(theta):
@@ -611,14 +604,12 @@ class TestSandwichAutoDiff:
         var_approx = mestr.variance
 
         # Checking bread estimates
-        npt.assert_allclose(bread_approx,
-                            bread_exact,
-                            atol=1e-6)
+        npt.assert_allclose(bread_approx, bread_exact, atol=1e-6)
 
         # Checking variance estimates
-        npt.assert_allclose(var_approx,
-                            var_exact,
-                            atol=1e-6)
+        npt.assert_allclose(var_approx, var_exact, atol=1e-6)
+
+    # Regression
 
     def test_exact_bread_linear_reg(self):
         n = 500
@@ -647,14 +638,10 @@ class TestSandwichAutoDiff:
         var_approx = mestr.variance
 
         # Checking bread estimates
-        npt.assert_allclose(bread_approx,
-                            bread_exact,
-                            atol=1e-6)
+        npt.assert_allclose(bread_approx, bread_exact, atol=1e-6)
 
         # Checking variance estimates
-        npt.assert_allclose(var_approx,
-                            var_exact,
-                            atol=1e-6)
+        npt.assert_allclose(var_approx, var_exact, atol=1e-6)
 
     def test_exact_bread_logit_reg(self):
         n = 500
@@ -683,14 +670,361 @@ class TestSandwichAutoDiff:
         var_approx = mestr.variance
 
         # Checking bread estimates
-        npt.assert_allclose(bread_approx,
-                            bread_exact,
-                            atol=1e-7)
+        npt.assert_allclose(bread_approx, bread_exact, atol=1e-7)
 
         # Checking variance estimates
-        npt.assert_allclose(var_approx,
-                            var_exact,
-                            atol=1e-7)
+        npt.assert_allclose(var_approx, var_exact, atol=1e-7)
+
+    def test_exact_bread_poisson_reg(self):
+        n = 500
+        data = pd.DataFrame()
+        data['X'] = np.random.normal(size=n)
+        data['Z'] = np.random.normal(size=n)
+        data['Y'] = np.random.poisson(lam=np.exp(0.5 + 2*data['X'] - 1*data['Z']), size=n)
+        data['C'] = 1
+        data['w'] = np.random.uniform(1, 10, size=n)
+
+        def psi(theta):
+            return ee_regression(theta,
+                                 X=data[['C', 'X', 'Z']], y=data['Y'],
+                                 model='poisson', weights=data['w'])
+
+        mestr = MEstimator(psi, init=[0., 2., -1.])
+
+        # Auto-differentation
+        mestr.estimate(solver='lm', deriv_method='exact')
+        bread_exact = mestr.bread
+        var_exact = mestr.variance
+
+        # Central difference method
+        mestr.estimate(solver='lm', deriv_method='approx')
+        bread_approx = mestr.bread
+        var_approx = mestr.variance
+
+        # Checking bread estimates
+        npt.assert_allclose(bread_approx, bread_exact, atol=1e-3)
+
+        # Checking variance estimates
+        npt.assert_allclose(var_approx, var_exact, atol=1e-7)
+
+    def test_exact_bread_glm_normal(self):
+        d = pd.DataFrame()
+        d['X'] = [1, -1, 0, 1, 2, 1, -2, -1, 0, 3, -3, 1, 1, -1, -1, -2, 2, 0, -1, 0]
+        d['Z'] = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        d['Y'] = [1, 5, 1, 9, -1, 4, 3, 3, 1, -2, 4, -2, 3, 6, 6, 8, 7, 1, -2, 5]
+        d['I'] = 1
+
+        def psi(theta):
+            return ee_glm(theta, X=d[['I', 'X', 'Z']], y=d['Y'],
+                          distribution='normal', link='identity')
+
+        mestr = MEstimator(psi, init=[0., 0., 0.])
+
+        # Auto-differentation
+        mestr.estimate(solver='lm', deriv_method='exact')
+        bread_exact = mestr.bread
+        var_exact = mestr.variance
+
+        # Central difference method
+        mestr.estimate(solver='lm', deriv_method='approx')
+        bread_approx = mestr.bread
+        var_approx = mestr.variance
+
+        # Checking bread estimates
+        npt.assert_allclose(bread_approx, bread_exact, atol=1e-5)
+
+        # Checking variance estimates
+        npt.assert_allclose(var_approx, var_exact, atol=1e-6)
+
+    def test_exact_bread_glm_linbin(self):
+        d = pd.DataFrame()
+        d['X'] = [1, -1, 0, 1, 2, 1, -2, -1, 0, 3, -3, 1, 1, -1, -1, -2, 2, 0, -1, 0]
+        d['Z'] = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        d['Y'] = [1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 0, 0]
+        d['I'] = 1
+
+        def psi(theta):
+            return ee_glm(theta, X=d[['I', 'X', 'Z']], y=d['Y'],
+                          link='identity', distribution='binomial')
+
+        mestr = MEstimator(psi, init=[0.2, 0., 0.])
+
+        # Auto-differentation
+        mestr.estimate(solver='lm', deriv_method='exact')
+        bread_exact = mestr.bread
+        var_exact = mestr.variance
+
+        # Central difference method
+        mestr.estimate(solver='lm', deriv_method='approx')
+        bread_approx = mestr.bread
+        var_approx = mestr.variance
+
+        # Checking bread estimates
+        npt.assert_allclose(bread_approx, bread_exact, atol=1e-5)
+
+        # Checking variance estimates
+        npt.assert_allclose(var_approx, var_exact, atol=1e-7)
+
+    def test_exact_bread_glm_loglog(self):
+        d = pd.DataFrame()
+        d['X'] = [1, -1, 0, 1, 2, 1, -2, -1, 0, 3, -3, 1, 1, -1, -1, -2, 2, 0, -1, 0]
+        d['Z'] = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        d['Y'] = [1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 0, 0]
+        d['I'] = 1
+
+        def psi(theta):
+            return ee_glm(theta, X=d[['I', 'X', 'Z']], y=d['Y'],
+                          link='loglog', distribution='binomial')
+
+        mestr = MEstimator(psi, init=[0., 0., 0.])
+
+        # Auto-differentation
+        mestr.estimate(solver='lm', deriv_method='exact')
+        bread_exact = mestr.bread
+        var_exact = mestr.variance
+
+        # Central difference method
+        mestr.estimate(solver='lm', deriv_method='approx')
+        bread_approx = mestr.bread
+        var_approx = mestr.variance
+
+        # Checking bread estimates
+        npt.assert_allclose(bread_approx, bread_exact, atol=1e-5)
+
+        # Checking variance estimates
+        npt.assert_allclose(var_approx, var_exact, atol=1e-6)
+
+    def test_exact_bread_glm_probit(self):
+        d = pd.DataFrame()
+        d['X'] = [1, -1, 0, 1, 2, 1, -2, -1, 0, 3, -3, 1, 1, -1, -1, -2, 2, 0, -1, 0]
+        d['Z'] = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        d['Y'] = [1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 0, 0]
+        d['I'] = 1
+
+        def psi(theta):
+            return ee_glm(theta, X=d[['I', 'X', 'Z']], y=d['Y'],
+                          link='probit', distribution='binomial')
+
+        mestr = MEstimator(psi, init=[0., 0., 0.])
+
+        # Auto-differentation
+        mestr.estimate(solver='lm', deriv_method='exact')
+        bread_exact = mestr.bread
+        var_exact = mestr.variance
+
+        # Central difference method
+        mestr.estimate(solver='lm', deriv_method='approx')
+        bread_approx = mestr.bread
+        var_approx = mestr.variance
+
+        # Checking bread estimates
+        npt.assert_allclose(bread_approx, bread_exact, atol=1e-7)
+
+        # Checking variance estimates
+        npt.assert_allclose(var_approx, var_exact, atol=1e-7)
+
+    def test_exact_bread_glm_cauchy(self):
+        d = pd.DataFrame()
+        d['X'] = [1, -1, 0, 1, 2, 1, -2, -1, 0, 3, -3, 1, 1, -1, -1, -2, 2, 0, -1, 0]
+        d['Z'] = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        d['Y'] = [1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 0, 0]
+        d['I'] = 1
+
+        def psi(theta):
+            return ee_glm(theta, X=d[['I', 'X', 'Z']], y=d['Y'],
+                          link='cauchy', distribution='binomial')
+
+        mestr = MEstimator(psi, init=[0., 0., 0.])
+
+        # Auto-differentation
+        mestr.estimate(solver='lm', deriv_method='exact')
+        bread_exact = mestr.bread
+        var_exact = mestr.variance
+
+        # Central difference method
+        mestr.estimate(solver='lm', deriv_method='approx')
+        bread_approx = mestr.bread
+        var_approx = mestr.variance
+
+        # Checking bread estimates
+        npt.assert_allclose(bread_approx, bread_exact, atol=1e-7)
+
+        # Checking variance estimates
+        npt.assert_allclose(var_approx, var_exact, atol=1e-7)
+
+    def test_exact_bread_glm_poisson(self):
+        d = pd.DataFrame()
+        d['X'] = [1, -1, 0, 1, 2, 1, -2, -1, 0, 3, -3, 1, 1, -1, -1, -2, 2, 0, -1, 0]
+        d['Z'] = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        d['Y'] = [1, 5, 1, 9, 1, 4, 3, 3, 1, 2, 4, 2, 3, 6, 6, 8, 7, 1, 2, 5]
+        d['I'] = 1
+
+        def psi(theta):
+            return ee_glm(theta, X=d[['I', 'X', 'Z']], y=d['Y'],
+                          distribution='poisson', link='sqrt')
+
+        mestr = MEstimator(psi, init=[2., 0., 0.])
+
+        # Auto-differentation
+        mestr.estimate(solver='lm', deriv_method='exact')
+        bread_exact = mestr.bread
+        var_exact = mestr.variance
+
+        # Central difference method
+        mestr.estimate(solver='lm', deriv_method='approx')
+        bread_approx = mestr.bread
+        var_approx = mestr.variance
+
+        # Checking bread estimates
+        npt.assert_allclose(bread_approx, bread_exact, atol=1e-5)
+
+        # Checking variance estimates
+        npt.assert_allclose(var_approx, var_exact, atol=1e-6)
+
+    def test_exact_bread_glm_invnormal(self):
+        d = pd.DataFrame()
+        d['X'] = [1, -1, 0, 1, 2, 1, -2, -1, 0, 3, -3, 1, 1, -1, -1, -2, 2, 0, -1, 0]
+        d['Z'] = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        d['Y'] = [1, 5, 1, 9, 1, 4, 3, 3, 1, 2, 4, 2, 3, 6, 6, 8, 7, 1, 2, 5]
+        d['I'] = 1
+
+        def psi(theta):
+            return ee_glm(theta, X=d[['I', 'X', 'Z']], y=d['Y'],
+                          distribution='inverse_normal', link='identity')
+
+        mestr = MEstimator(psi, init=[2., 0., 0.])
+
+        # Auto-differentation
+        mestr.estimate(solver='lm', deriv_method='exact')
+        bread_exact = mestr.bread
+        var_exact = mestr.variance
+
+        # Central difference method
+        mestr.estimate(solver='lm', deriv_method='approx')
+        bread_approx = mestr.bread
+        var_approx = mestr.variance
+
+        # Checking bread estimates
+        npt.assert_allclose(bread_approx, bread_exact, atol=1e-7)
+
+        # Checking variance estimates
+        npt.assert_allclose(var_approx, var_exact, atol=1e-7)
+
+    def test_exact_bread_glm_tweedie(self):
+        d = pd.DataFrame()
+        d['X'] = [1, -1, 0, 1, 2, 1, -2, -1, 0, 3, -3, 1, 1, -1, -1, -2, 2, 0, -1, 0]
+        d['Z'] = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        d['Y'] = [1, 5, 1, 9, 1, 4, 3, 3, 1, 2, 4, 2, 3, 6, 6, 8, 7, 1, 2, 5]
+        d['I'] = 1
+
+        def psi(theta):
+            return ee_glm(theta, X=d[['I', 'X', 'Z']], y=d['Y'],
+                          distribution='tweedie', link='log',
+                          hyperparameter=1.5)
+
+        mestr = MEstimator(psi, init=[2., 0., 0.])
+
+        # Auto-differentation
+        mestr.estimate(solver='lm', deriv_method='exact')
+        bread_exact = mestr.bread
+        var_exact = mestr.variance
+
+        # Central difference method
+        mestr.estimate(solver='lm', deriv_method='approx')
+        bread_approx = mestr.bread
+        var_approx = mestr.variance
+
+        # Checking bread estimates
+        npt.assert_allclose(bread_approx, bread_exact, atol=1e-7)
+
+        # Checking variance estimates
+        npt.assert_allclose(var_approx, var_exact, atol=1e-7)
+
+    def test_exact_bread_glm_loggamma(self):
+        d = pd.DataFrame()
+        d['X'] = np.log([5, 10, 15, 20, 30, 40, 60, 80, 100])
+        d['Y'] = [118, 58, 42, 35, 27, 25, 21, 19, 18]
+        d['I'] = 1
+
+        def psi(theta):
+            return ee_glm(theta, X=d[['I', 'X']], y=d['Y'],
+                          distribution='gamma', link='log')
+
+        # Auto-differentation
+        mestr = MEstimator(psi, init=[0., 0., 1.])
+        mestr.estimate(solver='lm', deriv_method='exact')
+        bread_exact = mestr.bread
+        var_exact = mestr.variance
+
+        # Central difference method
+        mestr = MEstimator(psi, init=[0., 0., 1.])
+        mestr.estimate(solver='lm', deriv_method='approx')
+        bread_approx = mestr.bread
+        var_approx = mestr.variance
+
+        # Checking bread estimates
+        npt.assert_allclose(bread_approx, bread_exact, atol=1e-6)
+
+        # Checking variance estimates
+        npt.assert_allclose(var_approx, var_exact, atol=5e-5)
+
+    def test_exact_bread_glm_lognb(self):
+        d = pd.DataFrame()
+        d['X'] = [1, -1, 0, 1, 2, 1, -2, -1, 0, 3, -3, 1, 1, -1, -1, -2, 2, 0, -1, 0]
+        d['Z'] = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        d['Y'] = [0, 0, 0, 0, 0, 15, 15, 25, 25, 45, 0, 0, 0, 0, 15, 15, 15, 25, 25, 35]
+        d['I'] = 1
+
+        def psi(theta):
+            return ee_glm(theta, X=d[['I', 'X']], y=d['Y'],
+                          distribution='nb', link='log')
+
+        # Auto-differentation
+        mestr = MEstimator(psi, init=[0., 0., 1.])
+        mestr.estimate(solver='lm', deriv_method='exact')
+        bread_exact = mestr.bread
+        var_exact = mestr.variance
+
+        # Central difference method
+        mestr = MEstimator(psi, init=[0., 0., 1.])
+        mestr.estimate(solver='lm', deriv_method='approx')
+        bread_approx = mestr.bread
+        var_approx = mestr.variance
+
+        # Checking bread estimates
+        npt.assert_allclose(bread_approx, bread_exact, atol=1e-6)
+
+        # Checking variance estimates
+        npt.assert_allclose(var_approx, var_exact, atol=1e-5)
+
+    def test_exact_bread_robust_regression(self):
+        d = pd.DataFrame()
+        d['X'] = [1, -1, 0, 1, 2, 1, -2, -1, 0, 3, -3, 1, 1, -1, -1, -2, 2, 0, -1, 0]
+        d['Z'] = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        d['Y'] = [1, 5, 1, 25, -1, 4, 3, 3, 1, -2, 4, -2, 3, 6, 6, 8, 7, 1, -20, 5]
+        d['I'] = 1
+
+        def psi(theta):
+            return ee_robust_regression(theta, X=d[['I', 'X', 'Z']], y=d['Y'],
+                                        model='linear', k=5)
+
+        mestr = MEstimator(psi, init=[0., 0., 0.])
+
+        # Auto-differentation
+        mestr.estimate(solver='lm', deriv_method='exact')
+        bread_exact = mestr.bread
+        var_exact = mestr.variance
+
+        # Central difference method
+        mestr.estimate(solver='lm', deriv_method='approx')
+        bread_approx = mestr.bread
+        var_approx = mestr.variance
+
+        # Checking bread estimates
+        npt.assert_allclose(bread_approx, bread_exact, atol=1e-5)
+
+        # Checking variance estimates
+        npt.assert_allclose(var_approx, var_exact, atol=1e-6)
 
     def test_exact_bread_linear_ridge(self):
         n = 500
@@ -806,24 +1140,24 @@ class TestSandwichAutoDiff:
                             var_exact,
                             atol=1e-5)
 
-    def test_exact_bread_glm_loggamma(self):
-        d = pd.DataFrame()
-        d['X'] = np.log([5, 10, 15, 20, 30, 40, 60, 80, 100])
-        d['Y'] = [118, 58, 42, 35, 27, 25, 21, 19, 18]
-        d['I'] = 1
+    # Survival
+
+    def test_exact_bread_weibull(self):
+        times = np.array([1, 2, 3, 5, 2, 3, 4, 3, 1, 4])
+        events = np.array([1, 0, 0, 0, 1, 1, 1, 0, 0, 1])
 
         def psi(theta):
-            return ee_glm(theta, X=d[['I', 'X']], y=d['Y'],
-                          distribution='gamma', link='log')
+            return ee_weibull_model(theta=theta,
+                                    t=times, delta=events)
+
+        mestr = MEstimator(psi, init=[1., 1.])
 
         # Auto-differentation
-        mestr = MEstimator(psi, init=[0., 0., 1.])
         mestr.estimate(solver='lm', deriv_method='exact')
         bread_exact = mestr.bread
         var_exact = mestr.variance
 
         # Central difference method
-        mestr = MEstimator(psi, init=[0., 0., 1.])
         mestr.estimate(solver='lm', deriv_method='approx')
         bread_approx = mestr.bread
         var_approx = mestr.variance
@@ -836,42 +1170,82 @@ class TestSandwichAutoDiff:
         # Checking variance estimates
         npt.assert_allclose(var_approx,
                             var_exact,
-                            atol=5e-5)
+                            atol=1e-5)
 
-    def test_exact_bread_glm_lognb(self):
+    def test_exact_bread_weibull_aft(self):
         d = pd.DataFrame()
-        d['X'] = [1, -1, 0, 1, 2, 1, -2, -1, 0, 3, -3, 1, 1, -1, -1, -2, 2, 0, -1, 0]
-        d['Z'] = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-        d['Y'] = [0, 0, 0, 0, 0, 15, 15, 25, 25, 45, 0, 0, 0, 0, 15, 15, 15, 25, 25, 35]
+        d['t'] = [1, 2, 3, 5, 2, 3, 4, 3, 1, 4]
+        d['d'] = [1, 0, 0, 0, 1, 1, 1, 0, 0, 1]
+        d['X'] = [1, 1, 1, 1, 1, 0, 0, 0, 0, 0]
         d['I'] = 1
 
         def psi(theta):
-            return ee_glm(theta, X=d[['I', 'X']], y=d['Y'],
-                          distribution='nb', link='log')
+            return ee_aft_weibull(theta=theta,
+                                  t=d['t'], delta=d['d'], X=d[['X', ]])
+
+        mestr = MEstimator(psi, init=[1.387, 0.107, 0.911])
 
         # Auto-differentation
-        mestr = MEstimator(psi, init=[0., 0., 1.])
-        mestr.estimate(solver='lm', deriv_method='exact')
+        mestr.estimate(solver='hybr', deriv_method='exact')
         bread_exact = mestr.bread
         var_exact = mestr.variance
 
         # Central difference method
-        mestr = MEstimator(psi, init=[0., 0., 1.])
-        mestr.estimate(solver='lm', deriv_method='approx')
+        mestr.estimate(solver='hybr', deriv_method='approx')
         bread_approx = mestr.bread
         var_approx = mestr.variance
 
         # Checking bread estimates
         npt.assert_allclose(bread_approx,
                             bread_exact,
-                            atol=1e-6)
+                            atol=1e-5)
 
         # Checking variance estimates
         npt.assert_allclose(var_approx,
                             var_exact,
-                            atol=5e-5)
+                            atol=1e-5)
 
-    def test_gcomputation(self):
+    # Dose-Response
+
+    def test_exact_doseresp_4plogit(self):
+        d = load_inderjit()
+        dose_data = d[:, 1] + 1e-6
+        resp_data = d[:, 0]
+
+        def psi(theta):
+            pl4 = ee_4p_logistic(theta=theta, X=dose_data, y=resp_data)
+            ed20 = ee_effective_dose_delta(theta[4], y=resp_data, delta=0.20,
+                                           steepness=theta[2], ed50=theta[1],
+                                           lower=theta[0], upper=theta[3])
+
+            # Returning stacked estimating equations
+            return np.vstack([pl4, ed20])
+
+        mestr = MEstimator(psi, init=[0.48, 3.05, 2.98, 7.79, 1.8])
+
+        # Central difference method
+        mestr.estimate(solver='lm', deriv_method='approx')
+        bread_approx = mestr.bread
+        var_approx = mestr.variance
+
+        # Auto-differentation
+        mestr.estimate(solver='hybr', deriv_method='exact')
+        bread_exact = mestr.bread
+        var_exact = mestr.variance
+
+        # Checking bread estimates
+        npt.assert_allclose(bread_approx,
+                            bread_exact,
+                            atol=1e-5)
+
+        # Checking variance estimates
+        npt.assert_allclose(var_approx,
+                            var_exact,
+                            atol=1e-5)
+
+    # Causal
+
+    def test_exact_gcomputation(self):
         d = pd.DataFrame()
         d['W'] = [1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3,
                   1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3,
@@ -897,14 +1271,14 @@ class TestSandwichAutoDiff:
                                X1=d[['I', 'A1', 'V', 'W']],
                                X0=d[['I', 'A0', 'V', 'W']])
 
-        # Auto-differentation
         mestr = MEstimator(psi, init=[0., ] * 7)
+
+        # Auto-differentation
         mestr.estimate(solver='lm', deriv_method='exact')
         bread_exact = mestr.bread
         var_exact = mestr.variance
 
         # Central difference method
-        mestr = MEstimator(psi, init=[0., ] * 7)
         mestr.estimate(solver='lm', deriv_method='approx')
         bread_approx = mestr.bread
         var_approx = mestr.variance
@@ -919,7 +1293,157 @@ class TestSandwichAutoDiff:
                             var_exact,
                             atol=5e-5)
 
-    def test_gestimation_linear_snm(self):
+    def test_exact_ipw(self):
+        d = pd.DataFrame()
+        d['W'] = [1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3,
+                  1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3,
+                  1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3]
+        d['V'] = [1, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 1, 1, 0, 0,
+                  1, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 1, 1, 0, 0,
+                  1, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 1, 1, 0, 0]
+        d['A'] = [1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 0, 1, 0, 1,
+                  1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 0, 1, 0, 1,
+                  1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 0, 1, 0, 1]
+        d['Y'] = [3, 5, 1, 5, 2, 5, 2, 1, 4, 2, 3, 4, 2, 5, 5,
+                  3, 5, 1, 5, 2, 5, 2, 1, 4, 2, 3, 4, 2, 5, 5,
+                  3, 5, 1, 5, 2, 5, 2, 1, 4, 2, 3, 4, 2, 5, 5]
+        d['I'] = 1
+
+        # M-estimator
+        def psi(theta):
+            return ee_ipw(theta=theta, y=d['Y'], A=d['A'],
+                          W=d[['I', 'V', 'W']])
+
+        mestr = MEstimator(psi, init=[0., ] * 6)
+
+        # Auto-differentation
+        mestr.estimate(solver='lm', deriv_method='exact')
+        bread_exact = mestr.bread
+        var_exact = mestr.variance
+
+        # Central difference method
+        mestr.estimate(solver='lm', deriv_method='approx')
+        bread_approx = mestr.bread
+        var_approx = mestr.variance
+
+        # Checking bread estimates
+        npt.assert_allclose(bread_approx,
+                            bread_exact,
+                            atol=1e-6)
+
+        # Checking variance estimates
+        npt.assert_allclose(var_approx,
+                            var_exact,
+                            atol=5e-5)
+
+    def test_exact_ipw_msm(self):
+        d = pd.DataFrame()
+        d['W'] = [1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3,
+                  1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3]
+        d['V'] = [1, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 1, 1, 0, 0,
+                  1, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 1, 1, 0, 0]
+        d['A'] = [1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 0, 1, 0, 1,
+                  1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 0, 1, 0, 1]
+        d['Y'] = [3, 5, 1, 5, 2, 5, 2, 1, 4, 2, 3, 4, 2, 5, 5, 3, 5, 1, 5, 2, 5, 2, 1, 4, 2, 3, 4, 2, 5, 5,
+                  ] + [np.nan, ]*15
+        d['I'] = 1
+
+        # Setting up data
+        W = d[['I', 'V', 'W']]
+        X = d[['I', 'A']]
+        msm = d[['I', 'A']]
+        a = d['A']
+        y = d['Y'].fillna(-1)
+        r = np.where(d['Y'].isna(), 0, 1)
+
+        # M-estimation
+        def psi(theta):
+            # Separating parameters out
+            alpha = theta[:2 + W.shape[1]]  # MSM & PS
+            gamma = theta[2 + W.shape[1]:]  # Missing score
+
+            # Estimating equation for IPMW
+            ee_ms = ee_regression(theta=gamma, X=X, y=r, model='logistic')
+            pi_m = inverse_logit(np.dot(X, gamma))
+            ipmw = r / pi_m
+
+            # Estimating equations for MSM and PS
+            ee_msm = ee_ipw_msm(alpha, y=y, A=a, W=W, V=msm,
+                                link='log', distribution='poisson', weights=ipmw)
+            ee_msm = ee_msm * r
+            return np.vstack([ee_msm, ee_ms])
+
+        init_vals = [0., 0., ] + [0., 0., 0.] + [0., 0.]
+        mestr = MEstimator(psi, init=init_vals)
+
+        # Auto-differentation
+        mestr.estimate(solver='lm', deriv_method='exact')
+        bread_exact = mestr.bread
+        var_exact = mestr.variance
+
+        # Central difference method
+        mestr.estimate(solver='lm', deriv_method='approx')
+        bread_approx = mestr.bread
+        var_approx = mestr.variance
+
+        # Checking bread estimates
+        npt.assert_allclose(bread_approx,
+                            bread_exact,
+                            atol=1e-6)
+
+        # Checking variance estimates
+        npt.assert_allclose(var_approx,
+                            var_exact,
+                            atol=1e-5)
+
+    def test_exact_aipw(self):
+        d = pd.DataFrame()
+        d['W'] = [1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3,
+                  1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3,
+                  1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3]
+        d['V'] = [1, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 1, 1, 0, 0,
+                  1, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 1, 1, 0, 0,
+                  1, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 1, 1, 0, 0]
+        d['A'] = [1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 0, 1, 0, 1,
+                  1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 0, 1, 0, 1,
+                  1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 0, 1, 0, 1]
+        d['Y'] = [3, 5, 1, 5, 2, 5, 2, 1, 4, 2, 3, 4, 2, 5, 5,
+                  3, 5, 1, 5, 2, 5, 2, 1, 4, 2, 3, 4, 2, 5, 5,
+                  3, 5, 1, 5, 2, 5, 2, 1, 4, 2, 3, 4, 2, 5, 5]
+        d['I'] = 1
+        d['A1'] = 1
+        d['A0'] = 0
+
+        def psi(theta):
+            return ee_aipw(theta, y=d['Y'], A=d['A'],
+                           W=d[['I', 'W']],
+                           X=d[['I', 'A', 'W']],
+                           X1=d[['I', 'A1', 'W']],
+                           X0=d[['I', 'A0', 'W']])
+
+        mestr = MEstimator(psi, init=[0., ]*8)
+
+        # Auto-differentation
+        mestr.estimate(solver='lm', deriv_method='exact')
+        bread_exact = mestr.bread
+        var_exact = mestr.variance
+
+        # Central difference method
+        mestr.estimate(solver='lm', deriv_method='approx')
+        bread_approx = mestr.bread
+        var_approx = mestr.variance
+
+        # Checking bread estimates
+        npt.assert_allclose(bread_approx,
+                            bread_exact,
+                            atol=1e-6)
+
+        # Checking variance estimates
+        npt.assert_allclose(var_approx,
+                            var_exact,
+                            atol=1e-5)
+
+    def test_exact_gestimation_snmm(self):
         d = pd.DataFrame()
         d['W'] = [1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3,
                   1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3,
@@ -943,14 +1467,14 @@ class TestSandwichAutoDiff:
                                        V=d[['I', 'V']],
                                        model='linear')
 
-        # Auto-differentation
         mestr = MEstimator(psi, init=[0., ] * 5)
+
+        # Auto-differentation
         mestr.estimate(solver='lm', deriv_method='exact')
         bread_exact = mestr.bread
         var_exact = mestr.variance
 
         # Central difference method
-        mestr = MEstimator(psi, init=[0., ] * 5)
         mestr.estimate(solver='lm', deriv_method='approx')
         bread_approx = mestr.bread
         var_approx = mestr.variance
@@ -963,4 +1487,43 @@ class TestSandwichAutoDiff:
         # Checking variance estimates
         npt.assert_allclose(var_approx,
                             var_exact,
-                            atol=5e-5)
+                            atol=1e-5)
+
+    def test_robins_sensitivity_mean(self):
+        d = pd.DataFrame()
+        d['I'] = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+        d['X'] = [0, 1, 2, 0, 1, 2, 0, 1, 2, 0]
+        d['Y'] = [7, 2, 5, np.nan, 1, 4, 8, np.nan, 1, np.nan]
+        d['delta'] = np.where(d['Y'].isna(), 0, 1)
+
+        def q_function(y_vals, alpha):
+            y_no_miss = np.where(np.isnan(y_vals), 0, y_vals)
+            return alpha * y_no_miss
+
+        def psi(theta):
+            return ee_mean_sensitivity_analysis(theta=theta,
+                                                y=d['Y'], delta=d['delta'], X=d[['I', 'X']],
+                                                q_eval=q_function(d['Y'], alpha=0.5),
+                                                H_function=inverse_logit)
+
+        mestr = MEstimator(psi, init=[0., 0., 0.])
+
+        # Auto-differentation
+        mestr.estimate(solver='lm', deriv_method='exact')
+        bread_exact = mestr.bread
+        var_exact = mestr.variance
+
+        # Central difference method
+        mestr.estimate(solver='lm', deriv_method='approx')
+        bread_approx = mestr.bread
+        var_approx = mestr.variance
+
+        # Checking bread estimates
+        npt.assert_allclose(bread_approx,
+                            bread_exact,
+                            atol=1e-6)
+
+        # Checking variance estimates
+        npt.assert_allclose(var_approx,
+                            var_exact,
+                            atol=1e-6)
