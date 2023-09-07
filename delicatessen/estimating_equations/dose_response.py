@@ -85,6 +85,7 @@ def ee_4p_logistic(theta, X, y):
     To summarize the recommendations, be sure to examine your data (e.g., scatterplot). This will help to determine the
     initial starting values for the root-finding procedure. Otherwise, you may come across a convergence error.
 
+
     >>> estr = MEstimator(psi, init=[np.min(resp_data),
     >>>                              (np.max(resp_data)+np.min(resp_data)) / 2,
     >>>                              (np.max(resp_data)+np.min(resp_data)) / 2,
@@ -120,18 +121,18 @@ def ee_4p_logistic(theta, X, y):
     # Generalized 4PL model function for y-hat
     fx = theta[0] + (theta[3] - theta[0]) / (1 + rho)
 
-    # Using a special implementatin of natural log here
+    # Using a special implementation of natural log here
     nested_log = np.log(X / theta[1],             # ... to avoid dose=0 issues only take log
                         where=0 < X)              # ... where dose>0 (otherwise puts zero in place)
 
     # Calculate the derivatives for the gradient
-    deriv = np.array((1 - 1/(1 + rho),                                         # Gradient for lower limit
-                     (theta[3]-theta[0])*theta[2]/theta[1]*rho/(1+rho)**2,     # Gradient for steepness
-                     (theta[3] - theta[0]) * nested_log * rho / (1 + rho)**2,  # Gradient for ED50
-                     1 / (1 + rho)), )                                         # Gradient for upper limit
+    deriv = np.array((1 - 1/(1 + rho),                                          # Gradient for lower limit
+                     (theta[3] - theta[0])*theta[2]/theta[1]*rho/(1 + rho)**2,  # Gradient for steepness
+                     (theta[3] - theta[0])*nested_log*rho/(1 + rho)**2,         # Gradient for ED50
+                     1 / (1 + rho)), )                                          # Gradient for upper limit
 
     # Compute gradient and return for each i
-    return -2*(y-fx)*deriv
+    return -2*(y - fx)*deriv
 
 
 def ee_3p_logistic(theta, X, y, lower):
