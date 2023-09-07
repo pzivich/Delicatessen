@@ -301,6 +301,11 @@ class MEstimator:
         self.meat = np.dot(evald_theta, evald_theta.T) / self.n_obs                  # Meat is dot product of arrays
 
         # STEP 2.3: assembling the sandwich (variance)
+        if np.isnan(self.bread).any():
+            raise ValueError("The bread matrix contains at least one np.nan, so it cannot be inverted. This may be an "
+                             "issue with the provided estimating equations or the evaluated theta. The point estimates "
+                             "were " + str(self.theta) +
+                             ". If using automatic differentiation, try setting numerical approximation instead.")
         if allow_pinv:                                                               # Support 1D theta-hat
             bread_invert = np.linalg.pinv(self.bread)                                # ... find pseudo-inverse
         else:                                                                        # Support 1D theta-hat

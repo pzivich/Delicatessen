@@ -9,7 +9,8 @@ from scipy.optimize import root
 
 from delicatessen import MEstimator
 from delicatessen.utilities import inverse_logit
-from delicatessen.estimating_equations import ee_regression
+from delicatessen.estimating_equations import ee_regression, ee_4p_logistic
+from delicatessen.data import load_inderjit
 
 np.random.seed(236461)
 
@@ -137,6 +138,18 @@ class TestMEstimation:
         mestimator = MEstimator(psi, init=[0, 0, 0])
         with pytest.raises(ValueError, match="A 2-dimensional array is expected"):
             mestimator.estimate()
+
+    def test_error_bread_of_nan(self):
+        d = load_inderjit()
+        dose_data = d[:, 1]
+        resp_data = d[:, 0]
+
+        def psi(theta):
+            return ee_4p_logistic(theta=theta, X=dose_data, y=resp_data)
+
+        mestr = MEstimator(psi, init=[0.48, 3.05, 2.98, 7.79])
+        with pytest.raises(ValueError, match="bread matrix contains at least one np.nan"):
+            mestr.estimate(solver='hybr', deriv_method='exact')
 
     def test_mean_variance_1eq(self):
         """Tests the mean / variance with a single estimating equation.
