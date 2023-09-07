@@ -21,7 +21,7 @@ def polygamma(n, x):
     Returns
     -------
     Return type depends on the input type (``PrimalTangentPairs`` will return ``PrimalTangentPairs``, otherwise will
-    return ``ndarray).
+    return ``ndarray``).
     """
     if isinstance(x, np.ndarray):
         storage = []
@@ -49,7 +49,7 @@ def digamma(z):
     Returns
     -------
     Return type depends on the input type (``PrimalTangentPairs`` will return ``PrimalTangentPairs``, otherwise will
-    return ``ndarray).
+    return ``ndarray``).
     """
     return polygamma(n=0, x=z)
 
@@ -102,6 +102,62 @@ def identity(value):
     value
     """
     return value
+
+
+def standard_normal_cdf(x):
+    """Cumulative distribution function for the standard normal distribution. This is a wrapper function of
+    ``scipy.stats.norm.cdf`` meant to enable automatic differentation with ``delicatessen``. When the input is a
+    ``PrimalTangentPairs`` object, then an internal function that implements the CDF function is called. Otherwise,
+    ``scipy.stats.norm.cdf`` is called for the input object.
+
+    Parameters
+    ----------
+    x : int, float, ndarray
+        Real valued input
+
+    Returns
+    -------
+    Return type depends on the input type (``PrimalTangentPairs`` will return ``PrimalTangentPairs``, otherwise will
+    return ``ndarray``).
+    """
+    if isinstance(x, np.ndarray):
+        storage = []
+        for xi in x:
+            normxi = standard_normal_cdf(x=xi)
+            storage.append(normxi)
+        return np.array(storage)
+    elif isinstance(x, PTPair):
+        return x.normal_cdf()
+    else:
+        return norm.cdf(x=x)
+
+
+def standard_normal_pdf(x):
+    """Probability density function for the standard normal distribution. This is a wrapper function of
+    ``scipy.stats.norm.pdf`` meant to enable automatic differentation with ``delicatessen``. When the input is a
+    ``PrimalTangentPairs`` object, then an internal function that implements the PDF function is called. Otherwise,
+    ``scipy.stats.norm.pdf`` is called for the input object.
+
+    Parameters
+    ----------
+    x : int, float, ndarray
+        Real valued input
+
+    Returns
+    -------
+    Return type depends on the input type (``PrimalTangentPairs`` will return ``PrimalTangentPairs``, otherwise will
+    return ``ndarray``).
+    """
+    if isinstance(x, np.ndarray):
+        storage = []
+        for xi in x:
+            normxi = standard_normal_pdf(x=xi)
+            storage.append(normxi)
+        return np.array(storage)
+    elif isinstance(x, PTPair):
+        return x.normal_pdf()
+    else:
+        return norm.pdf(x=x)
 
 
 def robust_loss_functions(residual, loss, k, a=None, b=None):

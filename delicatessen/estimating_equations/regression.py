@@ -1,11 +1,11 @@
 import warnings
 import numpy as np
 from scipy.stats import norm, cauchy
-from delicatessen.utilities import digamma, polygamma
 
 from delicatessen.utilities import (logit, inverse_logit, identity,
                                     robust_loss_functions,
-                                    additive_design_matrix)
+                                    additive_design_matrix,
+                                    digamma, polygamma, standard_normal_cdf, standard_normal_pdf)
 from delicatessen.estimating_equations.processing import generate_weights
 
 #################################################################
@@ -76,7 +76,7 @@ def ee_regression(theta, X, y, model, weights=None, offset=None):
     >>> data['Z'] = np.random.normal(size=n)
     >>> data['Y1'] = 0.5 + 2*data['X'] - 1*data['Z'] + np.random.normal(loc=0, size=n)
     >>> data['Y2'] = np.random.binomial(n=1, p=logistic.cdf(0.5 + 2*data['X'] - 1*data['Z']), size=n)
-    >>> data['Y3'] = np.random.poisson(np.exp(lam=0.5 + 2*data['X'] - 1*data['Z']), size=n)
+    >>> data['Y3'] = np.random.poisson(lam=np.exp(0.5 + 2*data['X'] - 1*data['Z']), size=n)
     >>> data['C'] = 1
 
     Note that ``C`` here is set to all 1's. This will be the intercept in the regression.
@@ -1351,11 +1351,15 @@ def _inverse_link_(betax, link):
         py = 1 - np.exp(-1*np.exp(betax))       # Inverse link
         dpy = np.exp(betax - np.exp(betax))     # Derivative of inverse link
     elif link == 'probit':
-        py = norm.cdf(betax)                    # Inverse link
-        dpy = norm.pdf(betax)                   # Derivative of inverse link
+        # py = norm.cdf(betax)                  # Inverse link
+        # dpy = norm.pdf(betax)                 # Derivative of inverse link
+        py = standard_normal_cdf(x=betax)       # Inverse link
+        dpy = standard_normal_pdf(x=betax)      # Derivative of inverse link
     elif link in ['cauchit', 'cauchy']:
-        py = cauchy.cdf(betax)                  # Inverse link
-        dpy = cauchy.pdf(betax)                 # Derivative of inverse link
+        # py = cauchy.cdf(betax)                # Inverse link
+        # dpy = cauchy.pdf(betax)               # Derivative of inverse link
+        py = (1/np.pi)*np.arctan(betax) + 0.5   # Inverse link
+        dpy = 1 / (np.pi*(1 + betax**2))        # Derivative of inverse link (by-hand)
     elif link in ['square_root', 'sqrt']:
         py = betax**2                           # Inverse link
         dpy = 2 * betax                         # Derivative of inverse link
