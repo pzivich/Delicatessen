@@ -122,8 +122,9 @@ def ee_4p_logistic(theta, X, y):
     fx = theta[0] + (theta[3] - theta[0]) / (1 + rho)
 
     # Using a special implementation of natural log here
-    nested_log = np.log(X / theta[1],             # ... to avoid dose=0 issues only take log
-                        where=0 < X)              # ... where dose>0 (otherwise puts zero in place)
+    # nested_log = np.log(X / theta[1],             # ... to avoid dose=0 issues only take log
+    #                     where=0 < X)              # ... where dose>0 (otherwise puts zero in place)
+    nested_log = np.where(X > 0, np.log(X / theta[1]), 0)  # Handling when dose = 0
 
     # Calculate the derivatives for the gradient
     deriv = np.array((1 - 1/(1 + rho),                                          # Gradient for lower limit
@@ -230,23 +231,8 @@ def ee_3p_logistic(theta, X, y, lower):
     Inderjit, Streibig JC, & Olofsdotter M. (2002). Joint action of phenolic acid mixtures and its significance in
     allelopathy research. *Physiologia Plantarum*, 114(3), 422-428.
     """
-    # Creating rho to cut down on typing
-    rho = (X / theta[0])**theta[1]
-
-    # Generalized 3PL model function for y-hat
-    fx = lower + (theta[2] - lower) / (1 + rho)
-
-    # Using a special implementation of natural log here
-    nested_log = np.log(X / theta[0],             # ... to avoid dose=0 issues only take log
-                        where=0 < X)              # ... where dose>0 (otherwise puts zero in place)
-
-    # Calculate the derivatives for the gradient
-    deriv = np.array(((theta[2]-lower)*theta[1]/theta[0]*rho/(1+rho)**2,     # Gradient for steepness
-                      (theta[2]-lower) * nested_log * rho / (1+rho)**2,      # Gradient for ED50
-                      1 / (1 + rho)), )                                      # Gradient for upper limit
-
-    # Compute gradient and return for each i
-    return -2*(y - fx)*deriv
+    ee_dr = ee_4p_logistic(theta=[lower, theta[0], theta[1], theta[2]], X=X, y=y)
+    return ee_dr[1:, :]
 
 
 def ee_2p_logistic(theta, X, y, lower, upper):
@@ -344,22 +330,8 @@ def ee_2p_logistic(theta, X, y, lower, upper):
     Inderjit, Streibig JC, & Olofsdotter M. (2002). Joint action of phenolic acid mixtures and its significance in
     allelopathy research. *Physiologia Plantarum*, 114(3), 422-428.
     """
-    # Creating rho to cut down on typing
-    rho = (X / theta[0])**theta[1]
-
-    # Generalized 3PL model function for y-hat
-    fx = lower + (upper - lower) / (1 + rho)
-
-    # Using a special implementatin of natural log here
-    nested_log = np.log(X / theta[0],             # ... to avoid dose=0 issues only take log
-                        where=0 < X)              # ... where dose>0 (otherwise puts zero in place)
-
-    # Calculate the derivatives for the gradient
-    deriv = np.array(((upper-lower)*theta[1]/theta[0]*rho/(1+rho)**2,     # Gradient for steepness
-                      (upper-lower) * nested_log * rho / (1+rho)**2), )   # Gradient for ED50
-
-    # Compute gradient and return for each i
-    return -2*(y-fx)*deriv
+    ee_dr = ee_4p_logistic(theta=[lower, theta[0], theta[1], upper], X=X, y=y)
+    return ee_dr[1:3, :]
 
 
 def ee_effective_dose_delta(theta, y, delta, steepness, ed50, lower, upper):
