@@ -79,6 +79,7 @@ Contents:
 .. toctree::
   :maxdepth: 3
 
+  Basics.rst
   Examples.rst
   Built-in Equations <Built-in Equations.rst>
   Custom Equations <Custom Equations.rst>
