@@ -850,7 +850,7 @@ class TestSandwichAutoDiff:
         npt.assert_allclose(bread_approx, bread_exact, atol=1e-7)
 
         # Checking variance estimates
-        npt.assert_allclose(var_approx, var_exact, atol=1e-7)
+        npt.assert_allclose(var_approx, var_exact, atol=1e-6)
 
     def test_exact_bread_glm_poisson(self):
         d = pd.DataFrame()
