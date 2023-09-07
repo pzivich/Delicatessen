@@ -352,6 +352,9 @@ class PrimalTangentPairs:
     def __pow__(self, other):
         # Power
         if isinstance(other, PrimalTangentPairs):                                    # For PrimalTangentPairs to powers
+            # I'm not sure about allowing this option. So it is disallowed for the time being
+            # if self.primal == 0:
+            #     return PrimalTangentPairs(0, self.tangent*0)
             fgx = other.primal * self.primal ** (other.primal - 1) * self.tangent    # ... initial piece of rule
             gx = self.primal ** other.primal * np.log(self.primal) * other.tangent   # ... secondary piece of rule
             return PrimalTangentPairs(self.primal ** other.primal,                   # ... raise primal to primal
