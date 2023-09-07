@@ -175,7 +175,7 @@ class MEstimator:
         self.variance = None              # Covariance matrix for theta values (calculated later)
         self.asymptotic_variance = None   # Asymptotic covariance matrix for theta values (calculated later)
 
-    def estimate(self, solver='newton', maxiter=1000, tolerance=1e-9, deriv_method='approx', dx=1e-9, allow_pinv=True):
+    def estimate(self, solver='newton', maxiter=5000, tolerance=1e-9, deriv_method='approx', dx=1e-9, allow_pinv=True):
         """Function to carry out the point and variance estimation of theta. After this procedure, the point estimates
         (in ``theta``) and the covariance matrix (in ``variance``) can be extracted.
 
@@ -190,7 +190,7 @@ class MEstimator:
             return only the optimized values. Please review the provided example in the documentation for how to
             implement a custom root-finding algorithm.
         maxiter : int, optional
-            Maximum iterations to consider for the root finding procedure. Default is 1000 iterations. For complex
+            Maximum iterations to consider for the root finding procedure. Default is 5000 iterations. For complex
             estimating equations (without preceding optimization), this value may need to be increased. This argument
             is not used for user-specified solvers.
         tolerance : float, optional
