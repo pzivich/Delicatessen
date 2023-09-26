@@ -47,6 +47,17 @@ automatic differentiation. This approach provides the exact derivative (as oppos
 implemented by-hand in ``delicatessen`` via operator overloading. Finally, we use forward-mode because there is no
 time advantage of backward-mode because the Jacobian is square.
 
+Automatic Differentiation Caveats
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+There are some caveats to the use of automatic differentiation. First, some NumPy functionalities are not fully
+supported. For example, ``np.log(x, where=0<x)`` will result in an error since there is an attempt to evaluate a
+log at zero internally. When using these specialty functions are necessary, it is better to use numerical approximation
+for differentiation. The second is regarding discontinuities. Consider the following function :math:`f(x) = x**2` if
+:math:`x \ge 1` and :math:`f(x) = 0` otherwise. Because of how automatic differentiation operates, the derivative at
+:math:`x=1` will result in :math:`2x` (this is the same behavior as other automatic differentiation software, like
+autograd).
+
 After computing the derivatives, the filling is computed via a dot product. The bread is then inverted using NumPy.
 Finally, the bread and filling matrices are combined via dot products.
 
