@@ -148,8 +148,12 @@ class TestMEstimation:
             return ee_4p_logistic(theta=theta, X=dose_data, y=resp_data)
 
         mestr = MEstimator(psi, init=[0.48, 3.05, 2.98, 7.79])
-        with pytest.raises(ValueError, match="bread matrix contains at least one np.nan"):
+        with pytest.warns(UserWarning, match="bread matrix contains at least one np.nan"):
             mestr.estimate(solver='hybr', deriv_method='exact')
+
+        # Ensuring variance is None but point estimates still exist
+        assert mestr.theta is not None
+        assert mestr.variance is None
 
     def test_mean_variance_1eq(self):
         """Tests the mean / variance with a single estimating equation.

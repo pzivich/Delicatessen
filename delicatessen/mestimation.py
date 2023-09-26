@@ -1,3 +1,5 @@
+import warnings
+
 import numpy as np
 from scipy.optimize import newton, root
 from scipy.misc import derivative
@@ -302,20 +304,20 @@ class MEstimator:
 
         # STEP 2.3: assembling the sandwich (variance)
         if np.isnan(self.bread).any():
-            raise ValueError("The bread matrix contains at least one np.nan, so it cannot be inverted. This may be an "
-                             "issue with the provided estimating equations or the evaluated theta. The point estimates "
-                             "were " + str(self.theta) +
-                             ". If using automatic differentiation, try setting numerical approximation instead.")
-        if allow_pinv:                                                               # Support 1D theta-hat
-            bread_invert = np.linalg.pinv(self.bread)                                # ... find pseudo-inverse
-        else:                                                                        # Support 1D theta-hat
-            bread_invert = np.linalg.inv(self.bread)                                 # ... find inverse
-        # Two sets of matrix multiplication to get the sandwich variance
-        sandwich = np.dot(np.dot(bread_invert, self.meat), bread_invert.T)
+            warnings.warn("The bread matrix contains at least one np.nan, so it cannot be inverted. The variance will "
+                          "not be calculated. This may be an issue with the provided estimating equations or the "
+                          "evaluated theta.",
+                          UserWarning)
+        else:
+            if allow_pinv:                                                               # Support 1D theta-hat
+                bread_invert = np.linalg.pinv(self.bread)                                # ... find pseudo-inverse
+            else:                                                                        # Support 1D theta-hat
+                bread_invert = np.linalg.inv(self.bread)                                 # ... find inverse
+            sandwich = np.dot(np.dot(bread_invert, self.meat), bread_invert.T)           # Compute sandwich
 
-        # STEP 3: updating storage for results
-        self.asymptotic_variance = sandwich       # Asymptotic variance requires division by n (done above)
-        self.variance = sandwich / self.n_obs     # Variance estimate requires division by n^2 (second done here)
+            # STEP 3: updating storage for results
+            self.asymptotic_variance = sandwich       # Asymptotic variance requires division by n (done above)
+            self.variance = sandwich / self.n_obs     # Variance estimate requires division by n^2 (second done here)
 
     def confidence_intervals(self, alpha=0.05):
         r"""Calculate Wald-type :math:`(1 - \alpha) \times` 100% confidence intervals using the point estimates and
@@ -342,9 +344,9 @@ class MEstimator:
             intervals for :math:`\theta_b`
         """
         # Check that estimate() has been called
-        if self.theta is None:
-            raise ValueError("theta has not been estimated yet. "
-                             "estimate() must be called before confidence_intervals()")
+        if self.variance is None:
+            raise ValueError("Either theta has not been estimated yet, or there is a np.nan in the bread matrix. "
+                             "Therefore, confidence_intervals() cannot be called.")
         # Check valid alpha value is being provided
         if not 0 < alpha < 1:
             raise ValueError("`alpha` must be 0 < a < 1")
@@ -382,8 +384,8 @@ class MEstimator:
         """
         # Check that self.estimate() has been called
         if self.theta is None:
-            raise ValueError("theta has not been estimated yet. "
-                             "estimate() must be called before confidence_intervals()")
+            raise ValueError("Either theta has not been estimated yet, or there is a np.nan in the bread matrix. "
+                             "Therefore, z_scores() cannot be called.")
 
         # Calculating Z-scores
         se = np.sqrt(np.diag(self.variance))       # Extract the standard error estimates from the sandwich
