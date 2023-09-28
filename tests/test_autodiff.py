@@ -1039,7 +1039,8 @@ class TestSandwichAutoDiff:
             return ee_ridge_regression(theta,
                                        X=data[['C', 'X', 'Z']], y=data['Y'],
                                        penalty=[0, 1, 2],
-                                       model='linear', weights=data['w'])
+                                       model='linear', weights=data['w'],
+                                       center=[0, 1, -2])
 
         mestr = MEstimator(psi, init=[0., 2., -1.])
 
