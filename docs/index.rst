@@ -80,7 +80,7 @@ Contents:
   :maxdepth: 3
 
   Basics.rst
-  Examples.rst
+  Examples/index
   Built-in Equations <Built-in Equations.rst>
   Custom Equations <Custom Equations.rst>
   Optimization Advice <Optimization Advice.rst>

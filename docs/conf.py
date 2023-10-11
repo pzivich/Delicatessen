@@ -33,6 +33,7 @@ def get_version():
 
 # Specify necessary extensions
 extensions = [
+    "nbsphinx",
     "sphinx.ext.coverage",
     "sphinx.ext.mathjax",
     "sphinx.ext.autosectionlabel",
