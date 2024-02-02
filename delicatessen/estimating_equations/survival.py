@@ -1,3 +1,7 @@
+#####################################################################################################################
+# Estimating functions for survival or time-to-event analyses
+#####################################################################################################################
+
 import numpy as np
 
 from delicatessen.estimating_equations.processing import generate_weights

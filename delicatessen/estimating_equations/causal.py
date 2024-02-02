@@ -1,3 +1,7 @@
+#####################################################################################################################
+# Estimating functions for causal inference applications
+#####################################################################################################################
+
 import numpy as np
 
 from .regression import ee_regression, ee_glm
@@ -73,7 +77,7 @@ def ee_gformula(theta, y, X, X1, X0=None, force_continuous=False):
     theta : ndarray, list, vector
         Theta consists of 1+b values if ``X0`` is ``None``, and 3+b values if ``X0`` is not ``None``.
     y : ndarray, list, vector
-        1-dimensional vector of n observed values. The Y values should all be 0 or 1.
+        1-dimensional vector of n observed values.
     X : ndarray, list, vector
         2-dimensional vector of n observed values for b variables.
     X1 : ndarray, list, vector
