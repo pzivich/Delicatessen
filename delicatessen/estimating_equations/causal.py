@@ -774,26 +774,26 @@ def ee_aipw(theta, y, A, W, X, X1, X0, truncate=None, force_continuous=False):
                       m_model))          # theta[c] is for the outcome model coefficients
 
 
-def ee_gestimation_snmm(theta, y, A, W, V, model='linear', weights=None):
+def ee_gestimation_snmm(theta, y, A, W, V, X=None, model='linear', weights=None, approach='efficient'):
     r"""Estimating equations for g-estimation of structural nested mean models. The parameter(s) of interest are the
     parameter(s) of the corresponding structural nested mean model (SNMM). Rather than estimating the causal effect of
     treating everyone versus treating no one, g-estimation of SNMM estimates the causal effect within strata of a set
-    of covariates, :math:`V`. Options for the SNMM include the linear SNMM and the log-linear SNMM. The linear
-    structural nested mean model is defined as
+    of covariates, :math:`V`. Options for the SNMM include the linear SNMM and the log-linear SNMM. The linear SNMM is
+    defined as
 
     .. math::
 
-        E[Y^a - Y^{a=0} | V] = \beta_1 a + \beta_2 a V
+        E[Y^a - Y^{a=0} | A=a, V] = \beta_1 a + \beta_2 a V
 
-    This model corresponds to the average casual effect or causal risk difference within strata of :math:`V`. The
-    log-linear structural nested mean model is defined as
+    This model corresponds to the average treatment effect among the treated or causal risk difference within strata
+    of :math:`V`. The log-linear structural nested mean model is defined as
 
     .. math::
 
         \frac{E[Y^a | A=a, V]}{E[Y^{a=0} | A=a, V]} = \exp(\beta_1 a + \beta_2 a V)
 
-    This model corresponds to the average casual mean ratio or causal risk ratio within strata of :math:`V`. Note that
-    the log-linear SNMM is only defined when :math:`Y > 0`.
+    This model corresponds to the average treatment mean ratio in the treated within strata of :math:`V`. Note that the
+    log-linear SNMM is only defined when :math:`Y > 0`.
 
     Under the assumption of causal consistency, conditional exchangeability and positivity, we can solve for
     :math:`\beta` using the following estimating equation
@@ -804,8 +804,8 @@ def ee_gestimation_snmm(theta, y, A, W, V, model='linear', weights=None):
 
     where :math:`H(\beta) = Y - \beta A \mathbb{V}`, and :math:`\mathbb{V}` is a design matrix for the SNMM (note: this
     design matrix should be for the case of :math:`a=1`). Note that :math:`V \subseteq W`. This estimating equation
-    requires :math:`\Pr(A | W)` or the propensity scores, which must be estimated. This is done via the following
-    estimating equation
+    requires :math:`E(A | W)`, which must be estimated. This is done via the following estimating equation for binary
+    actions
 
     .. math::
 
@@ -813,7 +813,7 @@ def ee_gestimation_snmm(theta, y, A, W, V, model='linear', weights=None):
 
     These estimating equations are stacked together. Therefore, the length of the parameter vector is b+c, where b is
     the number of columns in :math:`\mathbb{V}`, and c is the number of columns in ``W``. The *first* b values in theta
-    vector are the SNMM parameters. The *second* set are the parameters corresponding to the propensity score model.
+    vector are the SNMM parameters. The *second* set are the parameters corresponding to the :math:`E(A | W)` model.
 
     Parameters
     ----------
@@ -824,15 +824,20 @@ def ee_gestimation_snmm(theta, y, A, W, V, model='linear', weights=None):
     A : ndarray, list, vector
         1-dimensional vector of n observed values. The A values should all be 0 or 1.
     W : ndarray, list, vector
-        2-dimensional vector of n observed values for b variables.
+        2-dimensional vector of n observed values for b variables to model the expected value of ``A``.
     V : ndarray, list, vector
-        2-dimensional vector of n observed values for b variables.
+        2-dimensional vector of n observed values for b variables for the structural nested mean model specification.
+    X : ndarray, list, vector
+        2-dimensional vector of n observed values for b variables to model the outcome ``y``. This argument is only
+        used by the efficient g-estimator.
     model : str, optional
         Type of structural nested mean model to fit. Options are currently only ``linear``, with a default
         of ``linear``.
     weights : ndarray, list, vector, None, optional
         1-dimensional vector of n weights. Default is None, which assigns a weight of 1 to all observations. This
         argument is intended to support the use of sampling or missingness weights.
+    approach : str, optional
+        Type of g-estimator to use. Default is ``efficient`` which uses the efficient g-estimator. [...].
 
     Returns
     -------
@@ -866,7 +871,7 @@ def ee_gestimation_snmm(theta, y, A, W, V, model='linear', weights=None):
 
     .. math::
 
-        E[Y_i^a - Y_i^{a=0} | W_i] = \beta_1 a + \beta_2 a W_i
+        E[Y^a - Y^{a=0} | A=a, W] = \beta_1 a + \beta_2 a W
 
     >>> def psi(theta):
     >>>     return ee_gestimation_snmm(theta,
@@ -905,6 +910,9 @@ def ee_gestimation_snmm(theta, y, A, W, V, model='linear', weights=None):
 
     Vansteelandt S, & Joffe M (2014). Structural nested models and G-estimation: the partially realized promise.
     *Statist Sci*, 29(4), 707-731.
+
+    Vansteelandt S, & Sjolander A (2016). Revisiting g-estimation of the effect of a time-varying exposure subject to
+    time-varying confounding. *Epidemiologic Methods*, 5(1), 37-56.
     """
     # Ensuring correct typing
     y = np.asarray(y)[:, None]                  # Convert to NumPy array and converting shape
@@ -912,45 +920,76 @@ def ee_gestimation_snmm(theta, y, A, W, V, model='linear', weights=None):
     W = np.asarray(W)                           # Convert to NumPy array
     V = np.asarray(V)                           # Convert to NumPy array
     pdiv = V.shape[1]                           # Extracting number of SNM parameters
+    qdiv = W.shape[1] + pdiv                    # Extracting number of E[A|L] parameters
+    if weights is None:                         # Processing weights argument
+        weight = 1
+    else:
+        weight = np.asarray(weights)
+    eq_add = []                                 # Storage for outcome model, default is empty (none)
 
     # Extracting theta value for ease
-    beta = np.asarray(theta[0: pdiv])[:, None]  # theta parameters for the SNM
-    alpha = np.asarray(theta[pdiv:])            # theta parameters for the propensity score model
+    phi = np.asarray(theta[0: pdiv])[:, None]   # theta parameters for the SNM
+    alpha = np.asarray(theta[pdiv:qdiv])        # theta parameters for the E[A|L] model
+    if X is not None:                           # theta parameters for the E[Y|L] model
+        beta = np.asarray(theta[qdiv:])
 
-    # Propensity Score Model
+    # Option for the variations on the structural nested mean model
+    if model == 'linear':                                     # Linear structural nested mean model
+        snm = identity(np.dot(V, phi))                        # ... identity transform
+        h_phi = y - identity(np.dot(V*A[:, None], phi))       # ... subtract and identity transformation
+        y_model_spec = 'linear'
+        y_transform = identity
+    # elif model == 'log':                                      # Log-linear structural nested mean model
+    #     snm = np.exp(np.dot(V, phi))                          # ... exponential transform
+    #     h_phi = y * np.exp(-1 * np.dot(V*A[:, None], phi))    # ... multiplication and exp transformation
+    #     y_model_spec = 'poisson'
+    #     y_transform = np.exp
+    # elif model == 'logit':                                  # Logistic structural nested mean model
+    #     # Note: logistic SNMM are possible, but these require specifying an outcome model.
+    #     #   ... To keep the structure of SNMM as-is, I do not provide that option.
+    #     snm = identity(np.dot(V, beta))[:, None]
+    #     h_phi = 10
+    #     y_model_spec = 'logistic'
+    else:                                                     # Error checking
+        raise ValueError("model='" + str(model) + "' is not a supported option. "
+                         "Only the following options are supported: "
+                         "linear")
+    # Future consideration: add bias adjustment via b(A,W; \alpha) to h_psi from Vancak & Sjolander
+
+    # Estimating the E[A | L] Model
     ee_log = ee_regression(theta=alpha,         # Propensity score parameters
                            X=W, y=A,            # ... treatment and covariate design matrix
                            model='logistic',    # ... logistic model
                            weights=weights)     # ... with provided weights
     pi = inverse_logit(np.dot(W, alpha))        # Converting log-odds to probability
+    a_resid = (A - pi)[:, None]                 # Calculating residuals for A
 
-    # Option for the variations on the structural nested mean model
-    # Future consideration: add bias adjustment via b(A,W; \alpha) to h_psi from Vancak & Sjolander
-    if model == 'linear':                                      # Linear structural nested mean model
-        h_psi = y - identity(np.dot(V*A[:, None], beta))       # ... subtract and identity transformation
-    # Holding off on releasing the log-linear since I can't find a good external comparison yet...
-    # elif model == 'log':                                       # Log-linear structural nested mean model
-    #     h_psi = y * np.exp(-1 * np.dot(V*A[:, None], beta))    # ... multiplication and exp transformation
-    else:                                                      # Error checking
-        # Note: logistic SNMM are possible, but these require specifying an outcome model.
-        #   ... To keep the structure of SNMM as-is, I do not provide that option.
-        #   ... Further a double-robust g-estimation algorithm exists but is not implemented here.
-        raise ValueError("model='" + str(model) + "' is not a supported option. "
-                         "Only the following options are supported: "
-                         "linear")
-
-    # Processing weights argument
-    if weights is None:
-        weight = 1
+    # Estimating functions for the corresponding g-estimator of SNMM
+    if approach.lower() == "efficient":                              # Efficient g-estimator
+        if X is not None:                                            # Specifying an outcome model
+            X = np.asarray(X)                                        # ... convert X to NumPy array
+            ee_out = ee_regression(theta=beta,                       # ... outcome model with beta
+                                   X=X, y=h_phi[:, 0],               # ... for E[h(phi) | L]
+                                   model=y_model_spec,               # ... transformation to consider
+                                   weights=weights)                  # ... using provided weights
+            yhat = y_transform(np.dot(X, beta))                      # ... get predicted h(phi)
+            y_resid = (y - yhat[:, None])                            # ... compute the remaining residuals
+            eq_add = [ee_out, ]                                      # ... adding outcome model estimating functions
+        else:                                                        # Otherwise
+            y_resid = (y - 0)                                        # ... set yhat as zero
+        ee_snm = weight * (a_resid * (y_resid - snm*a_resid) * V).T  # Estimating function
+    elif approach.lower() == "inefficient":                          # Inefficient g-estimator
+        # TODO throw error if not linear (or only if logistic?)!
+        ee_snm = weight * (a_resid * h_phi * V).T                    # Estimating function
     else:
-        weight = weights
-
-    # Computing estimating functions for the corresponding structural nested mean model
-    ee_snm = weight*(h_psi * (A - pi)[:, None] * V).T  # Computing estimating function
+        raise ValueError("approach='" + str(approach) + "' is not a supported option. "
+                         "Only the following options are supported: "
+                         "efficient, inefficient")
 
     # Output (b+c)-by-n array
-    return np.vstack([ee_snm,                          # SNMM parameters
-                      ee_log])                         # Propensity score parameters
+    return np.vstack([ee_snm,     # SNMM parameters
+                      ee_log]     # E[A|L] parameters
+                     + eq_add)    # E[Y|L] parameters (if available for specification)
 
 
 def ee_mean_sensitivity_analysis(theta, y, delta, X, q_eval, H_function):
