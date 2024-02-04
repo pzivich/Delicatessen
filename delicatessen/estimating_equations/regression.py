@@ -1306,6 +1306,8 @@ def _model_transform_(model, assert_linear_model=False):
     ----------
     model : str
         Model identifier to calculate the transformation for
+    assert_linear_model : bool, optional
+        Flag to assert whether only a linear model is supported.
 
     Returns
     -------
