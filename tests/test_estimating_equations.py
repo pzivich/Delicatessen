@@ -3223,7 +3223,8 @@ class TestEstimatingEquationsCausal:
                                        y=d['Y'], A=d['A'],
                                        W=d[['I', 'V', 'W']],
                                        V=d[['I', 'V']],
-                                       model='linear')
+                                       model='linear',
+                                       approach='inefficient')
 
         mestr = MEstimator(psi, init=[0., ] * 5)
         mestr.estimate(solver='lm')
@@ -3276,6 +3277,7 @@ class TestEstimatingEquationsCausal:
                                          y=y, A=a,
                                          W=W, V=snm,
                                          model='linear',
+                                         approach='inefficient',
                                          weights=ipmw)
             # Setting rows with missing Y's as zero (no contribution)
             ee_snm = np.nan_to_num(ee_snm, copy=False, nan=0.)

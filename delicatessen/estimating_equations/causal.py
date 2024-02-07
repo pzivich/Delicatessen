@@ -914,6 +914,7 @@ def ee_gestimation_snmm(theta, y, A, W, V, X=None, model='linear', weights=None,
     Vansteelandt S, & Sjolander A (2016). Revisiting g-estimation of the effect of a time-varying exposure subject to
     time-varying confounding. *Epidemiologic Methods*, 5(1), 37-56.
     """
+    # Future consideration: add bias adjustment via b(A,W; \alpha) to h_psi from Vancak & Sjolander
     # Ensuring correct typing
     y = np.asarray(y)[:, None]                  # Convert to NumPy array and converting shape
     A = np.asarray(A)                           # Convert to NumPy array
@@ -934,27 +935,18 @@ def ee_gestimation_snmm(theta, y, A, W, V, X=None, model='linear', weights=None,
         beta = np.asarray(theta[qdiv:])
 
     # Option for the variations on the structural nested mean model
-    if model == 'linear':                                     # Linear structural nested mean model
-        snm = identity(np.dot(V, phi))                        # ... identity transform
+    if model.lower() == 'linear':                             # Linear structural nested mean model
         h_phi = y - identity(np.dot(V*A[:, None], phi))       # ... subtract and identity transformation
-        y_model_spec = 'linear'
-        y_transform = identity
-    # elif model == 'log':                                      # Log-linear structural nested mean model
-    #     snm = np.exp(np.dot(V, phi))                          # ... exponential transform
-    #     h_phi = y * np.exp(-1 * np.dot(V*A[:, None], phi))    # ... multiplication and exp transformation
-    #     y_model_spec = 'poisson'
-    #     y_transform = np.exp
-    # elif model == 'logit':                                  # Logistic structural nested mean model
-    #     # Note: logistic SNMM are possible, but these require specifying an outcome model.
-    #     #   ... To keep the structure of SNMM as-is, I do not provide that option.
-    #     snm = identity(np.dot(V, beta))[:, None]
-    #     h_phi = 10
-    #     y_model_spec = 'logistic'
+        y_model_spec = 'linear'                               # ... E[Y|L] specification to use
+        y_transform = identity                                # ... g() transformation to use
+    elif model.lower() == 'log':                              # Log-linear structural nested mean model
+        h_phi = y * np.exp(-1 * np.dot(V*A[:, None], phi))    # ... multiplication and exp transformation
+        y_model_spec = 'poisson'                              # ... E[Y|L] specification to use
+        y_transform = np.log                                  # ... g() transformation to use
     else:                                                     # Error checking
-        raise ValueError("model='" + str(model) + "' is not a supported option. "
-                         "Only the following options are supported: "
-                         "linear")
-    # Future consideration: add bias adjustment via b(A,W; \alpha) to h_psi from Vancak & Sjolander
+        raise ValueError("model='" + str(model) + "' is not a "
+                         "supported option. Only the following "
+                         "options are supported: linear")
 
     # Estimating the E[A | L] Model
     ee_log = ee_regression(theta=alpha,         # Propensity score parameters
@@ -965,6 +957,7 @@ def ee_gestimation_snmm(theta, y, A, W, V, X=None, model='linear', weights=None,
     a_resid = (A - pi)[:, None]                 # Calculating residuals for A
 
     # Estimating functions for the corresponding g-estimator of SNMM
+    snm = np.dot(V, phi)                                             # Predicted values from SNM
     if approach.lower() == "efficient":                              # Efficient g-estimator
         if X is not None:                                            # Specifying an outcome model
             X = np.asarray(X)                                        # ... convert X to NumPy array
@@ -972,19 +965,26 @@ def ee_gestimation_snmm(theta, y, A, W, V, X=None, model='linear', weights=None,
                                    X=X, y=h_phi[:, 0],               # ... for E[h(phi) | L]
                                    model=y_model_spec,               # ... transformation to consider
                                    weights=weights)                  # ... using provided weights
-            yhat = y_transform(np.dot(X, beta))                      # ... get predicted h(phi)
-            y_resid = (y - yhat[:, None])                            # ... compute the remaining residuals
+            yhat = np.dot(X, beta)                                   # ... get predicted h(phi)
+            m_resid = y_transform(y) - yhat[:, None]                 # ... get residual from the model
             eq_add = [ee_out, ]                                      # ... adding outcome model estimating functions
         else:                                                        # Otherwise
-            y_resid = (y - 0)                                        # ... set yhat as zero
-        ee_snm = weight * (a_resid * (y_resid - snm*a_resid) * V).T  # Estimating function
+            # TODO still want to check on this part...
+            m_resid = y_transform(y)                                 # ... model Y^0 residual directly
+        y0_resid = m_resid - snm*a_resid                             # Compute Y^0 residuals
     elif approach.lower() == "inefficient":                          # Inefficient g-estimator
-        # TODO throw error if not linear (or only if logistic?)!
-        ee_snm = weight * (a_resid * h_phi * V).T                    # Estimating function
+        y0_resid = h_phi                                             # ... Y^0 residual is just H(\psi)
+        # This error should not be reached. It is a placeholder for a potential future addition
+        if model.lower() == 'logistic':                              # Error if logistic is requested
+            raise ValueError("The g-estimation with approach='inefficient' "
+                             "does not support logistic structural mean models.")
     else:
         raise ValueError("approach='" + str(approach) + "' is not a supported option. "
                          "Only the following options are supported: "
                          "efficient, inefficient")
+
+    # Estimating function for the structural mean model
+    ee_snm = weight * (a_resid * y0_resid * V).T
 
     # Output (b+c)-by-n array
     return np.vstack([ee_snm,     # SNMM parameters
