@@ -279,6 +279,59 @@ def ee_glm(theta, X, y, distribution, link, hyperparameter=None, weights=None, o
         return ee_beta                                                                   # ... only beta EE
 
 
+def ee_mlogit(theta, X, y, weights=None, offset=None):
+    """Estimating equation for multinomial logistic regression. This estimating equation functionality supports
+    unranked categorical outcome data, unlike `ee_regression`` and ``ee_glm``. The general estimating equation is
+
+    .. math::
+
+        \sum_{i=1}^n \left\{ Y_i - g(X_i^T \theta) \right\} X_i = 0
+
+    Returns
+    -------
+
+    """
+    # Preparation of input shapes and object types
+    X, y, theta, offset = _prep_inputs_(X=X, y=y, theta=theta, penalty=None, offset=offset, reshape_y=False)
+    w = generate_weights(weights=weights, n_obs=X.shape[0])          # Compute the corresponding weight vector
+
+    # Setting up parameters for later use
+    n_y_vals = y.shape[1]                             # Number of categories in Y
+    n_x_vals = X.shape[1]                             # Number of columns / predictors in X
+    n_params = theta.shape[0]                         # Number of parameters provided
+    denom = 1                                         # Default value for denominator
+    exp_pred_y = []                                   # Storage for the expected values of Y
+    efuncs = []                                       # Storage for the stacked estimating functions
+    start_index = 0                                   # Starting index for looping over beta for all Y categories
+
+    # Checking that shapes agree to prevent user headaches
+    if (n_y_vals-1) * n_x_vals != theta.shape[0]:
+        raise ValueError("There is a mismatch in the number of provided parameters, " + str(n_params)
+                         + ", and the number of parameters for " + str(n_y_vals) + " columns of Y and "
+                         + "a design matrix with " + str(n_x_vals) + " columns. There should be "
+                         + str((n_y_vals-1) * n_x_vals) + " parameters.")
+
+    # Computing the overall denominator for the multinomial logistic model
+    for i in range(1, n_y_vals):                      # Looping over all columns of Y
+        end_index = start_index + n_x_vals            # ... get the current end_index
+        beta_i = theta[start_index: end_index]        # ... grab the corresponding beta's for Y column
+        pred_y = np.exp(np.dot(X, beta_i) + offset)   # ... generate predicted value of Y column
+        exp_pred_y.append(pred_y)                     # ... store the particular predicted values for Y
+        denom = denom + pred_y                        # ... update the denominator with summation
+        start_index = end_index                       # ... update start_index to current end_index
+
+    # Computing the stacked estimating equations for each column of Y
+    yhat_ref = y[:, 0][:, None] - 1/denom                                 # Compute the residual for the reference Y
+    for i in range(1, n_y_vals):                                 # Looping over all columns of Y
+        y_reshape = y[:, i][:, None]
+        yhat_i = yhat_ref + (y_reshape - exp_pred_y[i-1]/denom)    # ... get residuals for current Y versus reference Y
+        residual = w*(yhat_i*X).T                       # ... expanding residuals by design matrix
+        efuncs.append(residual)                                # ... store the current residuals
+
+    # Output b-by-n matrix
+    return np.vstack(efuncs)
+
+
 #################################################################
 # Robust Regression Estimating Equations
 
@@ -1260,7 +1313,7 @@ def ee_additive_regression(theta, X, y, specifications, model, weights=None, off
 #################################################################
 # Utility functions for regression equations
 
-def _prep_inputs_(X, y, theta, penalty=None, center=None, offset=None):
+def _prep_inputs_(X, y, theta, penalty=None, center=None, offset=None, reshape_y=True):
     """Internal use function to simplify variable transformations for regression. This function is used on the inputs
     to ensure they are the proper shapes
 
@@ -1274,13 +1327,19 @@ def _prep_inputs_(X, y, theta, penalty=None, center=None, offset=None):
         Input parameters
     penalty : ndarray, None, optional
         Input penalty term(s)
+    reshape_y : bool, optional
+        Whether to reshape the y array. All regression functions, besides multinomial logit, expect the reshaped
+        array. Therefore, default is True, with only ``ee_mlogit`` modifying this parameter.
 
     Returns
     -------
     transformed parameters
     """
     X = np.asarray(X)                       # Convert to NumPy array
-    y = np.asarray(y)[:, None]              # Convert to NumPy array and ensure correct shape for matrix algebra
+    if reshape_y:                           # Convert to NumPy array
+        y = np.asarray(y)[:, None]          # ... ensure correct shape for matrix algebra
+    else:                                   # ... otherwise
+        y = np.asarray(y)                   # ... keep original shape
     beta = np.asarray(theta)[:, None]       # Convert to NumPy array and ensure correct shape for matrix algebra
 
     # Logic to determine the offset variable if requested

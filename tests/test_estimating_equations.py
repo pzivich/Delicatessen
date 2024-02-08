@@ -12,8 +12,9 @@ from lifelines import ExponentialFitter, WeibullFitter, WeibullAFTFitter
 from delicatessen import MEstimator
 from delicatessen.estimating_equations import (ee_mean, ee_mean_variance, ee_mean_robust,
                                                # Regression models
-                                               ee_regression, ee_glm, ee_robust_regression, ee_ridge_regression,
-                                               ee_additive_regression, ee_elasticnet_regression,
+                                               ee_regression, ee_glm, ee_mlogit,
+                                               ee_robust_regression, ee_ridge_regression, ee_elasticnet_regression,
+                                               ee_additive_regression,
                                                # Survival models
                                                ee_exponential_model, ee_exponential_measure, ee_weibull_model,
                                                ee_weibull_measure, ee_aft_weibull, ee_aft_weibull_measure,
@@ -117,6 +118,28 @@ class TestEstimatingEquationsBase:
 
 
 class TestEstimatingEquationsRegression:
+
+    @pytest.fixture
+    def mlogit_data(self):
+        d = pd.DataFrame()
+        d['W0'] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1]
+        d['Y0'] = [1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0]
+        d['Y1'] = [0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1, 1, 0, 0]
+        d['Y2'] = [0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1]
+        d['offset'] = [.1, -.1, .2, -.2, -.2, .1, .1, .1, -.1, .1, .1, .1, .1, -.1]
+        d['C'] = 1
+        return d
+
+    @pytest.fixture
+    def mlogit_wdata(self):
+        d = pd.DataFrame()
+        d['W0'] = [0, 0, 0, 1, 1, 1]
+        d['Y0'] = [1, 0, 0, 1, 0, 0]
+        d['Y1'] = [0, 1, 0, 0, 1, 0]
+        d['Y2'] = [0, 0, 1, 0, 0, 1]
+        d['weight'] = [4, 2, 3, 1, 2, 2]
+        d['C'] = 1
+        return d
 
     def test_error_regression(self):
         """Test for error raised when incorrect regression name is provided
@@ -943,6 +966,118 @@ class TestEstimatingEquationsRegression:
         npt.assert_allclose(mestimator.theta,
                             np.asarray(lgt.params),
                             atol=1e-5)
+
+    def test_mlogit(self, mlogit_data):
+        # Setup data
+        y = np.asarray(mlogit_data[['Y0', 'Y1', 'Y2']])
+        X = np.asarray(mlogit_data[['C', 'W0']])
+
+        # M-estimator
+        def psi(theta):
+            return ee_mlogit(theta=theta, X=X, y=y)
+
+        estr = MEstimator(psi, init=[0., 0., 0., 0.])
+        estr.estimate(solver='lm')
+
+        # Statsmodels as the reference
+        model = sm.MNLogit(y, X)
+        fm = model.fit(cov_type="HC1")
+        ref_params = list(fm.params[:, 0]) + list(fm.params[:, 1])
+
+        # Checking mean estimate
+        npt.assert_allclose(estr.theta,
+                            ref_params,
+                            atol=1e-6)
+
+        # Checking variance estimates
+        npt.assert_allclose(estr.variance,
+                            np.asarray(fm.cov_params()),
+                            atol=1e-6)
+
+    def test_mlogit_weights(self, mlogit_data, mlogit_wdata):
+        # Setup data
+        y = np.asarray(mlogit_data[['Y0', 'Y1', 'Y2']])
+        X = np.asarray(mlogit_data[['C', 'W0']])
+
+        # M-estimator for reference
+        def psi(theta):
+            return ee_mlogit(theta=theta, X=X, y=y)
+
+        estr1 = MEstimator(psi, init=[0., 0., 0., 0.])
+        estr1.estimate(solver='lm')
+        ref_par = np.asarray(estr1.theta)
+
+        # Setup data
+        y = np.asarray(mlogit_wdata[['Y0', 'Y1', 'Y2']])
+        X = np.asarray(mlogit_wdata[['C', 'W0']])
+        w = np.asarray(mlogit_wdata['weight'])
+
+        # M-estimator for reference
+        def psi(theta):
+            return ee_mlogit(theta=theta, X=X, y=y, weights=w)
+
+        estr2 = MEstimator(psi, init=[0., 0., 0., 0.])
+        estr2.estimate(solver='lm')
+        wgt_par = np.asarray(estr2.theta)
+
+        # Checking mean estimate
+        npt.assert_allclose(wgt_par,
+                            ref_par,
+                            atol=1e-6)
+
+    def test_mlogit_offset(self, mlogit_data):
+        # Setup data
+        y = np.asarray(mlogit_data[['Y0', 'Y1', 'Y2']])
+        X = np.asarray(mlogit_data[['C', 'W0']])
+
+        # M-estimator
+        def psi(theta):
+            return ee_mlogit(theta=theta, X=X, y=y,
+                             offset=mlogit_data['offset'])
+
+        estr = MEstimator(psi, init=[0., 0., 0., 0.])
+        estr.estimate(solver='lm', tolerance=1e-12)
+
+        # SAS as the reference
+        # NOTE: I cannot find a variance reference. SAS doesn't offer it for proc logistic and genmod does not support
+        #       unranked multinomial logistic. R's mlogit doesn't allow the specification of the offset. So, I can only
+        #       compare coefficients here.
+        # SAS code used for the comparison:
+        # data dat;
+        #     input w y offset weight;
+        #     datalines;
+        # 0 1   0.1 1
+        # 0 1  -0.1 1
+        # 0 1   0.2 2
+        # 0 1  -0.2 1
+        # 0 2  -0.2 3
+        # 0 2   0.1 4
+        # 0 3   0.1 2
+        # 0 3   0.1 1
+        # 0 3  -0.1 1
+        # 1 1   0.1 1
+        # 1 2   0.1 1
+        # 1 2   0.1 1
+        # 1 3   0.1 1
+        # 1 3  -0.1 5
+        # ;
+        # run;
+        # proc logistic data = dat;
+        # 	class y (ref = "1") / param = ref;
+        # 	model y = w / link = glogit offset = offset gconv=1e-12;
+        # 	ods output ParameterEstimates=or;
+        # run;
+        # proc print data=or label;
+        #     format _numeric_ 12.10;
+        #     var _numeric_;
+        #     title "Odds Ratio Estimates";
+        # run;
+        ref_params = [-0.6920875177, 1.3271570373, -0.2866227784, 0.9216939568]
+
+        # Checking mean estimate
+        npt.assert_allclose(estr.theta,
+                            ref_params,
+                            atol=5e-5)
 
     def test_glm_normal_identity(self):
         d = pd.DataFrame()
