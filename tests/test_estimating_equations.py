@@ -1636,8 +1636,7 @@ class TestEstimatingEquationsRegression:
 
         def psi(theta):
             return ee_glm(theta, X=d[['I', 'X', 'Z']], y=d['Y'],
-                          distribution='inverse_normal', link='log',
-                          hyperparameter=1.5)
+                          distribution='inverse_normal', link='log')
 
         mestr = MEstimator(psi, init=[0., 0., 0.])
         mestr.estimate(solver='lm', maxiter=5000)
