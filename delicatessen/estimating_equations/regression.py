@@ -180,7 +180,7 @@ def ee_glm(theta, X, y, distribution, link, hyperparameter=None, weights=None, o
     y : ndarray, list, vector
         1-dimensional vector of n observed values.
     distribution : str
-        Distribution for the generalized linear model. Options are
+        Distribution for the generalized linear model. Options are:
         ``'normal'`` (alias: ``gaussian``),
         ``'binomial'`` (aliases: ``bernoulli``, ``bin``),
         ``'poisson'``,
@@ -189,7 +189,7 @@ def ee_glm(theta, X, y, distribution, link, hyperparameter=None, weights=None, o
         ``'negative_binomial'`` (alias: ``nb``),
         and ``'tweedie'``.
     link : str
-        Link function for the generalized linear model. Options are
+        Link function for the generalized linear model. Options are:
         ``identity``,
         ``log``,
         ``logistic`` (alias: ``logit``),
@@ -200,8 +200,8 @@ def ee_glm(theta, X, y, distribution, link, hyperparameter=None, weights=None, o
         ``inverse``,
         and ``square_root`` (alias: ``sqrt``).
     hyperparameter : None, int, float
-        Hyperparameter specification. Default is None. This option is only used by the tweedie and negative-binomial
-        distributions.
+        Hyperparameter specification. Default is None. This option is only used by the tweedie distribution. It is
+        ignored by all other distributions.
     weights : ndarray, list, vector, None, optional
         1-dimensional vector of n weights. Default is None, which assigns a weight of 1 to all observations.
     offset : ndarray, list, vector, None, optional
@@ -223,13 +223,95 @@ def ee_glm(theta, X, y, distribution, link, hyperparameter=None, weights=None, o
 
     >>> import numpy as np
     >>> import pandas as pd
-    >>> from scipy.stats import logistic
     >>> from delicatessen import MEstimator
     >>> from delicatessen.estimating_equations import ee_glm
 
     Some generic data to estimate the regression models
 
-    >>>
+    >>> d = pd.DataFrame()
+    >>> d['X'] = [1, -1, 0, 1, 2, 1, -2, -1, 0, 3, -3, 1, 1, -1, -1, -2, 2, 0, -1, 0]
+    >>> d['Z'] = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    >>> d['Y1'] = [1, 2, 4, 5, 2, 3, 1, 1, 3, 4, 2, 3, 7, 8, 2, 2, 1, 4, 2, 1]
+    >>> d['Y2'] = [1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 0, 0]
+    >>> d['C'] = 1
+    >>> X = d[['C', 'X', 'Z']]  # design matrix used hereafter
+
+    To start, we will demonstrate a GLM with a normal distribution and identity link. This GLM is equivalent to linear
+    regression. Defining psi, or the stacked estimating equations
+
+    >>> def psi(theta):
+    >>>     return ee_glm(theta, X=X, y=d['Y1'],
+    >>>                   distribution='normal', link='identity')
+
+    Calling the M-estimator (note that ``init`` requires 3 values, since ``X.shape[1]`` is 3).
+
+    >>> estr = MEstimator(stacked_equations=psi, init=[0., 0., 0.,])
+    >>> estr.estimate()
+
+    Inspecting the parameter estimates, variance, and confidence intervals
+
+    >>> estr.theta
+    >>> estr.variance
+    >>> estr.confidence_intervals()
+
+    Next, we will show a GLM with a binomial distribution and log link. This GLM can be used for binary data and
+    estimates log risk ratios. So, one may prefer this model for interpretability over logistic regression (GLM with
+    binomial distribution and logit link).
+
+    >>> def psi(theta):
+    >>>     return ee_glm(theta, X=X, y=d['Y2'],
+    >>>                   distribution='binomial', link='log')
+
+    Calling the M-estimator (note that ``init`` requires 3 values, since ``X.shape[1]`` is 3).
+
+    >>> estr = MEstimator(stacked_equations=psi, init=[-0.9, 0., 0.,])
+    >>> estr.estimate()
+
+    Notice that the root-finding solution may go off to weird places if bad starting values are given for the
+    log-binomial GLM. This is because the log-binomial GLM is not bounded. Providing starting values close to the truth
+    (or changing link functions) can help alleviate these issues. Other variations for binomial distribution link
+    functions that are bounded include: ``logit``, ``cauchy``, ``probit``, or ``loglog``.
+
+    The negative-binomial and gamma distributions for GLM have an additional parameter that is estimated. Therefore,
+    both of these distribution specifications require ``X.shape[1] + 1`` input starting values. Here, we illustrate
+    a gamma distribution and log link GLM
+
+    >>> def psi(theta):
+    >>>     return ee_glm(theta, X=X, y=d['Y1'],
+    >>>                   distribution='gamma', link='log')
+
+    Calling the M-estimator (note that ``init`` requires 4 values, since ``X.shape[1]`` is 3 and the gamma distribution
+    has an additional parameter).
+
+    >>> estr = MEstimator(stacked_equations=psi, init=[0., 0., 0., 0.])
+    >>> estr.estimate()
+
+    Note that ``delicatessen`` appropriately incorporates the estimation of the additional parameter for the
+    negative-binomial and gamma distributions. This is unlike some statistical software that estimates this parameter
+    but does *not* incorporate the uncertainty in estimation of that parameter. This may explain differences you
+    encounter across software (and the ``delicatessen`` implementation is preferred, as it is a more honest expression
+    of the uncertainty).
+
+    Finally, the tweedie distribution for GLM is a generalization of the Poisson and gamma distributions. Unlike the
+    negative-binomial and gamma distributions, there is a fixed (i.e., not estimated) hyperparameter bounded to be >0.
+    When the tweedie distribution hyperparameter is set to 1, it is equivalent to the Poisson distribution. When the
+    tweedie distribution hyperparameter is set to 2, it is equivalent to the gamma distribution. When the tweedie
+    distribution hyperparameter is set to 3, it is equivalent to the inverse-normal distribution. However, the tweedie
+    distribution hyperparameter can be specified for any values. Here, we illustrate the tweedie distribution that is
+    between a Poisson and gamma distribution.
+
+    >>> def psi(theta):
+    >>>     return ee_glm(theta, X=X, y=d['Y1'],
+    >>>                   distribution='tweedie', link='log',
+    >>>                   hyperparameter=1.5)
+
+    Calling the M-estimator (note that ``init`` requires 3 values, since ``X.shape[1]`` is 3).
+
+    >>> estr = MEstimator(stacked_equations=psi, init=[0., 0., 0.])
+    >>> estr.estimate()
+
+    Notice that the tweedie distribution does not estimate an additional parameter, unlike the gamma distribution GLM
+    described previously.
 
     References
     ----------
@@ -280,16 +362,101 @@ def ee_glm(theta, X, y, distribution, link, hyperparameter=None, weights=None, o
 
 
 def ee_mlogit(theta, X, y, weights=None, offset=None):
-    """Estimating equation for multinomial logistic regression. This estimating equation functionality supports
-    unranked categorical outcome data, unlike `ee_regression`` and ``ee_glm``. The general estimating equation is
+    r"""Estimating equation for multinomial logistic regression. This estimating equation functionality supports
+    unranked categorical outcome data, unlike `ee_regression`` and ``ee_glm``. Unlike the other regression estimating
+    equations, ``ee_mlogit`` expects a matrix of indicators for each possible value of ``y``. The first column of
+    this matrix is used as the referent category. In other words, the outcome variable is a matrix of dummy variables
+    that includes the reference. The estimating equation for column :math:`r` of the indicator variable :math:`Y_{r}`
+    of a :math:`Y` with :math:`k` unique categories is
 
     .. math::
 
-        \sum_{i=1}^n \left\{ Y_i - g(X_i^T \theta) \right\} X_i = 0
+        \sum_{i=1}^n \left\{ Y_{r,i} - \frac{\exp(X_i^T \theta_r)}{1 + \sum_{j=2}^{k} \exp(X_i^T \theta_j)}  \right\}
+        X_i = 0
+
+    where :math:`\theta_r` are the coefficients correspond to the log odds ratio comparing :math:`Y_r` to all other
+    categories of :math:`Y`. Here, :math:`\theta` is a 1-by-(b :math`\times` (k-1)) array, where b is the distinct
+    covariates included as part of X. So, the stack of estimating equations consists of :math:`(k-1)` estimating
+    equations of the dimension :math:`X_i`. For example, if X is a 3-by-n matrix and :math:`Y` has three unique
+    categories, then :math:`\theta` will be a 1-by-6 array.
+
+    Note
+    ----
+    All provided estimating equations are meant to be wrapped inside a user-specified function. Throughout, these
+    user-defined functions are defined as ``psi``.
+
+    Parameters
+    ----------
+    theta : ndarray, list, vector
+        Theta in this case consists of b :math:`\times` (k-1) values. Therefore, initial values should consist of the
+        same number as the number of columns present in the design matrix for each category of the outcome matrix
+        besides the reference.
+    X : ndarray, list, vector
+        2-dimensional design matrix of n observed covariates for b variables.
+    y : ndarray, list, vector
+        2-dimensional indicator matrix of n observed outcomes.
+    weights : ndarray, list, vector, None, optional
+        1-dimensional vector of n weights. Default is None, which assigns a weight of 1 to all observations.
+    offset : ndarray, list, vector, None, optional
+        A 1-dimensional offset to be included in the model. Default is None, which applies no offset term.
 
     Returns
     -------
+    array :
+        Returns a (b*(k-1))-by-n NumPy array evaluated for the input ``theta``
 
+    Examples
+    --------
+    Construction of a estimating equation(s) with ``ee_regression`` should be done similar to the following
+
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> from delicatessen import MEstimator
+    >>> from delicatessen.estimating_equations import ee_mlogit
+
+    Some generic data to estimate a multinomial logistic regression model
+
+    >>> d = pd.DataFrame()
+    >>> d['W'] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1]
+    >>> d['Y'] = [1, 1, 1, 1, 2, 2, 3, 3, 3, 1, 2, 2, 3, 3]
+    >>> d['C'] = 1
+
+    First, notice that ``Y`` needs to be pre-processed for use with ``ee_mlogit``. To prepare the data, we need to
+    convert ``d['Y']`` into a matrix of indicator variables. We can do this manually by
+
+    >>> d['Y1'] = np.where(d['Y'] == 1, 1, 0)
+    >>> d['Y2'] = np.where(d['Y'] == 2, 1, 0)
+    >>> d['Y3'] = np.where(d['Y'] == 3, 1, 0)
+
+    This can also be accomplished with ``pd.get_dummies(d['Y'], drop_first=False)``.
+
+    For the reference category, we want to have ``Y=1`` as the reference. Therefore, ``Y1`` will be the first column in
+    ``y``. The pair of matrices are
+
+    >>> y = d[['Y1', 'Y2', 'Y3']]
+    >>> X = d[['C', 'W']]
+
+    Defining psi, or the stacked estimating equations
+
+    >>> def psi(theta):
+    >>>     return ee_mlogit(theta, X=X, y=y)
+
+    Calling the M-estimator (note that ``init`` requires 4 values, since ``X.shape[1]`` is 2 and ``y.shape[1]`` is 3).
+
+    >>> estr = MEstimator(stacked_equations=psi, init=[0., 0., 0., 0.])
+    >>> estr.estimate()
+
+    Inspecting the parameter estimates, variance, and confidence intervals
+
+    >>> estr.theta
+    >>> estr.variance
+    >>> estr.confidence_intervals()
+
+    Here, the first two values of ``theta`` correspond to ``Y2`` and the last two values of ``theta`` correspond to
+    ``Y3``.
+
+    A weighted multinomial logistic regression can be implemented by specifying the ``weights`` argument. An offset can
+    be added by specifying the ``offset`` argument.
     """
     # Preparation of input shapes and object types
     X, y, theta, offset = _prep_inputs_(X=X, y=y, theta=theta, penalty=None, offset=offset, reshape_y=False)
@@ -321,12 +488,12 @@ def ee_mlogit(theta, X, y, weights=None, offset=None):
         start_index = end_index                       # ... update start_index to current end_index
 
     # Computing the stacked estimating equations for each column of Y
-    yhat_ref = y[:, 0][:, None] - 1/denom                                 # Compute the residual for the reference Y
-    for i in range(1, n_y_vals):                                 # Looping over all columns of Y
-        y_reshape = y[:, i][:, None]
+    yhat_ref = y[:, 0][:, None] - 1/denom                          # Compute the residual for the reference Y
+    for i in range(1, n_y_vals):                                   # Looping over all columns of Y
+        y_reshape = y[:, i][:, None]                               # ... extract and reshape current Y indicator
         yhat_i = yhat_ref + (y_reshape - exp_pred_y[i-1]/denom)    # ... get residuals for current Y versus reference Y
-        residual = w*(yhat_i*X).T                       # ... expanding residuals by design matrix
-        efuncs.append(residual)                                # ... store the current residuals
+        residual = w*(yhat_i*X).T                                  # ... expanding residuals by design matrix
+        efuncs.append(residual)                                    # ... store the current residuals
 
     # Output b-by-n matrix
     return np.vstack(efuncs)
