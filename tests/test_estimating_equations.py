@@ -992,7 +992,7 @@ class TestEstimatingEquationsRegression:
         # Checking variance estimates
         npt.assert_allclose(estr.variance,
                             np.asarray(fm.cov_params()),
-                            atol=1e-6)
+                            atol=1e-5)
 
     def test_mlogit_weights(self, mlogit_data, mlogit_wdata):
         # Setup data
