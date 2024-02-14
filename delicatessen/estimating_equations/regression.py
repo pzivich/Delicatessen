@@ -457,6 +457,10 @@ def ee_mlogit(theta, X, y, weights=None, offset=None):
 
     A weighted multinomial logistic regression can be implemented by specifying the ``weights`` argument. An offset can
     be added by specifying the ``offset`` argument.
+
+    References
+    ----------
+    Kwak C & Clayton-Matthews A. (2002). Multinomial logistic regression. *Nursing Research*, 51(6), 404-410.
     """
     # Preparation of input shapes and object types
     X, y, theta, offset = _prep_inputs_(X=X, y=y, theta=theta, penalty=None, offset=offset, reshape_y=False)
