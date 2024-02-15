@@ -16,9 +16,6 @@ from delicatessen.estimating_equations import (ee_regression, ee_glm, ee_mlogit,
 from delicatessen.utilities import additive_design_matrix
 
 
-np.random.seed(236461)
-
-
 @pytest.fixture
 def data_c():
     d = pd.DataFrame()
