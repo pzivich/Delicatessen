@@ -298,33 +298,62 @@ class TestFunctions:
         npt.assert_allclose(returned[:, 2], np.log(expected[:, 2]), atol=1e-6)
         npt.assert_allclose(returned[:, 3], np.log(expected[:, 3]), atol=1e-6)
 
-    def test_spline1(self):
+    def test_spline_unnormed(self):
         vars = [1, 5, 10, 15, 20]
 
         # Spline setup 1
         expected = np.array([[0.0, 0.0, 0.0, 0.0, 4.0], ]).T
-        returned = spline(variable=vars, knots=[16, ], power=1, restricted=False)
+        returned = spline(variable=vars, knots=[16, ], power=1, restricted=False, normalized=False)
         npt.assert_allclose(returned, expected)
 
         # Spline setup 2
         expected = np.array([[0.0, 0.0, 0.0, 0.0, 16.0], ]).T
-        returned = spline(variable=vars, knots=[16, ], power=2, restricted=False)
+        returned = spline(variable=vars, knots=[16, ], power=2, restricted=False, normalized=False)
         npt.assert_allclose(returned, expected)
 
         # Spline setup 3
         expected = np.array([[0.0, 0.0, 0.0, 5.0**1.5, 10.0**1.5],
                              [0.0, 0.0, 0.0, 0.0, 4.0**1.5]]).T
-        returned = spline(variable=vars, knots=[10, 16], power=1.5, restricted=False)
+        returned = spline(variable=vars, knots=[10, 16], power=1.5, restricted=False, normalized=False)
         npt.assert_allclose(returned, expected)
 
         # Spline setup 4
         expected = np.array([[0.0, 0.0, 0.0, 5.0, 6.0], ]).T
-        returned = spline(variable=vars, knots=[10, 16], power=1, restricted=True)
+        returned = spline(variable=vars, knots=[10, 16], power=1, restricted=True, normalized=False)
         npt.assert_allclose(returned, expected)
 
         # Spline setup 5
         expected = np.array([[0.0, 0.0, 5.0**2, 10.0**2, 15.0**2 - 4.0**2], ]).T
-        returned = spline(variable=vars, knots=[5, 16], power=2, restricted=True)
+        returned = spline(variable=vars, knots=[5, 16], power=2, restricted=True, normalized=False)
+        npt.assert_allclose(returned, expected)
+
+    def test_spline_normed(self):
+        vars = [1, 5, 10, 15, 20]
+
+        # Spline setup 1
+        expected = np.array([[0.0, 0.0, 0.0, 0.0, 4.0], ]).T / 16
+        returned = spline(variable=vars, knots=[16, ], power=1, restricted=False, normalized=True)
+        npt.assert_allclose(returned, expected)
+
+        # Spline setup 2
+        expected = np.array([[0.0, 0.0, 0.0, 0.0, 16.0], ]).T / 16**2
+        returned = spline(variable=vars, knots=[16, ], power=2, restricted=False, normalized=True)
+        npt.assert_allclose(returned, expected)
+
+        # Spline setup 3
+        expected = np.array([[0.0, 0.0, 0.0, 5.0**1.5, 10.0**1.5],
+                             [0.0, 0.0, 0.0, 0.0, 4.0**1.5]]).T / (16 - 10)**1.5
+        returned = spline(variable=vars, knots=[10, 16], power=1.5, restricted=False, normalized=True)
+        npt.assert_allclose(returned, expected)
+
+        # Spline setup 4
+        expected = np.array([[0.0, 0.0, 0.0, 5.0, 6.0], ]).T / (16 - 10)
+        returned = spline(variable=vars, knots=[10, 16], power=1, restricted=True, normalized=True)
+        npt.assert_allclose(returned, expected)
+
+        # Spline setup 5
+        expected = np.array([[0.0, 0.0, 5.0**2, 10.0**2, 15.0**2 - 4.0**2], ]).T / (16 - 5)**2
+        returned = spline(variable=vars, knots=[5, 16], power=2, restricted=True, normalized=True)
         npt.assert_allclose(returned, expected)
 
     def test_adm_error_noknots(self, design_matrix):
@@ -387,7 +416,7 @@ class TestFunctions:
 
     def test_adm_v1(self, design_matrix):
         specs = [None,
-                 {"knots": [16, ], "power": 1, "natural": False},
+                 {"knots": [16, ], "power": 1, "natural": False, "normalized": False},
                  None]
         expected = np.array([[1, 1, 1, 1, 1],
                              [1, 5, 10, 15, 20],
@@ -400,8 +429,8 @@ class TestFunctions:
 
     def test_adm_v2(self, design_matrix):
         specs = [None,
-                 {"knots": [16, ], "power": 1, "natural": False},
-                 {"knots": [2, 4], "power": 2, "natural": True}]
+                 {"knots": [16, ], "power": 1, "natural": False, "normalized": False},
+                 {"knots": [2, 4], "power": 2, "natural": True, "normalized": False}]
         expected = np.array([[1, 1, 1, 1, 1],
                              [1, 5, 10, 15, 20],
                              [0, 0, 0, 0, 4],
@@ -415,8 +444,8 @@ class TestFunctions:
     def test_adm_v3(self, design_matrix):
         # Testing non-ascending order correction for knots
         specs = [None,
-                 {"knots": [16, ], "power": 1, "natural": False},
-                 {"knots": [4, 2], "power": 2, "natural": True}]
+                 {"knots": [16, ], "power": 1, "natural": False, "normalized": False},
+                 {"knots": [4, 2], "power": 2, "natural": True, "normalized": False}]
         expected = np.array([[1, 1, 1, 1, 1],
                              [1, 5, 10, 15, 20],
                              [0, 0, 0, 0, 4],
@@ -430,14 +459,30 @@ class TestFunctions:
     def test_adm_v4(self, design_matrix):
         # Testing number of generated rows
         specs = [None,
-                 {"knots": [16, ], "power": 2, "natural": False},
-                 {"knots": [2, 4], "power": 1, "natural": False}]
+                 {"knots": [16, ], "power": 2, "natural": False, "normalized": False},
+                 {"knots": [2, 4], "power": 1, "natural": False, "normalized": False}]
         expected = np.array([[1, 1, 1, 1, 1],
                              [1, 5, 10, 15, 20],
                              [0, 0, 0, 0, 4**2],
                              [1, 2, 3, 4, 5],
                              [0, 0, 1, 2, 3],
                              [0, 0, 0, 0, 1]]).T
+        returned = additive_design_matrix(X=design_matrix,
+                                          specifications=specs,
+                                          return_penalty=False)
+        npt.assert_allclose(returned, expected)
+
+    def test_adm_v5(self, design_matrix):
+        # Testing number of generated rows
+        specs = [None,
+                 {"knots": [16, ], "power": 2, "natural": False, "normalized": True},
+                 {"knots": [2, 4], "power": 1, "natural": False, "normalized": True}]
+        expected = np.array([[1, 1, 1, 1, 1],
+                             [1, 5, 10, 15, 20],
+                             [0, 0, 0/16**2, 0, 4**2/16**2],
+                             [1, 2, 3, 4, 5],
+                             [0, 0, 1/(4-2), 2/(4-2), 3/(4-2)],
+                             [0, 0, 0, 0, 1/(4-2)]]).T
         returned = additive_design_matrix(X=design_matrix,
                                           specifications=specs,
                                           return_penalty=False)
