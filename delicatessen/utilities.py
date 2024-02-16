@@ -5,55 +5,6 @@ from scipy.stats import norm
 from delicatessen.derivative import PrimalTangentPairs as PTPair
 
 
-def polygamma(n, x):
-    """Polygamma functions. This is a wrapper function of ``scipy.special.polygamma`` meant to enable automatic
-    differentation with ``delicatessen``. When the input is a ``PrimalTangentPairs`` object, then an internal function
-    that implements the polygamma function is called. Otherwise, ``scipy.special.polygamma`` is called for the input
-    object.
-
-    Parameters
-    ----------
-    n : int
-        Order of the derivative of the digamma function
-    x : int, float, ndarray
-        Real valued input
-
-    Returns
-    -------
-    Return type depends on the input type (``PrimalTangentPairs`` will return ``PrimalTangentPairs``, otherwise will
-    return ``ndarray``).
-    """
-    if isinstance(x, np.ndarray):
-        storage = []
-        for xi in x:
-            pgnxi = polygamma(n=n, x=xi)
-            storage.append(pgnxi)
-        return np.array(storage)
-    elif isinstance(x, PTPair):
-        return x.polygamma(n=n)
-    else:
-        return sp.special.polygamma(n=n, x=x)
-
-
-def digamma(z):
-    """Digamma function. This is a wrapper function of ``scipy.special.digamma`` meant to enable automatic
-    differentation with ``delicatessen``. When the input is a ``PrimalTangentPairs`` object, then an internal function
-    that implements the digamma function is called. Otherwise, ``scipy.special.digamma`` is called for the input
-    object.
-
-    Parameters
-    ----------
-    x : int, float, ndarray
-        Real valued input
-
-    Returns
-    -------
-    Return type depends on the input type (``PrimalTangentPairs`` will return ``PrimalTangentPairs``, otherwise will
-    return ``ndarray``).
-    """
-    return polygamma(n=0, x=z)
-
-
 def logit(prob):
     """Logistic transformation of probabilities. Returns log-odds
 
@@ -102,6 +53,55 @@ def identity(value):
     value
     """
     return value
+
+
+def polygamma(n, x):
+    """Polygamma functions. This is a wrapper function of ``scipy.special.polygamma`` meant to enable automatic
+    differentation with ``delicatessen``. When the input is a ``PrimalTangentPairs`` object, then an internal function
+    that implements the polygamma function is called. Otherwise, ``scipy.special.polygamma`` is called for the input
+    object.
+
+    Parameters
+    ----------
+    n : int
+        Order of the derivative of the digamma function
+    x : int, float, ndarray
+        Real valued input
+
+    Returns
+    -------
+    Return type depends on the input type (``PrimalTangentPairs`` will return ``PrimalTangentPairs``, otherwise will
+    return ``ndarray``).
+    """
+    if isinstance(x, np.ndarray):
+        storage = []
+        for xi in x:
+            pgnxi = polygamma(n=n, x=xi)
+            storage.append(pgnxi)
+        return np.array(storage)
+    elif isinstance(x, PTPair):
+        return x.polygamma(n=n)
+    else:
+        return sp.special.polygamma(n=n, x=x)
+
+
+def digamma(z):
+    """Digamma function. This is a wrapper function of ``scipy.special.digamma`` meant to enable automatic
+    differentation with ``delicatessen``. When the input is a ``PrimalTangentPairs`` object, then an internal function
+    that implements the digamma function is called. Otherwise, ``scipy.special.digamma`` is called for the input
+    object.
+
+    Parameters
+    ----------
+    x : int, float, ndarray
+        Real valued input
+
+    Returns
+    -------
+    Return type depends on the input type (``PrimalTangentPairs`` will return ``PrimalTangentPairs``, otherwise will
+    return ``ndarray``).
+    """
+    return polygamma(n=0, x=z)
 
 
 def standard_normal_cdf(x):

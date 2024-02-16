@@ -18,6 +18,11 @@ Data transformations
   robust_loss_functions
   spline
   regression_predictions
+  polygamma
+  digamma
+  standard_normal_cdf
+  standard_normal_pdf
+
 
 Design matrices
 ---------------------
@@ -26,6 +31,7 @@ Design matrices
   :toctree: generated/
 
   additive_design_matrix
+
 
 Differentiation
 ---------------------
