@@ -4,7 +4,6 @@
 
 import warnings
 import numpy as np
-from scipy.stats import norm, cauchy
 
 from delicatessen.utilities import (logit, inverse_logit, identity,
                                     robust_loss_functions,
@@ -1595,11 +1594,13 @@ def _inverse_link_(betax, link):
     elif link == 'probit':
         # py = norm.cdf(betax)                  # Inverse link
         # dpy = norm.pdf(betax)                 # Derivative of inverse link
+        # Distributions compatible with autodiff
         py = standard_normal_cdf(x=betax)       # Inverse link
         dpy = standard_normal_pdf(x=betax)      # Derivative of inverse link
     elif link in ['cauchit', 'cauchy']:
         # py = cauchy.cdf(betax)                # Inverse link
         # dpy = cauchy.pdf(betax)               # Derivative of inverse link
+        # Distributions by-hand for autodiff
         py = (1/np.pi)*np.arctan(betax) + 0.5   # Inverse link
         dpy = 1 / (np.pi*(1 + betax**2))        # Derivative of inverse link (by-hand)
     elif link in ['square_root', 'sqrt']:
