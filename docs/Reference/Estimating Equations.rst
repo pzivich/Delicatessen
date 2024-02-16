@@ -28,6 +28,7 @@ Regression
   :toctree: generated/
 
   ee_regression
+  ee_mlogit
   ee_glm
   ee_robust_regression
   ee_ridge_regression
@@ -35,6 +36,17 @@ Regression
   ee_elasticnet_regression
   ee_bridge_regression
   ee_additive_regression
+
+
+Measurement
+-------------------
+
+.. currentmodule:: delicatessen.estimating_equations.measurement
+
+.. autosummary::
+  :toctree: generated/
+
+  ee_rogan_gladen
 
 
 Survival

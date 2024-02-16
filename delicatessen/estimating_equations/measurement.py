@@ -10,7 +10,7 @@ from delicatessen.estimating_equations.processing import generate_weights
 
 
 def ee_rogan_gladen(theta, y, y_star, r, weights=None):
-    """Estimating equation for the Rogan-Gladen correction for mismeasured *binary* outcomes. This estimator uses
+    r"""Estimating equation for the Rogan-Gladen correction for mismeasured *binary* outcomes. This estimator uses
     external data to estimate the sensitivity and specificity, and then uses those external estimates to correct the
     estimated proportion. The general form of the estimating equations are
 
@@ -33,8 +33,8 @@ def ee_rogan_gladen(theta, y, y_star, r, weights=None):
 
     Note
     ----
-    The Rogan-Gladen estimator is only well-defined when :math:`\alpha + \beta > 1`, or the addition of sensitivity
-    and specificity is greater than one.
+    The Rogan-Gladen estimator may provide corrected proportions outside of :math:`[0,1]` when
+    :math:`\alpha + \beta \le 1`, or the addition of sensitivity and specificity is less than or equal to one.
 
     Parameters
     ----------

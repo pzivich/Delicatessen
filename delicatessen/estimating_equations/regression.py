@@ -363,10 +363,16 @@ def ee_glm(theta, X, y, distribution, link, hyperparameter=None, weights=None, o
 
 def ee_mlogit(theta, X, y, weights=None, offset=None):
     r"""Estimating equation for multinomial logistic regression. This estimating equation functionality supports
-    unranked categorical outcome data, unlike `ee_regression`` and ``ee_glm``. Unlike the other regression estimating
-    equations, ``ee_mlogit`` expects a matrix of indicators for each possible value of ``y``. The first column of
-    this matrix is used as the referent category. In other words, the outcome variable is a matrix of dummy variables
-    that includes the reference. The estimating equation for column :math:`r` of the indicator variable :math:`Y_{r}`
+    unranked categorical outcome data, unlike ``ee_regression`` and ``ee_glm``.
+
+    Note
+    ----
+    Unlike the other regression estimating equations, ``ee_mlogit`` expects a matrix of indicators for each possible
+    value of ``y``, with the first column being used as the referent category. In other words, the outcome variable is
+    a matrix of dummy variables that includes the reference.
+
+
+    The estimating equation for column :math:`r` of the indicator variable :math:`Y_{r}`
     of a :math:`Y` with :math:`k` unique categories is
 
     .. math::
