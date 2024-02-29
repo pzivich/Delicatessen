@@ -936,12 +936,12 @@ def ee_lasso_regression(theta, X, y, model, penalty, epsilon=3.e-3, weights=None
         raise ValueError("epsilon must be greater than zero for the approximate LASSO")
 
     # Calling internal bridge penalized regression for implementation
-    ee_bridge_regression(theta=theta,
-                         X=X, y=y,
-                         model=model,
-                         weights=weights,
-                         penalty=penalty, gamma=1+epsilon, center=center,
-                         offset=offset)
+    return ee_bridge_regression(theta=theta,
+                                X=X, y=y,
+                                model=model,
+                                weights=weights,
+                                penalty=penalty, gamma=1+epsilon, center=center,
+                                offset=offset)
 
 
 def ee_elasticnet_regression(theta, X, y, model, penalty, ratio, epsilon=3.e-3, weights=None, center=0., offset=None):
