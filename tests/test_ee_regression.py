@@ -11,7 +11,8 @@ import statsmodels.formula.api as smf
 
 from delicatessen import MEstimator
 from delicatessen.estimating_equations import (ee_regression, ee_glm, ee_mlogit,
-                                               ee_robust_regression, ee_ridge_regression, ee_elasticnet_regression,
+                                               ee_robust_regression, ee_ridge_regression,
+                                               ee_lasso_regression, ee_elasticnet_regression,
                                                ee_additive_regression)
 from delicatessen.utilities import additive_design_matrix
 
@@ -763,6 +764,18 @@ class TestEstimatingEquationsRegressionPenalty:
         npt.assert_allclose(estr.theta,
                             np.asarray(ridge.params),
                             atol=1e-6)
+
+    def test_lasso_ols(self, data_c):
+        """Tests linear regression with the built-in estimating equation.
+        """
+        d = data_c
+
+        def psi_builtin_regression(theta):
+            return ee_lasso_regression(theta, X=d[['I', 'X', 'Z']], y=d['Y'],
+                                       model='linear', penalty=1.)
+
+        estr = MEstimator(psi_builtin_regression, init=[0., 0., 0.])
+        estr.estimate()
 
     def test_ridge_logistic(self, data_b):
         d = data_b
