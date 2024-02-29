@@ -798,8 +798,8 @@ def ee_lasso_regression(theta, X, y, model, penalty, epsilon=3.e-3, weights=None
 
     Note
     ----
-    As the derivative of the estimating equation for LASSO is not defined, the bread (and sandwich) cannot be used to
-    estimate the variance in all settings.
+    As the derivative of the estimating equation for LASSO is not defined at :math:`\theta=0`, the bread (and sandwich)
+    cannot be used to estimate the variance in all settings.
 
 
     The estimating equation for the approximate LASSO linear regression is
@@ -951,8 +951,8 @@ def ee_elasticnet_regression(theta, X, y, model, penalty, ratio, epsilon=3.e-3, 
 
     Note
     ----
-    As the derivative of the estimating equation for Elastic-Net is not defined, the bread (and sandwich) cannot be
-    used to estimate the variance in all settings.
+    As the derivative of the estimating equation for LASSO is not defined at :math:`\theta=0`, the bread (and sandwich)
+    cannot be used to estimate the variance in all settings.
 
 
     The estimating equation for Elastic-Net linear regression with the approximate L1 penalty is
