@@ -9,9 +9,10 @@ user-built estimating equations.
 .. toctree::
   :maxdepth: 2
 
-  Boos-Stefanski-Ch7
+  Ross-IJE-2024
   LifeScienceExamples
   Cole-AJE-2023
+  Boos-Stefanski-Ch7
   Hernan-Robins-2023
   Morris-Trials-2022
   Generalized-Additive-Model
