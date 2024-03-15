@@ -55,7 +55,7 @@ def ee_rogan_gladen(theta, y, y_star, r, weights=None):
     Returns
     -------
     array :
-        Returns a (2+2b)-by-n NumPy array evaluated for the input ``theta``
+        Returns a 4-by-n NumPy array evaluated for the input ``theta``
 
     Examples
     --------
