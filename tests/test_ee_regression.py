@@ -1028,7 +1028,7 @@ class TestEstimatingEquationsGLM:
         mestr = MEstimator(psi, init=[2., 0., 0.])
         mestr.estimate(solver='lm', maxiter=5000)
 
-        fam = sm.families.Gaussian(sm.families.links.log())
+        fam = sm.families.Gaussian(sm.families.links.Log())
         glm = sm.GLM(d['Y'], d[['I', 'X', 'Z']], family=fam).fit(cov_type="HC1")
 
         # Checking mean estimate
@@ -1074,7 +1074,7 @@ class TestEstimatingEquationsGLM:
         mestr = MEstimator(psi, init=[0., 0., 0.])
         mestr.estimate(solver='lm', maxiter=5000)
 
-        fam = sm.families.Poisson(sm.families.links.log())
+        fam = sm.families.Poisson(sm.families.links.Log())
         glm = sm.GLM(d['Y'], d[['I', 'X', 'Z']], family=fam).fit(cov_type="HC1")
 
         # Checking mean estimate
@@ -1097,7 +1097,7 @@ class TestEstimatingEquationsGLM:
         mestr = MEstimator(psi, init=[2., 0., 0.])
         mestr.estimate(solver='lm', maxiter=5000)
 
-        fam = sm.families.Poisson(sm.families.links.sqrt())
+        fam = sm.families.Poisson(sm.families.links.Sqrt())
         glm = sm.GLM(d['Y'], d[['I', 'X', 'Z']], family=fam).fit(cov_type="HC1")
 
         # Checking mean estimate
@@ -1120,7 +1120,7 @@ class TestEstimatingEquationsGLM:
         mestr = MEstimator(psi, init=[0., 0., 0.])
         mestr.estimate(solver='lm', maxiter=5000)
 
-        fam = sm.families.Binomial(sm.families.links.logit())
+        fam = sm.families.Binomial(sm.families.links.Logit())
         glm = sm.GLM(d['Y'], d[['I', 'X', 'Z']], family=fam).fit(cov_type="HC1")
 
         # Checking mean estimate
@@ -1143,7 +1143,7 @@ class TestEstimatingEquationsGLM:
         mestr = MEstimator(psi, init=[-.9, 0., 0.])
         mestr.estimate(solver='lm', maxiter=5000)
 
-        fam = sm.families.Binomial(sm.families.links.log())
+        fam = sm.families.Binomial(sm.families.links.Log())
         glm = sm.GLM(d['Y'], d[['I', 'X', 'Z']], family=fam).fit(cov_type="HC1", tol=1e-12)
 
         # Checking mean estimate
@@ -1189,7 +1189,7 @@ class TestEstimatingEquationsGLM:
         mestr = MEstimator(psi, init=[0., 0., 0.])
         mestr.estimate(solver='lm', maxiter=5000)
 
-        fam = sm.families.Binomial(sm.families.links.probit())
+        fam = sm.families.Binomial(sm.families.links.Probit())
         glm = sm.GLM(d['Y'], d[['I', 'X', 'Z']], family=fam).fit(cov_type="HC1", tol=1e-12)
 
         # Checking mean estimate
@@ -1212,7 +1212,7 @@ class TestEstimatingEquationsGLM:
         mestr = MEstimator(psi, init=[0., 0., 0.])
         mestr.estimate(solver='lm', maxiter=5000)
 
-        fam = sm.families.Binomial(sm.families.links.cauchy())
+        fam = sm.families.Binomial(sm.families.links.Cauchy())
         glm = sm.GLM(d['Y'], d[['I', 'X', 'Z']], family=fam).fit(cov_type="HC1", tol=1e-12)
 
         # Checking mean estimate
@@ -1258,7 +1258,7 @@ class TestEstimatingEquationsGLM:
         mestr = MEstimator(psi, init=[0., 0., 0.])
         mestr.estimate(solver='lm', maxiter=5000)
 
-        fam = sm.families.Binomial(sm.families.links.loglog())
+        fam = sm.families.Binomial(sm.families.links.LogLog())
         glm = sm.GLM(d['Y'], d[['I', 'X', 'Z']], family=fam).fit(cov_type="HC1", tol=1e-12)
 
         # Checking mean estimate
@@ -1282,7 +1282,7 @@ class TestEstimatingEquationsGLM:
         mestr = MEstimator(psi, init=[0., 0., 0.])
         mestr.estimate(solver='lm', maxiter=5000)
 
-        fam = sm.families.Binomial(sm.families.links.logit())
+        fam = sm.families.Binomial(sm.families.links.Logit())
         glm = sm.GLM(d['Y'], d[['I', 'X', 'Z']], offset=d['F'], family=fam).fit(cov_type="HC1", tol=1e-12)
 
         # Checking mean estimate
@@ -1478,7 +1478,7 @@ class TestEstimatingEquationsGLM:
         mestr = MEstimator(psi, init=[0., 0., 0.])
         mestr.estimate(solver='lm', maxiter=5000)
 
-        fam = sm.families.InverseGaussian(sm.families.links.log())
+        fam = sm.families.InverseGaussian(sm.families.links.Log())
         glm = sm.GLM(d['Y'], d[['I', 'X', 'Z']], family=fam).fit(cov_type="HC1")
 
         # Checking mean estimate
@@ -1502,7 +1502,7 @@ class TestEstimatingEquationsGLM:
         mestr = MEstimator(psi, init=[2., 0., 0.])
         mestr.estimate(solver='lm', maxiter=5000)
 
-        fam = sm.families.Tweedie(sm.families.links.log(), var_power=1.5)
+        fam = sm.families.Tweedie(sm.families.links.Log(), var_power=1.5)
         glm = sm.GLM(d['Y'], d[['I', 'X', 'Z']], family=fam).fit(cov_type="HC1")
 
         # Checking mean estimate
@@ -1538,7 +1538,7 @@ class TestEstimatingEquationsGLM:
         mestr = MEstimator(psi, init=[2., 0., 0.])
         mestr.estimate(solver='lm', maxiter=5000)
 
-        fam = sm.families.Tweedie(sm.families.links.log(), var_power=0.5)
+        fam = sm.families.Tweedie(sm.families.links.Log(), var_power=0.5)
         glm = sm.GLM(d['Y'], d[['I', 'X', 'Z']], family=fam).fit(cov_type="HC1")
 
         # Checking mean estimate
@@ -1562,7 +1562,7 @@ class TestEstimatingEquationsGLM:
         mestr = MEstimator(psi, init=[2., 0., 0.])
         mestr.estimate(solver='lm', maxiter=5000)
 
-        fam = sm.families.Tweedie(sm.families.links.log(), var_power=1.5)
+        fam = sm.families.Tweedie(sm.families.links.Log(), var_power=1.5)
         glm = sm.GLM(d['Y'], d[['I', 'X', 'Z']], family=fam).fit(cov_type="HC1")
 
         # Checking mean estimate
