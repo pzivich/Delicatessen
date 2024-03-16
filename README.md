@@ -17,16 +17,16 @@ of M-estimation.
 
 ## M-Estimation and Estimating Equations
 
-Here, we provide a brief overview of M-estimation theory. For a detailed introduction to M-estimation, see Chapter 7 of
-Boos & Stefanski (2013). M-estimation is a generalization of likelihood-based methods. *M-estimators* are solutions to
-estimating equations. To apply the M-estimator, we solve the estimating equations using observed data. This is similar
-to other approaches, but the key advantage of M-Estimators is estimation of the variance via the sandwich variance.
+Here, we provide a brief overview of M-estimation theory. For more detailed introductions to M-estimation, see Ross
+et al. (2024) or Chapter 7 of Boos & Stefanski (2013). M-estimation is a generalization of likelihood-based methods.
+*M-estimators* are solutions to estimating equations. To apply the M-estimator, we solve the estimating equations using
+observed data. This is similar to other approaches, but the key advantage of M-Estimators is estimation of the variance
+via the sandwich variance.
 
 While M-Estimation is a powerful tool, the derivatives and matrix algebra can quickly become unwieldy. This is where 
-`delicatessen` comes in. `delicatessen` takes an array of estimating functions and data, and solves for the parameter
-estimates, computes the derivatives, and performs the matrix algebra calculations. Therefore, M-estimators can be more
-easily adopted without having to perform by-hand calculations. In other words, we can let the computer do the math for
-us.
+`delicatessen` comes in. `delicatessen` takes estimating functions and data, and solves for the parameter estimates,
+computes the derivatives, and performs the matrix algebra calculations. Therefore, M-estimators can be more easily
+adopted without having to perform by-hand calculations. In other words, we can let the computer do the math for us.
 
 To further ease use, `delicatessen` also comes with a variety of built-in estimating equations. See
 the [delicatessen website](https://deli.readthedocs.io/en/latest/) for details on the available estimating equations,
@@ -77,31 +77,15 @@ print(estr.variance)  # Variance estimate
 ```
 
 For further details on using `delicatessen`, see the full documentation and worked examples available
-at [delicatessen website](https://deli.readthedocs.io/en/latest/) or in the examples folder of the GitHub page.
-
-
-## Applications
-
-The following papers demonstrate practical applications of `delicatessen` and M-estimation in epidemiology:
-
-- Zivich PN, Ross RK, Shook-Sa BE, Cole SR, & Edwards JK. (2023). Empirical sandwich variance estimator for iterated
-conditional expectation g-computation. *arXiv:2306.10976*
-[CODE](https://github.com/pzivich/publications-code/tree/master/M-estimator_ICE)
-- Shook-Sa BE, Zivich PN, Rosin SP, Edwards JK, Adimora AA, Hudgens MG, & Cole SR. (2023). Fusing Trial Data for
-Treatment Comparisons: Single versus Multi-Span Bridging. *arXiv:2305.00845*
-[CODE](https://github.com/bonnieshook/BridgedTreatmentComparisons)
-- Zivich PN, Cole SR, Edwards JK, Mulholland GE, Shook-Sa BE, & Tchetgen Tchetgen EJ. (2023). Introducing Proximal
-Causal Inference for Epidemiologists. *American Journal of Epidemiology*
-[CODE](https://github.com/pzivich/publications-code/tree/master/ProximalCI)
-- Cole SR, Zivich PN, Edwards JK, Shook-Sa BE, & Hudgens MG. (2023). Sensitivity Analyses for Means or Proportions with
-Missing Outcome Data. *Epidemiology*
-[CODE](https://github.com/pzivich/publications-code/tree/master/RobinsSensitivityAnalysis)
-
+at [delicatessen website](https://deli.readthedocs.io/en/latest/).
 
 ## References
 
 Boos DD, & Stefanski LA. (2013). M-estimation (estimating equations). In Essential Statistical Inference
 (pp. 297-337). Springer, New York, NY.
+
+Ross RK, Zivich PN, Stringer JS, & Cole SR. (2024). M-estimation for common epidemiological measures: introduction and
+applied examples. *International Journal of Epidemiology*, 53(2).
 
 Stefanski LA, & Boos DD. (2002). The calculus of M-estimation. *The American Statistician*, 56(1), 29-38.
 
