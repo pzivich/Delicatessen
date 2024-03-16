@@ -782,14 +782,14 @@ def ee_gestimation_snmm(theta, y, A, W, V, X=None, model='linear', weights=None)
 
     .. math::
 
-        E[Y^a - Y^{a=0} | A=a, V] = \beta_1 a + \beta_2 a V
+        E[Y^a - Y^{0} | A=a, V] = \beta_1 a + \beta_2 a V
 
     This model corresponds to the average causal effect among those with :math:`A=a` within strata of :math:`V`. The
     log-linear SMM is defined as
 
     .. math::
 
-        \frac{E[Y^a | A=a, V]}{E[Y^{a=0} | A=a, V]} = \exp(\beta_1 a + \beta_2 a V)
+        \frac{E[Y^a | A=a, V]}{E[Y^{0} | A=a, V]} = \exp(\beta_1 a + \beta_2 a V)
 
     This model corresponds to the causal mean ratio among those with :math:`A=a` within strata of :math:`V`. Note that
     the log-linear SMM is only defined when :math:`Y > 0`. The parameters of either SMM can be identified under the
@@ -800,7 +800,7 @@ def ee_gestimation_snmm(theta, y, A, W, V, X=None, model='linear', weights=None)
 
     .. math::
 
-        \sum_{i=1}^n \left\{ H(\beta) \times (A - E(A | W)) \right\}  \times \mathbb{V}_i = 0
+        \sum_{i=1}^n \left\{ H(\beta) \times (A - E[A | W]) \right\}  \times \mathbb{V}_i = 0
 
     where :math:`H(\beta) = Y - \beta A \mathbb{V}` for a linear SMM and
     :math:`H(\beta) = Y \times \exp(-A \beta \mathbb{V})` for a log-linear SMM, where :math:`\mathbb{V}` is a design
@@ -817,7 +817,7 @@ def ee_gestimation_snmm(theta, y, A, W, V, X=None, model='linear', weights=None)
     vector are the SMM parameters. The *second* set are the parameters corresponding to the :math:`E[A|W]` model.
 
     The second implementation for g-estimation is the 'efficient' g-estimator. For the efficient g-estimator we replace
-    :math:`H(\beta)` with :math:`H(\beta) - E[H(\beta) | W]` in the prior estimating equation. Here, we also need to
+    :math:`H(\beta)` with :math:`\{H(\beta) - E[H(\beta) | W]\}` in the prior estimating equation. Here, we also need to
     specify a model for :math:`E[H(\beta) | W]`. Therefore, an additional estimating equation for
     :math:`E[H(\beta) | W]` is stacked with the others. Therefore, there are b+c+d parameters for the efficient
     g-estimator, where d is the number of parameters in the model for :math:`E[H(\beta) | W]`.
@@ -879,7 +879,7 @@ def ee_gestimation_snmm(theta, y, A, W, V, X=None, model='linear', weights=None)
 
     .. math::
 
-        E[Y^a - Y^{a=0} | A=a, V] = \beta_1 a + \beta_2 a V
+        E[Y^a - Y^{0} | A=a, V] = \beta_1 a + \beta_2 a V
 
     >>> def psi(theta):
     >>>     return ee_gestimation_snmm(theta,
