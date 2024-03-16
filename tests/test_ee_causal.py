@@ -437,12 +437,13 @@ class TestEstimatingEquationsCausal:
 
     def test_gestimaton_linear(self, data_causal_c):
         d = data_causal_c
+        d['VW'] = d['V']*d['W']
 
         # M-estimator
         def psi(theta):
             return ee_gestimation_snmm(theta=theta, y=d['Y'], A=d['A'],
                                        W=d[['I', 'V', 'W']], V=d[['I', 'V']],
-                                       model='linear', approach='inefficient')
+                                       model='linear')
 
         mestr = MEstimator(psi, init=[0., ] * 5)
         mestr.estimate(solver='lm')
@@ -493,7 +494,7 @@ class TestEstimatingEquationsCausal:
             # Estimating equations for PS
             ee_snm = ee_gestimation_snmm(theta=alpha, y=y, A=a,
                                          W=W, V=snm,
-                                         model='linear', approach='inefficient', weights=ipmw)
+                                         model='linear', weights=ipmw)
             # Setting rows with missing Y's as zero (no contribution)
             ee_snm = np.nan_to_num(ee_snm, copy=False, nan=0.)
             return np.vstack([ee_snm, ee_ms])
@@ -525,6 +526,83 @@ class TestEstimatingEquationsCausal:
         # Checking variance
         npt.assert_allclose(mestr.variance[:2, :2],
                             snm_var,
+                            atol=1e-4)
+
+    def test_gestimation_linear_efficient(self, data_causal_c):
+        d = data_causal_c
+
+        # M-estimator
+        def psi(theta):
+            return ee_gestimation_snmm(theta=theta, y=d['Y'], A=d['A'],
+                                       W=d[['I', 'V', 'W']], V=d[['I', 'W']],
+                                       X=d[['I', 'V', 'W']], model='linear')
+
+        mestr = MEstimator(psi, init=[0., ] * 8)
+        mestr.estimate(solver='lm')
+
+        # Comparing nuisance models
+        npt.assert_allclose(mestr.theta[2:5], [2.06553139, -0.65396442, -0.80506948],
+                            atol=1e-7)
+        npt.assert_allclose(mestr.theta[5:], [0.37758292, -0.03818214, 1.28057925],
+                            atol=1e-7)
+
+        smm_params = [2.70724664, -1.17655853]
+        smm_var = [[1.10055729, -0.63263541],
+                   [-0.63263541, 0.41548127]]
+
+        # Checking SNM parameters
+        npt.assert_allclose(mestr.theta[:2], smm_params,
+                            atol=1e-7)
+
+        # Checking variance
+        npt.assert_allclose(mestr.variance[:2, :2], smm_var,
+                            atol=1e-4)
+
+    def test_gestimation_poisson(self, data_causal_c):
+        d = data_causal_c
+        ps_nuisance = [2.06553139, -0.65396442, -0.80506948]
+
+        # Inefficient g-estimator
+        def psi(theta):
+            return ee_gestimation_snmm(theta=theta, y=d['Y'], A=d['A'],
+                                       W=d[['I', 'V', 'W']], V=d[['I', 'W']],
+                                       model='poisson')
+
+        mestr = MEstimator(psi, init=[0., ] * 5)
+        mestr.estimate(solver='lm')
+
+        # Comparing nuisance models
+        npt.assert_allclose(mestr.theta[2:], ps_nuisance, atol=1e-7)
+
+        # Comparing SMM parameters
+        smm_params = [0.72207801, -0.28975432]
+        smm_var = [[0.15162332, -0.06732043],
+                   [-0.06732043,  0.03567282]]
+        npt.assert_allclose(mestr.theta[:2], smm_params,
+                            atol=1e-7)
+        npt.assert_allclose(mestr.variance[:2, :2], smm_var,
+                            atol=1e-4)
+
+        # Efficient g-estimator
+        def psi(theta):
+            return ee_gestimation_snmm(theta=theta, y=d['Y'], A=d['A'],
+                                       W=d[['I', 'V', 'W']], V=d[['I', 'W']],
+                                       X=d[['I', 'V', 'W']], model='poisson')
+
+        mestr = MEstimator(psi, init=[0., ] * 8)
+        mestr.estimate(solver='lm')
+
+        # Comparing nuisance models
+        npt.assert_allclose(mestr.theta[2:5], ps_nuisance, atol=1e-7)
+        npt.assert_allclose(mestr.theta[5:], [1.60740877e-01, -1.80166331e-03, 4.31572318e-01], atol=1e-7)
+
+        # Comparing SMM parameters
+        smm_params = [1.04245099, -0.441452325]
+        smm_var = [[0.10928566, -0.06168025],
+                   [-0.06168025, 0.04047553]]
+        npt.assert_allclose(mestr.theta[:2], smm_params,
+                            atol=1e-7)
+        npt.assert_allclose(mestr.variance[:2, :2], smm_var,
                             atol=1e-4)
 
     def test_robins_sensitivity_mean(self):

@@ -774,75 +774,83 @@ def ee_aipw(theta, y, A, W, X, X1, X0, truncate=None, force_continuous=False):
                       m_model))          # theta[c] is for the outcome model coefficients
 
 
-def ee_gestimation_snmm(theta, y, A, W, V, X=None, model='linear', weights=None, approach='efficient'):
-    r"""Estimating equations for g-estimation of structural nested mean models. The parameter(s) of interest are the
-    parameter(s) of the corresponding structural nested mean model (SNMM). Rather than estimating the causal effect of
-    treating everyone versus treating no one, g-estimation of SNMM estimates the causal effect within strata of a set
-    of covariates, :math:`V`. Options for the SNMM include the linear SNMM and the log-linear SNMM. The linear SNMM is
-    defined as
+def ee_gestimation_snmm(theta, y, A, W, V, X=None, model='linear', weights=None):
+    r"""Estimating equations for g-estimation of structural mean models (SMMs). The parameter(s) of interest are the
+    parameter(s) of the corresponding SMM. Rather than estimating the average causal effect, g-estimation of SMM
+    estimates the average causal effect in the acted on within strata of a set of covariates, :math:`V`. Options for
+    SMM include the linear SMM and the log-linear SMM. The linear SMM is defined as
 
     .. math::
 
         E[Y^a - Y^{a=0} | A=a, V] = \beta_1 a + \beta_2 a V
 
-    This model corresponds to the average treatment effect among the treated or causal risk difference within strata
-    of :math:`V`. The log-linear structural nested mean model is defined as
+    This model corresponds to the average causal effect among those with :math:`A=a` within strata of :math:`V`. The
+    log-linear SMM is defined as
 
     .. math::
 
         \frac{E[Y^a | A=a, V]}{E[Y^{a=0} | A=a, V]} = \exp(\beta_1 a + \beta_2 a V)
 
-    This model corresponds to the average treatment mean ratio in the treated within strata of :math:`V`. Note that the
-    log-linear SNMM is only defined when :math:`Y > 0`.
+    This model corresponds to the causal mean ratio among those with :math:`A=a` within strata of :math:`V`. Note that
+    the log-linear SMM is only defined when :math:`Y > 0`. The parameters of either SMM can be identified under the
+    assumptions of  causal consistency, and exchangeability with positivity.
 
-    Under the assumption of causal consistency, conditional exchangeability and positivity, we can solve for
-    :math:`\beta` using the following estimating equation
+    Two different estimating equations are available for g-estimation. The first set is referred to at the 'inefficient'
+    g-estimator. For the inefficient g-estimator we solve for :math:`\beta` in the following estimating equation
 
     .. math::
 
-        \sum_{i=1}^n \left\{ H(\beta) \times (A - \Pr(A | W)) \right\}  \times \mathbb{V}_i = 0
+        \sum_{i=1}^n \left\{ H(\beta) \times (A - E(A | W)) \right\}  \times \mathbb{V}_i = 0
 
-    where :math:`H(\beta) = Y - \beta A \mathbb{V}`, and :math:`\mathbb{V}` is a design matrix for the SNMM (note: this
-    design matrix should be for the case of :math:`a=1`). Note that :math:`V \subseteq W`. This estimating equation
-    requires :math:`E(A | W)`, which must be estimated. This is done via the following estimating equation for binary
-    actions
+    where :math:`H(\beta) = Y - \beta A \mathbb{V}` for a linear SMM and
+    :math:`H(\beta) = Y \times \exp(-A \beta \mathbb{V})` for a log-linear SMM, where :math:`\mathbb{V}` is a design
+    matrix. Note that :math:`V \subseteq W`, where :math:`W` is the set of confounding variables. This estimating
+    equation requires :math:`E[A|W]`, which must be estimated. This is done via the following estimating equation for
+    binary actions
 
     .. math::
 
         \sum_{i=1}^n \left\{ A_i - \text{expit}(W_i^T \alpha) \right\} W_i = 0
 
     These estimating equations are stacked together. Therefore, the length of the parameter vector is b+c, where b is
-    the number of columns in :math:`\mathbb{V}`, and c is the number of columns in ``W``. The *first* b values in theta
-    vector are the SNMM parameters. The *second* set are the parameters corresponding to the :math:`E(A | W)` model.
+    the number of columns in ``V``, and c is the number of columns in ``W``. The *first* b values in theta
+    vector are the SMM parameters. The *second* set are the parameters corresponding to the :math:`E[A|W]` model.
+
+    The second implementation for g-estimation is the 'efficient' g-estimator. For the efficient g-estimator we replace
+    :math:`H(\beta)` with :math:`H(\beta) - E[H(\beta) | W]` in the prior estimating equation. Here, we also need to
+    specify a model for :math:`E[H(\beta) | W]`. Therefore, an additional estimating equation for
+    :math:`E[H(\beta) | W]` is stacked with the others. Therefore, there are b+c+d parameters for the efficient
+    g-estimator, where d is the number of parameters in the model for :math:`E[H(\beta) | W]`.
 
     Parameters
     ----------
     theta : ndarray, list, vector
         Theta consists of 1+b values if ``X0`` is ``None``, and 3+b values if ``X0`` is not ``None``.
     y : ndarray, list, vector
-        1-dimensional vector of n observed values.
+        1-dimensional vector of n observed values of the outcome.
     A : ndarray, list, vector
-        1-dimensional vector of n observed values. The A values should all be 0 or 1.
+        1-dimensional vector of n observed values of the action. The A values should all be 0 or 1.
     W : ndarray, list, vector
-        2-dimensional vector of n observed values for b variables to model the expected value of ``A``.
+        2-dimensional vector of n observed values for b columns of a design matrix to model the expected value of ``A``.
     V : ndarray, list, vector
-        2-dimensional vector of n observed values for b variables for the structural nested mean model specification.
-    X : ndarray, list, vector
-        2-dimensional vector of n observed values for b variables to model the outcome ``y``. This argument is only
-        used by the efficient g-estimator.
+        2-dimensional vector of n observed values for b columns of a design matrix for the structural mean model. Note
+        that the design matrix here is expected to not include the observed values of ``A``
+    X : ndarray, list, vector, None, optional
+        Default of this argument is ``None``, which implements the estimating equation for the inefficient g-estimator.
+        To use the efficient g-estimator, a 2-dimensional vector of n observed values for b columns of a design matrix
+        for the :math:`E[H(\beta) | W]` model should be provided here.
     model : str, optional
-        Type of structural nested mean model to fit. Options are currently only ``linear``, with a default
-        of ``linear``.
+        Type of structural mean model to fit. Options are currently: ``linear``, ``poisson``. Default is ``linear``.
+        The Poisson model specification can be used for positive continuous data, or with binary data in order to
+        estimate causal risk ratios.
     weights : ndarray, list, vector, None, optional
         1-dimensional vector of n weights. Default is None, which assigns a weight of 1 to all observations. This
         argument is intended to support the use of sampling or missingness weights.
-    approach : str, optional
-        Type of g-estimator to use. Default is ``efficient`` which uses the efficient g-estimator. [...].
 
     Returns
     -------
     array :
-        Returns a (b+c)-by-n NumPy array evaluated for the input ``theta``
+        Returns a (b+c)-by-n (inefficient) or (b+c+d)-by-n (efficient) NumPy array evaluated for the input ``theta``
 
     Examples
     --------
@@ -858,29 +866,29 @@ def ee_gestimation_snmm(theta, y, A, W, V, X=None, model='linear', weights=None,
 
     >>> n = 200
     >>> d = pd.DataFrame()
-    >>> d['X'] = np.random.normal(size=n)
-    >>> d['W'] = np.random.binomial(1, p=0.5, size=n)
-    >>> d['A'] = np.random.binomial(1, p=logistic.cdf(0.25 + 0.5*d['W'] + d['X']), size=n)
-    >>> d['Ya0'] = np.random.binomial(1, p=logistic.cdf(0.75 - 0.5 * d['W'] + d['X']), size=n)
-    >>> d['Ya1'] = np.random.binomial(1, p=logistic.cdf(0.75 - 0.2 * d['W'] + d['X'] - 0.1 * 1), size=n)
+    >>> d['W'] = np.random.normal(size=n)
+    >>> d['V'] = np.random.binomial(1, p=0.5, size=n)
+    >>> d['A'] = np.random.binomial(1, p=logistic.cdf(0.25 + 0.5*d['V'] + d['W']), size=n)
+    >>> d['Ya0'] = 12.75 - 3.5*d['V'] + d['W'] + np.random.normal(size=n)
+    >>> d['Ya1'] = 10.75 - 0.8*d['V'] + d['W'] + np.random.normal(size=n)
     >>> d['Y'] = (1-d['A'])*d['Ya0'] + d['A']*d['Ya1']
     >>> d['C'] = 1
 
     Defining psi, or the stacked estimating equations. Note that ``A`` is the action of interest and ``Y`` is the
-    outcome of interest. Here, we are interested in estimating the following SNMM
+    outcome of interest. Here, we are interested in estimating the following linear SMM
 
     .. math::
 
-        E[Y^a - Y^{a=0} | A=a, W] = \beta_1 a + \beta_2 a W
+        E[Y^a - Y^{a=0} | A=a, V] = \beta_1 a + \beta_2 a V
 
     >>> def psi(theta):
     >>>     return ee_gestimation_snmm(theta,
     >>>                                y=d['Y'], A=d['A'],
-    >>>                                W=d[['C', 'W', 'X']],
-    >>>                                V=d[['C', 'W']])
+    >>>                                W=d[['C', 'V', 'W']],
+    >>>                                V=d[['C', 'V']])
 
-    Calling the M-estimator. AIPW has 2 coefficients in the SNMM, and 3 coefficients in the propensity score model. So,
-    the total number of initial values should be 2+3=5.
+    Calling the M-estimator.  Since there are 2 coefficients in the SMM and 3 coefficients in the :math:`E[A|W]` model,
+    the total number of initial values should be 2+3=5:
 
     >>> estr = MEstimator(psi,
     >>>                   init=[0., ]*5)
@@ -894,11 +902,26 @@ def ee_gestimation_snmm(theta, y, A, W, V, X=None, model='linear', weights=None,
 
     More specifically, the corresponding parameters are
 
-    >>> estr.theta[0]     # beta_1 of SNMM
-    >>> estr.theta[1]     # beta_2 of SNMM
+    >>> estr.theta[0]     # beta_1 of SMM
+    >>> estr.theta[1]     # beta_2 of SMM
     >>> estr.theta[2:]    # propensity score regression coefficients
 
-    The causal risk ratio in this example can be estimated by specifying ``model='log'``.
+    The efficient g-estimator can be implemented by providing a design matrix to the argument ``X``
+
+    >>> def psi(theta):
+    >>>     return ee_gestimation_snmm(theta,
+    >>>                                y=d['Y'], A=d['A'],
+    >>>                                W=d[['C', 'V', 'W']],
+    >>>                                V=d[['C', 'V']],
+    >>>                                X=d[['C', 'V', 'W']])
+
+    Here, there are 2+3+3=8 parameters to estimate
+
+    >>> estr = MEstimator(psi,
+    >>>                   init=[0., ]*8)
+    >>> estr.estimate(solver='lm')
+
+    A log-linear SMM for this example can be estimated by specifying ``model='poisson'``.
 
     References
     ----------
@@ -920,76 +943,67 @@ def ee_gestimation_snmm(theta, y, A, W, V, X=None, model='linear', weights=None,
     A = np.asarray(A)                           # Convert to NumPy array
     W = np.asarray(W)                           # Convert to NumPy array
     V = np.asarray(V)                           # Convert to NumPy array
-    pdiv = V.shape[1]                           # Extracting number of SNM parameters
-    qdiv = W.shape[1] + pdiv                    # Extracting number of E[A|L] parameters
-    if weights is None:                         # Processing weights argument
+    eq_add = []                                 # Storage for outcome model, default is empty (none)
+    pdiv = V.shape[1]                           # Extracting number of SMM parameters
+    qdiv = W.shape[1] + pdiv                    # Extracting number of E[A|W] parameters
+
+    # Processing weights argument
+    if weights is None:
         weight = 1
     else:
         weight = np.asarray(weights)
-    eq_add = []                                 # Storage for outcome model, default is empty (none)
 
     # Extracting theta value for ease
-    phi = np.asarray(theta[0: pdiv])[:, None]   # theta parameters for the SNM
-    alpha = np.asarray(theta[pdiv:qdiv])        # theta parameters for the E[A|L] model
-    if X is not None:                           # theta parameters for the E[Y|L] model
-        beta = np.asarray(theta[qdiv:])
+    phi = np.asarray(theta[0: pdiv])[:, None]   # theta parameters for the SMM
+    alpha = np.asarray(theta[pdiv:qdiv])        # theta parameters for the E[A|W] model
+    if X is not None:                           # If given an input X
+        beta = np.asarray(theta[qdiv:])         # ... theta parameters for the E[Y|W] model
 
-    # Option for the variations on the structural nested mean model
-    if model.lower() == 'linear':                             # Linear structural nested mean model
-        h_phi = y - identity(np.dot(V*A[:, None], phi))       # ... subtract and identity transformation
-        y_model_spec = 'linear'                               # ... E[Y|L] specification to use
-        y_transform = identity                                # ... g() transformation to use
-    elif model.lower() == 'log':                              # Log-linear structural nested mean model
+    # # Option for the variations on the structural mean model
+    if model.lower() == 'linear':                             # Linear structural mean model
+        h_phi = y - np.dot(V*A[:, None], phi)                 # ... simply subtract
+        y_transform = identity                                # ... transformation for E[h(phi) | X]
+    elif model.lower() == 'poisson':                          # Log-linear structural mean model
         h_phi = y * np.exp(-1 * np.dot(V*A[:, None], phi))    # ... multiplication and exp transformation
-        y_model_spec = 'poisson'                              # ... E[Y|L] specification to use
-        y_transform = np.log                                  # ... g() transformation to use
+        y_transform = np.exp                                  # ... transformation for E[h(phi) | X]
+    # Add tanh(.) as a function for the risk difference?
     else:                                                     # Error checking
         raise ValueError("model='" + str(model) + "' is not a "
                          "supported option. Only the following "
-                         "options are supported: linear")
+                         "options are supported: linear, poisson")
 
     # Estimating the E[A | L] Model
-    ee_log = ee_regression(theta=alpha,         # Propensity score parameters
-                           X=W, y=A,            # ... treatment and covariate design matrix
-                           model='logistic',    # ... logistic model
-                           weights=weights)     # ... with provided weights
-    pi = inverse_logit(np.dot(W, alpha))        # Converting log-odds to probability
-    a_resid = (A - pi)[:, None]                 # Calculating residuals for A
+    ee_log = ee_regression(theta=alpha,                              # Propensity score parameters
+                           X=W, y=A,                                 # ... treatment and covariate design matrix
+                           model='logistic',                         # ... logistic model
+                           weights=weights)                          # ... with provided weights
+    pi = inverse_logit(np.dot(W, alpha))                             # Converting log-odds to probability
+    a_resid = (A - pi)[:, None]                                      # Calculating residuals for A
 
-    # Estimating functions for the corresponding g-estimator of SNMM
-    snm = np.dot(V, phi)                                             # Predicted values from SNM
-    if approach.lower() == "efficient":                              # Efficient g-estimator
-        if X is not None:                                            # Specifying an outcome model
-            X = np.asarray(X)                                        # ... convert X to NumPy array
-            ee_out = ee_regression(theta=beta,                       # ... outcome model with beta
-                                   X=X, y=h_phi[:, 0],               # ... for E[h(phi) | L]
-                                   model=y_model_spec,               # ... transformation to consider
-                                   weights=weights)                  # ... using provided weights
-            yhat = np.dot(X, beta)                                   # ... get predicted h(phi)
-            m_resid = y_transform(y) - yhat[:, None]                 # ... get residual from the model
-            eq_add = [ee_out, ]                                      # ... adding outcome model estimating functions
-        else:                                                        # Otherwise
-            # TODO still want to check on this part...
-            m_resid = y_transform(y)                                 # ... model Y^0 residual directly
-        y0_resid = m_resid - snm*a_resid                             # Compute Y^0 residuals
-    elif approach.lower() == "inefficient":                          # Inefficient g-estimator
-        y0_resid = h_phi                                             # ... Y^0 residual is just H(\psi)
-        # This error should not be reached. It is a placeholder for a potential future addition
-        if model.lower() == 'logistic':                              # Error if logistic is requested
-            raise ValueError("The g-estimation with approach='inefficient' "
+    # Estimating functions for the corresponding g-estimator of SMM
+    if X is not None:                                            # Specifying an outcome model for efficient
+        X = np.asarray(X)                                        # ... convert X to NumPy array
+        ee_out = ee_regression(theta=beta,                       # ... outcome model with beta
+                               X=X, y=h_phi[:, 0],               # ... for E[h(phi)|W]
+                               model=model,                      # ... transformation to consider
+                               weights=weights)                  # ... using provided weights
+        yhat = y_transform(np.dot(X, beta)[:, None])             # ... get predicted h(phi)
+        eq_add = [ee_out, ]                                      # ... adding outcome model estimating functions
+    else:                                                        # Otherwise uses inefficient g-estimator
+        yhat = 0                                                 # ... residual set manually to zero
+        # This error should not be reached at this time. It is a placeholder for a potential future addition
+        if model.lower() == 'logistic':                          # Error if logistic is requested
+            raise ValueError("The g-estimator with X=None "
                              "does not support logistic structural mean models.")
-    else:
-        raise ValueError("approach='" + str(approach) + "' is not a supported option. "
-                         "Only the following options are supported: "
-                         "efficient, inefficient")
 
     # Estimating function for the structural mean model
-    ee_snm = weight * (a_resid * y0_resid * V).T
+    y0_resid = h_phi - yhat
+    ee_smm = weight * (a_resid * y0_resid * V).T
 
     # Output (b+c)-by-n array
-    return np.vstack([ee_snm,     # SNMM parameters
-                      ee_log]     # E[A|L] parameters
-                     + eq_add)    # E[Y|L] parameters (if available for specification)
+    stacked_ee = [ee_smm,            # SMM parameters
+                  ee_log] + eq_add   # Nuisance model parameters
+    return np.vstack(stacked_ee)
 
 
 def ee_mean_sensitivity_analysis(theta, y, delta, X, q_eval, H_function):
