@@ -774,6 +774,9 @@ def ee_aipw(theta, y, A, W, X, X1, X0, truncate=None, force_continuous=False):
                       m_model))          # theta[c] is for the outcome model coefficients
 
 
+#################################################################
+# Causal Inference (SMM) Estimating Equations
+
 def ee_gestimation_snmm(theta, y, A, W, V, X=None, model='linear', weights=None):
     r"""Estimating equations for g-estimation of structural mean models (SMMs). The parameter(s) of interest are the
     parameter(s) of the corresponding SMM. Rather than estimating the average causal effect, g-estimation of SMM
@@ -1005,6 +1008,9 @@ def ee_gestimation_snmm(theta, y, A, W, V, X=None, model='linear', weights=None)
                   ee_log] + eq_add   # Nuisance model parameters
     return np.vstack(stacked_ee)
 
+
+#################################################################
+# Causal Inference (Sensitivity Analysis) Estimating Equations
 
 def ee_mean_sensitivity_analysis(theta, y, delta, X, q_eval, H_function):
     r"""Estimating equation for weighted sensitivity analysis estimator of the mean. This estimator can handle cases of
