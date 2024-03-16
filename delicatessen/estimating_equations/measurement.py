@@ -39,7 +39,7 @@ def ee_rogan_gladen(theta, y, y_star, r, weights=None):
     Parameters
     ----------
     theta : ndarray, list, vector
-        Theta consists of 2+2b values. If ``X=None`` then 4 values should be provided.
+        Theta consists of 4 values.
     y : ndarray, list, vector
         1-dimensional vector of n observed values. These are the gold-standard :math:`Y` measurements in the external
         sample. All values should be either 0 or 1, and be non-missing among those with :math:`R=0`.
