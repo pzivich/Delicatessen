@@ -157,7 +157,7 @@ class TestMEstimation:
 
         # Ensuring variance is None but point estimates still exist
         assert mestr.theta is not None
-        assert mestr.variance is None
+        assert np.isnan(mestr.variance)
 
     def test_mean_variance_1eq(self):
         """Tests the mean / variance with a single estimating equation.
