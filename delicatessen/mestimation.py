@@ -1,12 +1,8 @@
-import warnings
-
 import numpy as np
 from scipy.optimize import newton, root
-from scipy.misc import derivative
-from scipy.optimize import approx_fprime
 from scipy.stats import norm
 
-from delicatessen.derivative import auto_differentiation
+from delicatessen.sandwich import compute_bread, compute_meat, build_sandwich
 
 
 class MEstimator:
@@ -292,32 +288,25 @@ class MEstimator:
             for s, n in zip(self._subset_, slv_theta):   # ... then look over the subset and input theta
                 self.theta[s] = n                        # ... and update the subset to the output/solved theta
 
-        # STEP 2: calculating Variance
+        # STEP 2: calculating the sandwich variance
+        # After solving for the parameters, we now can compute the empirical sandwich variance estimator. This is
+        #   done by compute the bread and meat matrices and then combining them. This is now done by a separate
+        #   functionality within `sandwich.py`.
         # STEP 2.1: baking the Bread
-        self.bread = self._bread_matrix_(theta=self.theta,                           # Provide theta-hat
-                                         method=deriv_method,                        # Method to use
-                                         dx=dx) / self.n_obs                         # Derivative approximation value
+        self.bread = compute_bread(stacked_equations=self.stacked_equations,
+                                   theta=self.theta,
+                                   deriv_method=deriv_method,
+                                   dx=dx) / self.n_obs
 
         # STEP 2.2: slicing the meat
-        evald_theta = np.asarray(self.stacked_equations(theta=self.theta))           # Evaluating EE at theta-hat
-        self.meat = np.dot(evald_theta, evald_theta.T) / self.n_obs                  # Meat is dot product of arrays
+        self.meat = compute_meat(stacked_equations=self.stacked_equations,
+                                 theta=self.theta) / self.n_obs
 
         # STEP 2.3: assembling the sandwich (variance)
-        if np.isnan(self.bread).any():
-            warnings.warn("The bread matrix contains at least one np.nan, so it cannot be inverted. The variance will "
-                          "not be calculated. This may be an issue with the provided estimating equations or the "
-                          "evaluated theta.",
-                          UserWarning)
-        else:
-            if allow_pinv:                                                               # Support 1D theta-hat
-                bread_invert = np.linalg.pinv(self.bread)                                # ... find pseudo-inverse
-            else:                                                                        # Support 1D theta-hat
-                bread_invert = np.linalg.inv(self.bread)                                 # ... find inverse
-            sandwich = np.dot(np.dot(bread_invert, self.meat), bread_invert.T)           # Compute sandwich
-
-            # STEP 3: updating storage for results
-            self.asymptotic_variance = sandwich       # Asymptotic variance requires division by n (done above)
-            self.variance = sandwich / self.n_obs     # Variance estimate requires division by n^2 (second done here)
+        self.asymptotic_variance = build_sandwich(bread=self.bread,
+                                                  meat=self.meat,
+                                                  allow_pinv=allow_pinv)
+        self.variance = self.asymptotic_variance / self.n_obs
 
     def confidence_intervals(self, alpha=0.05):
         r"""Calculate Wald-type :math:`(1 - \alpha) \times` 100% confidence intervals using the point estimates and
@@ -344,7 +333,7 @@ class MEstimator:
             intervals for :math:`\theta_b`
         """
         # Check that estimate() has been called
-        if self.variance is None:
+        if self.variance is None or np.isnan(self.variance):
             raise ValueError("Either theta has not been estimated yet, or there is a np.nan in the bread matrix. "
                              "Therefore, confidence_intervals() cannot be called.")
         # Check valid alpha value is being provided
@@ -383,7 +372,7 @@ class MEstimator:
             Array of Z-scores for :math:`\theta_1, ..., \theta_b`, respectively
         """
         # Check that self.estimate() has been called
-        if self.theta is None:
+        if self.variance is None or np.isnan(self.variance):
             raise ValueError("Either theta has not been estimated yet, or there is a np.nan in the bread matrix. "
                              "Therefore, z_scores() cannot be called.")
 
@@ -479,25 +468,6 @@ class MEstimator:
         stacked_equations = np.asarray(self.stacked_equations(full_theta))  # Returning stacked equation
         return self._mestimator_sum_(stacked_equations=stacked_equations,   # Passing to evaluating function
                                      subset=self._subset_)                  # ... with specified subset
-
-    def _mestimation_answer_no_subset_(self, theta):
-        """Internal function to evaluate the sum of the estimating equations. The summation is internally evaluated
-        since access to the estimating functions is needed for the sandwich variance computations. This function is
-        used by the bread matrix computation procedure (since subset is ignored for the bread).
-
-        Parameters
-        ----------
-        theta : array
-            b-by-n matrix to sum over the values of n.
-
-        Returns
-        -------
-        array :
-            b-by-1 array, which is the sum over n for each b.
-        """
-        stacked_equations = np.asarray(self.stacked_equations(theta))       # Returning stacked equation
-        return self._mestimator_sum_(stacked_equations=stacked_equations,   # Passing to evaluating function
-                                     subset=None)                           # ... with always /no/ subset
 
     @staticmethod
     def _mestimator_sum_(stacked_equations, subset):
@@ -614,43 +584,3 @@ class MEstimator:
 
         # Return optimized theta array
         return psi
-
-    def _bread_matrix_(self, theta, method, dx):
-        """Evaluate the bread matrix by taking all partial derivatives of the thetas in the estimating equation.
-
-        Parameters
-        ----------
-        theta : ndarray, float
-            Solved values of theta to evaluate at
-        dx : float
-            Spacing to use to numerically approximate the partial derivatives of the bread matrix.
-
-        Returns
-        -------
-        numpy.array
-        """
-        val_range = len(theta)                                       # Check how many values of theta there is
-        est_eq = self._mestimation_answer_no_subset_                 # Estimating equations to compute derivative of
-
-        # Compute the derivative
-        if method.lower() == "approx":                               # Numerical approximation method
-            if val_range == 1:                                       # When only a single theta is present
-                d = derivative(est_eq,                               # ... approximate the derivative
-                               theta, dx=dx)                         # ... at the solved theta (input)
-                bread_matrix = np.array([[d, ], ])                   # ... return as 1-by-1 array object for inversion
-            else:                                                    # Otherwise approximate the partial derivatives
-                bread_matrix = approx_fprime(xk=theta,               # ... use built-in jacobian functionality of SciPy
-                                             f=est_eq,               # ... with not-subset estimating equations
-                                             epsilon=dx)             # ... order option removed in v1.0
-
-        elif method.lower() == "exact":                              # Automatic Differentiation
-            bread_matrix = auto_differentiation(xk=theta,            # Compute the exact derivative at theta
-                                                f=est_eq)            # ... for the given estimating equations
-
-        else:                                                        # Error for unsupported option
-            raise ValueError("The input for deriv_method was "
-                             + str(method)
-                             + ", but only 'approx' and 'exact' are available.")
-
-        # Return bread (multiplied by negative 1 as in Stefanski & Boos)
-        return -1 * bread_matrix
