@@ -265,7 +265,7 @@ def build_sandwich(bread, meat, allow_pinv=True):
     """
     # Check if there is an issue with the bread matrix
     if np.any(np.isnan(bread)):                                   # If bread contains NaN, breaks
-        return np.nan                                             # ... so give back a NaN
+        return None                                               # ... so give back a NaN
 
     # Compute the bread inversion
     if allow_pinv:                                                 # Allowing the pseudo-inverse

@@ -316,7 +316,10 @@ class MEstimator:
         self.asymptotic_variance = build_sandwich(bread=self.bread,
                                                   meat=self.meat,
                                                   allow_pinv=allow_pinv)
-        self.variance = self.asymptotic_variance / self.n_obs
+        if self.asymptotic_variance is None:
+            self.variance = self.asymptotic_variance
+        else:
+            self.variance = self.asymptotic_variance / self.n_obs
 
     def confidence_intervals(self, alpha=0.05):
         r"""Calculate Wald-type :math:`(1 - \alpha) \times` 100% confidence intervals using the point estimates and
@@ -343,7 +346,7 @@ class MEstimator:
             intervals for :math:`\theta_b`
         """
         # Check that estimate() has been called
-        if self.variance is None or np.isnan(self.variance):
+        if self.variance is None:
             raise ValueError("Either theta has not been estimated yet, or there is a np.nan in the bread matrix. "
                              "Therefore, confidence_intervals() cannot be called.")
         # Check valid alpha value is being provided
@@ -382,7 +385,7 @@ class MEstimator:
             Array of Z-scores for :math:`\theta_1, ..., \theta_b`, respectively
         """
         # Check that self.estimate() has been called
-        if self.variance is None or np.isnan(self.variance):
+        if self.variance is None:
             raise ValueError("Either theta has not been estimated yet, or there is a np.nan in the bread matrix. "
                              "Therefore, z_scores() cannot be called.")
 

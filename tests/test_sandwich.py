@@ -159,7 +159,7 @@ class TestBuildSandwich:
         bread = compute_bread(psi, theta=[mean, ], deriv_method='approx')
         meat = compute_meat(psi, theta=[mean, ])
         sandwich = build_sandwich(bread=bread, meat=meat)
-        assert np.isnan(sandwich)
+        assert sandwich is None
 
     def test_solve_1d(self, y):
         def psi(theta):
