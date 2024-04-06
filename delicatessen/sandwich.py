@@ -1,3 +1,10 @@
+#####################################################################################################################
+# Functionality to compute the sandwich
+#   This script allows for computation of the empirical sandwich variance estimator with just the
+#   parameter values and estimating equations. This is to allow computing the sandwich quickly without
+#   called the MEstimator procedure itself.
+#####################################################################################################################
+
 import warnings
 
 import numpy as np
@@ -7,7 +14,28 @@ from delicatessen.derivative import auto_differentiation, approx_differentiation
 
 
 def compute_sandwich(stacked_equations, theta, deriv_method='approx', dx=1e-9, allow_pinv=True):
-    """Compute the empirical sandwich variance estimator given [...] and parameter estimates.
+    """Compute the empirical sandwich variance estimator given a set of estimating equations and parameter estimates.
+    Note that this functionality does not solve for the parameter estimates (unlike ``MEstimator``). Instead, it
+    only computes the sandwich for the provided value.
+
+    The empirical sandwich variance estimator is defined as
+
+    .. math::
+
+        V_n(O_i; \theta) = B_n(O_i; \theta)^{-1} F_n(O_i; \theta) \left[ B_n(O_i; \theta)^{-1} \right]^{T}
+
+    where :math:`B_n(O_i; \theta) = \sum_{i=1}^n \frac{\partial \psi(O_i; \theta)}{\partial \theta}`,
+    :math:`F_n(O_i; \theta) = \sum_{i=1}^n \psi(O_i; \theta) \psi(O_i; \theta)^T`, and :math:`\psi(O_i; \theta)` is the
+    estimating function.
+
+    To compute the bread matrix, :math:`B_n`, the matrix of partial derivatives is computed by using either finite
+    difference methods or automatic differentiation. For finite differences, the default is to use SciPy's
+    ``approx_fprime`` functionality, which uses forward finite differences. However, you can also use homebrew version
+    that allows for forward, backward, and center differences. Automatic differentiation is also supported by a
+    homebrew version.
+
+    To compute the meat matrix, :math:`F_n`, only linear algebra methods, implemented through NumPy, are necessary.
+    The sandwich is then constructed from these individual pieces.
 
     Parameters
     ----------
@@ -19,12 +47,13 @@ def compute_sandwich(stacked_equations, theta, deriv_method='approx', dx=1e-9, a
         that you have solved for the ``theta`` that correspond to the root of the input estimating equations.
     deriv_method : str, optional
         Method to compute the derivative of the estimating equations for the bread matrix. Options include numerical
-        approximation via the central difference method (``'approx'``) and forward-mode automatic differentiation
-        (``'exact'``). Default is ``'approx'``.
+        approximation via the forward difference method via SciPy (``'approx'``), forward difference implemented by-hand
+        (`'fapprox'`), backward difference implemented by-hand (`'bapprox'`),  central difference implemented by-hand
+        (`'capprox'`), or forward-mode automatic differentiation (``'exact'``). Default is ``'approx'``.
     dx : float, optional
         Spacing to use to numerically approximate the partial derivatives of the bread matrix. Here, a small value
         for ``dx`` should be used, since some large values can result in poor approximations. This argument is only
-        used when ``deriv_method='approx'``. Default is 1e-9.
+        used when numerical approximation methods. Default is 1e-9.
     allow_pinv : bool, optional
         Whether to allow for the pseudo-inverse (via ``numpy.linalg.pinv``) if the bread matrix is determined to be
         non-invertible. If you want to disallow the pseudo-inverse (i.e., use ``numpy.linalg.inv``), set this
@@ -32,49 +61,110 @@ def compute_sandwich(stacked_equations, theta, deriv_method='approx', dx=1e-9, a
 
     Returns
     -------
+    array :
+        Returns a p-by-p NumPy array for the input ``theta``, where ``p = len(theta)``
 
+    Examples
+    --------
+    Loading necessary functions and building a generic data set for estimation of the mean
+
+    >>> import numpy as np
+    >>> from delicatessen import MEstimator
+    >>> from delicatessen import compute_sandwich
+    >>> from delicatessen.estimating_equations import ee_mean_variance
+
+    >>> y_dat = [1, 2, 4, 1, 2, 3, 1, 5, 2]
+
+    The following is an illustration of how to compute sandwich covariance using only an estimating equation and the
+    paramter values. The mean and variance (that correspond to ``ee_mean_variance``) can be computed using NumPy by
+
+    >>> mean = np.mean(y_dat)
+    >>> var = np.var(y_dat, ddof=0)
+
+    For the corresponding estimating equation, we can use the built-in functionality as done below
+
+    >>> def psi(theta):
+    >>>     return ee_mean_variance(theta=theta, y=y_dat)
+
+    Calling the sandwich computation procedure
+
+    >>> sandwich_asymp = compute_sandwich(stacked_equations=psi, theta=[mean, var])
+
+    The output sandwich is the *asymptotic* variance (or the variance that corresponds to the standard deviation). To
+    get the variance (or the variance that corresponds to the standard error), we rescale ``sandwich`` by the number of
+    observations
+
+    >>> sandwich = sandwich_asymp / len(y_dat)
+
+    References
+    ----------
+    Boos DD, & Stefanski LA. (2013). M-estimation (estimating equations). In Essential Statistical Inference
+    (pp. 297-337). Springer, New York, NY.
+
+    Stefanski LA, & Boos DD. (2002). The calculus of M-estimation. The American Statistician, 56(1), 29-38.
     """
     # Evaluating at provided theta values
     evald_theta = np.asarray(stacked_equations(theta=theta))        # Evaluating EE at theta-hat
-    if len(theta) == 1:                                             #
-        n_obs = evald_theta.shape[0]                                # Number of observations
-    else:                                                           #
-        n_obs = evald_theta.shape[1]                                # Number of observations
+    if len(theta) == 1:                                             # Number of parameters
+        n_obs = evald_theta.shape[0]                                # ... to get number of obs
+    else:                                                           # Number of parameters
+        n_obs = evald_theta.shape[1]                                # ... to get number of obs
 
     # Step 1: Compute the bread matrix
-    bread = compute_bread(stacked_equations=stacked_equations,      #
-                          theta=theta,                              # Provide theta-hat
-                          deriv_method=deriv_method,                # Method to use
-                          dx=dx)                                    #
-    bread = bread / n_obs                                           #
+    bread = compute_bread(stacked_equations=stacked_equations,      # Call the bread matrix function
+                          theta=theta,                              # ... at given theta-hat
+                          deriv_method=deriv_method,                # ... with derivative method
+                          dx=dx)                                    # ... and approximation
+    bread = bread / n_obs                                           # Scale bread by number of obs
 
     # Step 2: Compute the meat matrix
-    meat = compute_meat(stacked_equations=stacked_equations,        #
-                        theta=theta)                                #
-    meat = meat / n_obs                                             # Meat is dot product of arrays
+    meat = compute_meat(stacked_equations=stacked_equations,        # Call the meat matrix function
+                        theta=theta)                                # ... at given theta-hat
+    meat = meat / n_obs                                             # Scale meat by number of obs
 
     # Step 3: Construct sandwich from the bread and meat matrices
-    sandwich = build_sandwich(bread=bread,                          #
-                              meat=meat,                            #
-                              allow_pinv=allow_pinv)                #
+    sandwich = build_sandwich(bread=bread,                          # Call the sandwich constructor
+                              meat=meat,                            # ... with bread and meat matrices above
+                              allow_pinv=allow_pinv)                # ... and whether to allow pinv
 
     # Return the constructed empirical sandwich variance estimator
     return sandwich
 
 
 def compute_bread(stacked_equations, theta, deriv_method, dx=1e-9):
-    """
+    """Function to compute the bread matrix. The bread matrix is defined as
+
+    .. math::
+
+        B_n(O_i; \theta) = \sum_{i=1}^n \frac{\partial \psi(O_i; \theta)}{\partial \theta}
+
+    The matrix of partial derivatives is computed by using either finite difference methods or automatic
+    differentiation. For finite differences, the default is to use SciPy's ``approx_fprime`` functionality, which uses
+    forward finite differences. However, you can also use homebrew version that allows for forward, backward, and
+    center differences. Automatic differentiation is also supported by a homebrew version.
 
     Parameters
     ----------
-    stacked_equations
-    theta
-    deriv_method
-    dx
+    stacked_equations : function, callable
+        Function that returns a b-by-n NumPy array of the estimating equations. See provided examples in the
+        documentation for how to construct a set of estimating equations.
+    theta : list, set, array
+        Parameter estimates to compute the empirical sandwich variance estimator at. Note that this function assumes
+        that you have solved for the ``theta`` that correspond to the root of the input estimating equations.
+    deriv_method : str, optional
+        Method to compute the derivative of the estimating equations for the bread matrix. Options include numerical
+        approximation via the forward difference method via SciPy (``'approx'``), forward difference implemented by-hand
+        (`'fapprox'`), backward difference implemented by-hand (`'bapprox'`),  central difference implemented by-hand
+        (`'capprox'`), or forward-mode automatic differentiation (``'exact'``). Default is ``'approx'``.
+    dx : float, optional
+        Spacing to use to numerically approximate the partial derivatives of the bread matrix. Here, a small value
+        for ``dx`` should be used, since some large values can result in poor approximations. This argument is only
+        used when numerical approximation methods. Default is 1e-9.
 
     Returns
     -------
-
+    array :
+        Returns a p-by-p NumPy array for the input ``theta``, where ``p = len(theta)``
     """
     def estimating_equation(input_theta):
         if len(input_theta) == 1:
@@ -125,40 +215,66 @@ def compute_bread(stacked_equations, theta, deriv_method, dx=1e-9):
 
 
 def compute_meat(stacked_equations, theta):
-    """
+    """Function to compute the meat matrix. The meat matrix is defined as
+
+    .. math::
+
+        F_n(O_i; \theta) = \sum_{i=1}^n \psi(O_i; \theta) \psi(O_i; \theta)^T
+
+    Rather than summing over all the individual contributions, this implementation takes a single dot product of the
+    stacked estimating functions. This implementation is much faster than summing over :math:`n` matrices.
 
     Parameters
     ----------
-    stacked_equations
-    theta
+    stacked_equations : function, callable
+        Function that returns a b-by-n NumPy array of the estimating equations. See provided examples in the
+        documentation for how to construct a set of estimating equations.
+    theta : list, set, array
+        Parameter estimates to compute the empirical sandwich variance estimator at. Note that this function assumes
+        that you have solved for the ``theta`` that correspond to the root of the input estimating equations.
 
     Returns
     -------
-
+    array :
+        Returns a p-by-p NumPy array for the input ``theta``, where ``p = len(theta)``
     """
     evald_theta = np.asarray(stacked_equations(theta=theta))  # Evaluating EE at theta-hat
-    return np.dot(evald_theta, evald_theta.T)
+    return np.dot(evald_theta, evald_theta.T)                 # Return the fast dot product calculation
 
 
 def build_sandwich(bread, meat, allow_pinv):
-    """
+    """Function to combine the sandwich elements together. This function takes the bread and meat matrices, does the
+    inversions, and then combines them together. This function is separate from ``compute_sandwich`` as it is called
+    by both ``compute_sandwich`` and ``MEstimator``.
 
     Parameters
     ----------
-    bread
-    meat
-    allow_pinv
+    bread : ndarray
+        The bread matrix. The expected input is the output from the ``compute_bread`` function
+    meat : ndarray
+        The meat matrix. The expected input is the output from the ``compute_meat`` function
+    allow_pinv : bool, optional
+        Whether to allow for the pseudo-inverse (via ``numpy.linalg.pinv``) if the bread matrix is determined to be
+        non-invertible. If you want to disallow the pseudo-inverse (i.e., use ``numpy.linalg.inv``), set this
+        argument to ``False``. Default is ``True``, which  is more robust to the possible bread matrices.
 
     Returns
     -------
-
+    array :
+        Returns a p-by-p NumPy array for the input ``theta``, where ``p = len(theta)``
     """
-    if np.any(np.isnan(bread)):
-        return np.nan
+    # Check if there is an issue with the bread matrix
+    if np.any(np.isnan(bread)):                                   # If bread contains NaN, breaks
+        return np.nan                                             # ... so give back a NaN
 
-    if allow_pinv:  # Support 1D theta-hat
-        bread_invert = np.linalg.pinv(bread)  # ... find pseudo-inverse
-    else:  # Support 1D theta-hat
-        bread_invert = np.linalg.inv(bread)  # ... find inverse
-    sandwich = np.dot(np.dot(bread_invert, meat), bread_invert.T)  # Compute sandwich
+    # Compute the bread inversion
+    if allow_pinv:                                                 # Allowing the pseudo-inverse
+        bread_invert = np.linalg.pinv(bread)                       # ... then call pinv
+    else:                                                          # Only allowing the actual inverse
+        bread_invert = np.linalg.inv(bread)                        # ... then call inv
+
+    # Compute the sandwich variance
+    sandwich = np.dot(np.dot(bread_invert, meat), bread_invert.T)
+
+    # Return the sandwich covariance matrix
     return sandwich
