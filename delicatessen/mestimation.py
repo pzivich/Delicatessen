@@ -1,3 +1,7 @@
+#####################################################################################################################
+# Implementation of the M-estimator
+#####################################################################################################################
+
 import numpy as np
 from scipy.optimize import newton, root
 from scipy.stats import norm
@@ -8,9 +12,9 @@ from delicatessen.sandwich import compute_bread, compute_meat, build_sandwich
 class MEstimator:
     r"""M-Estimator for stacked estimating equations.
 
-    M-Estimation, or loosely referred to as estimating equations, is a general approach to point and variance
-    estimation that consists of defining an estimator as the solution to an estimating equation. M-estimators
-    satisify the following
+    Estimating equations are a general approach to point and variance estimation that consists of defining an estimator
+    as the solution to a vector of equations that are equal to zero. The corresponding estimators, often called
+    M-estimators or Z-estimators, satisify the following equation
 
     .. math::
 
@@ -22,12 +26,12 @@ class MEstimator:
 
     Note
     ----
-    M-Estimation is advantageous in both theoretical and applied research. M-estimation simplifies proofs of
+    Estimating equations are advantageous in both theoretical and applied research. They simplifies proofs of
     consistency and asymptotic normality of estimators under a large-sample approximation framework. In application,
-    M-estimators simplify estimation of the variance of parameters and automate the delta-method.
+    this approach to esitmation simplifies estimation of the variance of parameters and automates the delta-method.
 
 
-    M-Estimation consists of two broad step: point estimation and variance estimation. Point estimation is carried out
+    M-Estimators consists of two broad step: point estimation and variance estimation. Point estimation is carried out
     by determining the values of :math:`\theta` where the sum of the estimating equations are zero. For variance
     estimation, the asymptotic sandwich variance estimator is used, which consists of
 
@@ -39,13 +43,13 @@ class MEstimator:
 
     .. math::
 
-        B_n(O, \hat{\theta}) = n^{-1} \sum_{i=1}^{n} - \psi'(O_i, \hat{\theta})
+        B_n(O, \hat{\theta}) = n^{-1} \sum_{i=1}^{n} - \frac{\partial}{\partial \theta} \psi(O_i, \hat{\theta})
 
     .. math::
 
         F_n(O, \hat{\theta}) = n^{-1} \sum_{i=1}^{n} \psi(O_i, \hat{\theta}) \psi(O_i, \hat{\theta})^T
 
-    The partial derivatives for the bread are calculated using either numerical approximation (i.e., central difference
+    The partial derivatives for the bread are calculated using either numerical approximation (e.g., forward difference
     method) or forward-mode automatic differentiation. Inverting the bread is done via NumPy's ``linalg.pinv``. For
     the filling, the dot product is taken at :math:`\hat{\theta}`.
 
@@ -113,6 +117,9 @@ class MEstimator:
     >>> np.sqrt(np.diag(estr.asymptotic_variance))  # Standard deviation
     >>> np.sqrt(np.diag(estr.variance))             # Standard error
     >>> estr.confidence_intervals()                 # Confidence intervals
+    >>> estr.z_scores()                             # Z-scores
+    >>> estr.p_values()                             # P-values
+    >>> estr.s_values()                             # S-values
 
     Alternatively, a custom estimating equation can be specified. This is done by constructing a valid estimating
     equation for the ``MEstimator``. The ``MEstimator`` expects the ``psi`` function to return a b-by-n array, where b
@@ -149,6 +156,8 @@ class MEstimator:
 
     >>> estr = MEstimator(stacked_equations=psi, init=[0, 0, ])
     >>> estr.estimate(solver=custom_solver)
+
+    For more examples on how to apply ``MEstimator``, see https://deli.readthedocs.io/en/latest/
 
     References
     ----------
@@ -196,12 +205,14 @@ class MEstimator:
             ``tol`` parameter. This argument is not used for user-specified solvers. Default is 1e-9.
         deriv_method : str, optional
             Method to compute the derivative of the estimating equations for the bread matrix. Options include numerical
-            approximation via the central difference method (``'approx'``) and forward-mode automatic differentiation
-            (``'exact'``). Default is ``'approx'``.
+            approximation via the forward difference method via SciPy (``'approx'``), forward difference implemented
+            by-hand (`'fapprox'`), backward difference implemented by-hand (`'bapprox'`),  central difference
+            implemented by-hand (`'capprox'`), or forward-mode automatic differentiation (``'exact'``).
+            Default is ``'approx'``.
         dx : float, optional
             Spacing to use to numerically approximate the partial derivatives of the bread matrix. Here, a small value
             for ``dx`` should be used, since some large values can result in poor approximations. This argument is only
-            used when ``deriv_method='approx'``. Default is 1e-9.
+            used with numerical approximation methods. Default is 1e-9.
         allow_pinv : bool, optional
             Whether to allow for the pseudo-inverse (via ``numpy.linalg.pinv``) if the bread matrix is determined to be
             non-invertible. If you want to disallow the pseudo-inverse (i.e., use ``numpy.linalg.inv``), set this
@@ -261,10 +272,9 @@ class MEstimator:
         #   the init values then passing them along to root(). Behind the scenes, self._mestimation_answer_() expands
         #   the parameters (to include everything), calculates the estimating equation at those values, and then
         #   extracts the corresponding subset.
-        #   This process only takes place within Step 1 (the sandwich variance did not require any corresponding
-        #   updates). There is an inherent danger with this process in that if non-subset parameters are not pre-washed,
-        #   then the returned parameters will not be correct. I am considering adding a warning for self_subset_, but I
-        #   may just have to trust the user...
+        #   This process only takes place within Step 1. There is an inherent danger with this process in that if
+        #   non-subset parameters are not pre-washed, then the returned parameters will not be correct. I am
+        #   considering adding a warning for self_subset_, but I currently just trust the user...
 
         # Processing initial values based on whether subset option was specified
         if self._subset_ is None:                        # If NOT subset,
@@ -291,7 +301,7 @@ class MEstimator:
         # STEP 2: calculating the sandwich variance
         # After solving for the parameters, we now can compute the empirical sandwich variance estimator. This is
         #   done by compute the bread and meat matrices and then combining them. This is now done by a separate
-        #   functionality within `sandwich.py`.
+        #   functionalities within the `sandwich.py` file as of v2.2.
         # STEP 2.1: baking the Bread
         self.bread = compute_bread(stacked_equations=self.stacked_equations,
                                    theta=self.theta,

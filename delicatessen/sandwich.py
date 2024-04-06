@@ -53,7 +53,7 @@ def compute_sandwich(stacked_equations, theta, deriv_method='approx', dx=1e-9, a
     dx : float, optional
         Spacing to use to numerically approximate the partial derivatives of the bread matrix. Here, a small value
         for ``dx`` should be used, since some large values can result in poor approximations. This argument is only
-        used when numerical approximation methods. Default is 1e-9.
+        used with numerical approximation methods. Default is 1e-9.
     allow_pinv : bool, optional
         Whether to allow for the pseudo-inverse (via ``numpy.linalg.pinv``) if the bread matrix is determined to be
         non-invertible. If you want to disallow the pseudo-inverse (i.e., use ``numpy.linalg.inv``), set this
