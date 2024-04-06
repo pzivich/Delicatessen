@@ -129,7 +129,10 @@ def approx_differentiation(xk, f, epsilon=1e-9, method='capprox'):
         raise ValueError("Method chosen is not supported")
 
     # Processing the final return based on parameter shape
-    return deriv
+    if xp == 1:
+        return np.asarray([deriv, ])
+    else:
+        return deriv
 
 
 def auto_differentiation(xk, f):
