@@ -87,43 +87,45 @@ def approx_differentiation(xk, f, epsilon=1e-9, method='capprox'):
     >>> def f(x):
     >>>     return [x[0]**2 - x[1], np.sin(np.sqrt(x[1]) + x[2]) + x[2]*(x[1]**2)]
 
-    >>> dy = approx_differentiation(xk=[0.7, 1.2, -0.9], f=f)
+    >>> approx_differentiation(xk=[0.7, 1.2, -0.9], f=f, method='fapprox')
+    >>> approx_differentiation(xk=[0.7, 1.2, -0.9], f=f, method='bapprox')
+    >>> approx_differentiation(xk=[0.7, 1.2, -0.9], f=f, method='capprox')
 
     which will return a 2-by-3 array of all the x-y pair derivatives at the given values. Here, the rows correspond to
-    the output and the columns correspond to the inputs.
+    the output and the columns correspond to the inputs. The approximation methods are forward, backward, and central.
     """
     # Setup parameters for call
-    xk = np.asarray(xk)
-    xp = xk.shape[0]
-    shift = np.identity(n=xk.shape[0]) * epsilon
+    xk = np.asarray(xk)                               # Convert inputs into NumPy array if not already
+    xp = xk.shape[0]                                  # Get the number of parameters in the input
+    shift = np.identity(n=xk.shape[0]) * epsilon      # Define the shift matrix for the partials
 
     def generate_matrix(x_shift, f):
         """Internal function to generate a matrix of the outputs under the parameter shifts, defined by x_shift"""
-        shift_matrix = []
-        for j in range(xp):
-            shift_matrix.append(f(x_shift[j, :]))
-        return np.asarray(shift_matrix)
+        shift_matrix = []                             # Storage for matrices
+        for j in range(xp):                           # Looping over shift combinations
+            shift_matrix.append(f(x_shift[j, :]))     # ... compute output at shifted values
+        return np.asarray(shift_matrix)               # Return matrix under all shifts
 
     # Computing the gradient using the corresponding method
-    if method == 'capprox':
-        lower = (xk - shift)
-        upper = (xk + shift)
-        f0 = generate_matrix(x_shift=lower, f=f)
-        f1 = generate_matrix(x_shift=upper, f=f)
-        deriv = (f1 - f0).T / (2*epsilon)
-    elif method == 'fapprox':
-        lower = (xk - shift)
-        f0 = generate_matrix(x_shift=lower, f=f)
-        f_eval = f(xk)
-        f1 = np.asarray([f_eval for i in range(xp)])
-        deriv = (f1 - f0).T / epsilon
-    elif method == 'bapprox':
-        f_eval = f(xk)
-        f0 = np.asarray([f_eval for i in range(xp)])
-        upper = (xk + shift)
-        f1 = generate_matrix(x_shift=upper, f=f)
-        deriv = (f1 - f0).T / epsilon
-    else:
+    if method == 'capprox':                           # Central difference
+        lower = (xk - shift)                          # ... defining lower shift
+        f0 = generate_matrix(x_shift=lower, f=f)      # ... output for lower shift
+        upper = (xk + shift)                          # ... defining upper shift
+        f1 = generate_matrix(x_shift=upper, f=f)      # ... output for upper shift
+        deriv = (f1 - f0).T / (2*epsilon)             # ... central difference approximation
+    elif method == 'bapprox':                         # Backward difference
+        lower = (xk - shift)                          # ... defining lower shift
+        f0 = generate_matrix(x_shift=lower, f=f)      # ... output for lower shift
+        f_eval = f(xk)                                # ... upper is held fixed
+        f1 = np.asarray([f_eval for i in range(xp)])  # ... stack upper into a matrix
+        deriv = (f1 - f0).T / epsilon                 # ... backward difference approximation
+    elif method == 'fapprox':                         # Forward difference
+        f_eval = f(xk)                                # ... lower is held fixed
+        f0 = np.asarray([f_eval for i in range(xp)])  # ... stack lower into a matrix
+        upper = (xk + shift)                          # ... defining upper shift
+        f1 = generate_matrix(x_shift=upper, f=f)      # ... output for upper shift
+        deriv = (f1 - f0).T / epsilon                 # ... forward difference approximation
+    else:                                             # Otherwise error
         raise ValueError("Method chosen is not supported")
 
     # Processing the final return based on parameter shape
