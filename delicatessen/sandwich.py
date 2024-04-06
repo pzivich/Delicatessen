@@ -242,7 +242,7 @@ def compute_meat(stacked_equations, theta):
     return np.dot(evald_theta, evald_theta.T)                 # Return the fast dot product calculation
 
 
-def build_sandwich(bread, meat, allow_pinv):
+def build_sandwich(bread, meat, allow_pinv=True):
     """Function to combine the sandwich elements together. This function takes the bread and meat matrices, does the
     inversions, and then combines them together. This function is separate from ``compute_sandwich`` as it is called
     by both ``compute_sandwich`` and ``MEstimator``.
