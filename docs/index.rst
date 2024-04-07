@@ -9,10 +9,10 @@ recommend looking into ``geex`` (`Saul & Hudgens (2020) <https://bsaul.github.io
 ``delicatessen`` supports a variety of pre-built estimating equations as well as custom, user built estimating
 equations.
 
-Here, we provide a brief overview of M-Estimation. For a more detailed, please refer to Stefanski & Boos (2002) or
-Boos & Stefanski (2013). M-estimation was developed to study the large sample properties of robust statistics. However,
-many common large-sample statistics can be expressed with estimating equations, so M-estimation provides a unified
-structure and a streamlined approach to estimation. Let the parameter of interest be the
+Here, we provide a brief overview of M-Estimation. For a more detailed, please refer to Ross et al. (2024),
+Stefanski & Boos (2002), or Boos & Stefanski (2013). M-estimation was developed to study the large sample properties
+of robust statistics. However, many common large-sample statistics can be expressed with estimating equations, so
+M-estimation provides a unified structure and a streamlined approach to estimation. Let the parameter of interest be the
 vector :math:`\theta = (\theta_1, \theta_2, ..., \theta_v)` and data is observed for :math:`n` independent units
 :math:`O_1, O_2, …, O_n`. An M-estimator, :math:`\hat{\theta}`, is the solution to the estimating equation
 :math:`\sum_{i=1}^{n} \psi(O_i, \hat{\theta}) = 0` where :math:`\psi` is a known :math:`v \times 1`-dimension estimating
@@ -99,13 +99,16 @@ Otherwise, you may contact me via email (gmail: zivich.5).
 References
 -----------------------------
 
-Zivich PN, Klose M, Cole SR, Edwards JK, & Shook-Sa BE. (2022). Delicatessen: M-Estimation in Python.
-*arXiv preprint arXiv:2203.11300*.
-
-Stefanski LA, & Boos DD. (2002). The calculus of M-estimation. *The American Statistician*, 56(1), 29-38.
-
 Boos DD, & Stefanski LA. (2013). M-estimation (estimating equations). In *Essential Statistical Inference*
 (pp. 297-337). Springer, New York, NY.
 
 Saul BC, & Hudgens MG. (2020). The Calculus of M-Estimation in R with geex. *Journal of Statistical Software*,
 92(2).
+
+Stefanski LA, & Boos DD. (2002). The calculus of M-estimation. *The American Statistician*, 56(1), 29-38.
+
+Ross RK, Zivich PN, Stringer JSA, & Cole SR. (2024). M-estimation for common epidemiological measures: introduction and
+applied examples. *International Journal of Epidemiology*, 53(2), dyae030.
+
+Zivich PN, Klose M, Cole SR, Edwards JK, & Shook-Sa BE. (2022). Delicatessen: M-Estimation in Python.
+*arXiv preprint arXiv:2203.11300*.
