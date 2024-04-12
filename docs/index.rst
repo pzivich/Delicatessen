@@ -54,9 +54,9 @@ To install ``delicatessen``, use the following command in terminal or command pr
 
 Only two dependencies for ``delicatessen`` are: ``NumPy``, ``SciPy``.
 
-While pandas is not necessary, several examples are demonstrated with pandas for ease of data processing. To replicate
-the tests in ``tests/`` you will need to install ``pandas``, ``statsmodels`` and ``pytest`` (but these are not necessary
-for use of the package).
+While ``pandas`` is not a dependency, several examples are demonstrated with pandas for ease of data processing. To
+replicate the tests in ``tests/`` you will need to also install ``pandas``, ``statsmodels`` and ``pytest`` (but these
+are not necessary for use of the package).
 
 Citation:
 -------------
