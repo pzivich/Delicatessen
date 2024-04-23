@@ -14,7 +14,7 @@ from delicatessen.derivative import auto_differentiation, approx_differentiation
 
 
 def compute_sandwich(stacked_equations, theta, deriv_method='approx', dx=1e-9, allow_pinv=True):
-    """Compute the empirical sandwich variance estimator given a set of estimating equations and parameter estimates.
+    r"""Compute the empirical sandwich variance estimator given a set of estimating equations and parameter estimates.
     Note that this functionality does not solve for the parameter estimates (unlike ``MEstimator``). Instead, it
     only computes the sandwich for the provided value.
 
@@ -24,7 +24,7 @@ def compute_sandwich(stacked_equations, theta, deriv_method='approx', dx=1e-9, a
 
         V_n(O_i; \theta) = B_n(O_i; \theta)^{-1} F_n(O_i; \theta) \left[ B_n(O_i; \theta)^{-1} \right]^{T}
 
-    where :math:`B_n(O_i; \theta) = \sum_{i=1}^n \frac{\partial \psi(O_i; \theta)}{\partial \theta}`,
+    where :math:`B_n(O_i; \theta) = \sum_{i=1}^n \frac{\partial}{\partial \theta} \psi(O_i; \theta)`,
     :math:`F_n(O_i; \theta) = \sum_{i=1}^n \psi(O_i; \theta) \psi(O_i; \theta)^T`, and :math:`\psi(O_i; \theta)` is the
     estimating function.
 
