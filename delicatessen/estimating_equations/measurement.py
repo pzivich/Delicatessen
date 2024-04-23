@@ -21,20 +21,22 @@ def ee_rogan_gladen(theta, y, y_star, r, weights=None):
             \mu \times \left\{ \alpha + \beta - 1 \right\} - \left\{ \mu^* + \beta - 1 \right\} \\
             R_i (Y_i^* - \mu^*) \\
             (1-R_i) Y_i \left\{ Y^*_i - \beta \right\} \\
-            (1-R_i) (1-Y_i) \left\{ Y^*_i - \alpha \right\} \\
+            (1-R_i) (1-Y_i) \left\{ (1 - Y^*_i) - \alpha \right\} \\
         \end{bmatrix}
         = 0
 
-    where :math:`Y` is the true value of the outcome, :math:`Y^*` is the mismeasured value of the outcome. The first
+    where :math:`Y` is the true value of the outcome, :math:`Y^*` is the mismeasured value of the outcome, :math:`R` is
+    the indicator for the main study data, :math:`\mu` is the corrected mean, :math:`\mu^*` is the mismeasured mean in
+    the main study data, :math:`\beta` is the sensitivity, and :math:`\alpha` is the specificity. The first
     estimating equation is the corrected proportion, the second is the naive proportion, the third is for sensitivity,
     and the fourth for specificity.
 
-    Here, :math:`\theta` is a 1-by-4 array.
+    Here, ``theta`` is a 1-by-4 array.
 
     Note
     ----
     The Rogan-Gladen estimator may provide corrected proportions outside of :math:`[0,1]` when
-    :math:`\alpha + \beta \le 1`, or the addition of sensitivity and specificity is less than or equal to one.
+    :math:`\alpha + \beta \le 1`.
 
     Parameters
     ----------
@@ -67,7 +69,7 @@ def ee_rogan_gladen(theta, y, y_star, r, weights=None):
     >>> from delicatessen import MEstimator
     >>> from delicatessen.estimating_equations import ee_rogan_gladen
 
-    Replicating the example from Cole et al. (2023).
+    Replicating the published example from Cole et al. (2023).
 
     >>> d = pd.DataFrame()
     >>> d['Y_star'] = [0, 1] + [0, 1, 0, 1]
@@ -99,7 +101,8 @@ def ee_rogan_gladen(theta, y, y_star, r, weights=None):
 
     >>> estr.theta[0]
 
-    Inverse probability weights can be used through the ``weights`` argument.
+    Inverse probability weights can be used through the ``weights`` argument. See the applied examples for a
+    demonstration.
 
     References
     ----------
@@ -108,6 +111,9 @@ def ee_rogan_gladen(theta, y, y_star, r, weights=None):
 
     Rogan WJ & Gladen B. (1978). Estimating prevalence from the results of a screening test.
     *American Journal of Epidemiology*, 107(1), 71-76.
+
+    Ross RK, Zivich PN, Stringer JSA, & Cole SR. (2024). M-estimation for common epidemiological measures: introduction
+    and applied examples. *International Journal of Epidemiology*, 53(2), dyae030.
     """
     # Processing inputs
     y = np.asarray(y)                           # Convert to NumPy array
@@ -138,3 +144,152 @@ def ee_rogan_gladen(theta, y, y_star, r, weights=None):
                       ee_naive_mean,            # Naive mean
                       ee_sens,                  # Sensitivity model parameters
                       ee_spec])                 # Specificity model parameters
+
+
+def ee_rogan_gladen_extended(theta, y, y_star, r, X, weights=None):
+    r"""Estimating equation for the extended Rogan-Gladen correction for mismeasured *binary* outcomes. This estimator
+    uses external data to estimate the sensitivity and specificity conditional on covariates, and then uses those
+    external estimates to correct the estimated proportion. The general form of the estimating equations are
+
+    .. math::
+
+        \sum_{i=1}^n
+        \begin{bmatrix}
+            R_i \times \left\{ \frac{Y^* + m(X_i; \beta) - 1}{m(X_i; \alpha) + m(X_i; \beta) - 1}  - \mu \right\} \\
+            (1-R_i) Y_i \left\{ Y^*_i - m(X_i; \beta) \right\} X_i^T \\
+            (1-R_i) (1 - Y_i) \left\{ (1 - Y^*_i) - m(X_i; \beta) \right\} X_i^T \\
+        \end{bmatrix}
+        = 0
+
+    where :math:`Y` is the true value of the outcome, :math:`Y^*` is the mismeasured value of the outcome. The first
+    estimating equation is the corrected proportion, the second is for sensitivity, and the third for specificity.
+
+    If :math:`X` is of dimension :math:`p`, then ``theta`` is a 1-by-(1+2p) array. Note that the design matrix is
+    shared across the sensitivity and specificity models.
+
+    Note
+    ----
+    The Rogan-Gladen estimator may provide corrected proportions outside of :math:`[0,1]` when
+    :math:`\alpha + \beta \le 1`, or the addition of sensitivity and specificity is less than or equal to one.
+
+    Parameters
+    ----------
+    theta : ndarray, list, vector
+        Theta consists of 4 values.
+    y : ndarray, list, vector
+        1-dimensional vector of n observed values. These are the gold-standard :math:`Y` measurements in the external
+        sample. All values should be either 0 or 1, and be non-missing among those with :math:`R=0`.
+    y_star : ndarray, list, vector
+        1-dimensional vector of n observed values. These are the mismeasured :math:`Y` values. All values should be
+        either 0 or 1, and be non-missing among all observations.
+    r : ndarray, list, vector
+        1-dimensional vector of n indicators regarding whether an observation was part of the external validation data.
+        Indicator should designate if observations are the main data.
+    X : ndarray, list, vector
+        2-dimensional vector of a design matrix for the sensitivity and specificity models.
+    weights : ndarray, list, vector, None, optional
+        1-dimensional vector of n weights. Default is ``None``, which assigns a weight of 1 to all observations.
+
+    Returns
+    -------
+    array :
+        Returns a 4-by-n NumPy array evaluated for the input ``theta``
+
+    Examples
+    --------
+    Construction of a estimating equation(s) with ``ee_rogan_gladen_extended`` should be done similar to the following
+
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> from scipy.stats import logistic
+    >>> from delicatessen import MEstimator
+    >>> from delicatessen.estimating_equations import ee_rogan_gladen_extended
+
+    Replicating the example from Cole et al. (2023).
+
+    >>> d = pd.DataFrame()
+    >>> d['Y_star'] = [0, 1] + [0, 1, 0, 1]
+    >>> d['Y'] = [np.nan, np.nan] + [0, 0, 1, 1]
+    >>> d['S'] = [1, 1] + [0, 0, 0, 0]
+    >>> d['n'] = [270, 680] + [71, 18, 38, 203]
+    >>> d = pd.DataFrame(np.repeat(d.values, d['n'], axis=0), columns=d.columns)
+    >>> d['C'] = 1
+
+    Applying the Rogan-Gladen correction to this example
+
+    >>> def psi(theta):
+    >>>     return ee_rogan_gladen_extended(theta=theta, y=d['Y'],
+    >>>                                     y_star=d['Y_star'],
+    >>>                                     X=d[['C', ]], r=d['S'])
+
+    Notice that ``y`` corresponds to the gold-standard outcomes (only available where R=0), ``y_star`` corresponds to
+    the mismeasured covariate data (available for R=1 and R=0), and ``r`` corresponds to the indicator for the main
+    data source. Now we can call the M-Estimator.
+
+    >>> estr = MEstimator(psi, init=[0.5, 1., 1.])
+    >>> estr.estimate(solver='lm')
+
+    Inspecting the parameter estimates, variance, and 95% confidence intervals
+
+    >>> estr.theta
+    >>> estr.variance
+    >>> estr.confidence_intervals()
+
+    Note
+    ----
+    The sensitivity and specificity in ``ee_rogan_gladen_extended`` correspond to the logit transformations, unlike
+    ``ee_rogan_gladen`` which returns the sensitivity and specificity directly.
+
+
+    The corrected proportion is
+
+    >>> estr.theta[0]
+
+    Inverse probability weights can be used through the ``weights`` argument. See the applied examples for a
+    demonstration.
+
+    References
+    ----------
+    Cole SR, Edwards JK, Breskin A, Rosin S, Zivich PN, Shook-Sa BE, & Hudgens MG. (2023). Illustration of 2 Fusion
+    Designs and Estimators. *American Journal of Epidemiology*, 192(3), 467-474.
+
+    Rogan WJ & Gladen B. (1978). Estimating prevalence from the results of a screening test.
+    *American Journal of Epidemiology*, 107(1), 71-76.
+
+    Ross RK, Cole SR, Edwards JK, Zivich PN, Westreich D, Daniels JL, Price JT & Stringer JSA. (2024). Leveraging
+    External Validation Data: The Challenges of Transporting Measurement Error Parameters. *Epidemiology*,
+    35(2), 196-207.
+    """
+    # Processing inputs
+    y = np.asarray(y)                           # Convert to NumPy array
+    y_star = np.asarray(y_star)                 # Convert to NumPy array
+    r = np.asarray(r)                           # Convert to NumPy array
+    X = np.asarray(X)                           # Convert to NumPy array
+    if weights is None:                         # Handle weights argument
+        weights = 1                             # ... set all weight as 1
+    else:                                       # Otherwise
+        weights = np.asarray(weights)           # ... convert to NumPy array
+
+    # Preparing data for estimating equation operations
+    nXp = X.shape[1] + 1                        # Index start for the NumPy matrices
+    y = np.where(r == 1, -999, y)               # Removing NaN (or any other indicators) for Y in main
+    mu = theta[0]                               # Parameter of interest
+    sens = theta[1:nXp]                         # Parameters for sensitivity model
+    spec = theta[nXp:]                          # Parameters for specificity model
+
+    # Nuisance models for sensitivity
+    ee_sens = ee_regression(theta=sens, y=y_star, X=X,
+                            model='logistic', weights=weights) * (1-r) * y
+    sens_i = inverse_logit(np.dot(X, sens))     # Predicted sensitivity for each unit
+
+    # Nuisance models for specificity
+    ee_spec = ee_regression(theta=spec, y=1-y_star, X=X,
+                            model='logistic', weights=weights) * (1-r) * (1-y)
+    spec_i = inverse_logit(np.dot(X, spec))     # Predicted specificity for each unit
+
+    # Estimating equation for the individual-level version of the Rogan-Gladen correction
+    rg_equation = (y_star + spec_i - 1) / (sens_i + spec_i - 1)
+    ee_corr_mean = r * (rg_equation - mu) * weights
+
+    # Returning the stacked estimating equations
+    return np.vstack([ee_corr_mean, ee_sens, ee_spec])
