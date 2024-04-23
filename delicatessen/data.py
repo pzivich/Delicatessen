@@ -14,7 +14,13 @@ def load_shaq_free_throws():
 
     Returns
     -------
-    ndarray
+    array :
+        Returns a 24-by-2 NumPy array.
+
+    References
+    ----------
+    Boos DD, & Stefanski LA. (2013). M-estimation (estimating equations). In Essential Statistical Inference
+    (pp. 297-337). Springer, New York, NY.
     """
     d = np.array([[ 1,  4,  5],
                   [ 2,  5, 11],
@@ -43,7 +49,7 @@ def load_shaq_free_throws():
 
 
 def load_inderjit():
-    """Load example data from Inderjit et al. (2002) on the dose-response of herbicide on perennial ryegrass growth
+    """Load example data from Inderjit et al. (2002) on the dose-response of herbicide on perennial ryegrass growth.
 
     Notes
     -----
@@ -53,7 +59,13 @@ def load_inderjit():
 
     Returns
     -------
-    ndarray
+    array :
+        Returns a 24-by-2 NumPy array.
+
+    References
+    ----------
+    Inderjit, Streibig JC, & Olofsdotter M. (2002). Joint action of phenolic acid mixtures and its significance in
+    allelopathy research. *Physiologia Plantarum*, 114(3), 422-428.
     """
     d = np.array([[7.5800000,  0.00],
                   [8.0000000,  0.00],
@@ -83,14 +95,22 @@ def load_inderjit():
 
 
 def load_robust_regress(outlier=True):
-    """Load illustrative example for robust linear regression.
+    """Load illustrative example of robust linear regression published in Zivich et al. (2022).
 
     Parameters
     ----------
+    outlier : bool, optional
+        Whether to induce the outlier (``True``) or not (``False``).
 
     Returns
     -------
+    array :
+        Returns a 15-by-2 NumPy array.
 
+    References
+    ----------
+    Zivich PN, Klose M, Cole SR, Edwards JK, & Shook-Sa BE. (2022). Delicatessen: M-estimation in Python.
+    *arXiv:2203.11300*.
     """
     height = [168.519, 166.944, 164.327, 164.058, 166.212, 167.358,
               165.244, 169.352, 159.386, 166.953, 163.876,

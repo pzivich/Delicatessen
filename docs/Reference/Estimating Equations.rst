@@ -47,6 +47,7 @@ Measurement
   :toctree: generated/
 
   ee_rogan_gladen
+  ee_rogan_gladen_extended
 
 
 Survival

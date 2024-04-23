@@ -41,5 +41,5 @@ Differentiation
 .. autosummary::
   :toctree: generated/
 
+  approx_differentiation
   auto_differentiation
-

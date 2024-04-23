@@ -26,28 +26,24 @@ def ee_4p_logistic(theta, X, y):
     :math:`\rho = \frac{D_i}{\theta_1}^{\theta_2}`, and
     :math:`\hat{Y_i} = \theta_0 + \frac{\theta_3 - \theta_0}{1+\rho}`.
 
-    Here, theta is a 1-by-4 array, where 4 are the 4 parameters of the 4PL. The first theta corresponds to lower limit
+    Here, theta is a 1-by-4 array. The first theta corresponds to lower limit
     (:math:`\theta_0`), the second corresponds to the effective dose (ED50) (:math:`\theta_1`), the third corresponds
     to the steepness of the curve (:math:`\theta_2`), and the fourth corresponds to the upper limit (:math:`\theta_3`).
-
-    Note
-    ----
-    All provided estimating equations are meant to be wrapped inside a user-specified function. Throughtout, these
-    user-defined functions are defined as ``psi``.
 
     Parameters
     ----------
     theta : ndarray, list, vector
-        Theta in this case consists of 4 values. In general, starting values ``>0`` are better choices for the 4PL model
+        Theta in this case consists of 4 values. In general, starting values :math:`>0` are better choices for the
+        4PL model
     X : ndarray, list, vector
-        1-dimensional vector of n dose values.
+        1-dimensional vector of `n` dose values.
     y : ndarray, list, vector
-        1-dimensional vector of n response values.
+        1-dimensional vector of `n` response values.
 
     Returns
     -------
     array :
-        Returns a 4-by-n NumPy array evaluated for the input ``theta``
+        Returns a 4-by-`n` NumPy array evaluated for the input ``theta``.
 
     Examples
     --------
@@ -162,26 +158,22 @@ def ee_3p_logistic(theta, X, y, lower):
     corresponds to the upper limit (:math:`\theta_3`). The lower limit (:math:`\theta_0`, ``lower``) is pre-specified
     by the user (and is no longer estimated)
 
-    Note
-    ----
-    All provided estimating equations are meant to be wrapped inside a user-specified function. Throughtout, these
-    user-defined functions are defined as ``psi``.
-
     Parameters
     ----------
     theta : ndarray, list, vector
-        Theta in this case consists of 3 values. In general, starting values ``>0`` are better choices for the 3PL model
+        Theta in this case consists of 3 values. In general, starting values :math:`>0` are better choices for the
+        3PL model
     X : ndarray, list, vector
-        1-dimensional vector of n dose values.
+        1-dimensional vector of `n` dose values.
     y : ndarray, list, vector
-        1-dimensional vector of n response values.
+        1-dimensional vector of `n` response values.
     lower : int, float
         Set value for the lower limit.
 
     Returns
     -------
     array :
-        Returns a 3-by-n NumPy array evaluated for the input theta, y, X
+        Returns a 3-by-`n` NumPy array evaluated for the input ``theta``.
 
     Examples
     --------
@@ -260,19 +252,15 @@ def ee_2p_logistic(theta, X, y, lower, upper):
     (:math:`\theta_0`, ``lower``) and upper limit (:math:`\theta_3`, ``upper``) are pre-specified by the user (and are
     no longer estimated)
 
-    Note
-    ----
-    All provided estimating equations are meant to be wrapped inside a user-specified function. Throughtout, these
-    user-defined functions are defined as ``psi``.
-
     Parameters
     ----------
     theta : ndarray, list, vector
-        Theta in this case consists of 2 values. In general, starting values >0 are better choices for the 3PL model
+        Theta in this case consists of 2 values. In general, starting values :math:`>0` are better choices for the
+        2PL model
     X : ndarray, list, vector
-        1-dimensional vector of n dose values.
+        1-dimensional vector of `n` dose values.
     y : ndarray, list, vector
-        1-dimensional vector of n response values.
+        1-dimensional vector of `n` response values.
     lower : int, float
         Set value for the lower limit.
     upper : int, float
@@ -281,7 +269,7 @@ def ee_2p_logistic(theta, X, y, lower, upper):
     Returns
     -------
     array :
-        Returns a 2-by-n NumPy array evaluated for the input theta, y, X
+        Returns a 2-by-`n` NumPy array evaluated for the input ``theta``.
 
     Examples
     --------
@@ -356,7 +344,7 @@ def ee_effective_dose_delta(theta, y, delta, steepness, ed50, lower, upper):
     theta : int, float
         Theta value corresponding to the ED(alpha).
     y : ndarray, list, vector
-        1-dimensional vector of n response values, used to construct correct shape for output.
+        1-dimensional vector of `n` response values, used to construct correct shape for output.
     delta : float
         The effective dose level of interest, ED(alpha).
     steepness : float
@@ -373,7 +361,7 @@ def ee_effective_dose_delta(theta, y, delta, steepness, ed50, lower, upper):
     Returns
     -------
     array :
-        Returns a 1-by-n NumPy array evaluated for the input theta
+        Returns a 1-by-`n` NumPy array evaluated for the input theta
 
     Examples
     --------

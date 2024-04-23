@@ -27,39 +27,31 @@ def ee_regression(theta, X, y, model, weights=None, offset=None):
     Logistic regression uses the inverse-logit function, :math:`\text{expit}(u) = 1 / (1 + \exp(u))`. Finally, Poisson
     regression is :math:`\exp(u)`.
 
-    Here, :math:`\theta` is a 1-by-b array, where b is the distinct covariates included as part of X. For example, if
-    X is a 3-by-n matrix, then :math:`\theta` will be a 1-by-3 array. The code is general to allow for an arbitrary
-    number of X's (as long as there is enough support in the data).
-
-    Note
-    ----
-    All provided estimating equations are meant to be wrapped inside a user-specified function. Throughout, these
-    user-defined functions are defined as ``psi``.
-
-
-    Here, :math:`\theta` corresponds to the coefficients in the corresponding regression model
+    Here, :math:`\theta` is a 1-by-`b` array, which corresponds to the coefficients in the corresponding regression
+    model and `b` is the distinct covariates included as part of ``X``. For example, if ``X`` is a 3-by-`n` matrix, then
+    :math:`\theta` will be a 1-by-3 array. The code is general to allow for an arbitrary number of elements in ``X``.
 
     Parameters
     ----------
     theta : ndarray, list, vector
-        Theta in this case consists of b values. Therefore, initial values should consist of the same number as the
+        Theta in this case consists of `b` values. Therefore, initial values should consist of the same number as the
         number of columns present. This can easily be implemented by ``[0, ] * X.shape[1]``.
     X : ndarray, list, vector
-        2-dimensional vector of n observed values for b variables.
+        2-dimensional vector of `n` observed values for `b` variables.
     y : ndarray, list, vector
-        1-dimensional vector of n observed values.
+        1-dimensional vector of `n` observed values.
     model : str
         Type of regression model to estimate. Options are ``'linear'`` (linear regression), ``'logistic'`` (logistic
         regression), and ``'poisson'`` (Poisson regression).
     weights : ndarray, list, vector, None, optional
-        1-dimensional vector of n weights. Default is None, which assigns a weight of 1 to all observations.
+        1-dimensional vector of `n` weights. Default is ``None``, which assigns a weight of 1 to all observations.
     offset : ndarray, list, vector, None, optional
-        A 1-dimensional offset to be included in the model. Default is None, which applies no offset term.
+        A 1-dimensional offset to be included in the model. Default is ``None``, which applies no offset term.
 
     Returns
     -------
     array :
-        Returns a b-by-n NumPy array evaluated for the input ``theta``
+        Returns a `b`-by-`n` NumPy array evaluated for the input ``theta``.
 
     Examples
     --------
@@ -145,7 +137,7 @@ def ee_glm(theta, X, y, distribution, link, hyperparameter=None, weights=None, o
 
     .. math::
 
-        \sum_{i=1}^n W_i \left\{ Y_i - g^{-1}(X_i^T \theta) \times \frac{D(\theta)}{v(\theta)} \right\} X_i = 0
+        \sum_{i=1}^n \left\{ Y_i - g^{-1}(X_i^T \theta) \right\} \times \frac{D(\theta)}{v(\theta)} X_i = 0
 
     where :math:`g` is the link function, :math:`g^{-1}` is the inverse link function, :math:`D(\theta)` is the
     derivative of the inverse link function by :math:`\theta`, and :math:`v(\theta)` is the variance function for the
@@ -157,27 +149,19 @@ def ee_glm(theta, X, y, distribution, link, hyperparameter=None, weights=None, o
     additional parameter-specific estimating equations.
 
 
-    Here, :math:`\theta` is a 1-by-b array, where b is the distinct covariates included as part of X. For example, if
-    X is a 3-by-n matrix, then :math:`\theta` will be a 1-by-3 array. The code is general to allow for an arbitrary
-    number of X's (as long as there is enough support in the data).
-
-    Note
-    ----
-    All provided estimating equations are meant to be wrapped inside a user-specified function. Throughout, these
-    user-defined functions are defined as ``psi``.
-
-
-    Here, :math:`\theta` corresponds to the coefficients in the corresponding regression model
+    Here, :math:`\theta` is a 1-by-`b` array, which corresponds to the coefficients in the corresponding regression
+    model and `b` is the distinct covariates included as part of ``X``. For example, if ``X`` is a 3-by-`n` matrix, then
+    :math:`\theta` will be a 1-by-3 array. The code is general to allow for an arbitrary number of elements in ``X``.
 
     Parameters
     ----------
     theta : ndarray, list, vector
-        Theta in this case consists of b values. Therefore, initial values should consist of the same number as the
+        Theta in this case consists of `b` values. Therefore, initial values should consist of the same number as the
         number of columns present. This can easily be implemented by ``[0, ] * X.shape[1]``.
     X : ndarray, list, vector
-        2-dimensional vector of n observed values for b variables.
+        2-dimensional vector of `n` observed values for `b` variables.
     y : ndarray, list, vector
-        1-dimensional vector of n observed values.
+        1-dimensional vector of `n` observed values.
     distribution : str
         Distribution for the generalized linear model. Options are:
         ``'normal'`` (alias: ``gaussian``),
@@ -199,22 +183,22 @@ def ee_glm(theta, X, y, distribution, link, hyperparameter=None, weights=None, o
         ``inverse``,
         and ``square_root`` (alias: ``sqrt``).
     hyperparameter : None, int, float
-        Hyperparameter specification. Default is None. This option is only used by the tweedie distribution. It is
+        Hyperparameter specification. Default is ``None``. This option is only used by the tweedie distribution. It is
         ignored by all other distributions.
     weights : ndarray, list, vector, None, optional
-        1-dimensional vector of n weights. Default is None, which assigns a weight of 1 to all observations.
+        1-dimensional vector of `n` weights. Default is ``None``, which assigns a weight of 1 to all observations.
     offset : ndarray, list, vector, None, optional
-        A 1-dimensional offset to be included in the model. Default is None, which applies no offset term.
+        A 1-dimensional offset to be included in the model. Default is ``None``, which applies no offset term.
 
     Note
     ----
     Link and distribution combinations are not checked for their validity. Some pairings may not converge or may
-    produce nonsensical results. Please check the combination you are using is valid.
+    produce nonsensical results. Please check the distribution-link combination you are using is valid.
 
     Returns
     -------
     array :
-        Returns a b-by-n NumPy array evaluated for the input ``theta``
+        Returns a `b`-by-`n` NumPy array evaluated for the input ``theta``.
 
     Examples
     --------
@@ -285,19 +269,19 @@ def ee_glm(theta, X, y, distribution, link, hyperparameter=None, weights=None, o
     >>> estr = MEstimator(stacked_equations=psi, init=[0., 0., 0., 0.])
     >>> estr.estimate()
 
-    Note that ``delicatessen`` appropriately incorporates the estimation of the additional parameter for the
+    Note that delicatessen appropriately incorporates the estimation of the additional parameter for the
     negative-binomial and gamma distributions. This is unlike some statistical software that estimates this parameter
     but does *not* incorporate the uncertainty in estimation of that parameter. This may explain differences you
-    encounter across software (and the ``delicatessen`` implementation is preferred, as it is a more honest expression
-    of the uncertainty).
+    encounter across software (and the delicatessen implementation is to be preferred, as it is a more honest
+    expression of the uncertainty).
 
     Finally, the tweedie distribution for GLM is a generalization of the Poisson and gamma distributions. Unlike the
-    negative-binomial and gamma distributions, there is a fixed (i.e., not estimated) hyperparameter bounded to be >0.
-    When the tweedie distribution hyperparameter is set to 1, it is equivalent to the Poisson distribution. When the
-    tweedie distribution hyperparameter is set to 2, it is equivalent to the gamma distribution. When the tweedie
-    distribution hyperparameter is set to 3, it is equivalent to the inverse-normal distribution. However, the tweedie
-    distribution hyperparameter can be specified for any values. Here, we illustrate the tweedie distribution that is
-    between a Poisson and gamma distribution.
+    negative-binomial and gamma distributions, there is a fixed (i.e., not estimated) hyperparameter bounded to be
+    :math:`>0`. When the tweedie distribution hyperparameter is set to 1, it is equivalent to the Poisson distribution.
+    When the tweedie distribution hyperparameter is set to 2, it is equivalent to the gamma distribution. When the
+    tweedie distribution hyperparameter is set to 3, it is equivalent to the inverse-normal distribution. However, the
+    tweedie distribution hyperparameter can be specified for any values. Here, we illustrate the tweedie distribution
+    that is between a Poisson and gamma distribution.
 
     >>> def psi(theta):
     >>>     return ee_glm(theta, X=X, y=d['Y1'],
@@ -364,15 +348,11 @@ def ee_mlogit(theta, X, y, weights=None, offset=None):
     r"""Estimating equation for multinomial logistic regression. This estimating equation functionality supports
     unranked categorical outcome data, unlike ``ee_regression`` and ``ee_glm``.
 
-    Note
-    ----
     Unlike the other regression estimating equations, ``ee_mlogit`` expects a matrix of indicators for each possible
     value of ``y``, with the first column being used as the referent category. In other words, the outcome variable is
     a matrix of dummy variables that includes the reference.
-
-
-    The estimating equation for column :math:`r` of the indicator variable :math:`Y_{r}`
-    of a :math:`Y` with :math:`k` unique categories is
+    The estimating equation for column :math:`r` of the indicator variable :math:`Y_{r}` of a :math:`Y` with :math:`k`
+    unique categories is
 
     .. math::
 
@@ -380,35 +360,30 @@ def ee_mlogit(theta, X, y, weights=None, offset=None):
         X_i = 0
 
     where :math:`\theta_r` are the coefficients correspond to the log odds ratio comparing :math:`Y_r` to all other
-    categories of :math:`Y`. Here, :math:`\theta` is a 1-by-(b :math`\times` (k-1)) array, where b is the distinct
-    covariates included as part of X. So, the stack of estimating equations consists of :math:`(k-1)` estimating
-    equations of the dimension :math:`X_i`. For example, if X is a 3-by-n matrix and :math:`Y` has three unique
+    categories of :math:`Y`. Here, :math:`\theta` is a 1-by-(`b` :math`\times` (`k`-1)) array, where `b` is the distinct
+    covariates included as part of ``X``. So, the stack of estimating equations consists of (`k`-1) estimating
+    equations of the dimension :math:`X_i`. For example, if X is a 3-by-`n` matrix and :math:`Y` has three unique
     categories, then :math:`\theta` will be a 1-by-6 array.
-
-    Note
-    ----
-    All provided estimating equations are meant to be wrapped inside a user-specified function. Throughout, these
-    user-defined functions are defined as ``psi``.
 
     Parameters
     ----------
     theta : ndarray, list, vector
-        Theta in this case consists of b :math:`\times` (k-1) values. Therefore, initial values should consist of the
-        same number as the number of columns present in the design matrix for each category of the outcome matrix
+        Theta in this case consists of `b` :math:`\times` (`k`-1) values. Therefore, initial values should consist of
+        the same number as the number of columns present in the design matrix for each category of the outcome matrix
         besides the reference.
     X : ndarray, list, vector
-        2-dimensional design matrix of n observed covariates for b variables.
+        2-dimensional design matrix of `n` observed covariates for `b` variables.
     y : ndarray, list, vector
-        2-dimensional indicator matrix of n observed outcomes.
+        2-dimensional indicator matrix of `n` observed outcomes.
     weights : ndarray, list, vector, None, optional
-        1-dimensional vector of n weights. Default is None, which assigns a weight of 1 to all observations.
+        1-dimensional vector of `n` weights. Default is ``None``, which assigns a weight of 1 to all observations.
     offset : ndarray, list, vector, None, optional
-        A 1-dimensional offset to be included in the model. Default is None, which applies no offset term.
+        A 1-dimensional offset to be included in the model. Default is ``None``, which applies no offset term.
 
     Returns
     -------
     array :
-        Returns a (b*(k-1))-by-n NumPy array evaluated for the input ``theta``
+        Returns a (`b` :math:`\times` (`k`-1))-by-`n` NumPy array evaluated for the input ``theta``.
 
     Examples
     --------
@@ -532,46 +507,41 @@ def ee_robust_regression(theta, X, y, model, k, loss='huber', weights=None, uppe
     occurring is zero.
 
 
-    Here, :math:`\theta` is a 1-by-b array, where b is the distinct covariates included as part of X. For example, if
-    X is a 3-by-n matrix, then :math:`\theta` will be a 1-by-3 array. The code is general to allow for an arbitrary
-    number of X's (as long as there is enough support in the data).
-
-    Note
-    ----
-    All provided estimating equations are meant to be wrapped inside a user-specified function. Throughtout, these
-    user-defined functions are defined as ``psi``.
+    Here, :math:`\theta` is a 1-by-`b` array, which corresponds to the coefficients in the corresponding regression
+    model and `b` is the distinct covariates included as part of ``X``. For example, if ``X`` is a 3-by-`n` matrix, then
+    :math:`\theta` will be a 1-by-3 array. The code is general to allow for an arbitrary number of elements in ``X``.
 
     Parameters
     ----------
     theta : ndarray, list, vector
-        Theta in this case consists of b values. Therefore, initial values should consist of the same number as the
+        Theta in this case consists of `b` values. Therefore, initial values should consist of the same number as the
         number of columns present. This can easily be implemented via ``[0, ] * X.shape[1]``.
     X : ndarray, list, vector
-        2-dimensional vector of n observed values for b variables.
+        2-dimensional vector of `n` observed values for `b` variables.
     y : ndarray, list, vector
-        1-dimensional vector of n observed values.
+        1-dimensional vector of `n` observed values.
     model : str
         Type of regression model to estimate. Options include: ``'linear'`` (linear regression).
     k : int, float
         Tuning or hyperparameter for the chosen loss function. Notice that the choice of hyperparameter should depend
         on the chosen loss function.
     loss : str, optional
-        Robust loss function to use. Default is 'huber'. Options include 'andrew', 'hampel', 'huber', 'tukey'.
+        Robust loss function to use. Default is ``'huber'``. Options include ``'andrew'``, ``'hampel'``, ``'tukey'``.
     weights : ndarray, list, vector, None, optional
-        1-dimensional vector of n weights. Default is None, which assigns a weight of 1 to all observations.
+        1-dimensional vector of `n` weights. Default is ``None``, which assigns a weight of 1 to all observations.
     lower : int, float, None, optional
-        Lower parameter for the 'hampel' loss function. This parameter does not impact the other loss functions.
+        Lower parameter for the Hampel loss function. This parameter does not impact the other loss functions.
         Default is ``None``.
     upper : int, float, None, optional
-        Upper parameter for the 'hampel' loss function. This parameter does not impact the other loss functions.
+        Upper parameter for the Hampel loss function. This parameter does not impact the other loss functions.
         Default is ``None``.
     offset : ndarray, list, vector, None, optional
-        A 1-dimensional offset to be included in the model. Default is None, which applies no offset term.
+        A 1-dimensional offset to be included in the model. Default is ``None``, which applies no offset term.
 
     Returns
     -------
     array :
-        Returns a b-by-n NumPy array evaluated for the input ``theta``
+        Returns a `b`-by-`n` NumPy array evaluated for the input ``theta``
 
     Examples
     --------
@@ -668,9 +638,9 @@ def ee_ridge_regression(theta, X, y, model, penalty, weights=None, center=0., of
 
     where :math:`\lambda` is the penalty term.
 
-    Here, :math:`\theta` is a 1-by-b array, where b is the distinct covariates included as part of X. For example, if
-    X is a 3-by-n matrix, then :math:`\theta` will be a 1-by-3 array. The code is general to allow for an arbitrary
-    number of X's (as long as there is enough support in the data).
+    Here, :math:`\theta` is a 1-by-`b` array, which corresponds to the coefficients in the corresponding regression
+    model and `b` is the distinct covariates included as part of ``X``. For example, if ``X`` is a 3-by-`n` matrix, then
+    :math:`\theta` will be a 1-by-3 array. The code is general to allow for an arbitrary number of elements in ``X``.
 
     Note
     ----
@@ -680,38 +650,37 @@ def ee_ridge_regression(theta, X, y, model, penalty, weights=None, center=0., of
     Parameters
     ----------
     theta : ndarray, list, vector
-        Theta in this case consists of b values. Therefore, initial values should consist of the same number as the
+        Theta in this case consists of `b` values. Therefore, initial values should consist of the same number as the
         number of columns present. This can easily be implemented via ``[0, ] * X.shape[1]``.
     X : ndarray, list, vector
-        2-dimensional vector of n observed values for b variables.
+        2-dimensional vector of `n` observed values for `b` variables.
     y : ndarray, list, vector
-        1-dimensional vector of n observed values.
+        1-dimensional vector of `n` observed values.
     model : str
         Type of regression model to estimate. Options are ``'linear'`` (linear regression), ``'logistic'`` (logistic
         regression), and ``'poisson'`` (Poisson regression).
     penalty : int, float, ndarray, list, vector
         Penalty term to apply to all coefficients (if only a integer or float is provided) or the corresponding
         coefficient (if a list or vector of integers or floats is provided). Note that the penalty term should either
-        consists of a single value or b values (to match the length of ``theta``). The penalty is scaled by n.
+        consists of a single value or `b` values (to match the length of ``theta``). The penalty is scaled by `n`.
     weights : ndarray, list, vector, None, optional
-        1-dimensional vector of n weights. Default is ``None``, which assigns a weight of 1 to all observations.
+        1-dimensional vector of `n` weights. Default is ``None``, which assigns a weight of 1 to all observations.
     center : int, float, ndarray, list, vector, optional
         Center or reference value to penalized estimated coefficients towards. Default is ``0``, which penalized
         coefficients towards the null. Other center values can be specified for all coefficients (by providing an
         integer or float) or covariate-specific centering values (by providing a vector of values of the same length as
         X).
     offset : ndarray, list, vector, None, optional
-        A 1-dimensional offset to be included in the model. Default is None, which applies no offset term.
+        A 1-dimensional offset to be included in the model. Default is ``None``, which applies no offset term.
 
     Returns
     -------
     array :
-        Returns a b-by-n NumPy array evaluated for the input ``theta``
+        Returns a `b`-by-`n` NumPy array evaluated for the input ``theta``.
 
     Examples
     --------
-    Construction of a estimating equation(s) with ``ee_ridge_regression`` should be done similar to the
-    following
+    Construction of a estimating equation(s) with ``ee_ridge_regression`` should be done similar to the following
 
     >>> import numpy as np
     >>> import pandas as pd
@@ -796,12 +765,6 @@ def ee_lasso_regression(theta, X, y, model, penalty, epsilon=3.e-3, weights=None
     r"""Estimating equation for an approximate LASSO (least absolute shrinkage and selection operator) regressor. LASSO
     regression applies an L1-regularization through a magnitude penalty.
 
-    Note
-    ----
-    As the derivative of the estimating equation for LASSO is not defined at :math:`\theta=0`, the bread (and sandwich)
-    cannot be used to estimate the variance in all settings.
-
-
     The estimating equation for the approximate LASSO linear regression is
 
     .. math::
@@ -811,13 +774,19 @@ def ee_lasso_regression(theta, X, y, model, penalty, epsilon=3.e-3, weights=None
 
     where :math:`\lambda` is the penalty term.
 
+    Note
+    ----
+    As the derivative of the estimating equation for LASSO is not defined at :math:`\theta=0`, the bread (and sandwich)
+    cannot be used to estimate the variance in all settings.
+
+
     Here, an approximation based on the bridge penalty for the LASSO is used. For the bridge penalty, LASSO is the
     special case where :math:`\epsilon = 0`. By making :math:`\epsilon > 0`, we can approximate the LASSO. The true
     LASSO may not be possible to implement due to the existence of multiple solutions
 
-    Here, :math:`\theta` is a 1-by-b array, where b is the distinct covariates included as part of X. For example, if
-    X is a 3-by-n matrix, then :math:`\theta` will be a 1-by-3 array. The code is general to allow for an arbitrary
-    number of X's (as long as there is enough support in the data).
+    Here, :math:`\theta` is a 1-by-`b` array, which corresponds to the coefficients in the corresponding regression
+    model and `b` is the distinct covariates included as part of ``X``. For example, if ``X`` is a 3-by-`n` matrix, then
+    :math:`\theta` will be a 1-by-3 array. The code is general to allow for an arbitrary number of elements in ``X``.
 
     Note
     ----
@@ -828,36 +797,36 @@ def ee_lasso_regression(theta, X, y, model, penalty, epsilon=3.e-3, weights=None
     Parameters
     ----------
     theta : ndarray, list, vector
-        Theta in this case consists of b values. Therefore, initial values should consist of the same number as the
+        Theta in this case consists of `b` values. Therefore, initial values should consist of the same number as the
         number of columns present. This can easily be implemented via ``[0, ] * X.shape[1]``.
     X : ndarray, list, vector
-        2-dimensional vector of n observed values for b variables.
+        2-dimensional vector of `n` observed values for `b` variables.
     y : ndarray, list, vector
-        1-dimensional vector of n observed values.
+        1-dimensional vector of `n` observed values.
     model : str
         Type of regression model to estimate. Options are ``'linear'`` (linear regression), ``'logistic'`` (logistic
         regression), and ``'poisson'`` (Poisson regression).
     penalty : int, float, ndarray, list, vector
         Penalty term to apply to all coefficients (if only a integer or float is provided) or the corresponding
         coefficient (if a list or vector of integers or floats is provided). Note that the penalty term should either
-        consists of a single value or b values (to match the length of ``theta``).  The penalty is scaled by n.
+        consists of a single value or `b` values (to match the length of ``theta``).  The penalty is scaled by `n`.
     epsilon : float, optional
         Approximation error to use for the LASSO approximation. Default argument is ``0.003``, which results in a
-        bridge penalty of 1.0003.
+        bridge penalty of ``1.0003``.
     weights : ndarray, list, vector, None, optional
-        1-dimensional vector of n weights. Default is ``None``, which assigns a weight of 1 to all observations.
+        1-dimensional vector of `n` weights. Default is ``None``, which assigns a weight of 1 to all observations.
     center : int, float, ndarray, list, vector, optional
         Center or reference value to penalized estimated coefficients towards. Default is ``0``, which penalized
         coefficients towards the null. Other center values can be specified for all coefficients (by providing an
         integer or float) or covariate-specific centering values (by providing a vector of values of the same length as
         X).
     offset : ndarray, list, vector, None, optional
-        A 1-dimensional offset to be included in the model. Default is None, which applies no offset term.
+        A 1-dimensional offset to be included in the model. Default is ``None``, which applies no offset term.
 
     Returns
     -------
     array :
-        Returns a b-by-n NumPy array evaluated for the input ``theta``
+        Returns a `b`-by-`n` NumPy array evaluated for the input ``theta``.
 
     Examples
     --------
@@ -949,12 +918,6 @@ def ee_elasticnet_regression(theta, X, y, model, penalty, ratio, epsilon=3.e-3, 
     pre-specified ratio. Notice that the L1 penalty is based on an approximation. See ``ee_lasso_regression`` for
     further details on the approximation for the L1 penalty.
 
-    Note
-    ----
-    As the derivative of the estimating equation for LASSO is not defined at :math:`\theta=0`, the bread (and sandwich)
-    cannot be used to estimate the variance in all settings.
-
-
     The estimating equation for Elastic-Net linear regression with the approximate L1 penalty is
 
     .. math::
@@ -964,9 +927,15 @@ def ee_elasticnet_regression(theta, X, y, model, penalty, ratio, epsilon=3.e-3, 
 
     where :math:`\lambda` is the penalty term and :math:`r` is the ratio for the L1 vs L2 penalty.
 
-    Here, :math:`\theta` is a 1-by-b array, where b is the distinct covariates included as part of X. For example, if
-    X is a 3-by-n matrix, then :math:`\theta` will be a 1-by-3 array. The code is general to allow for an arbitrary
-    number of X's (as long as there is enough support in the data).
+    Note
+    ----
+    As the derivative of the estimating equation for LASSO is not defined at :math:`\theta=0`, the bread (and sandwich)
+    cannot be used to estimate the variance in all settings.
+
+
+    Here, :math:`\theta` is a 1-by-`b` array, which corresponds to the coefficients in the corresponding regression
+    model and `b` is the distinct covariates included as part of ``X``. For example, if ``X`` is a 3-by-`n` matrix, then
+    :math:`\theta` will be a 1-by-3 array. The code is general to allow for an arbitrary number of elements in ``X``.
 
     Note
     ----
@@ -976,25 +945,25 @@ def ee_elasticnet_regression(theta, X, y, model, penalty, ratio, epsilon=3.e-3, 
     Parameters
     ----------
     theta : ndarray, list, vector
-        Theta in this case consists of b values. Therefore, initial values should consist of the same number as the
+        Theta in this case consists of `b` values. Therefore, initial values should consist of the same number as the
         number of columns present. This can easily be implemented via ``[0, ] * X.shape[1]``.
     X : ndarray, list, vector
-        2-dimensional vector of n observed values for b variables.
+        2-dimensional vector of `n` observed values for `b` variables.
     y : ndarray, list, vector
-        1-dimensional vector of n observed values.
+        1-dimensional vector of `n` observed values.
     model : str
         Type of regression model to estimate. Options are ``'linear'`` (linear regression), ``'logistic'`` (logistic
         regression), and ``'poisson'`` (Poisson regression).
     penalty : int, float, ndarray, list, vector
         Penalty term to apply to all coefficients (if only a integer or float is provided) or the corresponding
         coefficient (if a list or vector of integers or floats is provided). Note that the penalty term should either
-        consists of a single value or b values (to match the length of ``theta``). The penalty is scaled by n.
+        consists of a single value or `b` values (to match the length of ``theta``). The penalty is scaled by `n`.
     ratio : float
         Ratio for the L1 vs L2 penalty in Elastic-net. The ratio must be be :math:`0 \le r \le 1`. Setting ``ratio=1``
         results in LASSO and ``ratio=0`` results in ridge regression.
     epsilon : float, optional
         Approximation error to use for the LASSO approximation. Default argument is ``0.003``, which results in a
-        bridge penalty of 1.0003.
+        bridge penalty of ``1.0003``.
     weights : ndarray, list, vector, None, optional
         1-dimensional vector of n weights. Default is ```None``, which assigns a weight of 1 to all observations.
     center : int, float, ndarray, list, vector, optional
@@ -1003,12 +972,12 @@ def ee_elasticnet_regression(theta, X, y, model, penalty, ratio, epsilon=3.e-3, 
         integer or float) or covariate-specific centering values (by providing a vector of values of the same length as
         X).
     offset : ndarray, list, vector, None, optional
-        A 1-dimensional offset to be included in the model. Default is None, which applies no offset term.
+        A 1-dimensional offset to be included in the model. Default is ``None``, which applies no offset term.
 
     Returns
     -------
     array :
-        Returns a b-by-n NumPy array evaluated for the input theta and y
+        Returns a `b`-by-`n` NumPy array evaluated for the input ``theta``.
 
     Examples
     --------
@@ -1128,9 +1097,9 @@ def ee_bridge_regression(theta, X, y, model, penalty, gamma, weights=None, cente
 
     where :math:`\lambda` is the penalty term and :math:`\gamma` is a tuning parameter.
 
-    Here, :math:`\theta` is a 1-by-b array, where b is the distinct covariates included as part of X. For example, if
-    X is a 3-by-n matrix, then :math:`\theta` will be a 1-by-3 array. The code is general to allow for an arbitrary
-    number of X's (as long as there is enough support in the data).
+    Here, :math:`\theta` is a 1-by-`b` array, which corresponds to the coefficients in the corresponding regression
+    model and `b` is the distinct covariates included as part of ``X``. For example, if ``X`` is a 3-by-`n` matrix, then
+    :math:`\theta` will be a 1-by-3 array. The code is general to allow for an arbitrary number of elements in ``X``.
 
     Note
     ----
@@ -1140,19 +1109,19 @@ def ee_bridge_regression(theta, X, y, model, penalty, gamma, weights=None, cente
     Parameters
     ----------
     theta : ndarray, list, vector
-        Theta in this case consists of b values. Therefore, initial values should consist of the same number as the
+        Theta in this case consists of `b` values. Therefore, initial values should consist of the same number as the
         number of columns present. This can easily be implemented via ``[0, ] * X.shape[1]``.
     X : ndarray, list, vector
-        2-dimensional vector of n observed values for b variables.
+        2-dimensional vector of `n` observed values for `b` variables.
     y : ndarray, list, vector
-        1-dimensional vector of n observed values.
+        1-dimensional vector of `n` observed values.
     model : str
         Type of regression model to estimate. Options are ``'linear'`` (linear regression), ``'logistic'`` (logistic
         regression), and ``'poisson'`` (Poisson regression).
     penalty : int, float, ndarray, list, vector
         Penalty term to apply to all coefficients (if only a integer or float is provided) or the corresponding
         coefficient (if a list or vector of integers or floats is provided). Note that the penalty term should either
-        consists of a single value or b values (to match the length of ``theta``). The penalty is scaled by n.
+        consists of a single value or `b` values (to match the length of ``theta``). The penalty is scaled by `n`.
     gamma : float
         Hyperparameter for the bridge penalty, defined for :math:`\gamma > 0`. However, only :math:`\gamma \ge 1` are
         supported.
@@ -1164,12 +1133,12 @@ def ee_bridge_regression(theta, X, y, model, penalty, gamma, weights=None, cente
         integer or float) or covariate-specific centering values (by providing a vector of values of the same length as
         X).
     offset : ndarray, list, vector, None, optional
-        A 1-dimensional offset to be included in the model. Default is None, which applies no offset term.
+        A 1-dimensional offset to be included in the model. Default is ``None``, which applies no offset term.
 
     Returns
     -------
     array :
-        Returns a b-by-n NumPy array evaluated for the input ``theta``
+        Returns a `b`-by-`n` NumPy array evaluated for the input ``theta``.
 
     Examples
     --------
@@ -1304,44 +1273,44 @@ def ee_additive_regression(theta, X, y, specifications, model, weights=None, off
     ``ee_additive_regression`` through setting the knot locations.
 
 
-    Here, :math:`\theta` is a 1-by-(b+k) array, where b is the distinct covariates included as part of X and the k
-    distinct spline basis functions. For example, if X is a 2-by-n matrix with a 10-knot natural spline for the second
-    column in X, then :math:`\theta` will be a 1-by-(2+9) array. The code is general to allow for an arbitrary
-    number of X variables and spline knots.
+    Here, :math:`\theta` is a 1-by-(`b`+`k`) array, where `b` is the distinct covariates included as part of ``X`` and
+    the `k` distinct spline basis functions. For example, if ``X`` is a 2-by-`n` matrix with a 10-knot natural spline
+    for the second column in X, then :math:`\theta` will be a 1-by-(2+9) array. The code is general to allow for an
+    arbitrary number of X variables and spline knots.
 
     Parameters
     ----------
     theta : ndarray, list, vector
-        Parameter values. Number of values should match the number of columns in the additive design matrix.
+        Theta in this case consists of `b`+`k` values. Number of values should match the number of columns in the
+        additive design matrix.
     X : ndarray, list, vector
-        2-dimensional vector of n observed values for b variables.
+        2-dimensional vector of `n` observed values for `b` variables.
     y : ndarray, list, vector
-        1-dimensional vector of n observed values.
+        1-dimensional vector of `n` observed values.
     specifications : list, dict, None
         A list of dictionaries that define the hyperparameters for the spline (e.g., number of knots, strength of
         penalty). For terms that should not have splines, ``None`` should be specified instead (see examples below).
-        Each dictionary supports the following parameters:
-        "knots", "natural", "power", "penalty"
-        * knots (list): controls the position of the knots, with knots are placed at given locations. There is no
-            default, so must be specified by the user.
-        * natural (bool): controls whether to generate natural (restricted) or unrestricted splines.
-            Default is ``True``, which corresponds to natural splines.
-        * power (float): controls the power to raise the spline terms to. Default is 3, which corresponds to cubic
-            splines.
-        * penalty (float): penalty term (:math:`\lambda`) applied to each corresponding spline basis term. Default is 0,
-            which applies no penalty to the spline basis terms.
+        Each dictionary supports the following parameters: "knots", "natural", "power", "penalty"
+        knots (list): controls the position of the knots, with knots are placed at given locations. There is no
+        default, so must be specified by the user.
+        natural (bool): controls whether to generate natural (restricted) or unrestricted splines.
+        Default is ``True``, which corresponds to natural splines.
+        power (float): controls the power to raise the spline terms to. Default is 3, which corresponds to cubic
+        splines.
+        penalty (float): penalty term (:math:`\lambda`) applied to each corresponding spline basis term. Default is 0,
+        which applies no penalty to the spline basis terms.
     model : str
         Type of regression model to estimate. Options are ``'linear'`` (linear regression), ``'logistic'`` (logistic
         regression), and ``'poisson'`` (Poisson regression).
     weights : ndarray, list, vector, None, optional
-        1-dimensional vector of n weights. Default is ``None``, which assigns a weight of 1 to all observations.
+        1-dimensional vector of `n` weights. Default is ``None``, which assigns a weight of 1 to all observations.
     offset : ndarray, list, vector, None, optional
-        A 1-dimensional offset to be included in the model. Default is None, which applies no offset term.
+        A 1-dimensional offset to be included in the model. Default is ``None``, which applies no offset term.
 
     Returns
     -------
     array :
-        Returns a (b+k)-by-n NumPy array evaluated for the input ``theta``
+        Returns a (`b`+`k`)-by-`n` NumPy array evaluated for the input ``theta``.
 
     Examples
     --------
@@ -1572,6 +1541,15 @@ def _model_transform_(model, assert_linear_model=False):
 
 
 def _inverse_link_(betax, link):
+    """Internal function to return the evaluated inverse link and derivative of the inverse link.
+
+    Parameters
+    ----------
+    betax : ndarray, list, array
+        Parameter values
+    link : str
+        Specified link function
+    """
     # Distributions not implemented: power, inverse power
     if link == 'identity':
         py = identity(betax)                    # Inverse link
@@ -1612,6 +1590,19 @@ def _inverse_link_(betax, link):
 
 
 def _distribution_variance_(dist, mu, hyperparameter=None, alpha=None):
+    """Internal function to return the distribution variance for GLM specifications.
+
+    Parameters
+    ----------
+    dist : str
+        Distribution
+    mu :
+        Prediction
+    hyperparameter : int, float, None, optional
+        Hyperparameter for the Tweedie distribution
+    alpha : int, float, None, optional
+        Hyperparameter for gamma or negative-binomial
+    """
     if dist in ['normal', 'gaussian']:
         v = 1
     elif dist == 'poisson':

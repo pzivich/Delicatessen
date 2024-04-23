@@ -13,6 +13,7 @@ user-built estimating equations.
   LifeScienceExamples
   Cole-AJE-2023
   Boos-Stefanski-Ch7
+  Bonate-Pharmaco
   Hernan-Robins-2023
   Morris-Trials-2022
   Generalized-Additive-Model

@@ -6,7 +6,11 @@ from delicatessen.derivative import PrimalTangentPairs as PTPair
 
 
 def logit(prob):
-    """Logistic transformation of probabilities. Returns log-odds
+    r"""Logistic transformation. Used to transform probabilities into log-odds.
+
+    .. math::
+
+        \log \left( \frac{p}{1-p} \right)
 
     Parameters
     ----------
@@ -15,13 +19,18 @@ def logit(prob):
 
     Returns
     -------
-    logit-transformed probabilities
+    array :
+        logit-transformed values
     """
     return np.log(prob / (1 - prob))
 
 
 def inverse_logit(logodds):
-    """Inverse logistic transformation. Returns probabilities
+    r"""Inverse logistic transformation. Used to transform log-odds into probabilities.
+
+    .. math::
+
+        \frac{1}{1 + \exp(o)}
 
     Parameters
     ----------
@@ -30,13 +39,14 @@ def inverse_logit(logodds):
 
     Returns
     -------
-    inverse-logit transformed results (i.e. probabilities for log-odds)
+    array :
+        inverse-logit transformed values
     """
     return 1 / (1 + np.exp(-logodds))
 
 
 def identity(value):
-    """Identity transformation. Returns itself
+    """Identity transformation. Used to transform input into itself (i.e., no transformation in applied).
 
     Note
     ----
@@ -56,7 +66,7 @@ def identity(value):
 
 
 def polygamma(n, x):
-    """Polygamma functions. This is a wrapper function of ``scipy.special.polygamma`` meant to enable automatic
+    """Polygamma function. This is a wrapper function of ``scipy.special.polygamma`` meant to enable automatic
     differentation with ``delicatessen``. When the input is a ``PrimalTangentPairs`` object, then an internal function
     that implements the polygamma function is called. Otherwise, ``scipy.special.polygamma`` is called for the input
     object.
@@ -162,12 +172,12 @@ def standard_normal_pdf(x):
 
 def robust_loss_functions(residual, loss, k, a=None, b=None):
     r"""Loss functions for robust mean and robust regression estimating equations. This function is called internally
-    for ``ee_mean_robust`` and ``ee_robust_regression``. This function can also be loaded, so user's can easily adapt
+    for ``ee_mean_robust`` and ``ee_robust_regression``. This function can also be accessed, so user's can easily adapt
     their own regression models into robust regression models using the pre-defined loss functions.
 
     Note
     ----
-    The loss functions here are technically the first-order derivatives of the loss functions
+    The loss functions here are technically the first-order derivatives of the loss functions you see in the literature.
 
 
     The following score of the loss functions, :math:`f_k()`, are available.
@@ -176,30 +186,30 @@ def robust_loss_functions(residual, loss, k, a=None, b=None):
 
     .. math::
 
-        f_k(x) = I(k \pi <= x <= k \pi) \times \sin(x/k)
+        f_k(x) = I(k \pi \le x \le k \pi) \times \sin(x/k)
 
     Huber
 
     .. math::
 
-        f_k(x) = x \times I(-k < x < k) + k \times (1 - I(-k < x < k)) \times \text{sign}(x)
+        f_k(x) = x I(-k < x < k) + \text{sign}(x) k (1 - I(-k < x < k))
 
     Tukey's biweight
 
     .. math::
 
-        f_k(x) = x \times I(-k < x < k) + x \left( 1 - (x/k)^2 \right)^2
+        f_k(x) = x I(-k < x < k) + x \left( 1 - (x/k)^2 \right)^2
 
     Hampel (Hampel's add two additional parameters, :math:`a` and :math:`b`)
 
     .. math::
 
-        f_k(x) =
+        f_{k,a,b}(x) =
         \begin{bmatrix}
             I(-a < x < a) \times x \\
-            + I(a \ge |x| < b) \times a \times \text{sign}(x) \\
-            + I(b \ge x < k) \times a \frac{k - x}{k - b} \\
-            + I(-b \le x > -k) \times -a \frac{-k + x}{-k + b} \\
+            + I(a \le |x| < b) \times a \times \text{sign}(x) \\
+            + I(b \le x < k) \times a \frac{k - x}{k - b} \\
+            + I(-k \ge x > -b) \times -a \frac{-k + x}{-k + b} \\
             + I(|x| \ge k) \times 0
         \end{bmatrix}
 
@@ -315,7 +325,8 @@ def regression_predictions(X, theta, covariance, offset=None, alpha=0.05):
     values. Importantly, this method allows for the variance of :math:`\hat{Y}` to be estimated without having to expand
     the estimating equations. As such, this functionality is meant to be used after ``MEstimator`` has been used to
     estimate the coefficients (i.e., this function is for use after the M-estimator has computed the results for the
-    chosen regression model). Therefore, this function should be viewed as a post-processing functionality.
+    chosen regression model). Therefore, this function should be viewed as a post-processing functionality for
+    generating plots or tables.
 
     Note
     ----
@@ -329,9 +340,9 @@ def regression_predictions(X, theta, covariance, offset=None, alpha=0.05):
         2-dimensional vector of values to generate predicted variances for. The number of columns must match the number
         of coefficients / parameters in ``theta``.
     theta : ndarray
-        Estimated coefficients from ``delicatessen.MEstimator.theta``.
+        Estimated coefficients from ``MEstimator.theta``.
     covariance : ndarray
-        Estimated covariance matrix from ``delicatessen.MEstimator.variance``.
+        Estimated covariance matrix from ``MEstimator.variance``.
     offset : ndarray, None, optional
         A 1-dimensional offset to be included in the model. Default is None, which applies no offset term.
     alpha : float, optional
@@ -448,9 +459,10 @@ def spline(variable, knots, power=3, restricted=True, normalized=False):
 
         r_k(X) = I(X > k) \left\{ X - k \right\}^a - s_K(X)
 
-    where :math:`K` is largest knot value. Splines are normalized by the upper knot minus the lower knot to the
-    corresponding power. Normalizing the splines can be helpful for the root-finding procedure, but does change the
-    interpretation of the corresponding coefficients.
+    where :math:`K` is largest knot value.
+
+    Splines are normalized by the upper knot minus the lower knot to the corresponding power. Normalizing the splines
+    can be helpful for the root-finding procedure.
 
     Parameters
     ----------
@@ -546,16 +558,16 @@ def additive_design_matrix(X, specifications, return_penalty=False):
         penalty). For terms that should not have splines, ``None`` should be specified instead (see examples below).
         Each dictionary supports the following parameters:
         "knots", "natural", "power", "penalty"
-        * knots (list): controls the position of the knots, with knots are placed at given locations. There is no
-            default, so must be specified by the user.
-        * natural (bool): controls whether to generate natural (restricted) or unrestricted splines.
-            Default is ``True``, which corresponds to natural splines.
-        * power (float): controls the power to raise the spline terms to. Default is 3, which corresponds to cubic
-            splines.
-        * penalty (float): penalty term (:math:`\lambda`) applied to each corresponding spline basis term. Default is 0,
-            which applies no penalty to the spline basis terms.
-        * normalized (bool): whether to normalize the spline terms. Default is ``False``, with a default change coming
-            with v3.0 release.
+        knots (list): controls the position of the knots, with knots are placed at given locations. There is no
+        default, so must be specified by the user.
+        natural (bool): controls whether to generate natural (restricted) or unrestricted splines.
+        Default is ``True``, which corresponds to natural splines.
+        power (float): controls the power to raise the spline terms to. Default is 3, which corresponds to cubic
+        splines.
+        penalty (float): penalty term (:math:`\lambda`) applied to each corresponding spline basis term. Default is 0,
+        which applies no penalty to the spline basis terms.
+        normalized (bool): whether to normalize the spline terms. Default is ``False``, with a default change coming
+        with v3.0 release.
     return_penalty : bool, optional
         Whether the list of the corresponding penalty terms should also be returned. This functionality is used
         internally to create the list of penalty terms to provide the Ridge regression model, where only the spline

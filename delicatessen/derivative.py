@@ -4,6 +4,137 @@ import scipy as sp
 from scipy.stats import norm
 
 
+def approx_differentiation(xk, f, epsilon=1e-9, method='capprox'):
+    r"""Numerical approximation to compute the gradient. This function implements numerical approximation methods for
+    derivatives generally (i.e., it provides the first-order forward, backward, and central difference approximations).
+
+    Note
+    ----
+    This functionality is only intended for use behind the scenes in ``delicatessen``. Numerical approximation is
+    implemented from scratch to offer backward and central difference approximations (SciPy's ``approx_fprime`` only
+    offers the forward difference).
+
+
+    The forward difference approximation is
+
+    .. math::
+
+        \frac{f(x + \epsilon) - f(x)}{\epsilon}
+
+    the backward difference approximation is
+
+    .. math::
+
+        \frac{f(x) - f(x - \epsilon)}{\epsilon}
+
+    and the central difference approximation is
+
+    .. math::
+
+        \frac{f(x + \epsilon) - f(x - \epsilon)}{2\epsilon}
+
+    Here, the numerical approximation is implemented by generating matrices for output from a function evaluated under
+    minor perturbations (determined by ``epsilon``) of each input argument. These matrices are then subtracted from
+    each other and then scaled by ``epsilon``.
+
+    Parameters
+    ----------
+    xk : ndarray, list, shape (n, )
+        Point(s) or coordinate vector to evaluate the gradient at.
+    f : callable
+        Function of which to estimate the gradient of.
+    epsilon : float, optional
+        Increment to perturb the points by to compute the gradient. This should be a small value
+    method : str, optional
+        Approximation to use to compute the gradient. Default is `capprox` which uses the central difference method.
+        One can also specify the forward difference (`fapprox`) or backward difference (`bapprox`) methods.
+
+    Returns
+    -------
+    numpy.array :
+        Corresponding array of the pairwise derivatives for all different input x values.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from delicatessen.derivative import approx_differentiation
+
+    To illustrate use, we will compute the derivative of the following function
+
+    .. math::
+
+        f(x) = x^2 - x^1 + sin(x + \sqrt{x})
+
+    >>> def f(x):
+    >>>     return x**2 - x + np.sin(x + np.sqrt(x))
+
+    If you work out the deriative by-hand, you will end up with the following
+
+    .. math::
+
+        2x - 1 + \left( \frac{1}{2 \sqrt{x}} + 1 \right) \cos(x + \sqrt{x})
+
+    Instead, we can use the central difference approximation to evaluate the derivative at a specific point. Here, we
+    will evaluate the derivative at :math:`x=1`
+
+    >>> dy = approx_differentiation(xk=[1, ], f=f)
+
+    which returns ``0.37578``, which is close to plugging in :math:`x=1` into the previous equation.
+
+    The derivative of a function with multiple inputs and multiple outputs can also be evaluated. Consider the following
+    example with three inputs and two outputs
+
+    >>> def f(x):
+    >>>     return [x[0]**2 - x[1], np.sin(np.sqrt(x[1]) + x[2]) + x[2]*(x[1]**2)]
+
+    >>> approx_differentiation(xk=[0.7, 1.2, -0.9], f=f, method='fapprox')
+    >>> approx_differentiation(xk=[0.7, 1.2, -0.9], f=f, method='bapprox')
+    >>> approx_differentiation(xk=[0.7, 1.2, -0.9], f=f, method='capprox')
+
+    which will return a 2-by-3 array of all the x-y pair derivatives at the given values. Here, the rows correspond to
+    the output and the columns correspond to the inputs. The approximation methods are forward, backward, and central.
+    """
+    # Setup parameters for call
+    xk = np.asarray(xk)                               # Convert inputs into NumPy array if not already
+    xp = xk.shape[0]                                  # Get the number of parameters in the input
+    shift = np.identity(n=xk.shape[0]) * epsilon      # Define the shift matrix for the partials
+
+    def generate_matrix(x_shift, f):
+        """Internal function to generate a matrix of the outputs under the parameter shifts, defined by x_shift"""
+        shift_matrix = []                             # Storage for matrices
+        for j in range(xp):                           # Looping over shift combinations
+            shift_matrix.append(f(x_shift[j, :]))     # ... compute output at shifted values
+        return np.asarray(shift_matrix)               # Return matrix under all shifts
+
+    # Computing the gradient using the corresponding method
+    if method == 'capprox':                           # Central difference
+        lower = (xk - shift)                          # ... defining lower shift
+        f0 = generate_matrix(x_shift=lower, f=f)      # ... output for lower shift
+        upper = (xk + shift)                          # ... defining upper shift
+        f1 = generate_matrix(x_shift=upper, f=f)      # ... output for upper shift
+        deriv = (f1 - f0).T / (2*epsilon)             # ... central difference approximation
+    elif method == 'bapprox':                         # Backward difference
+        lower = (xk - shift)                          # ... defining lower shift
+        f0 = generate_matrix(x_shift=lower, f=f)      # ... output for lower shift
+        f_eval = f(xk)                                # ... upper is held fixed
+        f1 = np.asarray([f_eval for i in range(xp)])  # ... stack upper into a matrix
+        deriv = (f1 - f0).T / epsilon                 # ... backward difference approximation
+    elif method == 'fapprox':                         # Forward difference
+        f_eval = f(xk)                                # ... lower is held fixed
+        f0 = np.asarray([f_eval for i in range(xp)])  # ... stack lower into a matrix
+        upper = (xk + shift)                          # ... defining upper shift
+        f1 = generate_matrix(x_shift=upper, f=f)      # ... output for upper shift
+        deriv = (f1 - f0).T / epsilon                 # ... forward difference approximation
+    else:                                             # Otherwise error
+        raise ValueError("Method chosen is not supported")
+
+    # Processing the final return based on parameter shape
+    if xp == 1:
+        return np.asarray([deriv, ])
+    else:
+        return deriv
+
+
 def auto_differentiation(xk, f):
     r"""Forward-mode automatic differentiation. Automatic differentiation offers a way to compute the exact derivative,
     rather than numerically approximated (i.e., the central difference method). Automatic differentiation iteratively
@@ -22,9 +153,9 @@ def auto_differentiation(xk, f):
 
     Parameters
     ----------
-    xk: ndarray, list, shape (n, )
+    xk : ndarray, list, shape (n, )
         Point(s) or coordinate vector to evaluate the gradient at.
-    f: callable
+    f : callable
         Function of which to estimate the gradient of.
 
     Returns

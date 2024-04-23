@@ -1,5 +1,5 @@
 ####################################################################################################################
-# Tests for automatic differentiation procedures
+# Tests for differentiation procedures
 ####################################################################################################################
 
 import pytest
@@ -10,7 +10,7 @@ import scipy as sp
 from scipy.stats import logistic
 from scipy.optimize import approx_fprime
 
-from delicatessen.derivative import auto_differentiation
+from delicatessen.derivative import auto_differentiation, approx_differentiation
 from delicatessen.utilities import inverse_logit, identity, polygamma, standard_normal_cdf, standard_normal_pdf
 from delicatessen import MEstimator
 from delicatessen.data import load_inderjit
@@ -466,6 +466,168 @@ class TestAutoDifferentiation:
 
         # Checking
         npt.assert_allclose(dx_true, dx_exact, atol=1e-5)
+
+
+class TestApproxDifferentiation:
+
+    def test_single_evaluation(self):
+        def f(x):
+            return -32 + 4*x - 10*x**2
+
+        # Points to Evaluate at
+        xinput = [2.754, ]
+
+        # Evaluating the derivatives at the points
+        dx_byhand = approx_differentiation(xinput, f, method='fapprox')
+        dx_approx = approx_fprime(xinput, f, epsilon=1e-9)
+
+        # Checking
+        npt.assert_allclose(dx_approx, dx_byhand[0][0], atol=1e-5)
+
+    def test_doc_example(self):
+        # First function to check
+        def f(x):
+            return x ** 2 - x + np.sin(x + np.sqrt(x))
+
+        dy_approx = approx_differentiation(xk=[1, ], f=f)
+        dy_exact = auto_differentiation(xk=[1, ], f=f)
+        npt.assert_allclose(dy_exact, dy_approx[0][0], atol=1e-5)
+
+        # Second function to check
+        def f(x):
+            return [x[0]**2 - x[1], np.sin(np.sqrt(x[1]) + x[2]) + x[2]*(x[1]**2)]
+
+        dy_approx = approx_differentiation(xk=[0.7, 1.2, -0.9], f=f)
+        dy_exact = auto_differentiation(xk=[0.7, 1.2, -0.9], f=f)
+        npt.assert_allclose(dy_exact, dy_approx, atol=1e-5)
+
+    def test_compare_elementary_operators_f(self):
+        # Defining the functions to check
+        def f(x):
+            return [10,
+                    10 - 5 + 32*5 - 6**2,
+                    5 + x[0] + x[1] - x[2] - x[3],
+                    -32 + x[0]*x[2] + x[1]*x[3],
+                    x[1]**2 + x[0] + x[3] - 30,
+                    -32 + x[0]**x[2] + x[1]**x[3],
+                    (x[0] + x[1])**(x[2] + x[3]) + 6,
+                    5*x[1]**2 + (x[2]**2)*5,
+                    x[1] / 10 + (10/x[2])**2,
+                    x[0]**x[1],
+                    0.9**x[2],
+                    (x[3] + 0.9)**(x[1] * x[0] - 0.1),
+                    ]
+
+        # Points to Evaluate at
+        xinput = [0.5, 1.9, -2.3, 2]
+
+        # Evaluating the derivatives at the points
+        dx_byhand = approx_differentiation(xinput, f, epsilon=1e-9, method='fapprox')
+        dx_approx = approx_fprime(xinput, f, epsilon=1e-9)
+
+        # Checking
+        npt.assert_allclose(dx_approx, dx_byhand, atol=1e-5)
+
+    def test_compare_elementary_operators_b(self):
+        # Defining the functions to check
+        def f(x):
+            return [10,
+                    10 - 5 + 32*5 - 6**2,
+                    5 + x[0] + x[1] - x[2] - x[3],
+                    -32 + x[0]*x[2] + x[1]*x[3],
+                    x[1]**2 + x[0] + x[3] - 30,
+                    -32 + x[0]**x[2] + x[1]**x[3],
+                    (x[0] + x[1])**(x[2] + x[3]) + 6,
+                    5*x[1]**2 + (x[2]**2)*5,
+                    x[1] / 10 + (10/x[2])**2,
+                    x[0]**x[1],
+                    0.9**x[2],
+                    (x[3] + 0.9)**(x[1] * x[0] - 0.1),
+                    ]
+
+        # Points to Evaluate at
+        xinput = [0.5, 1.9, -2.3, 2]
+
+        # Evaluating the derivatives at the points
+        dx_byhand = approx_differentiation(xinput, f, epsilon=1e-9, method='bapprox')
+        dx_approx = approx_fprime(xinput, f, epsilon=1e-9)
+
+        # Checking
+        npt.assert_allclose(dx_approx, dx_byhand, atol=1e-5)
+
+    def test_compare_elementary_operators_c(self):
+        # Defining the functions to check
+        def f(x):
+            return [10,
+                    10 - 5 + 32*5 - 6**2,
+                    5 + x[0] + x[1] - x[2] - x[3],
+                    -32 + x[0]*x[2] + x[1]*x[3],
+                    x[1]**2 + x[0] + x[3] - 30,
+                    -32 + x[0]**x[2] + x[1]**x[3],
+                    (x[0] + x[1])**(x[2] + x[3]) + 6,
+                    5*x[1]**2 + (x[2]**2)*5,
+                    x[1] / 10 + (10/x[2])**2,
+                    x[0]**x[1],
+                    0.9**x[2],
+                    (x[3] + 0.9)**(x[1] * x[0] - 0.1),
+                    ]
+
+        # Points to Evaluate at
+        xinput = [0.5, 1.9, -2.3, 2]
+
+        # Evaluating the derivatives at the points
+        dx_byhand = approx_differentiation(xinput, f, epsilon=1e-9, method='capprox')
+        dx_approx = approx_fprime(xinput, f, epsilon=1e-9)
+
+        # Checking
+        npt.assert_allclose(dx_approx, dx_byhand, atol=1e-5)
+
+    def test_compare_equality1_operators(self):
+        # Defining the functions to check
+        def f(x):
+            return [(x[0] <= 0.1)*x[0] + x[1]**x[2],
+                    (x[0] < 0.1)*x[0] + x[1]**x[2],
+                    (x[0] >= 0.1) * x[0] + x[1] ** x[2],
+                    (x[0] > 0.1) * x[0] + x[1] ** x[2],
+                    (x[0] >= 5.0)*x[0] + x[1]**x[2],
+                    (x[0] > 5.0)*x[0] + x[1]**x[2],
+                    (x[0] <= 5.0)*x[0] + x[1]**x[2],
+                    (x[0] < 5.0)*x[0] + x[1]**x[2],
+                    (x[0] <= 5.1)*(x[0] <= 7.0)*(x[0] ** 2.5)*(x[0] + 3)**0.5 + 27*x[0]**3,
+                    (x[0] < 5.1) * (x[0] + x[1] ** 2) ** 3,
+                    ]
+
+        # Points to Evaluate at
+        xinput = [0.5, 1.9, -2.3, 2]
+
+        # Evaluating the derivatives at the points
+        dx_byhand = approx_differentiation(xinput, f, method='fapprox')
+        dx_approx = approx_fprime(xinput, f, epsilon=1e-9)
+
+        # Checking
+        npt.assert_allclose(dx_approx, dx_byhand, atol=1e-5)
+
+    def test_scipy_special_numapprox(self):
+        def f(x):
+            return [polygamma(n=1, x=x[0]),
+                    polygamma(n=2, x=x[1]) + x[1]**2,
+                    polygamma(n=3, x=x[2]*x[3] + x[1]),
+                    polygamma(n=4, x=np.log(x[3] + x[1]) + x[0]**2) - x[3],
+                    standard_normal_cdf(x=x[1]),
+                    standard_normal_pdf(x=x[2]),
+                    ]
+
+        # Points to Evaluate at
+        xinput = [0.5, 1.9, -2.3, 2]
+
+        # Approximate Derivatives
+        dx_approx = approx_fprime(xinput, f, epsilon=1e-9)
+
+        # Evaluating the derivatives at the points
+        dx_byhand = approx_differentiation(xinput, f, method='fapprox')
+
+        # Checking
+        npt.assert_allclose(dx_approx, dx_byhand, atol=1e-5)
 
 
 class TestSandwichAutoDiff:
@@ -1532,3 +1694,123 @@ class TestSandwichAutoDiff:
         npt.assert_allclose(var_approx,
                             var_exact,
                             atol=1e-6)
+
+
+class TestSandwichApproxDiff:
+
+    def test_capprox_bread_mean(self):
+        # Data set
+        y = np.array([5, 1, 2, 4, 2, 4, 5, 7, 11, 1, 6, 3, 4, 6])
+
+        def psi(theta):
+            return y - theta
+
+        mestr = MEstimator(psi, init=[0, ])
+        mestr.estimate(deriv_method='capprox')
+
+        # Checking bread estimates
+        npt.assert_allclose(mestr.bread,
+                            [[1]],
+                            rtol=1e-6)
+
+        # Checking variance estimates
+        npt.assert_allclose(mestr.asymptotic_variance,
+                            np.var(y, ddof=0),
+                            rtol=1e-6)
+
+    def test_capprox_bread_mean_var(self):
+        # Data set
+        y = np.array([5, 1, 2, 4, 2, 4, 5, 7, 11, 1, 6, 3, 4, 6])
+
+        def psi(theta):
+            return ee_mean_variance(theta=theta, y=y)
+
+        mestr = MEstimator(psi, init=[0, 1, ])
+        mestr.estimate(deriv_method='capprox')
+        bread_exact = mestr.bread
+        var_exact = mestr.variance
+        mestr.estimate(deriv_method='approx')
+        bread_approx = mestr.bread
+        var_approx = mestr.variance
+
+        # Checking bread estimates
+        npt.assert_allclose(bread_approx, bread_exact, atol=1e-6)
+
+        # Checking variance estimates
+        npt.assert_allclose(var_approx, var_exact, atol=1e-5)
+
+    def test_capprox_bread_glm_lognb(self):
+        d = pd.DataFrame()
+        d['X'] = [1, -1, 0, 1, 2, 1, -2, -1, 0, 3, -3, 1, 1, -1, -1, -2, 2, 0, -1, 0]
+        d['Z'] = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        d['Y'] = [0, 0, 0, 0, 0, 15, 15, 25, 25, 45, 0, 0, 0, 0, 15, 15, 15, 25, 25, 35]
+        d['I'] = 1
+
+        def psi(theta):
+            return ee_glm(theta, X=d[['I', 'X']], y=d['Y'],
+                          distribution='nb', link='log')
+
+        # Auto-differentation
+        mestr = MEstimator(psi, init=[0., 0., 1.])
+        mestr.estimate(solver='lm', deriv_method='capprox')
+        bread_exact = mestr.bread
+        var_exact = mestr.variance
+
+        # Central difference method
+        mestr = MEstimator(psi, init=[0., 0., 1.])
+        mestr.estimate(solver='lm', deriv_method='approx')
+        bread_approx = mestr.bread
+        var_approx = mestr.variance
+
+        # Checking bread estimates
+        npt.assert_allclose(bread_approx, bread_exact, atol=1e-6)
+
+        # Checking variance estimates
+        npt.assert_allclose(var_approx, var_exact, atol=1e-5)
+
+    def test_capprox_aipw(self):
+        d = pd.DataFrame()
+        d['W'] = [1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3,
+                  1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3,
+                  1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3]
+        d['V'] = [1, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 1, 1, 0, 0,
+                  1, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 1, 1, 0, 0,
+                  1, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 1, 1, 0, 0]
+        d['A'] = [1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 0, 1, 0, 1,
+                  1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 0, 1, 0, 1,
+                  1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 0, 1, 0, 1]
+        d['Y'] = [3, 5, 1, 5, 2, 5, 2, 1, 4, 2, 3, 4, 2, 5, 5,
+                  3, 5, 1, 5, 2, 5, 2, 1, 4, 2, 3, 4, 2, 5, 5,
+                  3, 5, 1, 5, 2, 5, 2, 1, 4, 2, 3, 4, 2, 5, 5]
+        d['I'] = 1
+        d['A1'] = 1
+        d['A0'] = 0
+
+        def psi(theta):
+            return ee_aipw(theta, y=d['Y'], A=d['A'],
+                           W=d[['I', 'W']],
+                           X=d[['I', 'A', 'W']],
+                           X1=d[['I', 'A1', 'W']],
+                           X0=d[['I', 'A0', 'W']])
+
+        mestr = MEstimator(psi, init=[0., ]*8)
+
+        # Auto-differentation
+        mestr.estimate(solver='lm', deriv_method='capprox')
+        bread_exact = mestr.bread
+        var_exact = mestr.variance
+
+        # Central difference method
+        mestr.estimate(solver='lm', deriv_method='approx')
+        bread_approx = mestr.bread
+        var_approx = mestr.variance
+
+        # Checking bread estimates
+        npt.assert_allclose(bread_approx,
+                            bread_exact,
+                            atol=1e-6)
+
+        # Checking variance estimates
+        npt.assert_allclose(var_approx,
+                            var_exact,
+                            atol=1e-5)

@@ -15,3 +15,14 @@ M-Estimator
 
    MEstimator
 
+
+Sandwich Variance Estimator
+---------------------------
+
+.. currentmodule:: delicatessen.sandwich
+
+.. autosummary::
+   :toctree: generated/
+
+   compute_sandwich
+

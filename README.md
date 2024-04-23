@@ -18,10 +18,10 @@ of M-estimation.
 ## M-Estimation and Estimating Equations
 
 Here, we provide a brief overview of M-estimation theory. For more detailed introductions to M-estimation, see Ross
-et al. (2024) or Chapter 7 of Boos & Stefanski (2013). M-estimation is a generalization of likelihood-based methods.
-*M-estimators* are solutions to estimating equations. To apply the M-estimator, we solve the estimating equations using
-observed data. This is similar to other approaches, but the key advantage of M-Estimators is estimation of the variance
-via the sandwich variance.
+et al. (2024), Stefanski & Boos (2002), or Chapter 7 of Boos & Stefanski (2013). M-estimation is a generalization of
+likelihood-based methods. *M-estimators* are solutions to estimating equations. To apply the M-estimator, we solve the
+estimating equations using observed data. This is similar to other approaches, but the key advantage of M-Estimators is
+variance estimation via the empirical sandwich variance estimator.
 
 While M-Estimation is a powerful tool, the derivatives and matrix algebra can quickly become unwieldy. This is where 
 `delicatessen` comes in. `delicatessen` takes estimating functions and data, and solves for the parameter estimates,
@@ -84,10 +84,10 @@ at [delicatessen website](https://deli.readthedocs.io/en/latest/).
 Boos DD, & Stefanski LA. (2013). M-estimation (estimating equations). In Essential Statistical Inference
 (pp. 297-337). Springer, New York, NY.
 
+Stefanski LA, & Boos DD. (2002). The calculus of M-estimation. *The American Statistician*, 56(1), 29-38.
+
 Ross RK, Zivich PN, Stringer JS, & Cole SR. (2024). M-estimation for common epidemiological measures: introduction and
 applied examples. *International Journal of Epidemiology*, 53(2).
-
-Stefanski LA, & Boos DD. (2002). The calculus of M-estimation. *The American Statistician*, 56(1), 29-38.
 
 Zivich PN, Klose M, Cole SR, Edwards JK, & Shook-Sa BE. (2022). Delicatessen: M-Estimation in Python.
 *arXiv preprint arXiv:2203.11300*.
