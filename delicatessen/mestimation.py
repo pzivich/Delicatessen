@@ -28,18 +28,20 @@ class MEstimator:
     ----
     Estimating equations are advantageous in both theoretical and applied research. They simplifies proofs of
     consistency and asymptotic normality of estimators under a large-sample approximation framework. In application,
-    this approach to esitmation simplifies estimation of the variance of parameters and automates the delta-method.
+    this approach simplifies variance estimation and automates the delta-method.
 
 
     M-Estimators consists of two broad step: point estimation and variance estimation. Point estimation is carried out
-    by determining the values of :math:`\theta` where the sum of the estimating equations are zero. For variance
-    estimation, the asymptotic sandwich variance estimator is used, which consists of
+    by determining the values of :math:`\theta` where the sum of the estimating equations are zero. This is done via
+    standard root-finding algorithms.
+
+    For variance estimation, sandwich variance estimator is used. The asymptotic sandwich variance estimator consists of
 
     .. math::
 
-        B_n(O, \hat{\theta})^{-1} F_n(O, \hat{\theta}) \left\{B_n(O, \hat{\theta}^{-1})\right\}^T
+        V_n(O, \hat{\theta}) = B_n(O, \hat{\theta})^{-1} F_n(O, \hat{\theta}) \left\{B_n(O, \hat{\theta}^{-1})\right\}^T
 
-    where :math:`B` is the 'bread' and :math:`F` is the 'filling'
+    where :math:`B` is the 'bread' and :math:`F` is the 'filling' matrix. These matrices are defined as
 
     .. math::
 
@@ -49,31 +51,33 @@ class MEstimator:
 
         F_n(O, \hat{\theta}) = n^{-1} \sum_{i=1}^{n} \psi(O_i, \hat{\theta}) \psi(O_i, \hat{\theta})^T
 
-    The partial derivatives for the bread are calculated using either numerical approximation (e.g., forward difference
-    method) or forward-mode automatic differentiation. Inverting the bread is done via NumPy's ``linalg.pinv``. For
-    the filling, the dot product is taken at :math:`\hat{\theta}`.
+    respectively. The partial derivatives for the bread are calculated using either numerical approximation (e.g.,
+    forward difference method) or forward-mode automatic differentiation. Inverting the bread is done via NumPy's
+    ``linalg.pinv``. For the filling, the dot product is taken at :math:`\hat{\theta}`.
 
     Note
     ----
-    A hard part, that must be done by the user, is to specify the estimating equations. Be sure to check the provided
-    examples for the expected format. Pre-built estimating equations for common problems are also made available.
+    The difficult part (that must be done by the user) is to specify the estimating equations. Be sure to check the
+    provided examples for the expected format. Pre-built estimating equations for common problems are also made
+    available.
 
 
     After completion of these steps, point and variance estimates are stored. These can be extracted from
-    ``MEstimator``.
+    ``MEstimator``. Further, confidence intervals, Z-scores, P-values, or S-values can all be generated.
 
     Note
     ----
     For complex regression problems, the root-finding algorithms are not as robust relative to maximization approaches.
-    A solution for difficult problems is to 'pre-wash' the initial values.
+    A simple solution for difficult problems is to 'pre-wash' or find the solution to the equations and provide those
+    as the initial starting values.
 
     Parameters
     ----------
     stacked_equations : function, callable
-        Function that returns a b-by-n NumPy array of the estimating equations. See provided examples in the
+        Function that returns a `v`-by-`n` NumPy array of the estimating equations. See provided examples in the
         documentation for how to construct a set of estimating equations.
     init : list, set, array
-        Initial values for the root-finding algorithm.
+        Initial values for the root-finding algorithm. A total of `v` values should be provided.
     subset : list, set, array, None, optional
         Optional argument to conduct the root-finding procedure on a subset of parameters in the estimating equations.
         The input list is used to location index the parameter array via ``np.take()``. The subset list will
@@ -82,9 +86,10 @@ class MEstimator:
 
     Note
     ----
-    Because the root-finding procedure is NOT ran for parameters outside of the subset, those coefficients must be
-    solved outside of ``MEstimator``. In general, I do NOT recommend using the ``subset`` argument unless a series of
-    complex estimating equations need to be solved.
+    Because the root-finding procedure is NOT ran for parameters outside of the subset, those coefficients *must* be
+    solved outside of ``MEstimator``. In general, I do *NOT* recommend using the ``subset`` argument unless a series of
+    complex estimating equations need to be solved. In general, this argument does not massively improve speed until
+    the estimating equations consist of hundreds of parameters.
 
     Examples
     --------
@@ -115,6 +120,7 @@ class MEstimator:
     >>> estr.variance                               # Covariance
     >>> estr.asymptotic_variance                    # Asymptotic covariance
     >>> np.sqrt(np.diag(estr.asymptotic_variance))  # Standard deviation
+    >>> estr.variance                               # Covariance
     >>> np.sqrt(np.diag(estr.variance))             # Standard error
     >>> estr.confidence_intervals()                 # Confidence intervals
     >>> estr.z_scores()                             # Z-scores
@@ -122,9 +128,9 @@ class MEstimator:
     >>> estr.s_values()                             # S-values
 
     Alternatively, a custom estimating equation can be specified. This is done by constructing a valid estimating
-    equation for the ``MEstimator``. The ``MEstimator`` expects the ``psi`` function to return a b-by-n array, where b
-    is the number of parameters (length of ``theta``) and n is the total number of observations. Below is an example
-    of the mean and variance estimating equation from before
+    equation for the ``MEstimator``. The ``MEstimator`` expects the ``psi`` function to return a `v`-by-`n` array,
+    where `v` is the number of parameters (length of ``theta``) and n is the total number of observations. Below is an
+    example of the mean and variance estimating equation from before, but implemented by-hand
 
     >>> def psi(theta):
     >>>     y = np.array(y_dat)
@@ -137,7 +143,7 @@ class MEstimator:
     >>> estr = MEstimator(stacked_equations=psi, init=[0, 0, ])
     >>> estr.estimate()
 
-    Note that ``len(init)`` should be equal to b. So in this case, two initial values are provided.
+    Note that ``len(init)`` should be equal to `v`. So in this case, two initial values are provided.
 
     ``MEstimator`` can also be run with a user-provided root-finding algorithm. To specify a custom root-finder, a
     function must be created by the user that consists of two keyword arguments (``stacked_equations``, ``init``) and
@@ -164,7 +170,10 @@ class MEstimator:
     Boos DD, & Stefanski LA. (2013). M-estimation (estimating equations). In Essential Statistical Inference
     (pp. 297-337). Springer, New York, NY.
 
-    Stefanski LA, & Boos DD. (2002). The calculus of M-estimation. The American Statistician, 56(1), 29-38.
+    Ross RK, Zivich PN, Stringer JSA, & Cole SR. (2024). M-estimation for common epidemiological measures: introduction
+    and applied examples. *International Journal of Epidemiology*, 53(2), dyae030.
+
+    Stefanski LA, & Boos DD. (2002). The calculus of M-estimation. *The American Statistician*, 56(1), 29-38.
     """
     def __init__(self, stacked_equations, init=None, subset=None):
         self.stacked_equations = stacked_equations     # User-input stacked estimating equations
@@ -183,36 +192,38 @@ class MEstimator:
         self.asymptotic_variance = None   # Asymptotic covariance matrix for theta values (calculated later)
 
     def estimate(self, solver='lm', maxiter=5000, tolerance=1e-9, deriv_method='approx', dx=1e-9, allow_pinv=True):
-        """Function to carry out the point and variance estimation of theta. After this procedure, the point estimates
-        (in ``theta``) and the covariance matrix (in ``variance``) can be extracted.
+        """Run the point and variance estimation procedures for given estimating equation and starting values. This
+        function carries out the point and variance estimation of ``theta``. After this procedure, the point estimates
+        (in ``theta``) and the covariance matrix (in ``variance``) can be extracted from the ``MEstimator`` object.
 
         Parameters
         ----------
         solver : str, function, callable, optional
             Method to use for the root-finding procedure. Default is the Levenberg-Marquardt algorithm
-            (``scipy.optimize.root(method='lm')``). Other built-in option is the secant method
-            (``scipy.optimize.newton``), and a modification of the Powell hybrid method
-            (``scipy.optimize.root(method='hybr')``). Finally, any generic root-finding algorithm can be used via a
-            user-provided callable object. The function must consist of two keyword arguments: ``stacked_equations``,
-            and ``init``. Additionally, the function should return only the optimized values. Please review the
-            provided example in the documentation for how to implement a custom root-finding algorithm.
+            (``scipy.optimize.root(method='lm')``, specified by ``solver='lm'``). Other built-in option is the secant
+            method (``scipy.optimize.newton``, specified by ``solver='newton'``), and a modification of the Powell
+            hybrid method (``scipy.optimize.root(method='hybr')``, specified by ``solver='hybr'``). Finally, any generic
+            root-finding algorithm can be used via a user-provided callable object. The function must consist of two
+            keyword arguments: ``stacked_equations``, and ``init``. Additionally, the function should return only the
+            optimized values. Please review the provided example in the documentation for how to implement a custom
+            root-finding algorithm.
         maxiter : int, optional
             Maximum iterations to consider for the root finding procedure. Default is 5000 iterations. For complex
-            estimating equations (without preceding optimization), this value may need to be increased. This argument
-            is not used for user-specified solvers.
+            estimating equations, this value may need to be increased. This argument is not used when a custom
+            root-finding method (e.g., ``solver``) is provided.
         tolerance : float, optional
-            Maximum tolerance for errors in the root finding. This argument is passed ``scipy.optimize`` via the
-            ``tol`` parameter. This argument is not used for user-specified solvers. Default is 1e-9.
+            Maximum tolerance for errors in the root finding in ``scipy.optimize``. Default is 1e-9. This argument is
+            not used when a custom root-finding method (e.g., ``solver``) is provided.
         deriv_method : str, optional
-            Method to compute the derivative of the estimating equations for the bread matrix. Options include numerical
-            approximation via the forward difference method via SciPy (``'approx'``), forward difference implemented
-            by-hand (`'fapprox'`), backward difference implemented by-hand (`'bapprox'`),  central difference
-            implemented by-hand (`'capprox'`), or forward-mode automatic differentiation (``'exact'``).
-            Default is ``'approx'``.
+            Method to compute the derivative of the estimating equations for the bread matrix. Default is ``'approx'``.
+            Options include numerical approximation via the forward difference method via SciPy (``'approx'``), forward
+            difference as implemented in delicatessen (`'fapprox'`), backward difference as implemented in delicatessen
+            (`'bapprox'`), central difference implemented as in delicatessen (`'capprox'`), or forward-mode automatic
+            differentiation as implemented in delicatessen(``'exact'``).
         dx : float, optional
-            Spacing to use to numerically approximate the partial derivatives of the bread matrix. Here, a small value
-            for ``dx`` should be used, since some large values can result in poor approximations. This argument is only
-            used with numerical approximation methods. Default is 1e-9.
+            Spacing to use to numerically approximate the partial derivatives of the bread matrix. Default is 1e-9.
+            Here, a small value for ``dx`` should be used, since some large values can result in poor approximations.
+            This argument is only used with numerical approximation methods.
         allow_pinv : bool, optional
             Whether to allow for the pseudo-inverse (via ``numpy.linalg.pinv``) if the bread matrix is determined to be
             non-invertible. If you want to disallow the pseudo-inverse (i.e., use ``numpy.linalg.inv``), set this
@@ -322,8 +333,8 @@ class MEstimator:
             self.variance = self.asymptotic_variance / self.n_obs
 
     def confidence_intervals(self, alpha=0.05):
-        r"""Calculate Wald-type :math:`(1 - \alpha) \times` 100% confidence intervals using the point estimates and
-        the sandwich variance. The formula for the confidence intervals are
+        r"""Calculate two-sided Wald-type :math:`(1 - \alpha) \times` 100% confidence intervals using the point
+        and sandwich variance estimates. The formula for the confidence intervals is
 
         .. math::
 
@@ -372,7 +383,7 @@ class MEstimator:
             \frac{\hat{\theta} - \theta}{\widehat{SE}(\hat{\theta})}
 
         where :math:`\theta` is the null. The ``.estimate()`` function must be called before the Z-scores can be
-        calculated.
+        calculated. Note that the default value for the null is zero.
 
         Parameters
         ----------
@@ -418,13 +429,8 @@ class MEstimator:
     def s_values(self, null=0):
         r"""Calculate two-sided Wald-type S-values using the point estimates and the sandwich variance. The S-value,
         or Shannon Information value, is a transformation of the P-values that has been argued to be more easily
-        interpretable as it can be related back to simple coin-flipping scenarios.
-
-        Suppose the S-value is :math:`s`. Then :math:`s` corresponds to the number of heads in a row with a fair coin
-        (equal chances heads or tails). As :math:`s` increases, one would be more 'surprised' by the result (e.g., it
-        might not be surprising to have two heads in a row, but it would be surprising for 10 in a row).
-
-        The transformation from a P-value into a S-value is.
+        interpretable as it can be related back to simple coin-flipping scenarios. The transformation from a P-value
+        into a S-value is.
 
         .. math::
 
@@ -432,6 +438,11 @@ class MEstimator:
 
         where :math:`P` is the corresponding P-value. The ``.estimate()`` function must be called before the S-values
         can be calculated.
+
+        The S-value can be contextualized in terms of coin-flips. Suppose the S-value is :math:`s`. Then :math:`s`
+        corresponds to the number of heads in a row with a fair coin (equal chances heads or tails). As :math:`s`
+        increases, one would be more 'surprised' by the result (e.g., it might not be surprising to have 2 heads in a
+        row, but it would be surprising for 20 in a row).
 
         Parameters
         ----------
@@ -526,8 +537,8 @@ class MEstimator:
 
     @staticmethod
     def _solve_coefficients_(stacked_equations, init, method, maxiter, tolerance):
-        """Quasi-Newton solver for the values of theta, such that the estimating equations are equal to zero. Default
-        uses the secant method from SciPy's `newton` optimizer.
+        """Calls the root-finding procedure for the values of theta, such that the estimating equations are equal to
+        zero. Default uses the Levenberg-Marquardt algorithm from SciPy.
 
         Parameters
         ----------
@@ -589,11 +600,9 @@ class MEstimator:
                 raise ValueError("The user-specified root-finding `solver` must return the solution to the "
                                  "optimization")
         else:
-            raise ValueError("The solver '" +  # ... otherwise throw ValueError
-                             str(method) +
-                             "' is not available. Please see the "
-                             "documentation for valid"
-                             "options for the optimizer.")
+            # ... otherwise throw ValueError if no other root-finding steps are triggered.
+            raise ValueError("The solver '" +  str(method) + "' is not available. Please see the "
+                             "documentation for valid options for the optimizer.")
 
         # Return optimized theta array
         return psi

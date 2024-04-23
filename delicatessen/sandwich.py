@@ -24,23 +24,31 @@ def compute_sandwich(stacked_equations, theta, deriv_method='approx', dx=1e-9, a
 
         V_n(O_i; \theta) = B_n(O_i; \theta)^{-1} F_n(O_i; \theta) \left[ B_n(O_i; \theta)^{-1} \right]^{T}
 
-    where :math:`B_n(O_i; \theta) = \sum_{i=1}^n \frac{\partial}{\partial \theta} \psi(O_i; \theta)`,
-    :math:`F_n(O_i; \theta) = \sum_{i=1}^n \psi(O_i; \theta) \psi(O_i; \theta)^T`, and :math:`\psi(O_i; \theta)` is the
-    estimating function.
+    where :math:`\psi(O_i; \theta)` is the estimating function,
+
+    .. math::
+
+        B_n(O_i; \theta) = \sum_{i=1}^n \frac{\partial}{\partial \theta} \psi(O_i; \theta),
+
+    and
+
+    .. math::
+
+        F_n(O_i; \theta) = \sum_{i=1}^n \psi(O_i; \theta) \psi(O_i; \theta)^T .
 
     To compute the bread matrix, :math:`B_n`, the matrix of partial derivatives is computed by using either finite
     difference methods or automatic differentiation. For finite differences, the default is to use SciPy's
-    ``approx_fprime`` functionality, which uses forward finite differences. However, you can also use homebrew version
-    that allows for forward, backward, and center differences. Automatic differentiation is also supported by a
-    homebrew version.
+    ``approx_fprime`` functionality, which uses forward finite differences. However, you can also use the delicatessen
+    homebrew version that allows for forward, backward, and center differences. Automatic differentiation is also
+    supported by a homebrew version.
 
     To compute the meat matrix, :math:`F_n`, only linear algebra methods, implemented through NumPy, are necessary.
-    The sandwich is then constructed from these individual pieces.
+    The sandwich is then constructed from these pieces using linear algebra methods from NumPy.
 
     Parameters
     ----------
     stacked_equations : function, callable
-        Function that returns a b-by-n NumPy array of the estimating equations. See provided examples in the
+        Function that returns a `v`-by-`n` NumPy array of the estimating equations. See provided examples in the
         documentation for how to construct a set of estimating equations.
     theta : list, set, array
         Parameter estimates to compute the empirical sandwich variance estimator at. Note that this function assumes
@@ -53,7 +61,7 @@ def compute_sandwich(stacked_equations, theta, deriv_method='approx', dx=1e-9, a
     dx : float, optional
         Spacing to use to numerically approximate the partial derivatives of the bread matrix. Here, a small value
         for ``dx`` should be used, since some large values can result in poor approximations. This argument is only
-        used with numerical approximation methods. Default is 1e-9.
+        used with numerical approximation methods. Default is ``1e-9``.
     allow_pinv : bool, optional
         Whether to allow for the pseudo-inverse (via ``numpy.linalg.pinv``) if the bread matrix is determined to be
         non-invertible. If you want to disallow the pseudo-inverse (i.e., use ``numpy.linalg.inv``), set this
@@ -62,7 +70,7 @@ def compute_sandwich(stacked_equations, theta, deriv_method='approx', dx=1e-9, a
     Returns
     -------
     array :
-        Returns a p-by-p NumPy array for the input ``theta``, where ``p = len(theta)``
+        Returns a `p`-by-`p` NumPy array for the input ``theta``, where ``p = len(theta)``
 
     Examples
     --------
@@ -76,7 +84,7 @@ def compute_sandwich(stacked_equations, theta, deriv_method='approx', dx=1e-9, a
     >>> y_dat = [1, 2, 4, 1, 2, 3, 1, 5, 2]
 
     The following is an illustration of how to compute sandwich covariance using only an estimating equation and the
-    paramter values. The mean and variance (that correspond to ``ee_mean_variance``) can be computed using NumPy by
+    parameter values. The mean and variance (that correspond to ``ee_mean_variance``) can be computed using NumPy by
 
     >>> mean = np.mean(y_dat)
     >>> var = np.var(y_dat, ddof=0)
@@ -96,10 +104,17 @@ def compute_sandwich(stacked_equations, theta, deriv_method='approx', dx=1e-9, a
 
     >>> sandwich = sandwich_asymp / len(y_dat)
 
+    The standard errors are then
+
+    >>> se = np.sqrt(np.diag(sandwich))
+
     References
     ----------
     Boos DD, & Stefanski LA. (2013). M-estimation (estimating equations). In Essential Statistical Inference
     (pp. 297-337). Springer, New York, NY.
+
+    Ross RK, Zivich PN, Stringer JSA, & Cole SR. (2024). M-estimation for common epidemiological measures: introduction
+    and applied examples. *International Journal of Epidemiology*, 53(2), dyae030.
 
     Stefanski LA, & Boos DD. (2002). The calculus of M-estimation. The American Statistician, 56(1), 29-38.
     """
@@ -132,21 +147,23 @@ def compute_sandwich(stacked_equations, theta, deriv_method='approx', dx=1e-9, a
 
 
 def compute_bread(stacked_equations, theta, deriv_method, dx=1e-9):
-    """Function to compute the bread matrix. The bread matrix is defined as
+    r"""Function to compute the bread matrix. The bread matrix is defined as
 
     .. math::
 
-        B_n(O_i; \theta) = \sum_{i=1}^n \frac{\partial \psi(O_i; \theta)}{\partial \theta}
+        B_n(O_i; \theta) = \sum_{i=1}^n \frac{\partial }{\partial \theta} \psi(O_i; \theta)
 
-    The matrix of partial derivatives is computed by using either finite difference methods or automatic
-    differentiation. For finite differences, the default is to use SciPy's ``approx_fprime`` functionality, which uses
-    forward finite differences. However, you can also use homebrew version that allows for forward, backward, and
-    center differences. Automatic differentiation is also supported by a homebrew version.
+    where :math:`\psi(O_i; \theta)` is the estimating function.
+    To compute the bread matrix, :math:`B_n`, the matrix of partial derivatives is computed by using either finite
+    difference methods or automatic differentiation. For finite differences, the default is to use SciPy's
+    ``approx_fprime`` functionality, which uses forward finite differences. However, you can also use the delicatessen
+    homebrew version that allows for forward, backward, and center differences. Automatic differentiation is also
+    supported by a homebrew version.
 
     Parameters
     ----------
     stacked_equations : function, callable
-        Function that returns a b-by-n NumPy array of the estimating equations. See provided examples in the
+        Function that returns a `v`-by-`n` NumPy array of the estimating equations. See provided examples in the
         documentation for how to construct a set of estimating equations.
     theta : list, set, array
         Parameter estimates to compute the empirical sandwich variance estimator at. Note that this function assumes
@@ -159,12 +176,12 @@ def compute_bread(stacked_equations, theta, deriv_method, dx=1e-9):
     dx : float, optional
         Spacing to use to numerically approximate the partial derivatives of the bread matrix. Here, a small value
         for ``dx`` should be used, since some large values can result in poor approximations. This argument is only
-        used when numerical approximation methods. Default is 1e-9.
+        used when numerical approximation methods. Default is ``1e-9``.
 
     Returns
     -------
     array :
-        Returns a p-by-p NumPy array for the input ``theta``, where ``p = len(theta)``
+        Returns a `p`-by-`p` NumPy array for the input ``theta``, where ``p = len(theta)``
     """
     def estimating_equation(input_theta):
         if len(input_theta) == 1:
@@ -215,19 +232,20 @@ def compute_bread(stacked_equations, theta, deriv_method, dx=1e-9):
 
 
 def compute_meat(stacked_equations, theta):
-    """Function to compute the meat matrix. The meat matrix is defined as
+    r"""Function to compute the meat matrix. The meat matrix is defined as
 
     .. math::
 
         F_n(O_i; \theta) = \sum_{i=1}^n \psi(O_i; \theta) \psi(O_i; \theta)^T
 
+    where :math:`\psi(O_i; \theta)` is the estimating function.
     Rather than summing over all the individual contributions, this implementation takes a single dot product of the
     stacked estimating functions. This implementation is much faster than summing over :math:`n` matrices.
 
     Parameters
     ----------
     stacked_equations : function, callable
-        Function that returns a b-by-n NumPy array of the estimating equations. See provided examples in the
+        Function that returns a `v`-by-`n` NumPy array of the estimating equations. See provided examples in the
         documentation for how to construct a set of estimating equations.
     theta : list, set, array
         Parameter estimates to compute the empirical sandwich variance estimator at. Note that this function assumes
@@ -236,14 +254,14 @@ def compute_meat(stacked_equations, theta):
     Returns
     -------
     array :
-        Returns a p-by-p NumPy array for the input ``theta``, where ``p = len(theta)``
+        Returns a `p`-by-`p` NumPy array for the input ``theta``, where ``p = len(theta)``
     """
     evald_theta = np.asarray(stacked_equations(theta=theta))  # Evaluating EE at theta-hat
     return np.dot(evald_theta, evald_theta.T)                 # Return the fast dot product calculation
 
 
 def build_sandwich(bread, meat, allow_pinv=True):
-    """Function to combine the sandwich elements together. This function takes the bread and meat matrices, does the
+    r"""Function to combine the sandwich elements together. This function takes the bread and meat matrices, does the
     inversions, and then combines them together. This function is separate from ``compute_sandwich`` as it is called
     by both ``compute_sandwich`` and ``MEstimator``.
 
@@ -261,7 +279,7 @@ def build_sandwich(bread, meat, allow_pinv=True):
     Returns
     -------
     array :
-        Returns a p-by-p NumPy array for the input ``theta``, where ``p = len(theta)``
+        Returns a `p`-by-`p` NumPy array for the input ``theta``, where ``p = len(theta)``
     """
     # Check if there is an issue with the bread matrix
     if np.any(np.isnan(bread)):                                   # If bread contains NaN, breaks

@@ -27,26 +27,20 @@ def ee_exponential_model(theta, t, delta):
 
         h(t) = \lambda
 
-    Note
-    ----
-    All provided estimating equations are meant to be wrapped inside a user-specified function. Throughtout, these
-    user-defined functions are defined as ``psi``.
-
-
     Parameters
     ----------
     theta : ndarray, list, vector
         Theta in the case of the exponential model consists of a single value. Furthermore, the parameter will be
         non-negative. Therefore, an initial value like the ``[1, ]`` should be provided.
     t : ndarray, list, vector
-        1-dimensional vector of n observed times.
+        1-dimensional vector of `n` observed times.
     delta : ndarray, list, vector
-        1-dimensional vector of n event indicators, where 1 indicates an event and 0 indicates right censoring.
+        1-dimensional vector of `n` event indicators, where 1 indicates an event and 0 indicates right censoring.
 
     Returns
     -------
     array :
-        Returns a 1-by-n NumPy array evaluated for the input ``theta``
+        Returns a 1-by-`n` NumPy array evaluated for the input ``theta``
 
     Examples
     --------
@@ -121,28 +115,22 @@ def ee_weibull_model(theta, t, delta):
 
         h(t) = \lambda \gamma t^{\gamma - 1}
 
-    Note
-    ----
-    All provided estimating equations are meant to be wrapped inside a user-specified function. Throughtout, these
-    user-defined functions are defined as ``psi``.
-
-
     Parameters
     ----------
     theta : ndarray, list, vector
-        Theta in the case of the exponential model consists of a single value. Furthermore, the parameter will be
+        Theta in the case of the Weibull model consists of two values. Furthermore, the parameter will be
         non-negative. Therefore, an initial value like the ``[1, ]`` is recommended.
     t : ndarray, list, vector
-        1-dimensional vector of n observed times. No missing data should be included (missing data may cause
+        1-dimensional vector of `n` observed times. No missing data should be included (missing data may cause
         unexpected behavior).
     delta : ndarray, list, vector
-        1-dimensional vector of n event indicators, where 1 indicates an event and 0 indicates right censoring. No
+        1-dimensional vector of `n` event indicators, where 1 indicates an event and 0 indicates right censoring. No
         missing data should be included (missing data may cause unexpected behavior).
 
     Returns
     -------
     array :
-        Returns a 2-by-n NumPy array evaluated for the input theta.
+        Returns a 2-by-`n` NumPy array evaluated for the input ``theta``.
 
     Examples
     --------
@@ -254,7 +242,7 @@ def ee_exponential_measure(theta, times, n, measure, scale):
     Returns
     -------
     array :
-        Returns a t-by-n NumPy array evaluated for the input ``theta``
+        Returns a `t`-by-`n` NumPy array evaluated for the input ``theta``
 
     Examples
     --------
@@ -376,8 +364,8 @@ def ee_weibull_measure(theta, times, n, measure, scale, shape):
     Parameters
     ----------
     theta : ndarray, list, vector
-        theta consists of t values. The initial values should consist of the same number of elements as provided in the
-        ``times`` argument.
+        theta consists of `t` values. The initial values should consist of the same number of elements as provided in
+        the ``times`` argument.
     times : int, float, ndarray, list, vector
         A single time or 1-dimensional collection of times to calculate the measure at. The number of provided times
         should consist of the same number of elements as provided in the ``theta`` argument.
@@ -396,7 +384,7 @@ def ee_weibull_measure(theta, times, n, measure, scale, shape):
     Returns
     -------
     array :
-        Returns a t-by-n NumPy array evaluated for the input ``theta``
+        Returns a `t`-by-`n` NumPy array evaluated for the input ``theta``.
 
     Examples
     --------
@@ -546,34 +534,29 @@ def ee_aft_weibull(theta, X, t, delta, weights=None):
     following relation between the coefficients: :math:`\lambda = - \mu \gamma`,
     :math:`\beta_{PH} = - \beta_{AFT} \gamma`, and :math:`\gamma = \exp(\sigma)`.
 
-    Here, :math:`\theta` is a 1-by-(2+b) array, where b is the distinct covariates included as part of X. For example,
-    if X is a 3-by-n matrix, then theta will be a 1-by-5 array. The code is general to allow for an arbitrary number of
-    X's (as long as there is enough support in the data).
-
-    Note
-    ----
-    All provided estimating equations are meant to be wrapped inside a user-specified function. Throughtout, these
-    user-defined functions are defined as ``psi``.
+    Here, :math:`\theta` is a 1-by-(2+`b`) array, where `b` is the distinct covariates included as part of ``X``. For
+    example, if ``X`` is a 3-by-`n` matrix, then theta will be a 1-by-5 array. The code is general to allow for an
+    arbitrary dimension of ``X``.
 
     Parameters
     ----------
     theta : ndarray, list, vector
-        theta consists of 1+b+1 values. Therefore, initial values should consist of the same number as the number of
+        theta consists of 1+`b`+1 values. Therefore, initial values should consist of the same number as the number of
         columns present in ``X`` plus 2. This can easily be implemented via
         ``[0, ] + [0, ] * X.shape[1] + [0, ]``.
     X : ndarray, list, vector
-        2-dimensional vector of n observed values for b variables.
+        2-dimensional vector of `n` observed values for `b` variables.
     t : ndarray, list, vector
-        1-dimensional vector of n observed times.
+        1-dimensional vector of `n` observed times.
     delta : ndarray, list, vector
-        1-dimensional vector of n values indicating whether the time was an event or censoring.
+        1-dimensional vector of `n` values indicating whether the time was an event or censoring.
     weights : ndarray, list, vector, None, optional
-        1-dimensional vector of n weights. Default is ``None``, which assigns a weight of 1 to all observations.
+        1-dimensional vector of `n` weights. Default is ``None``, which assigns a weight of 1 to all observations.
 
     Returns
     -------
     array :
-        Returns a b-by-n NumPy array evaluated for the input ``theta``.
+        Returns a 1+`b`+1-by-`n` NumPy array evaluated for the input ``theta``.
 
     Examples
     --------
@@ -711,13 +694,13 @@ def ee_aft_weibull_measure(theta, times, X, measure, mu, beta, sigma):
     Parameters
     ----------
     theta : ndarray, list, vector
-        theta consists of t values. The initial values should consist of the same number of elements as provided in the
+        theta consists of `t` values. The initial values should consist of the same number of elements as provided in the
         ``times`` argument.
     times : int, float, ndarray, list, vector
         A single time or 1-dimensional collection of times to calculate the measure at. The number of provided times
         should consist of the same number of elements as provided in the ``theta`` argument.
     X : ndarray, list, vector
-        2-dimensional vector of n observed values for b variables.
+        2-dimensional vector of `n` observed values for `b` variables.
     measure : str
         Measure to calculate. Options include survival (``'survival'``), density (``'density'``), risk or the cumulative
         density (``'risk'``), hazard (``'hazard'``), or cumulative hazard (``'cumulative_hazard'``).
@@ -731,7 +714,7 @@ def ee_aft_weibull_measure(theta, times, X, measure, mu, beta, sigma):
     Returns
     -------
     array :
-        Returns a t-by-n NumPy array evaluated for the input theta
+        Returns a `t`-by-`n` NumPy array evaluated for the input theta
 
     Examples
     --------

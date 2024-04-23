@@ -20,11 +20,6 @@ def ee_mean(theta, y):
 
         \sum_{i=1}^n (Y_i - \theta) = 0
 
-    Note
-    ----
-    All provided estimating equations are meant to be wrapped inside a user-specified function. Throughtout, these
-    user-defined functions are defined as ``psi``.
-
     Parameters
     ----------
     theta : ndarray, list, vector
@@ -36,7 +31,7 @@ def ee_mean(theta, y):
     Returns
     -------
     array :
-        Returns a 1-by-n NumPy array evaluated for the input ``theta`` and ``y``
+        Returns a 1-by-`n` NumPy array evaluated for the input ``theta`` and ``y``
 
     Examples
     --------
@@ -89,11 +84,6 @@ def ee_mean_robust(theta, y, k, loss='huber', lower=None, upper=None):
     Tukey's biweight, Andrew's Sine, and Hampel. See ``robust_loss_function`` for further details on the loss
     functions for the robust mean.
 
-    Note
-    ----
-    All provided estimating equations are meant to be wrapped inside a user-specified function. Throughtout, these
-    user-defined functions are defined as ``psi``.
-
     Parameters
     ----------
     theta : ndarray, list, vector
@@ -105,18 +95,18 @@ def ee_mean_robust(theta, y, k, loss='huber', lower=None, upper=None):
         Tuning or hyperparameter for the chosen loss function. Notice that the choice of hyperparameter depends on the
         loss function.
     loss : str, optional
-        Robust loss function to use. Default is 'huber'. Options include 'andrew', 'hampel', 'huber', 'tukey'.
+        Robust loss function to use. Default is ``'huber'``. Options include ``'andrew'``, ``'hampel'``, ``'tukey'``.
     lower : int, float, None, optional
-        Lower parameter for the 'hampel' loss function. This parameter does not impact the other loss functions.
+        Lower parameter for the Hampel loss function. This parameter does not impact the other loss functions.
         Default is ``None``.
     upper : int, float, None, optional
-        Upper parameter for the 'hampel' loss function. This parameter does not impact the other loss functions.
+        Upper parameter for the Hampel loss function. This parameter does not impact the other loss functions.
         Default is ``None``.
 
     Returns
     -------
     array :
-        Returns a 1-by-n NumPy array evaluated for the input theta and y
+        Returns a 1-by-`n` NumPy array evaluated for the input ``theta`` and ``y``.
 
     Examples
     --------
@@ -186,12 +176,6 @@ def ee_mean_variance(theta, y):
     Unlike ``ee_mean``, ``theta`` consists of 2 parameters. The output covariance matrix will also provide estimates
     for each of the ``theta`` values.
 
-    Note
-    ----
-    All provided estimating equations are meant to be wrapped inside a user-specified function. Throughtout, these
-    user-defined functions are defined as ``psi``.
-
-
     Parameters
     ----------
     theta : ndarray, list, vector
@@ -204,7 +188,7 @@ def ee_mean_variance(theta, y):
     Returns
     -------
     array :
-        Returns a 2-by-n NumPy array evaluated for the input theta and y
+        Returns a 2-by-`n` NumPy array evaluated for the input ``theta`` and ``y``.
 
     Examples
     --------
@@ -273,12 +257,12 @@ def ee_percentile(theta, y, q):
         1-dimensional vector of n observed values. No missing data should be included (missing data may cause unexpected
         behavior when attempting to calculate the mean).
     q : float
-        Percentile to calculate. Must be (0, 1)
+        Percentile to calculate. Must be :math:`(0, 1)`
 
     Returns
     -------
     array :
-        Returns a 1-by-n NumPy array evaluated for the input theta and y
+        Returns a 1-by-`n` NumPy array evaluated for the input ``theta`` and ``y``.
 
     Examples
     --------
@@ -309,7 +293,7 @@ def ee_percentile(theta, y, q):
     >>> estr.theta
 
     Then displays the estimated percentile / median. In this example, there is a difference between the closed form
-    solution (-0.07978) and M-Estimation (-0.06022).
+    solution (``-0.07978``) and M-Estimation (``-0.06022``).
 
     References
     ----------
@@ -352,11 +336,6 @@ def ee_positive_mean_deviation(theta, y):
     sandwich) cannot be used to estimate the variance. This estimating equation is offered for completeness, but is not
     generally recommended for applications.
 
-    Note
-    ----
-    All provided estimating equations are meant to be wrapped inside a user-specified function. Throughtout, these
-    user-defined functions are defined as ``psi``.
-
     Parameters
     ----------
     theta : ndarray, list, vector
@@ -369,7 +348,7 @@ def ee_positive_mean_deviation(theta, y):
     Returns
     -------
     array :
-        Returns a 2-by-n NumPy array evaluated for the input theta and y
+        Returns a 2-by-`n` NumPy array evaluated for the input ``theta`` and ``y``.
 
     Examples
     --------

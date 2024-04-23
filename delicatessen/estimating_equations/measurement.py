@@ -43,21 +43,21 @@ def ee_rogan_gladen(theta, y, y_star, r, weights=None):
     theta : ndarray, list, vector
         Theta consists of 4 values.
     y : ndarray, list, vector
-        1-dimensional vector of n observed values. These are the gold-standard :math:`Y` measurements in the external
+        1-dimensional vector of `n` observed values. These are the gold-standard :math:`Y` measurements in the external
         sample. All values should be either 0 or 1, and be non-missing among those with :math:`R=0`.
     y_star : ndarray, list, vector
-        1-dimensional vector of n observed values. These are the mismeasured :math:`Y` values. All values should be
+        1-dimensional vector of `n` observed values. These are the mismeasured :math:`Y` values. All values should be
         either 0 or 1, and be non-missing among all observations.
     r : ndarray, list, vector
-        1-dimensional vector of n indicators regarding whether an observation was part of the external validation data.
-        Indicator should designate if observations are the main data.
+        1-dimensional vector of `n` indicators regarding whether an observation was part of the external validation
+        data. Indicator should designate if observations are the main data.
     weights : ndarray, list, vector, None, optional
-        1-dimensional vector of n weights. Default is ``None``, which assigns a weight of 1 to all observations.
+        1-dimensional vector of `n` weights. Default is ``None``, which assigns a weight of 1 to all observations.
 
     Returns
     -------
     array :
-        Returns a 4-by-n NumPy array evaluated for the input ``theta``
+        Returns a 4-by-`n` NumPy array evaluated for the input ``theta``
 
     Examples
     --------
@@ -164,7 +164,7 @@ def ee_rogan_gladen_extended(theta, y, y_star, r, X, weights=None):
     where :math:`Y` is the true value of the outcome, :math:`Y^*` is the mismeasured value of the outcome. The first
     estimating equation is the corrected proportion, the second is for sensitivity, and the third for specificity.
 
-    If :math:`X` is of dimension :math:`p`, then ``theta`` is a 1-by-(1+2p) array. Note that the design matrix is
+    If :math:`X` is of dimension :math:`p`, then ``theta`` is a 1-by-(1+2`p`) array. Note that the design matrix is
     shared across the sensitivity and specificity models.
 
     Note
@@ -177,23 +177,23 @@ def ee_rogan_gladen_extended(theta, y, y_star, r, X, weights=None):
     theta : ndarray, list, vector
         Theta consists of 4 values.
     y : ndarray, list, vector
-        1-dimensional vector of n observed values. These are the gold-standard :math:`Y` measurements in the external
+        1-dimensional vector of `n` observed values. These are the gold-standard :math:`Y` measurements in the external
         sample. All values should be either 0 or 1, and be non-missing among those with :math:`R=0`.
     y_star : ndarray, list, vector
-        1-dimensional vector of n observed values. These are the mismeasured :math:`Y` values. All values should be
+        1-dimensional vector of `n` observed values. These are the mismeasured :math:`Y` values. All values should be
         either 0 or 1, and be non-missing among all observations.
     r : ndarray, list, vector
-        1-dimensional vector of n indicators regarding whether an observation was part of the external validation data.
-        Indicator should designate if observations are the main data.
+        1-dimensional vector of `n` indicators regarding whether an observation was part of the external validation
+        data. Indicator should designate if observations are the main data.
     X : ndarray, list, vector
         2-dimensional vector of a design matrix for the sensitivity and specificity models.
     weights : ndarray, list, vector, None, optional
-        1-dimensional vector of n weights. Default is ``None``, which assigns a weight of 1 to all observations.
+        1-dimensional vector of `n` weights. Default is ``None``, which assigns a weight of 1 to all observations.
 
     Returns
     -------
     array :
-        Returns a 4-by-n NumPy array evaluated for the input ``theta``
+        Returns a 4-by-`n` NumPy array evaluated for the input ``theta``
 
     Examples
     --------

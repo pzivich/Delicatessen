@@ -13,37 +13,36 @@ from delicatessen.utilities import logit, inverse_logit, identity
 
 
 def ee_gformula(theta, y, X, X1, X0=None, force_continuous=False):
-    r"""Estimating equations for the g-computation. The parameter of interest can either be the mean under a single
-    policy or plan of action, or the mean difference between two policies. This is accomplished by providing the
-    estimating equation the observed data (``X``, ``y``), and the same data under the actions (``X1`` and optionally
-    ``X0``).
+    r"""Estimating equations for the g-formula (or g-computation). The parameter of interest can either be the mean
+    under a single policy or plan of action, or the mean difference between two policies. This is accomplished by
+    providing the estimating equation the observed data (``X``, ``y``), and the same data under the actions (``X1``
+    and optionally ``X0``).
 
-    The outcome regression estimating equation is
+    The stack of estimating equations are
 
     .. math::
 
-        \sum_{i=1}^n \left\{ Y_i - g(X_i^T \beta) \right\} X_i = 0
+        \sum_{i=1}^n
+        \begin{bmatrix}
+            \left\{ g({X_i^*}^T \beta) - \theta_1 \right\} \\
+            \left\{ Y_i - g(X_i^T \beta) \right\} X_i
+        \end{bmatrix}
+        = 0
 
-    where :math:`g` indicates a transformation function. For linear regression, :math:`g` is the identity function.
-    Logistic regression uses the inverse-logit function. By default, `ee_gformula` detects whether `y` is all binary
+    where the first is the mean under the specified plan, with the plan setting the values of action :math:`A` (e.g.,
+    exposure, treatment, vaccination, etc.), and the second equation is the outcome regression model.
+    Here, :math:`g` indicates a transformation function. For linear regression, :math:`g` is the identity function.
+    Logistic regression uses the inverse-logit function. By default, ``ee_gformula`` detects whether `y` is all binary
     (zero or one), and applies logistic regression if that is evaluated to be true.
-
-    There are two variations on the parameter of interest. The first could be the mean under a plan, where the plan sets
-    the values of action :math:`A` (e.g., exposure, treatment, vaccination, etc.). The estimating equation for this
-    causal mean is
-
-    .. math::
-
-        \sum_{i=1}^n \left\{ g({X_i^*}^T \beta) - \theta_1 \right\} = 0
 
     Note
     ----
-    This variation includes :math:`1+b` parameters, where the first parameter is the causal mean, and the remainder are
+    This variation includes 1+`b` parameters, where the first parameter is the causal mean, and the remainder are
     the parameters for the regression model.
 
 
-    The alternative parameter of interest could be the mean difference between two plans. A common example of this would
-    be the average causal effect, where the plans are all-action-one versus all-action-zero. Therefore, the estimating
+    Alternatively, a causal mean difference is estimated when ``X0`` is specified. A common example of this would be
+    the average causal effect, where the plans are all-action-one versus all-action-zero. Therefore, the estimating
     equations consist of the following three equations
 
     .. math::
@@ -52,46 +51,38 @@ def ee_gformula(theta, y, X, X1, X0=None, force_continuous=False):
         \begin{bmatrix}
             (\theta_1 - \theta_2) - \theta_0 \\
             g({X_i^1}^T \beta) - \theta_1 \\
-            g({X_i^0}^T \beta) - \theta_2
+            g({X_i^0}^T \beta) - \theta_2 \\
+            \left\{ Y_i - g(X_i^T \beta) \right\} X_i
         \end{bmatrix}
         = 0
 
     Note
     ----
-    This variation includes :math:`3+b` parameters, where the first parameter is the causal mean difference, the second
+    This variation includes 3+`b` parameters, where the first parameter is the causal mean difference, the second
     is the causal mean under plan 1, the third is the causal mean under plan 0, and the remainder are the parameters
     for the regression model.
-
-
-    The parameter of interest is designated by the user via whether the optional argument ``X0`` is left as ``None``
-    (which estimates the causal mean) or is given an array (which estimates the causal mean difference and the
-    corresponding causal means).
-
-    Note
-    ----
-    All provided estimating equations are meant to be wrapped inside a user-specified function. Throughtout, these
-    user-defined functions are defined as ``psi``.
 
     Parameters
     ----------
     theta : ndarray, list, vector
-        Theta consists of 1+b values if ``X0`` is ``None``, and 3+b values if ``X0`` is not ``None``.
+        Theta consists of 1+`b` values if ``X0`` is ``None``, and 3+`b` values if ``X0`` is not ``None``.
     y : ndarray, list, vector
-        1-dimensional vector of n observed values.
+        1-dimensional vector of `n` observed values.
     X : ndarray, list, vector
-        2-dimensional vector of n observed values for b variables.
+        2-dimensional vector of `n` observed values for `b` variables.
     X1 : ndarray, list, vector
-        2-dimensional vector of n observed values for b variables under the action plan.
+        2-dimensional vector of `n` observed values for `b` variables under the action plan.
     X0 : ndarray, list, vector, None, optional
-        2-dimensional vector of n observed values for b variables under the separate action plan. This second argument
-        is optional and should be specified if the causal mean difference between two action plans is of interest.
+        2-dimensional vector of `n` observed values for `b` variables under the separate action plan. This second
+        argument is optional and should be specified if the causal mean difference between two action plans is of
+        interest.
     force_continuous : bool, optional
         Option to force the use of linear regression despite detection of a binary variable.
 
     Returns
     -------
     array :
-        Returns a (1+b)-by-n NumPy array if ``X0=None``, or returns a (3+b)-by-n NumPy array if ``X0!=None``
+        Returns a (1+`b`)-by-`n` NumPy array if ``X0=None``, or returns a (3+`b`)-by-`n` NumPy array if ``X0!=None``
 
     Examples
     --------
@@ -248,18 +239,10 @@ def ee_gformula(theta, y, X, X1, X0=None, force_continuous=False):
 
 
 def ee_ipw(theta, y, A, W, truncate=None, weights=None):
-    r"""Estimating equation for inverse probability weighting estimator. For estimation of the weights (or propensity
-    scores), a logistic model is used. The first estimating equations for the logistic regression model are
+    r"""Estimating equation for inverse probability weighting (IPW) estimator. The average causal effect is estimated by
+    this implementation of the IPW estimator. For estimation of the propensity scores, a logistic model is used.
 
-    .. math::
-
-        \sum_{i=1}^n \left\{ A_i - \text{expit}(W_i^T \alpha) \right\} W_i = 0
-
-    where A is the action and W is the set of confounders.
-
-    For the implementation of the inverse probability weighting estimator, stacked estimating equations are used
-    for the mean had everyone been set to ``A=1``, the mean had everyone been set to ``A=0``, and the mean difference
-    between the two causal means. The estimating equations are
+    The stacked estimating equations are
 
     .. math::
 
@@ -267,52 +250,41 @@ def ee_ipw(theta, y, A, W, truncate=None, weights=None):
         \begin{bmatrix}
             (\theta_1 - \theta_2) - \theta_0 \\
             \frac{A_i Y_i}{\pi_i} - \theta_1 - \theta_1 \\
-            \frac{(1-A_i) Y_i}{1-\pi_i} - \theta_2
+            \frac{(1-A_i) Y_i}{1-\pi_i} - \theta_2 \\
+            \left\{ A_i - \text{expit}(W_i^T \alpha) \right\} W_i
         \end{bmatrix}
         = 0
 
-    where :math:`\pi_i = expit(W_i^T \alpha)`. Due to these 3 extra values, the length of the theta vector is 3+b,
-    where b is the number of parameters in the regression model.
-
-    Note
-    ----
-    Unlike ``ee_gformula``, ``ee_ipw`` always provides the average causal effect, and causal means for ``A=1`` and
-    ``A=0``.
-
-
-    Here, theta corresponds to a variety of different quantities. The *first* value in theta vector is the causal mean
-    difference, the *second* is the mean had everyone been set to ``A=1``, the *third* is the mean had everyone been
-    set to ``A=0``. The remainder of the parameters correspond to the logistic regression model coefficients.
-
-    Note
-    ----
-    All provided estimating equations are meant to be wrapped inside a user-specified function. Throughtout, these
-    user-defined functions are defined as ``psi``.
+    where :math:`A` is the action, math:`W` is the set of confounders, and :math:`\pi_i = expit(W_i^T \alpha)`. The
+    first estimating equation is for the average causal effect, the second is for the mean under :math:`A:=1`,
+    the third is for the mean under :math:`A:=0`, and the last is the logistic regression model for the propensity
+    scores. Here, the length of the theta vector is 3+`b`, where `b` is the number of parameters in the regression
+    model.
 
     Parameters
     ----------
     theta : ndarray, list, vector
-        Theta consists of 3+b values.
+        Theta consists of 3+`b` values.
     y : ndarray, list, vector
-        1-dimensional vector of n observed values.
+        1-dimensional vector of `n` observed values.
     A : ndarray, list, vector
-        1-dimensional vector of n observed values. The A values should all be 0 or 1.
+        1-dimensional vector of `n` observed values. The A values should all be 0 or 1.
     W : ndarray, list, vector
-        2-dimensional vector of n observed values for b variables to model the probability of ``A`` with.
+        2-dimensional vector of `n` observed values for `b` variables to model the probability of ``A`` with.
     truncate : None, list, set, ndarray, optional
         Bounds to truncate the estimated probabilities of ``A`` at. For example, estimated probabilities above 0.99 or
         below 0.01 can be set to 0.99 or 0.01, respectively. This is done by specifying ``truncate=(0.01, 0.99)``. Note
         this step is done via ``numpy.clip(.., a_min, a_max)``, so order is important. Default
         is ``None``, which applies no truncation.
     weights : ndarray, list, vector, None, optional
-        1-dimensional vector of n weights. Default is None, which assigns a weight of 1 to all observations. This
+        1-dimensional vector of n weights. Default is ``None``, which assigns a weight of 1 to all observations. This
         argument is intended to support the use of missingness weights. The propensity score model is *not* fit using
         these weights.
 
     Returns
     -------
     array :
-        Returns a (3+b)-by-n NumPy array evaluated for the input ``theta``
+        Returns a (3+`b`)-by-`n` NumPy array evaluated for the input ``theta``.
 
     Examples
     --------
@@ -334,7 +306,7 @@ def ee_ipw(theta, y, A, W, truncate=None, weights=None):
     >>> d['Y'] = (1-d['A'])*d['Ya0'] + d['A']*d['Ya1']
     >>> d['C'] = 1
 
-    Defining psi, or the stacked estimating equations. Note that 'A' is the action.
+    Defining psi, or the stacked estimating equations. Note that ``'A'`` is the action.
 
     >>> def psi(theta):
     >>>     return ee_ipw(theta, y=d['Y'], A=d['A'],
@@ -409,39 +381,42 @@ def ee_ipw(theta, y, A, W, truncate=None, weights=None):
 
 
 def ee_ipw_msm(theta, y, A, W, V, distribution, link, hyperparameter=None, truncate=None, weights=None):
-    r"""Estimating equation for inverse probability weighting estimator of the parameters of a marginal structural
-    model. For estimation of the weights (or propensity scores), a logistic model is used. The first estimating
-    equations for the logistic regression model are
+    r"""Estimating equation for parameters of a marginal structural model estimated using inverse probability weighting.
+    For estimation of the propensity scores, a logistic model is used.
+
+    The stacked estimating equations are
 
     .. math::
 
-        \sum_{i=1}^n \left\{ A_i - \text{expit}(W_i^T \alpha) \right\} W_i = 0
+        \sum_{i=1}^n
+        \begin{bmatrix}
+            \frac{1}{\pi_i} \left\{ Y_i - g^{-1}(X_i^T \beta) \right\} \times \frac{D(\beta)}{v(\beta)} X_i \\
+            \left\{ A_i - \text{expit}(W_i^T \alpha) \right\} W_i
+        \end{bmatrix}
+        = 0
 
-    where A is the action and W is the set of confounders. For the implementation of the inverse probability weighting
-    estimator of the marginal structural model, a weighted generalized linear model is used. See ``ee_glm`` for details
-    on this estimating equation.
+    where :math:`A` is the action, math:`W` is the set of confounders, and :math:`\pi_i = \text{expit}(W_i^T \alpha)`.
+    Here, :math:`X` is the design matrix for the marginal structural model (it includes :math:`A`, and possibly some
+    covariates from :math:`W`). The first estimating equation is a weighted generalized linear model is used. See
+    ``ee_glm`` for details on this estimating equation. The second estimating equation is the logistic model for the
+    propensity scores.
 
     Here, ``theta`` corresponds to multiple quantities. The *first* set of values correspond to the parameters of the
     marginal structural model, and the *second* set correspond to the logistic regression model coefficients for the
     propensity scores.
 
-    Note
-    ----
-    All provided estimating equations are meant to be wrapped inside a user-specified function. Throughtout, these
-    user-defined functions are defined as ``psi``.
-
     Parameters
     ----------
     theta : ndarray, list, vector
-        Theta consists of 3+b values.
+        Theta consists of `c`+`b` values.
     y : ndarray, list, vector
-        1-dimensional vector of n observed values.
+        1-dimensional vector of `n` observed values.
     A : ndarray, list, vector
-        1-dimensional vector of n observed values. The A values should all be 0 or 1.
+        1-dimensional vector of `n` observed values. The A values should all be 0 or 1.
     W : ndarray, list, vector
-        2-dimensional vector of n observed values for b variables to model the probability of ``A`` with.
+        2-dimensional vector of `n` observed values for `b` variables to model the probability of ``A`` with.
     V : ndarray, list, vector
-        2-dimensional vector of n observed values for c variables in the marginal structural model.
+        2-dimensional vector of `n` observed values for `c` variables in the marginal structural model.
     distribution : str
         Distribution for the generalized linear model. See ``ee_glm`` for options.
     link : str
@@ -459,7 +434,7 @@ def ee_ipw_msm(theta, y, A, W, V, distribution, link, hyperparameter=None, trunc
     Returns
     -------
     array :
-        Returns a (3+b)-by-n NumPy array evaluated for the input ``theta``
+        Returns a (`c`+`b`)-by-`n` NumPy array evaluated for the input ``theta``.
 
     Examples
     --------
@@ -558,26 +533,9 @@ def ee_ipw_msm(theta, y, A, W, V, distribution, link, hyperparameter=None, trunc
 
 def ee_aipw(theta, y, A, W, X, X1, X0, truncate=None, force_continuous=False):
     r"""Estimating equation for augmented inverse probability weighting (AIPW) estimator. AIPW consists of two nuisance
-    models (the propensity score model and the outcome model). For estimation of the propensity scores, the estimating
-    equations are
+    models (the propensity score model and the outcome model).
 
-    .. math::
-
-        \sum_{i=1}^n \left\{ A_i - \text{expit}(W_i^T \alpha) \right\} W_i = 0
-
-    where ``A`` is the treatment and ``W`` is the set of confounders. The estimating equations for the outcome model
-    are
-
-    .. math::
-
-        \sum_{i=1}^n \left\{ Y_i - g(X_i^T \beta) \right\} X_i = 0
-
-    By default, `ee_aipw` detects whether `y` is all binary (zero or one), and applies logistic regression. Notice that
-    ``X`` here should consists of both ``A`` and ``W`` (with possible interaction terms or other differences in
-    functional forms from the propensity score model).
-
-    The AIPW estimating equations include the causal mean difference, mean had everyone been set to ``A=1``, and the
-    mean had everyone been set to ``A=0``
+    The stacked estimating equations are
 
     .. math::
 
@@ -585,46 +543,39 @@ def ee_aipw(theta, y, A, W, X, X1, X0, truncate=None, force_continuous=False):
         \begin{bmatrix}
             (\theta_1 - \theta_2) - \theta_0 \\
             \frac{A_i Y_i}{\pi_i} - \frac{\hat{Y^1}(A_i-\pi_i}{\pi_i} - \theta_1 \\
-            \frac{(1-A_i) Y_i}{1-\pi_i} + \frac{\hat{Y^0}(A_i-\pi_i}{1-\pi_i} - \theta_2
+            \frac{(1-A_i) Y_i}{1-\pi_i} + \frac{\hat{Y^0}(A_i-\pi_i}{1-\pi_i} - \theta_2 \\
+            \left\{ A_i - \text{expit}(W_i^T \alpha) \right\} W_i \\
+            \left\{ Y_i - g(X_i^T \beta) \right\} X_i
         \end{bmatrix}
         = 0
 
-    where :math:`\hat{Y}^a = g({X_i^*}^T \beta)`.
+    where :math:`A` is the action and :math:`W` is the set of confounders, :math:`Y` is the outcome, and
+    :math:`\pi_i = \text{expit}(W_i^T \alpha)`. The first estimating equation is for the average causal effect, the
+    second is for the mean under :math:`A:=1`, the third is for the mean under :math:`A:=0`, the fourth is the logistic
+    regression model for the propensity scores, and the last is for the outcome model. Here, the length of the theta
+    vector is 3+`b`+`c`, where `b` is the number of parameters in the propensity score model and `c` is the number
+    of parameters in the outcome model.
 
-    Note
-    ----
-    Unlike ``ee_gformula``, ``ee_aipw`` always provides the average causal effect, and causal means for ``A=1`` and
-    ``A=0``.
-
-
-    Due to these 3 extra values and two nuisance models, the length of the parameter vector is 3+b+c, where b is the
-    number of columns in ``W``, and c is the number of columns in ``X``. The *first* value in theta vector is the
-    causal mean difference (or average causal effect), the *second* is the mean had everyone been given ``A=1``, the
-    *third* is the mean had everyone been given ``A=0``. The remainder of the parameters correspond to the regression
-    model coefficients, in the order input. The first 'chunk' of  coefficients correspond to the propensity score model
-    and the last 'chunk' correspond to the outcome model.
-
-    Note
-    ----
-    All provided estimating equations are meant to be wrapped inside a user-specified function. Throughtout, these
-    user-defined functions are defined as ``psi``.
+    By default, `ee_aipw` detects whether `y` is all binary (zero or one), and applies logistic regression. Notice that
+    ``X`` here should consists of both ``A`` and ``W`` (with possible interaction terms or other differences in
+    functional forms from the propensity score model).
 
     Parameters
     ----------
     theta : ndarray, list, vector
-        Theta consists of 3+b+c values.
+        Theta consists of 3+`b`+`c` values.
     y : ndarray, list, vector
-        1-dimensional vector of n observed values.
+        1-dimensional vector of `n` observed values.
     A : ndarray, list, vector
-        1-dimensional vector of n observed values. The A values should all be 0 or 1.
+        1-dimensional vector of `n` observed values. The A values should all be 0 or 1.
     W : ndarray, list, vector
-        2-dimensional vector of n observed values for b variables to model the probability of ``A`` with.
+        2-dimensional vector of `n` observed values for `b` variables to model the probability of ``A`` with.
     X : ndarray, list, vector
-        2-dimensional vector of n observed values for c variables to model the outcome ``y``.
+        2-dimensional vector of `n` observed values for `c` variables to model the outcome ``y``.
     X1 : ndarray, list, vector
-        2-dimensional vector of n observed values for b variables under the action plan where ``A=1`` for all units.
+        2-dimensional vector of `n` observed values for `c` variables under the action plan where ``A=1`` for all units.
     X0 : ndarray, list, vector, None, optional
-        2-dimensional vector of n observed values for b variables under the action plan where ``A=0`` for all units.
+        2-dimensional vector of `n` observed values for `c` variables under the action plan where ``A=0`` for all units.
     truncate : None, list, set, ndarray, optional
         Bounds to truncate the estimated probabilities of ``A`` at. For example, estimated probabilities above 0.99 or
         below 0.01 can be set to 0.99 or 0.01, respectively. This is done by specifying ``truncate=(0.01, 0.99)``. Note
@@ -636,7 +587,7 @@ def ee_aipw(theta, y, A, W, X, X1, X0, truncate=None, force_continuous=False):
     Returns
     -------
     array :
-        Returns a (3+b+c)-by-n NumPy array evaluated for the input ``theta``
+        Returns a (3+`b`+`c`)-by-`n` NumPy array evaluated for the input ``theta``
 
     Examples
     --------
@@ -787,15 +738,15 @@ def ee_gestimation_snmm(theta, y, A, W, V, X=None, model='linear', weights=None)
 
         E[Y^a - Y^{0} | A=a, V] = \beta_1 a + \beta_2 a V
 
-    This model corresponds to the average causal effect among those with :math:`A=a` within strata of :math:`V`. The
+    This model corresponds to the average causal effect among those with :math:`A=a` by :math:`V`. The
     log-linear SMM is defined as
 
     .. math::
 
         \frac{E[Y^a | A=a, V]}{E[Y^{0} | A=a, V]} = \exp(\beta_1 a + \beta_2 a V)
 
-    This model corresponds to the causal mean ratio among those with :math:`A=a` within strata of :math:`V`. Note that
-    the log-linear SMM is only defined when :math:`Y > 0`. The parameters of either SMM can be identified under the
+    This model corresponds to the causal mean ratio among those with :math:`A=a` by :math:`V`. Note that
+    the log-linear SMM is only defined when :math:`Y > 0`. The parameters of either SMM are identified under the
     assumptions of  causal consistency, and exchangeability with positivity.
 
     Two different estimating equations are available for g-estimation. The first set is referred to at the 'inefficient'
@@ -803,57 +754,68 @@ def ee_gestimation_snmm(theta, y, A, W, V, X=None, model='linear', weights=None)
 
     .. math::
 
-        \sum_{i=1}^n \left\{ H(\beta) \times (A - E[A | W]) \right\}  \times \mathbb{V}_i = 0
+        \sum_{i=1}^n
+        \begin{bmatrix}
+            \left\{ H(\beta) \times (A - \pi_i) \right\}  \times V_i \\
+            \left\{ A_i - \text{expit}(W_i^T \alpha) \right\} W_i
+        \end{bmatrix}
+        = 0
 
-    where :math:`H(\beta) = Y - \beta A \mathbb{V}` for a linear SMM and
-    :math:`H(\beta) = Y \times \exp(-A \beta \mathbb{V})` for a log-linear SMM, where :math:`\mathbb{V}` is a design
-    matrix. Note that :math:`V \subseteq W`, where :math:`W` is the set of confounding variables. This estimating
-    equation requires :math:`E[A|W]`, which must be estimated. This is done via the following estimating equation for
-    binary actions
+    where :math:`\pi_i = \text{expit}(W_i^T \alpha)`, and
+    :math:`H(\beta) = Y - \beta A \mathbb{V}` for a linear SMM and
+    :math:`H(\beta) = Y \times \exp(-A \beta \mathbb{V})` for a log-linear SMM, where .
+    Note that :math:`V \subseteq W`, where :math:`W` is the set of confounding variables.
+    The length of the parameter vector is `b`+`c`, where `b` is the number of columns in ``V``, and
+    `c` is the number of columns in ``W``.
+
+    The second implementation for g-estimation is the 'efficient' g-estimator. For the efficient g-estimator we replace
+    :math:`H(\beta)` with :math:`\{H(\beta) - E[H(\beta) | W]\}` in the prior estimating equation and specify a model
+    for :math:`E[H(\beta) | W]`. The corresponding stacked estimating equations are
 
     .. math::
 
-        \sum_{i=1}^n \left\{ A_i - \text{expit}(W_i^T \alpha) \right\} W_i = 0
+        \sum_{i=1}^n
+        \begin{bmatrix}
+            \left\{ (H(\beta) - g^{-1}(W_i^T \gamma)) \times (A - \pi_i) \right\}  \times V_i \\
+            \left\{ A_i - \text{expit}(W_i^T \alpha) \right\} W_i \\
+            \left\{ H(\beta) - g^{-1}(W_i^T \gamma) \right\} W_i \\
+        \end{bmatrix}
+        = 0
 
-    These estimating equations are stacked together. Therefore, the length of the parameter vector is b+c, where b is
-    the number of columns in ``V``, and c is the number of columns in ``W``. The *first* b values in theta
-    vector are the SMM parameters. The *second* set are the parameters corresponding to the :math:`E[A|W]` model.
-
-    The second implementation for g-estimation is the 'efficient' g-estimator. For the efficient g-estimator we replace
-    :math:`H(\beta)` with :math:`\{H(\beta) - E[H(\beta) | W]\}` in the prior estimating equation. Here, we also need to
-    specify a model for :math:`E[H(\beta) | W]`. Therefore, an additional estimating equation for
-    :math:`E[H(\beta) | W]` is stacked with the others. Therefore, there are b+c+d parameters for the efficient
-    g-estimator, where d is the number of parameters in the model for :math:`E[H(\beta) | W]`.
+    where :math:`g^{-1}` is the inverse transformation for the specified SMM. Therefore, there are b+c+d parameters
+    for the efficient g-estimator, where `d` is the number of parameters in the model for :math:`E[H(\beta) | W]`.
 
     Parameters
     ----------
     theta : ndarray, list, vector
-        Theta consists of 1+b values if ``X0`` is ``None``, and 3+b values if ``X0`` is not ``None``.
+        Theta consists of 1+`b` values if ``X0`` is ``None``, and 3+b values if ``X0`` is not ``None``.
     y : ndarray, list, vector
-        1-dimensional vector of n observed values of the outcome.
+        1-dimensional vector of `n` observed values of the outcome.
     A : ndarray, list, vector
-        1-dimensional vector of n observed values of the action. The A values should all be 0 or 1.
+        1-dimensional vector of `n` observed values of the action. The A values should all be 0 or 1.
     W : ndarray, list, vector
-        2-dimensional vector of n observed values for b columns of a design matrix to model the expected value of ``A``.
+        2-dimensional vector of `n` observed values for b columns of a design matrix to model the expected value of
+        ``A``.
     V : ndarray, list, vector
-        2-dimensional vector of n observed values for b columns of a design matrix for the structural mean model. Note
-        that the design matrix here is expected to not include the observed values of ``A``
+        2-dimensional vector of `n` observed values for `b` columns of a design matrix for the structural mean model.
+        Note that the design matrix here is expected to not include the observed values of ``A``
     X : ndarray, list, vector, None, optional
         Default of this argument is ``None``, which implements the estimating equation for the inefficient g-estimator.
-        To use the efficient g-estimator, a 2-dimensional vector of n observed values for b columns of a design matrix
+        To use the efficient g-estimator, a 2-dimensional vector of n observed values for `b` columns of a design matrix
         for the :math:`E[H(\beta) | W]` model should be provided here.
     model : str, optional
         Type of structural mean model to fit. Options are currently: ``linear``, ``poisson``. Default is ``linear``.
         The Poisson model specification can be used for positive continuous data, or with binary data in order to
         estimate causal risk ratios.
     weights : ndarray, list, vector, None, optional
-        1-dimensional vector of n weights. Default is None, which assigns a weight of 1 to all observations. This
+        1-dimensional vector of n weights. Default is ``None``, which assigns a weight of 1 to all observations. This
         argument is intended to support the use of sampling or missingness weights.
 
     Returns
     -------
     array :
-        Returns a (b+c)-by-n (inefficient) or (b+c+d)-by-n (efficient) NumPy array evaluated for the input ``theta``
+        Returns a (`b`+`c`)-by-`n` (inefficient) or (`b`+`c`+`d`)-by-`n` (efficient) NumPy array evaluated for the
+        input ``theta``.
 
     Examples
     --------
@@ -1040,34 +1002,35 @@ def ee_mean_sensitivity_analysis(theta, y, delta, X, q_eval, H_function):
     probability weighting estimator will result in different (but similar) estimates.
 
 
-    The length of the parameter vector, :math:`\theta`, is 1+b, where b is the number of columns in ``X``. The *first*
-    value in the theta vector is the corrected mean of :math:`Y`. The remainder of the parameters correspond to the
-    regression model coefficients.
+    The length of the parameter vector, :math:`\theta`, is 1+`b`, where `b` is the number of columns in ``X``.
+    The *first* value in the theta vector is the corrected mean of :math:`Y`. The remainder of the parameters
+    correspond to the regression model coefficients.
 
     Parameters
     ----------
     theta : ndarray, list, vector
-        Theta in this case consists of 1+b values. Therefore, initial values should consist of one plus the number of
+        Theta in this case consists of 1+`b` values. Therefore, initial values should consist of one plus the number of
         columns present in ``X``. This can easily be accomplished generally by ``[0, ] + [0, ] * X.shape[1]``.
     y : ndarray, list, vector
-        1-dimensional vector of n values. Any values of ``y`` that are missing should be indicated by the ``delta``
+        1-dimensional vector of `n` values. Any values of ``y`` that are missing should be indicated by the ``delta``
         parameter.
     delta : ndarray, list, vector
-        1-dimensional vector of n observed values indicating whether the observation has a value for ``y`` observed,
+        1-dimensional vector of `n` observed values indicating whether the observation has a value for ``y`` observed,
         where 1 indicates yes and 0 indicated no. This vector should not include any ``nan`` values.
     X : ndarray, list, vector
-        2-dimensional vector of n observed values for b variables consider as predictors. At a minimum, a vector of ones
-        (intercept) should be included. This matrix should not include any ``nan`` values.
+        2-dimensional vector of `n` observed values for `b` variables consider as predictors. At a minimum, a vector
+        of ones (intercept) should be included. This matrix cannot include any ``nan`` values.
     q_eval : ndarray, list, vector
-        1-dimensional vector of n values evaluated using the :math:`q(Y; \alpha)` function.
+        1-dimensional vector of `n` values evaluated using the :math:`q(Y; \alpha)` function.
     H_function : callable
-        Function use to bound the observations between 0,1. The function must be monotonic increasing and be bounded by
-        :math:`[0,1]`. For example, the expit (``delicatessen.utilities.inverse_logit``) function meets this criteria.
+        Function use to bound the observations between :math:`[0,1]`. The function must be monotonic increasing and be
+        bounded by :math:`[0,1]`. For example, the expit (``delicatessen.utilities.inverse_logit``) function meets
+        this criteria.
 
     Returns
     -------
     array :
-        Returns a (1+b)-by-n NumPy array evaluated for the input ``theta``
+        Returns a (1+`b`)-by-`n` NumPy array evaluated for the input ``theta``.
 
     Examples
     --------
