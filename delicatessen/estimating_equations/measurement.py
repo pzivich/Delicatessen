@@ -318,7 +318,7 @@ def ee_regression_calibration(theta, beta, a, a_star, r, X=None, weights=None):
     the coefficient for :math:`A^*` on :math:`Y` (which comes from a model external to ``ee_regression_calibration``)
     by the predictiveness in terms of probability of :math:`A^*` for :math:`A`, :math:`\gamma_0`. The second estimating
     equation is used to estimate :math:`\gamma` using a linear probability model. Here, :math:`\gamma` are the
-    parameters of the calibration model.
+    parameters of the calibration model. Notice that only the validation set contributes to the calibration model.
 
     Note
     ----
@@ -371,9 +371,82 @@ def ee_regression_calibration(theta, beta, a, a_star, r, X=None, weights=None):
     >>> import pandas as pd
     >>> from scipy.stats import logistic
     >>> from delicatessen import MEstimator
+    >>> from delicatessen.estimating_equations import ee_regression
     >>> from delicatessen.estimating_equations import ee_regression_calibration
 
-    TODO ... provide example ...
+    Creating some example data for illustration
+
+    >>> d = pd.DataFrame()
+    >>> d['A_star'] = [0, 1, 0, 1] + [1, 0, 1, 0]
+    >>> d['A'] = [np.nan, np.nan, np.nan, np.nan] + [1, 1, 0, 0]
+    >>> d['Y'] = [0, 0, 1, 1] + [0, 1] + [np.nan, np.nan]
+    >>> d['n'] = [266, 67, 400, 267] + [90, 10, 20, 80]
+    >>> d['S'] = [1, 1, 1, 1] + [0, 0, 0, 0]
+    >>> d = pd.DataFrame(np.repeat(d.values, d['n'], axis=0), columns=d.columns)
+    >>> d['C'] = 1
+    >>> d1 = d.loc[d['S'] == 1].copy()
+
+    Suppose we are interested in the odds ratio for A on Y. In the main study, we only have a mismeasured version of A,
+    indicated by ``A_star``. As a starting point, we might examine ``A_star`` on Y, which can be done using a logistic
+    regression model with delicatessen
+
+    >>> def psi(theta):
+    >>>     return ee_regression(theta=theta, y=d1['Y'],
+    >>>                          X=d1[['C', 'A_star']],
+    >>>                          model='logistic')
+
+    >>> estr = MEstimator(psi, init=[0, 0])
+    >>> estr.estimate()
+    >>> np.exp(estr.theta[1])  # Odds Ratio of interest
+
+    While we obtain a result, the corresponding odds ratio may be biased due to measurement error of A. Under the
+    assumption of non-differential measurement error, we can use regression calibration (and our external data) to
+    correct for the measurement error.
+
+    To implement regression calibration, we stack our previous estimating equations with the regression calibration
+    estimating equations. Below is code that illustrates this process
+
+    >>> def psi(theta):
+    >>>     theta_calib = theta[:3]  # Calibration model parameters
+    >>>     theta_main = theta[3:]   # Naive model parameters
+    >>>     y_no_nan = np.where(d['Y'].isna(), -999, d['Y'])
+    >>>     r = np.asarray(d['S'])
+    >>>     # Naive regression model
+    >>>     ee_logit_star = ee_regression(theta=theta_main, y=y_no_nan,
+    >>>                                   X=d[['C', 'A_star']],
+    >>>                                   model='logistic')
+    >>>     ee_logit_star = ee_logit_star * r  # Only main-study contributes
+    >>>     # Regression calibration
+    >>>     ee_calib = ee_regression_calibration(theta=theta_calib,  # Calibration parameters
+    >>>                                          beta=theta_main[1], # Coefficient to correct
+    >>>                                          a=d['A'],           # True A
+    >>>                                          a_star=d['A_star'], # Mismeasured A
+    >>>                                          r=r)                # Validation set indicator
+    >>>     return np.vstack([ee_calib, ee_logit_star])
+
+    >>> estr = MEstimator(psi, init=[0, 0.75, 0, 0, 0])
+    >>> estr.estimate()
+
+    Note that 5 initial starting values are provided, 3 for the regression calibration equations and 2 for the main
+    model. Further, note that the second parameter is non-zero. Providing a starting value of zero will result in a
+    division by zero error. It is recommended to have the starting value between 0.5 and 1. Finally, note that the
+    naive log-odds ratio is provided to ``ee_regression_calibration`` via the ``beta`` argument. This argument tells
+    ``ee_regression_calibration`` which coefficient needs to be corrected.
+
+    Inspecting the parameter estimates
+
+    >>> estr.theta[0]                    # Corrected log-odds ratio
+    >>> estr.theta[1]                    # Calibration factor for the coefficient
+    >>> estr.theta[-1]                   # Uncorrected log-odds ratio (for this setup)
+    >>> estr.theta[-1] / estr.theta[1]   # Equivalent to estr.theta[0]
+
+    While one could calculate the corrected odds ratio by-hand, the sandwich variance estimator provides a consistent
+    estimate of the variance in this context. The provided estimating equation  method can be easily extended to
+    account for measurement error of conditional odds ratios, parameters of generlized linear models, or marginal
+    structural models.
+
+    Weighted calibration models can be estimated by specifying the optional ``weights`` argument (weights are not used
+    to calibrate the coefficient).
 
     References
     ----------
@@ -386,6 +459,7 @@ def ee_regression_calibration(theta, beta, a, a_star, r, X=None, weights=None):
     """
     # Processing inputs
     a = np.asarray(a)                           # Convert to NumPy array
+    a_star = np.asarray(a_star)                 # Convert to NumPy array
     r = np.asarray(r)                           # Convert to NumPy array
     if X is None:                               # Intercept-only model
         X = np.ones(a.shape)[:, None]           # ... intercept-only
@@ -397,6 +471,7 @@ def ee_regression_calibration(theta, beta, a, a_star, r, X=None, weights=None):
         weights = np.asarray(weights)           # ... convert to NumPy array
 
     # Preparing data for estimating equation operations
+    a = np.where(r == 1, -999, a)               # Removing NaN (or any other indicators) for Y in main
     beta_corrected = theta[0]                   # First parameter in vector will be corrected coefficient
     gamma = theta[1:]                           # All other parameters are for the regression calibration model
 
