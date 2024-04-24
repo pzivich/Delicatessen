@@ -175,7 +175,7 @@ def ee_rogan_gladen_extended(theta, y, y_star, r, X, weights=None):
     Parameters
     ----------
     theta : ndarray, list, vector
-        Theta consists of 4 values.
+        Theta consists of 1+2`p` values.
     y : ndarray, list, vector
         1-dimensional vector of `n` observed values. These are the gold-standard :math:`Y` measurements in the external
         sample. All values should be either 0 or 1, and be non-missing among those with :math:`R=0`.
@@ -193,7 +193,7 @@ def ee_rogan_gladen_extended(theta, y, y_star, r, X, weights=None):
     Returns
     -------
     array :
-        Returns a 4-by-`n` NumPy array evaluated for the input ``theta``
+        Returns a (1+2`p`)-by-`n` NumPy array evaluated for the input ``theta``
 
     Examples
     --------
@@ -293,3 +293,122 @@ def ee_rogan_gladen_extended(theta, y, y_star, r, X, weights=None):
 
     # Returning the stacked estimating equations
     return np.vstack([ee_corr_mean, ee_sens, ee_spec])
+
+
+def ee_regression_calibration(theta, beta, a, a_star, r, X=None, weights=None):
+    """Estimating equation for regression calibration with external data for a mismeasured *binary* action. Regression
+    calibration is a simple to implement method to correct for measurement error.
+
+    The general form of the estimating equations are
+
+    .. math::
+
+        \sum_{i=1}^n
+        \begin{bmatrix}
+            (\beta^* / \gamma_0) - \beta  \\
+            (1-R_i) \left\{ A_i - \gamma_0 A_i^* + \gamma^T X_i \right\} X_i^T
+        \end{bmatrix}
+        = 0
+
+    where :math:`A` is the gold-standard measurement of the action, :math:`A^*` is the mismeasured version of the binary
+    action, :math:`X` is some additional covariates (including at least an intercept), and :math:`R` indicates whether
+    someone was in the validation set (:math:`R=0` if in the validation set).
+
+    The first estimating equation is for the corrected coefficient for :math:`A` on :math:`Y`. This is done by scaling
+    the coefficient for :math:`A^*` on :math:`Y` (which comes from a model external to ``ee_regression_calibration``)
+    by the predictiveness in terms of probability of :math:`A^*` for :math:`A`, :math:`\gamma_0`. The second estimating
+    equation is used to estimate :math:`\gamma` using a linear probability model. Here, :math:`\gamma` are the
+    parameters of the calibration model.
+
+    Note
+    ----
+    For the second place in ``theta``, (i.e., ``theta[1]``), a starting value between between 0.5 and 1 is recommended.
+
+
+    One caution for application of regression calibration is that it is only valid for non-differential measurement
+    error. In cases of differential measurement error, methods like Multiple Imputation for Measurement Error (MIME)
+    should be considered instead (Cole et al., 2006).
+
+    If ``X=None`` then ``theta`` is a 1-by-3 array. Otherwise, ``theta`` is a 1-by-(2+`p`) array, where `p` is the is
+    the dimension of :math:`X`.
+
+    Parameters
+    ----------
+    theta : ndarray, list, vector
+        Theta consists of 1+2`p` values.
+    beta : float, int, ndarray
+        Coefficient to correct from a model fit outside of ``ee_regression_calibration``. This coefficient should be
+        for the main effect of ``a_star`` on the outcome. Notice that regression calibration only requires the
+        coefficient to apply the correction (i.e., ``y`` is not needed for this estimating equation).
+    a : ndarray, list, vector
+        1-dimensional vector of `n` observed values. These are the gold-standard :math:`A` measurements in the external
+        sample. All values should be either 0 or 1, and be non-missing among those with :math:`R=0`.
+    a_star : ndarray, list, vector
+        1-dimensional vector of `n` observed values. These are the mis-measured :math:`A` in the external and internal
+        sample. All values should be either 0 or 1, and must be non-missing among those with :math:`R=0`.
+    r : ndarray, list, vector
+        1-dimensional vector of `n` indicators regarding whether an observation was part of the external validation
+        data. Indicator should designate if observations are the main data.
+    X : ndarray, list, vector, None, optional
+        2-dimensional vector of a design matrix for calibration model. Notice that this design matrix should not include
+        ``a``. Behind the scenes, ``a`` is added to this design matrix to make it easier to process the coefficients for
+        the regression calibration step. Default is ``None``, which automatically generates an intercept, so the
+        calibration model ``a ~ a_star + 1`` is fit by default.
+    weights : ndarray, list, vector, None, optional
+        1-dimensional vector of `n` weights. Default is ``None``, which assigns a weight of 1 to all observations. Note
+        that weights are only used in the calibration model fitting.
+
+    Returns
+    -------
+    array :
+        Returns a 3-by-`n` or (2+`p`)-by-`n` NumPy array evaluated for the input ``theta``
+
+    Examples
+    --------
+    Construction of a estimating equation(s) with ``ee_regression_calibration`` should be done similar to the following
+
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> from scipy.stats import logistic
+    >>> from delicatessen import MEstimator
+    >>> from delicatessen.estimating_equations import ee_regression_calibration
+
+    TODO ... provide example ...
+
+    References
+    ----------
+    Cole SR, Chu H, & Greenland S. (2006). Multiple-imputation for measurement-error correction.
+    *International Journal of Epidemiology*, 35(4), 1074-1081.
+
+    Cole SR, Jacobson LP, Tien PC, Kingsley L, Chmiel JS, & Anastos K. (2010). Using marginal structural
+    measurement-error models to estimate the long-term effect of antiretroviral therapy on incident AIDS or death.
+    *American Journal of Epidemiology*, 171(1), 113-122.
+    """
+    # Processing inputs
+    a = np.asarray(a)                           # Convert to NumPy array
+    r = np.asarray(r)                           # Convert to NumPy array
+    if X is None:                               # Intercept-only model
+        X = np.ones(a.shape)[:, None]           # ... intercept-only
+    else:                                       # User-specified design matrix
+        X = np.asarray(X)                       # ... convert to NumPy array
+    if weights is None:                         # Handle weights argument
+        weights = 1                             # ... set all weight as 1
+    else:                                       # Otherwise
+        weights = np.asarray(weights)           # ... convert to NumPy array
+
+    # Preparing data for estimating equation operations
+    beta_corrected = theta[0]                   # First parameter in vector will be corrected coefficient
+    gamma = theta[1:]                           # All other parameters are for the regression calibration model
+
+    # Calibration Model (via a linear probability model)
+    ee_calib = ee_regression(theta=gamma,                              # Regression model for the calibration step
+                             y=a, X=np.hstack([a_star[:, None], X]),   # ... Design matrices built as I expect them
+                             model='linear',                           # ... linear regression
+                             weights=weights)                          # ... with provided weights
+    ee_calib = ee_calib * (1-r)                                        # Only have the external observations contribute
+
+    # Corrected coefficient
+    ee_corr_beta = np.ones(a.shape) * (beta / gamma[0] - beta_corrected)  # Transformation of coefficients for RC
+
+    # Returning the stacked estimating equations
+    return np.vstack([ee_corr_beta, ee_calib])
