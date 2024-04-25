@@ -495,11 +495,35 @@ def ee_emax_model(theta, X, y):
     >>> from delicatessen.estimating_equations import ee_emax_model
 
     For demonstration, we use dose-response data from Inderjit et al. (2002), which can be loaded from ``delicatessen``
-    directly.
+    directly. Notice that here the response data is modified to correspond to the descrease in root length (since
+    the E-max model assumes increase dose leads to increased response). This example is purely for illustration and
+    one may not think this is the appopriately model for this context
 
-    >>> d = load_inderjit()   # Loading array of data
-    >>> resp_data = d[:, 0]   # Response data
-    >>> dose_data = d[:, 1]   # Dose data
+    >>> d = load_inderjit()                   # Loading array of data
+    >>> response = np.max(d[:, 0]) - d[:, 0]  # Response data
+    >>> dose = d[:, 1]                        # Dose data
+
+   Defining psi, or the stacked estimating equations
+
+    >>> def psi(theta):
+    >>>     return ee_emax_model(theta=theta, X=dose, y=response)
+
+    This model can be difficult to solve. To make the solving process more stable, we provide starting values for the
+    root-finding process based on the observed data
+
+    >>> estr = MEstimator(psi, init=[np.max(response), np.median(dose)])
+    >>> estr.estimate(solver='lm')
+
+    Inspecting the parameter estimates, variance, and confidence intervals
+
+    >>> estr.theta
+    >>> estr.variance
+    >>> estr.confidence_intervals()
+
+    Inspecting the parameter estimates
+
+    >>> estr.theta[0]    # Maximum response
+    >>> estr.theta[1]    # Dose that results in 50% of max response
 
     References
     ----------
