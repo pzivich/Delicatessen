@@ -296,7 +296,7 @@ def ee_rogan_gladen_extended(theta, y, y_star, r, X, weights=None):
 
 
 def ee_regression_calibration(theta, beta, a, a_star, r, X=None, weights=None):
-    """Estimating equation for regression calibration with external data for a mismeasured *binary* action. Regression
+    r"""Estimating equation for regression calibration with external data for a mismeasured *binary* action. Regression
     calibration is a simple to implement method to correct for measurement error.
 
     The general form of the estimating equations are
