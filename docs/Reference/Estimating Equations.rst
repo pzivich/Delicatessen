@@ -66,10 +66,10 @@ Survival
   ee_aft_weibull_measure
 
 
-Dose Response
--------------------
+Pharmacokinetic Models
+----------------------
 
-.. currentmodule:: delicatessen.estimating_equations.dose_response
+.. currentmodule:: delicatessen.estimating_equations.pharmacokinetics
 
 .. autosummary::
   :toctree: generated/
