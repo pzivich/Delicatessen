@@ -456,6 +456,9 @@ def ee_regression_calibration(theta, beta, a, a_star, r, X=None, weights=None):
     Cole SR, Jacobson LP, Tien PC, Kingsley L, Chmiel JS, & Anastos K. (2010). Using marginal structural
     measurement-error models to estimate the long-term effect of antiretroviral therapy on incident AIDS or death.
     *American Journal of Epidemiology*, 171(1), 113-122.
+
+    Rosner B, Willett WC, & Spiegelman D. (1989). Correction of logistic regression relative risk estimates and
+    confidence intervals for systematic within‐person measurement error. *Statistics in Medicine*, 8(9), 1051-1069.
     """
     # Processing inputs
     a = np.asarray(a)                           # Convert to NumPy array
