@@ -57,8 +57,8 @@ def ee_4p_logistic(theta, X, y):
     directly.
 
     >>> d = load_inderjit()   # Loading array of data
-    >>> dose_data = d[:, 1]   # Dose data
     >>> resp_data = d[:, 0]   # Response data
+    >>> dose_data = d[:, 1]   # Dose data
 
     Defining psi, or the stacked estimating equations
 
@@ -115,6 +115,10 @@ def ee_4p_logistic(theta, X, y):
     Inderjit, Streibig JC, & Olofsdotter M. (2002). Joint action of phenolic acid mixtures and its significance in
     allelopathy research. *Physiologia Plantarum*, 114(3), 422-428.
     """
+    # Processing inputs
+    X = np.asarray(X)        # Convert to NumPy array
+    y = np.asarray(y)        # Convert to NumPy array
+
     # Creating rho to cut down on typing
     rho = (X / theta[1]) ** theta[2]
 
@@ -187,8 +191,8 @@ def ee_3p_logistic(theta, X, y, lower):
     directly.
 
     >>> d = load_inderjit()   # Loading array of data
-    >>> dose_data = d[:, 1]   # Dose data
     >>> resp_data = d[:, 0]   # Response data
+    >>> dose_data = d[:, 1]   # Dose data
 
     Since there is a natural lower-bound of 0 for root growth, we set ``lower=0``. Defining psi, or the stacked
     estimating equations
@@ -283,8 +287,8 @@ def ee_2p_logistic(theta, X, y, lower, upper):
     directly.
 
     >>> d = load_inderjit()   # Loading array of data
-    >>> dose_data = d[:, 1]   # Dose data
     >>> resp_data = d[:, 0]   # Response data
+    >>> dose_data = d[:, 1]   # Dose data
 
     Since there is a natural lower-bound of 0 for root growth, we set ``lower=0``. While a natural upper bound does not
     exist for this example, we set ``upper=8`` for illustrative purposes. Defining psi, or the stacked estimating
@@ -361,7 +365,7 @@ def ee_effective_dose_delta(theta, y, delta, steepness, ed50, lower, upper):
     Returns
     -------
     array :
-        Returns a 1-by-`n` NumPy array evaluated for the input theta
+        Returns a 1-by-`n` NumPy array evaluated for the input ``theta``.
 
     Examples
     --------
@@ -375,8 +379,8 @@ def ee_effective_dose_delta(theta, y, delta, steepness, ed50, lower, upper):
     directly.
 
     >>> d = load_inderjit()   # Loading array of data
-    >>> dose_data = d[:, 1]   # Dose data
     >>> resp_data = d[:, 0]   # Response data
+    >>> dose_data = d[:, 1]   # Dose data
 
     Since there is a natural lower-bound of 0 for root growth, we set ``lower=0``. While a natural upper bound does not
     exist for this example, we set ``upper=8`` for illustrative purposes. Defining psi, or the stacked estimating
@@ -435,3 +439,88 @@ def ee_effective_dose_delta(theta, y, delta, steepness, ed50, lower, upper):
 
     # Returning constructed 1-by-ndarray for stacked estimating equations
     return np.ones(np.asarray(y).shape[0])*ed_delta
+
+
+def ee_emax_model(theta, X, y):
+    r"""Estimating equations for the E-max model, or Hill Equation. The E-max model describes the dose-response
+    relationship with two parameters: the maximum response (E-max) and the dose producing half maximal effect.
+    The assumed model is
+
+    .. math::
+
+        R = \frac{\theta_{m} D}{\theta_{50} + D}
+
+    where :math:`R` is the response and :math:`D` is the dose. Here, :math:`\theta_{m}` is the maximum response and
+    :math:`\theta_{50}` is the dose with 50% of maximal response. The corresponding estimating equations for this
+    model are
+
+    .. math::
+
+        \sum_{i=1}^n
+        \begin{bmatrix}
+            \left( R - \frac{\theta_{m} D}{\theta_{50} + D} \right) \times \left( \frac{D}{\theta_{50} + D} \right)\\
+            \left( R - \frac{\theta_{m} D}{\theta_{50} + D} \right) \times
+            \left( \frac{-\theta_{m} D}{\theta_{50} + D} \right) \\
+        \end{bmatrix}
+        = 0
+
+    The first estimating equation is for the maximum response and the second estimating equation is for 50% maximal
+    response.
+
+    Note
+    ----
+    This model assumes that as the dose increases, the effect increases. This model may fail to converge when
+    increasing the dose descreases the effect.
+
+    Parameters
+    ----------
+    theta : ndarray, list, vector
+        Theta in this case consists of 2 values.
+    X : ndarray, list, vector
+        1-dimensional vector of `n` dose values.
+    y : ndarray, list, vector
+        1-dimensional vector of `n` response values.
+
+    Returns
+    -------
+    array :
+        Returns a 2-by-`n` NumPy array evaluated for the input ``theta``.
+
+    Examples
+    --------
+    Construction of a estimating equations with ``ee_emax_model`` should be done similar to the following
+
+    >>> from delicatessen import MEstimator
+    >>> from delicatessen.data import load_inderjit
+    >>> from delicatessen.estimating_equations import ee_emax_model
+
+    For demonstration, we use dose-response data from Inderjit et al. (2002), which can be loaded from ``delicatessen``
+    directly.
+
+    >>> d = load_inderjit()   # Loading array of data
+    >>> resp_data = d[:, 0]   # Response data
+    >>> dose_data = d[:, 1]   # Dose data
+
+    References
+    ----------
+    Bonate PL. *Pharmacokinetic-Pharmacodynamic Modeling and Simulation* 2nd edition. pg 101.
+
+    Felmlee MA, Morris ME, & Mager DE. (2012). Mechanism-based pharmacodynamic modeling. *Methods Mol Biol*,
+    929, 583–600.
+
+    Wagner JG. (1968). Kinetics of pharmacologic response I. Proposed relationships between response and drug
+    concentration in the intact animal and man. *Journal of Theoretical Biology*, 20(2), 173-201.
+    """
+    # Processing inputs
+    X = np.asarray(X)                                            # Convert to NumPy array
+    y = np.asarray(y)                                            # Convert to NumPy array
+    e_max = theta[0]                                             # Max effect parameter
+    e_50 = theta[1]                                              # 50% max effect parameter
+
+    # Computing estimating equations
+    r_contribution = y - (e_max * X) / (e_50 + X)                # Response-contribution
+    ee_max = r_contribution * (X / (e_50 + X))                   # E_max estimating equation
+    ee_ec50 = r_contribution * ((-e_max * X) / ((e_50 + X)**2))  # E_50 estimating equation
+
+    # Returning stacked estimating equations
+    return np.vstack([ee_max, ee_ec50])
