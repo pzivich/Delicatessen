@@ -8,7 +8,9 @@ import numpy.testing as npt
 import pandas as pd
 
 from delicatessen import MEstimator
-from delicatessen.estimating_equations import ee_regression, ee_rogan_gladen, ee_rogan_gladen_extended
+from delicatessen.estimating_equations import (ee_regression,
+                                               ee_rogan_gladen, ee_rogan_gladen_extended,
+                                               ee_regression_calibration)
 from delicatessen.utilities import inverse_logit, logit
 
 
@@ -67,6 +69,25 @@ class TestEstimatingEquationsMeasurement:
         d0['weights'] = np.where(d0['Y'].isna(), 2, 1)
 
         return pd.concat([d1, d0])
+
+    @pytest.fixture
+    def data_exp_m(self):
+        # Internal data
+        d1 = pd.DataFrame()
+        d1['A*'] = [1, 1, 1, 1, 1, 0, 0, 0, 0]
+        d1['Y'] = [3, 3, 5, 2, 1, 9, 6, 7, 2]
+        d1['C'] = 1
+        d1['R'] = 1
+        d1['weights'] = [1, 1, 1, 1, 5, 10, 1, 1, 1]
+        # External validation data
+        d0 = pd.DataFrame()
+        d0['A*'] = [1, ]*10 + [0, ]*10
+        d0['A'] = [1, ]*9 + [0, ] + [0, ]*8 + [1, 1]
+        d0['C'] = 1
+        d0['R'] = 0
+        d0['weights'] = [1, ]*9 + [2, ] + [1, ]*8 + [1, 2]
+        return pd.concat([d1, d0])
+
 
     def test_rogan_gladen(self, cole2023_data):
         # Replicate Cole et al. 2023 Rogan-Gladen example as a test
@@ -256,3 +277,87 @@ class TestEstimatingEquationsMeasurement:
         corrected_mu = ((1-pr_x1) * ((0.5 + 0.85 - 1) / (0.85 + 0.8 - 1))
                         + pr_x1 * ((0.5 + 0.75 - 1) / (0.75 + 0.95 - 1)))
         npt.assert_allclose(corrected_mu, estr.theta[0], atol=1e-7)
+
+    def test_regression_calibration(self, data_exp_m):
+        # R-code replicated against
+        #
+        # library(mecor)
+        # d1 = data.frame(a_star=c(1, 1, 1, 1, 1, 0, 0, 0, 0), y=c(3, 3, 5, 2, 1, 9, 6, 7, 2))
+        # d1$r = 1
+        # d1$a = NaN
+        # d0 = data.frame(a_star=c(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+        #                 a=c(1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1))
+        # d0$r = 0
+        # d0$y = NaN
+        # d = rbind(d1, d0)
+        # fm <- lm(a ~ a_star, data=d)
+        # mecor(y ~ MeasErrorExt(a_star, model=fm), data=d1)
+
+        d = data_exp_m
+        y_no_nan = np.where(d['Y'].isna(), -999, d['Y'])
+        r = np.asarray(d['R'])
+
+        def psi(theta):
+            theta_calib = theta[:3]
+            theta_main = theta[3:]
+            ee_logit_star = ee_regression(theta=theta_main, y=y_no_nan, X=d[['C', 'A*']], model='linear')
+            ee_logit_star = ee_logit_star * r
+            ee_calib = ee_regression_calibration(theta=theta_calib, beta=theta_main[1],
+                                                 a=d['A'], a_star=d['A*'], r=r)
+            return np.vstack([ee_calib, ee_logit_star])
+
+        estr = MEstimator(psi, init=[0.5, 0.7, 0., 1., 0., ])
+        estr.estimate(solver='lm')
+
+        # Naive regression model
+        npt.assert_allclose([6, -3.2], estr.theta[3:], atol=1e-7)
+
+        # Calibration model
+        npt.assert_allclose([0.7, 0.2], estr.theta[1:3], atol=1e-7)
+
+        # Corrected coefficient
+        npt.assert_allclose([-4.571429, ], estr.theta[0], atol=1e-7)
+
+    def test_regression_calibration_weights(self, data_exp_m):
+        d = data_exp_m
+        y_no_nan = np.where(d['Y'].isna(), -999, d['Y'])
+        r = np.asarray(d['R'])
+
+        def psi(theta):
+            theta_calib = theta[:3]
+            theta_main = theta[3:]
+            ee_logit_star = ee_regression(theta=theta_main, y=y_no_nan, X=d[['C', 'A*']], model='linear',
+                                          weights=d['weights'])
+            ee_logit_star = ee_logit_star * r
+            ee_calib = ee_regression_calibration(theta=theta_calib, beta=theta_main[1],
+                                                 a=d['A'], a_star=d['A*'], r=r, weights=d['weights'])
+            return np.vstack([ee_calib, ee_logit_star])
+
+        estr = MEstimator(psi, init=[0.5, 0.7, 0., 1., 0., ])
+        estr.estimate(solver='lm')
+
+        # By-hand models
+        def byhand_naive(theta):
+            return ee_regression(theta=theta, y=y_no_nan, X=d[['C', 'A*']], model='linear', weights=d['weights']) * r
+
+        naive = MEstimator(byhand_naive, init=[0., 0., ])
+        naive.estimate(solver='lm')
+
+        def byhand_calib(theta):
+            a = np.where(r == 1, -999, d['A'])
+            return ee_regression(theta=theta, y=a, X=d[['A*', 'C']], model='linear', weights=d['weights']) * (1-r)
+
+        calib = MEstimator(byhand_calib, init=[0.7, 0., ])
+        calib.estimate(solver='lm')
+
+        # Naive regression model
+        npt.assert_allclose(naive.theta, estr.theta[3:], atol=1e-7)
+        npt.assert_allclose(naive.variance, estr.variance[3:, 3:], atol=1e-7)
+
+        # Calibration model
+        npt.assert_allclose(calib.theta, estr.theta[1:3], atol=1e-7)
+        npt.assert_allclose(calib.variance, estr.variance[1:3, 1:3], atol=1e-7)
+
+        # Corrected coefficient
+        npt.assert_allclose(naive.theta[1] / calib.theta[0], estr.theta[0], atol=1e-7)
+
