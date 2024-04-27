@@ -151,3 +151,5 @@ class TestEstimatingEquationsDoseResponse:
 
         # Checking variance estimate
         npt.assert_allclose(np.diag(estr.variance)[-3:]**0.5, comparison_var, atol=1e-5)
+
+    def test_emax_model(self):
