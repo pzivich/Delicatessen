@@ -448,24 +448,26 @@ def ee_emax_model(theta, X, y):
 
     .. math::
 
-        R = \frac{\theta_{m} D}{\theta_{50} + D}
+        R = \theta_{z} + \frac{\theta_{m} D}{\theta_{50} + D}
 
-    where :math:`R` is the response and :math:`D` is the dose. Here, :math:`\theta_{m}` is the maximum response and
-    :math:`\theta_{50}` is the dose with 50% of maximal response. The corresponding estimating equations for this
-    model are
+    where :math:`R` is the response and :math:`D` is the dose. Here, :math:`\theta_{z}` is the zero-dose response,
+    :math:`\theta_{m}` is the maximum response and :math:`\theta_{50}` is the dose with 50% of maximal response. The
+    corresponding estimating equations for this model are
 
     .. math::
 
         \sum_{i=1}^n
         \begin{bmatrix}
-            \left( R - \frac{\theta_{m} D}{\theta_{50} + D} \right) \times \left( \frac{D}{\theta_{50} + D} \right)\\
-            \left( R - \frac{\theta_{m} D}{\theta_{50} + D} \right) \times
-            \left( \frac{-\theta_{m} D}{\theta_{50} + D} \right) \\
+            R_i - \theta_{z} - \frac{\theta_{m} D_i}{\theta_{50} + D_i}\\
+            \left( R_i - \theta_{z} - \frac{\theta_{m} D_i}{\theta_{50} + D_i} \right) \times
+            \left( \frac{D_i}{\theta_{50} + D_i} \right)\\
+            \left( R_i - \theta_{z} - \frac{\theta_{m} D_i}{\theta_{50} + D_i} \right) \times
+            \left( \frac{-\theta_{m} D_i}{\theta_{50} + D_i} \right) \\
         \end{bmatrix}
         = 0
 
-    The first estimating equation is for the maximum response and the second estimating equation is for 50% maximal
-    response.
+    The first estimating equation is for the zero-dose response, the second estimating equations is for the maximum
+    response and the third estimating equation is for 50% maximal response.
 
     Note
     ----
@@ -511,7 +513,7 @@ def ee_emax_model(theta, X, y):
     This model can be difficult to solve. To make the solving process more stable, we provide starting values for the
     root-finding process based on the observed data
 
-    >>> estr = MEstimator(psi, init=[np.max(response), np.median(dose)])
+    >>> estr = MEstimator(psi, init=[np.min(response), np.max(response), np.median(dose)])
     >>> estr.estimate(solver='lm')
 
     Inspecting the parameter estimates, variance, and confidence intervals
@@ -522,8 +524,9 @@ def ee_emax_model(theta, X, y):
 
     Inspecting the parameter estimates
 
-    >>> estr.theta[0]    # Maximum response
-    >>> estr.theta[1]    # Dose that results in 50% of max response
+    >>> estr.theta[0]    # Minimum response
+    >>> estr.theta[1]    # Maximum response
+    >>> estr.theta[2]    # Dose that results in 50% of max response
 
     References
     ----------
@@ -538,13 +541,15 @@ def ee_emax_model(theta, X, y):
     # Processing inputs
     X = np.asarray(X)                                            # Convert to NumPy array
     y = np.asarray(y)                                            # Convert to NumPy array
-    e_max = theta[0]                                             # Max effect parameter
-    e_50 = theta[1]                                              # 50% max effect parameter
+    e_0 = theta[0]                                               # Minimum effect parameter
+    e_max = theta[1]                                             # Max effect parameter
+    e_50 = theta[2]                                              # 50% max effect parameter
 
     # Computing estimating equations
-    r_contribution = y - (e_max * X) / (e_50 + X)                # Response-contribution
+    r_contribution = y - e_0 - (e_max * X) / (e_50 + X)          # Response-contribution
+    ee_0 = r_contribution                                        # E_min estimating equation
     ee_max = r_contribution * (X / (e_50 + X))                   # E_max estimating equation
     ee_ec50 = r_contribution * ((-e_max * X) / ((e_50 + X)**2))  # E_50 estimating equation
 
     # Returning stacked estimating equations
-    return np.vstack([ee_max, ee_ec50])
+    return np.vstack([ee_0, ee_max, ee_ec50])

@@ -7,11 +7,10 @@ import numpy as np
 import numpy.testing as npt
 
 from delicatessen import MEstimator
-from delicatessen.estimating_equations import ee_2p_logistic, ee_3p_logistic, ee_4p_logistic, ee_effective_dose_delta
+from delicatessen.estimating_equations import (ee_2p_logistic, ee_3p_logistic, ee_4p_logistic,
+                                               ee_effective_dose_delta,
+                                               ee_emax_model)
 from delicatessen.data import load_inderjit
-
-
-np.random.seed(236461)
 
 
 class TestEstimatingEquationsDoseResponse:
@@ -153,3 +152,29 @@ class TestEstimatingEquationsDoseResponse:
         npt.assert_allclose(np.diag(estr.variance)[-3:]**0.5, comparison_var, atol=1e-5)
 
     def test_emax_model(self):
+        # R code used to check against
+        # library(DoseFinding)
+        # data = data.frame(r=c(7.58, 8., 8.3285714, 7.25, 7.375, 7.9625, 8.3555556,
+        #                       6.9142857, 7.75, 6.8714286, 6.45, 5.9222222, 1.925,
+        #                       2.8857143, 4.2333333, 1.1875, 0.8571429, 1.0571429,
+        #                       0.6875, 0.525, 0.825, 0.25, 0.22, 0.44),
+        #                   d=c(0., 0., 0., 0., 0., 0., 0.94, 0.94, 0.94, 1.88, 1.88,
+        #                       1.88, 3.75, 3.75, 3.75, 7.5, 7.5, 7.5, 15, 15, 15, 30,
+        #                       30, 30))
+        # data$r = max(data$r) - data$r
+        # emax0 <- fitMod(d, r, data = data,  model = "emax")
+        # emax0
+        d = load_inderjit()                    # Loading array of data
+        resp_data = np.max(d[:, 0]) - d[:, 0]  # Response data
+        dose_data = d[:, 1]                    # Dose data
+
+        def psi(theta):
+            return ee_emax_model(theta=theta, X=dose_data, y=resp_data)
+
+        # Optimization procedure
+        estr = MEstimator(psi, init=[np.min(dose_data), np.max(resp_data), np.median(dose_data)])
+        estr.estimate()
+
+        # Checking mean estimate
+        comparison_theta = [0.1404261, 9.8200414, 4.5745239]
+        npt.assert_allclose(estr.theta, comparison_theta, atol=1e-5)
