@@ -450,6 +450,9 @@ def ee_regression_calibration(theta, beta, a, a_star, r, X=None, weights=None):
 
     References
     ----------
+    Boe LA, Lumley T, & Shaw PA. (2024). Practical Considerations for Sandwich Variance Estimation in 2-Stage
+    Regression Settings. *American Journal of Epidemiology*, 193(5), 798-810.
+
     Cole SR, Chu H, & Greenland S. (2006). Multiple-imputation for measurement-error correction.
     *International Journal of Epidemiology*, 35(4), 1074-1081.
 
