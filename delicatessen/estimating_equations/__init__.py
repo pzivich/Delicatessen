@@ -5,7 +5,8 @@ from .causal import (ee_ipw, ee_ipw_msm, ee_gformula, ee_aipw, ee_gestimation_sn
                      ee_mean_sensitivity_analysis)
 
 from .pharmacokinetics import (ee_4p_logistic, ee_3p_logistic, ee_2p_logistic, ee_effective_dose_delta,
-                               ee_emax_model)
+                               ee_emax, ee_emax_ed,
+                               ee_loglogistic, ee_loglogistic_ed)
 
 from .measurement import (ee_rogan_gladen, ee_rogan_gladen_extended, ee_regression_calibration
                           )
