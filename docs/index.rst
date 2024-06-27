@@ -81,8 +81,7 @@ Contents:
 
   Basics.rst
   Examples/index
-  Built-in Equations <Built-in Equations.rst>
-  Custom Equations <Custom Equations.rst>
+  Custom-EE
   Optimization Advice <Optimization Advice.rst>
   Reference/index
   Create a GitHub Issue <https://github.com/pzivich/Deli/issues>
