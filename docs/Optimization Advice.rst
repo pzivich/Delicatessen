@@ -57,7 +57,7 @@ Different root-finding
 
 By default, ``delicatessen`` uses the secant method available in ``scipy.optimize.newton``. However, ``delicatessen``
 also supports other algorithms in ``scipy.optimize.root``, such as Levenberg-Marquette and Powell's Hybrid.
-Additionally, user-specified root-finding algorithms can also be used.
+Additionally, manually-specified root-finding algorithms can also be used.
 
 Non-smooth equations
 --------------------
