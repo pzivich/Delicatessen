@@ -7,7 +7,14 @@ import numpy as np
 
 
 def ee_4p_logistic(theta, X, y):
-    r"""Estimating equations for the 4-parameter logistic model (4PL). The estimating equations are
+    r"""Estimating equations for the 4-parameter logistic model (4PL).
+
+    Note
+    ----
+    This estimating equation is being depreciated in favor of ``ee_loglogistic`` in v3.0.
+
+
+    The estimating equations are
 
     .. math::
 
@@ -141,7 +148,14 @@ def ee_4p_logistic(theta, X, y):
 
 
 def ee_3p_logistic(theta, X, y, lower):
-    r"""Estimating equations for the 3-parameter logistic model (3PL). The estimating equations are
+    r"""Estimating equations for the 3-parameter logistic model (3PL).
+
+    Note
+    ----
+    This estimating equation is being depreciated in favor of ``ee_loglogistic`` in v3.0.
+
+
+    The estimating equations are
 
     .. math::
 
@@ -236,7 +250,14 @@ def ee_3p_logistic(theta, X, y, lower):
 
 
 def ee_2p_logistic(theta, X, y, lower, upper):
-    r"""Estimating equations for the 2-parameter logistic model (2PL). The estimating equations are
+    r"""Estimating equations for the 2-parameter logistic model (2PL).
+
+    Note
+    ----
+    This estimating equation is being depreciated in favor of ``ee_loglogistic`` in v3.0.
+
+
+    The estimating equations are
 
     .. math::
 
@@ -332,7 +353,14 @@ def ee_2p_logistic(theta, X, y, lower, upper):
 
 def ee_effective_dose_delta(theta, y, delta, steepness, ed50, lower, upper):
     r"""Default stacked estimating equation to pair with the 4 parameter logistic model for estimation of the
-    :math:`delta` effective dose. The estimating equation is
+    :math:`delta` effective dose.
+
+    Note
+    ----
+    This estimating equation is being depreciated in favor of ``ee_loglogistic_ed`` in v3.0.
+
+
+    The estimating equation is
 
     .. math::
 
@@ -479,9 +507,9 @@ def ee_emax(theta, dose, response):
     ----------
     theta : ndarray, list, vector
         Theta in this case consists of 2 values.
-    X : ndarray, list, vector
+    dose : ndarray, list, vector
         1-dimensional vector of `n` dose values.
-    y : ndarray, list, vector
+    response : ndarray, list, vector
         1-dimensional vector of `n` response values.
 
     Returns
