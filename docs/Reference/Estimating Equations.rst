@@ -75,6 +75,10 @@ Pharmacokinetic Models
 .. autosummary::
   :toctree: generated/
 
+  ee_emax
+  ee_emax_ed
+  ee_loglogistic
+  ee_loglogistic_ed
   ee_4p_logistic
   ee_3p_logistic
   ee_2p_logistic
