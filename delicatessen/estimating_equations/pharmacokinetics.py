@@ -120,8 +120,8 @@ def ee_4p_logistic(theta, X, y):
     Inderjit, Streibig JC, & Olofsdotter M. (2002). Joint action of phenolic acid mixtures and its significance in
     allelopathy research. *Physiologia Plantarum*, 114(3), 422-428.
     """
-    warnings.warn("The `ee_#p_logistic` models will be removed in v3.0. Please use the new `ee_emax_sigmoid` model "
-                  "instead. Also note that the parameter order has changed for `ee_emax_sigmoid`.", UserWarning)
+    warnings.warn("The `ee_#p_logistic` models will be removed in v3.0. Please use the new `ee_loglogistic` model "
+                  "instead. Also note that the parameter order has changed for `ee_loglogistic`.", UserWarning)
     # Processing inputs
     X = np.asarray(X)        # Convert to NumPy array
     y = np.asarray(y)        # Convert to NumPy array
@@ -456,6 +456,10 @@ def ee_effective_dose_delta(theta, y, delta, steepness, ed50, lower, upper):
     Inderjit, Streibig JC, & Olofsdotter M. (2002). Joint action of phenolic acid mixtures and its significance in
     allelopathy research. *Physiologia Plantarum*, 114(3), 422-428.
     """
+    warnings.warn("The `ee_#p_logistic` models and `ee_effective_dose_delta` will be removed in v3.0. Please use the "
+                  "new `ee_loglogistic` model and `ee_loglogistic_ed` instead. Also note that the parameter order has "
+                  "changed for `ee_loglogistic`.", UserWarning)
+
     # Creating rho to cut down on typing
     rho = (theta / steepness)**ed50            # Theta is the corresponds ED(alpha) value
 
@@ -471,7 +475,7 @@ def ee_effective_dose_delta(theta, y, delta, steepness, ed50, lower, upper):
 
 def ee_emax(theta, dose, response):
     r"""Estimating equations for the (hyperbolic) E-max model, or Hill Equation. The E-max model describes the
-    dose-response relationship as concave monotone definend by three parameters: the zero-dose response, the maximum
+    dose-response relationship as concave monotone defined by three parameters: the zero-dose response, the maximum
     response (E-max) and the dose producing half maximal effect (ED50). The assumed model is
 
     .. math::
@@ -586,8 +590,7 @@ def ee_emax(theta, dose, response):
 
 
 def ee_emax_ed(theta, dose, delta, ed50):
-    """Estimating equation for the :math:`delta`-effective dose with the E-max model. The estimating
-    equation is
+    r"""Estimating equation for the :math:`delta`-effective dose with the E-max model. The estimating equation is
 
     .. math::
 
@@ -671,7 +674,7 @@ def ee_emax_ed(theta, dose, delta, ed50):
 
 
 def ee_loglogistic(theta, dose, response):
-    """Estimating equations for the 4 parameter log-logistic dose-response model. The log-logistic model describes the
+    r"""Estimating equations for the 4 parameter log-logistic dose-response model. The log-logistic model describes the
     dose-response relationship in terms of four parameters: the zero-dose response, the maximum response (E-max), the
     dose producing half maximal effect (ED50), and steepness of the dose-response curve. The assumed model is
 
@@ -845,7 +848,7 @@ def ee_loglogistic(theta, dose, response):
 
 
 def ee_loglogistic_ed(theta, dose, delta, lower, upper, ed50, steepness):
-    """Estimating equation for the :math:`delta`-effective dose with the 4 parameter log-logistic model.
+    r"""Estimating equation for the :math:`delta`-effective dose with the 4 parameter log-logistic model.
     The estimating equation is
 
     .. math::
