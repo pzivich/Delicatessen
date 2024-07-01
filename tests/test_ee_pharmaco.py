@@ -204,6 +204,29 @@ class TestEstimatingEquationsDoseResponse:
         # Checking mean estimate
         npt.assert_allclose(estr.theta[3:], comparison_theta, atol=1e-5)
 
+    def test_emax_bonate(self):
+        # Corrupted Bonate data (I added a zero dose to get R's DoseFinding to work
+        d = [0, 5, 5, 13, 11, 14.5, 6.8, 42.5, 37.5, 25, 38, 40, 26.5, 27.7, 27.4, 45, 61.4, 52.8]
+        r = [0, -12, -13, -28, -24, -45, -18, -26, -40, -45, -26, -29, -26, -22, -28, -36, -27, -48]
+
+        # R code
+        # library(DoseFinding)
+        # d = c(0, 5, 5, 13, 11, 14.5, 6.8, 42.5, 37.5, 25, 38, 40, 26.5, 27.7, 27.4, 45, 61.4, 52.8)
+        # r = c(0, -12, -13, -28, -24, -45, -18, -26, -40, -45, -26, -29, -26, -22, -28, -36, -27, -48)
+        # data = data.frame(d=d, r=r)
+        # emax0 <- fitMod(d, r, data = data,  model = "emax", bnds=c(0, 10))
+        # emax0$coefs
+        comparison_theta = np.asarray([1.658004, -40.138821, 5.739854])
+
+        def psi(theta):
+            return ee_emax(theta=theta, dose=d, response=r)
+
+        estr = MEstimator(psi, init=[0, -40, 5])
+        estr.estimate()
+
+        # Checking mean estimate
+        npt.assert_allclose(estr.theta, comparison_theta, atol=1e-5)
+
     def test_loglogistic4(self):
         # Compares against R's drc library:
         #
