@@ -542,8 +542,8 @@ def ee_aipw(theta, y, A, W, X, X1, X0, truncate=None, force_continuous=False):
         \sum_{i=1}^n
         \begin{bmatrix}
             (\theta_1 - \theta_2) - \theta_0 \\
-            \frac{A_i Y_i}{\pi_i} - \frac{\hat{Y^1}(A_i-\pi_i}{\pi_i} - \theta_1 \\
-            \frac{(1-A_i) Y_i}{1-\pi_i} + \frac{\hat{Y^0}(A_i-\pi_i}{1-\pi_i} - \theta_2 \\
+            \frac{A_i Y_i}{\pi_i} - \frac{\hat{Y^1}(A_i-\pi_i)}{\pi_i} - \theta_1 \\
+            \frac{(1-A_i) Y_i}{1-\pi_i} + \frac{\hat{Y^0}(A_i-\pi_i)}{1-\pi_i} - \theta_2 \\
             \left\{ A_i - \text{expit}(W_i^T \alpha) \right\} W_i \\
             \left\{ Y_i - g(X_i^T \beta) \right\} X_i
         \end{bmatrix}
