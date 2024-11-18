@@ -39,6 +39,29 @@ class TestEstimatingEquationsBase:
         # Checking variance estimates
         npt.assert_allclose(mcee.asymptotic_variance, mpee.asymptotic_variance, atol=1e-6)
 
+    def test_mean_weighted(self):
+        y1 = [1, 2, 3, 4]
+        w1 = [4, 3, 2, 1]
+        y2 = [1, 1, 1, 1, 2, 2, 2, 3, 3, 4]
+
+        def psi1(theta):
+            return ee_mean(theta=theta, y=y1, weights=w1)
+
+        def psi2(theta):
+            return ee_mean(theta=theta, y=y2, weights=None)
+
+        estr1 = MEstimator(psi1, init=[0, ])
+        estr1.estimate(deriv_method='exact')
+
+        estr2 = MEstimator(psi2, init=[0, ])
+        estr2.estimate()
+
+        # Checking mean estimate
+        npt.assert_allclose(estr1.theta, estr2.theta, atol=1e-6)
+
+        # Checking variance estimates
+        npt.assert_allclose(estr1.variance, [[0.24, ], ], atol=1e-6)
+
     def test_mean_robust(self, yr):
         def byhand(theta):
             k = 6

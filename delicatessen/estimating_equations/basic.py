@@ -13,12 +13,14 @@ from delicatessen.estimating_equations.processing import generate_weights
 # Basic Estimating Equations
 
 
-def ee_mean(theta, y):
+def ee_mean(theta, y, weights=None):
     r"""Estimating equation for the mean. The estimating equation for the mean is
 
     .. math::
 
         \sum_{i=1}^n (Y_i - \theta) = 0
+
+    For the weights mean, the difference in the previous estimating equation is multiplied by the corresponding weight.
 
     Parameters
     ----------
@@ -27,6 +29,8 @@ def ee_mean(theta, y):
         ``[0, ]`` should be provided.
     y : ndarray, list, vector
         1-dimensional vector of n observed values.
+    weights : ndarray, list, vector, None, optional
+        1-dimensional vector of `n` weights. Default is ``None``, which assigns a weight of 1 to all observations.
 
     Returns
     -------
@@ -68,8 +72,11 @@ def ee_mean(theta, y):
     # Convert input y values to NumPy array
     y_array = np.asarray(y)
 
+    # Allowing for a weighted mean
+    w = generate_weights(weights=weights, n_obs=y_array.shape[0])
+
     # Output 1-by-n array estimating equation for the mean
-    return y_array - theta
+    return w * (y_array - theta)
 
 
 def ee_mean_robust(theta, y, k, loss='huber', lower=None, upper=None):
