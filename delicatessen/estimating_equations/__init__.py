@@ -13,7 +13,8 @@ from .measurement import (ee_rogan_gladen, ee_rogan_gladen_extended, ee_regressi
 
 from .regression import (ee_regression, ee_glm, ee_mlogit,
                          ee_robust_regression,
-                         ee_ridge_regression, ee_lasso_regression, ee_elasticnet_regression, ee_bridge_regression,
+                         ee_ridge_regression, ee_lasso_regression, ee_dlasso_regression,
+                         ee_elasticnet_regression, ee_bridge_regression,
                          ee_additive_regression)
 
 from .survival import (ee_exponential_model, ee_weibull_model,

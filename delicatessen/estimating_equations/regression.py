@@ -913,6 +913,156 @@ def ee_lasso_regression(theta, X, y, model, penalty, epsilon=3.e-3, weights=None
                                 offset=offset)
 
 
+def ee_dlasso_regression(theta, X, y, model, penalty, s=1e-6, weights=None, center=0., offset=None):
+    r"""Estimating equation for a differentiable LASSO (least absolute shrinkage and selection operator) regressor.
+    LASSO regression applies an L1-regularization through a magnitude penalty.
+
+    The estimating equation for the differentiable LASSO linear regression is
+
+    .. math::
+
+        \sum_{i=1}^n \left\{(Y_i - X_i^T \theta) X_i - \lambda 2 \Phi(\theta / s) + 2 (\theta / s) \phi(\theta / s) - 1
+        \right\} = 0
+
+    where :math:`\lambda` is the penalty term, and :math:`\Phi,\phi` are the CDF and PDF for the standard normal.
+
+    Here, the penalty function is a modification of the standard LASSO penalty. As the scaling factor :math:`s` goes to
+    zero, the behavior of dLASSO goes towards the behavior of LASSO. Importantly, dLASSO is differentiable, unlike the
+    standard LASSO.
+
+    Here, :math:`\theta` is a 1-by-`b` array, which corresponds to the coefficients in the corresponding regression
+    model and `b` is the distinct covariates included as part of ``X``. For example, if ``X`` is a 3-by-`n` matrix, then
+    :math:`\theta` will be a 1-by-3 array. The code is general to allow for an arbitrary number of elements in ``X``.
+
+    Note
+    ----
+    The 'strength' of the penalty term is indicated by :math:`\lambda`, which is the ``penalty`` argument scaled (or
+    divided by) the number of observations.
+
+
+    Parameters
+    ----------
+    theta : ndarray, list, vector
+        Theta in this case consists of `b` values. Therefore, initial values should consist of the same number as the
+        number of columns present. This can easily be implemented via ``[0, ] * X.shape[1]``.
+    X : ndarray, list, vector
+        2-dimensional vector of `n` observed values for `b` variables.
+    y : ndarray, list, vector
+        1-dimensional vector of `n` observed values.
+    model : str
+        Type of regression model to estimate. Options are ``'linear'`` (linear regression), ``'logistic'`` (logistic
+        regression), and ``'poisson'`` (Poisson regression).
+    penalty : int, float, ndarray, list, vector
+        Penalty term to apply to all coefficients (if only a integer or float is provided) or the corresponding
+        coefficient (if a list or vector of integers or floats is provided). Note that the penalty term should either
+        consists of a single value or `b` values (to match the length of ``theta``).  The penalty is scaled by `n`.
+    s : float, optional
+        Slope of the penalty for the dLASSO. Default argument is ``1e-6``.
+    weights : ndarray, list, vector, None, optional
+        1-dimensional vector of `n` weights. Default is ``None``, which assigns a weight of 1 to all observations.
+    center : int, float, ndarray, list, vector, optional
+        Center or reference value to penalized estimated coefficients towards. Default is ``0``, which penalized
+        coefficients towards the null. Other center values can be specified for all coefficients (by providing an
+        integer or float) or covariate-specific centering values (by providing a vector of values of the same length as
+        X).
+    offset : ndarray, list, vector, None, optional
+        A 1-dimensional offset to be included in the model. Default is ``None``, which applies no offset term.
+
+    Returns
+    -------
+    array :
+        Returns a `b`-by-`n` NumPy array evaluated for the input ``theta``.
+
+    Examples
+    --------
+    Construction of a estimating equation(s) with ``ee_dlasso_regression`` should be done similar to the
+    following
+
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> from scipy.stats import logistic
+    >>> from delicatessen import MEstimator
+    >>> from delicatessen.estimating_equations import ee_dlasso_regression
+
+    Some generic data to estimate a dLASSO regression model
+
+    >>> n = 500
+    >>> data = pd.DataFrame()
+    >>> data['V'] = np.random.normal(size=n)
+    >>> data['W'] = np.random.normal(size=n)
+    >>> data['X'] = data['W'] + np.random.normal(scale=0.25, size=n)
+    >>> data['Z'] = np.random.normal(size=n)
+    >>> data['Y1'] = 0.5 + 2*data['W'] - 1*data['Z'] + np.random.normal(loc=0, size=n)
+    >>> data['Y2'] = np.random.binomial(n=1, p=logistic.cdf(0.5 + 2*data['W'] - 1*data['Z']), size=n)
+    >>> data['Y3'] = np.random.poisson(lam=np.exp(1 + 2*data['W'] - 1*data['Z']), size=n)
+    >>> data['C'] = 1
+
+    Note that ``C`` here is set to all 1's. This will be the intercept in the regression.
+
+    Defining psi, or the stacked estimating equations. Note that the penalty is a list of values. Here, we are *not*
+    penalizing the intercept (which is generally recommended when the intercept is unlikely to be zero). The remainder
+    of covariates have a penalty of 10 applied.
+
+    >>> penalty_vals = [0., 10., 10., 10., 10.]
+    >>> def psi(theta):
+    >>>     x, y = data[['C', 'V', 'W', 'X', 'Z']], data['Y1']
+    >>>     return ee_dlasso_regression(theta=theta, X=x, y=y, model='linear', penalty=penalty_vals)
+
+    Calling the M-estimator (note that ``init`` has 5 values now, since ``X.shape[1]`` is 5).
+
+    >>> estr = MEstimator(stacked_equations=psi, init=[0.01, 0.01, 0.01, 0.01, 0.01])
+    >>> estr.estimate(solver='lm', maxiter=20000)
+
+    Inspecting the parameter estimates
+
+    >>> estr.theta
+
+    Next, we can estimate the parameters for a logistic regression model as follows
+
+    >>> penalty_vals = [0., 10., 10., 10., 10.]
+    >>> def psi(theta):
+    >>>     x, y = data[['C', 'V', 'W', 'X', 'Z']], data['Y2']
+    >>>     return ee_dlasso_regression(theta=theta, X=x, y=y, model='logistic', penalty=penalty_vals)
+
+    >>> estr = MEstimator(stacked_equations=psi, init=[0.01, 0.01, 0.01, 0.01, 0.01])
+    >>> estr.estimate(solver='lm', maxiter=20000)
+
+    Finally, we can estimate the parameters for a Poisson regression model as follows
+
+    >>> penalty_vals = [0., 10., 10., 10., 10.]
+    >>> def psi(theta):
+    >>>     x, y = data[['C', 'V', 'W', 'X', 'Z']], data['Y3']
+    >>>     return ee_dlasso_regression(theta=theta, X=x, y=y, model='poisson', penalty=penalty_vals)
+
+    >>> estr = MEstimator(stacked_equations=psi, init=[0.01, 0.01, 0.01, 0.01, 0.01])
+    >>> estr.estimate(solver='lm', maxiter=20000)
+
+    Weighted models can be estimated by specifying the optional ``weights`` argument.
+
+    References
+    ----------
+    Haselimashhadi H. (2019). A unified class of penalties with the capability of producing a differentiable
+    alternative to l1 norm penalty. *Communications in Statistics - Theory and Methods*, 48(22), 5530-5545.
+    """
+    # Preparation of input shapes and object types
+    X, y, beta, penalty, center, offset = _prep_inputs_(X=X, y=y, theta=theta,
+                                                        penalty=penalty, center=center,
+                                                        offset=offset)
+
+    # Determining transformation function to use for the regression model
+    transform = _model_transform_(model=model)    # Looking up corresponding transformation
+    pred_y = transform(np.dot(X, beta) + offset)  # Generating predicted values
+
+    # Allowing for a weighted penalized regression model
+    w = generate_weights(weights=weights, n_obs=X.shape[0])
+
+    # Creating penalty term for dLASSO regression
+    penalty_terms = _dlasso_penalty_(theta=theta, penalty=penalty, s=s, n_obs=y.shape[0], center=center)
+
+    # Output b-by-n matrix
+    return w * (((y - pred_y) * X).T - penalty_terms[:, None])  # Score function with penalty term subtracted off
+
+
 def ee_elasticnet_regression(theta, X, y, model, penalty, ratio, epsilon=3.e-3, weights=None, center=0., offset=None):
     r"""Estimating equations for Elastic-Net regression. Elastic-Net applies both L1- and L2-regularization at a
     pre-specified ratio. Notice that the L1 penalty is based on an approximation. See ``ee_lasso_regression`` for
@@ -1656,6 +1806,8 @@ def _bridge_penalty_(theta, gamma, penalty, n_obs, center):
         consists of a single value or b values (to match the length of ``theta``).
     n_obs : int
         Number of observations. Used to rescale the penalty terms
+    center : ndarray, list, vector
+        Center point to penalize towards
 
     Returns
     -------
@@ -1683,4 +1835,48 @@ def _bridge_penalty_(theta, gamma, penalty, n_obs, center):
     # Calculating the penalties
     penalty_scaled = penalty / (gamma * n_obs)
     penalty_terms = penalty_scaled * gamma * (np.abs(theta - center)**(gamma-1)) * np.sign(theta - center)
+    return penalty_terms
+
+
+def _dlasso_penalty_(theta, penalty, s, n_obs, center):
+    r"""Internal use function to calculate the corresponding penalty term. The penalty term formula is based on the
+    differentiable LASSO
+
+    Parameters
+    ----------
+    theta : ndarray, list, vector
+        Regression coefficients to penalize. ``theta`` in this case consists of b values.
+    penalty : int, float, ndarray, list, vector
+        Penalty term to apply to all coefficients (if only a integer or float is provided) or the corresponding
+        coefficient (if a list or vector of integers or floats is provided). Note that the penalty term should either
+        consists of a single value or b values (to match the length of ``theta``).
+    s : float
+        Hyperparameter for dLASSO scaling
+    n_obs : int
+        Number of observations. Used to rescale the penalty terms
+    center : ndarray, list, vector
+        Center point to penalize towards
+
+    Returns
+    -------
+    ndarray
+    """
+    # Checking the penalty term is non-negative
+    if penalty.size != 1:
+        if penalty.shape[0] != len(theta):
+            raise ValueError("The penalty term must be either a single number or the same length as theta.")
+    if center.size != 1:
+        if center.shape[0] != len(theta):
+            raise ValueError("The center term must be either a single number or the same length as theta.")
+
+    # Checking a valid hyperparameter is being provided
+    if s < 0:
+        raise ValueError("`s` must be greater than zero for the approximate LASSO")
+
+    # Calculating the penalties
+    penalty_scaled = penalty / n_obs
+    theta_centered = theta - center
+    penalty_terms = penalty_scaled * (2 * standard_normal_cdf(theta_centered / s)
+                                      + 2 * (theta_centered / s) * standard_normal_pdf(theta_centered / s)
+                                      - 1)
     return penalty_terms
