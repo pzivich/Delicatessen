@@ -32,6 +32,7 @@ Regression
   ee_glm
   ee_robust_regression
   ee_ridge_regression
+  ee_dlasso_regression
   ee_lasso_regression
   ee_elasticnet_regression
   ee_bridge_regression
