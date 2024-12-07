@@ -11,8 +11,9 @@ import statsmodels.formula.api as smf
 
 from delicatessen import MEstimator
 from delicatessen.estimating_equations import (ee_regression, ee_glm, ee_mlogit,
-                                               ee_robust_regression, ee_ridge_regression,
-                                               ee_lasso_regression, ee_elasticnet_regression,
+                                               ee_robust_regression,
+                                               ee_ridge_regression, ee_lasso_regression, ee_dlasso_regression,
+                                               ee_elasticnet_regression,
                                                ee_additive_regression)
 from delicatessen.utilities import additive_design_matrix
 
@@ -763,6 +764,48 @@ class TestEstimatingEquationsRegressionPenalty:
         # Checking mean estimate
         npt.assert_allclose(estr.theta,
                             np.asarray(ridge.params),
+                            atol=1e-6)
+
+    def test_dlasso_ols(self, data_c):
+        d = data_c
+        Xvals = np.asarray(d[['I', 'X', 'Z']])
+        yvals = np.asarray(d['Y'])
+        weights = np.asarray(d['w'])
+
+        # Testing array of penalty terms
+        def psi(theta):
+            return ee_dlasso_regression(theta, X=Xvals, y=yvals, model='linear',
+                                        penalty=[0, 10, 10], weights=None)
+
+        estr = MEstimator(psi, init=[3, -1, 0])
+        estr.estimate(solver='lm')
+
+        lasso = sm.WLS(yvals, Xvals).fit_regularized(L1_wt=1., alpha=np.array([0, 10, 10])/Xvals.shape[0])
+
+        # Checking mean estimate
+        npt.assert_allclose(estr.theta,
+                            np.asarray(lasso.params),
+                            atol=1e-6)
+
+    def test_dlasso_wls(self, data_c):
+        d = data_c
+        Xvals = np.asarray(d[['I', 'X', 'Z']])
+        yvals = np.asarray(d['Y'])
+        weights = np.asarray(d['w'])
+
+        # Testing array of penalty terms
+        def psi(theta):
+            return ee_dlasso_regression(theta, X=Xvals, y=yvals, model='linear',
+                                        penalty=[0, 10, 10], weights=weights)
+
+        estr = MEstimator(psi, init=[3, -1, 0])
+        estr.estimate(solver='lm')
+
+        lasso = sm.WLS(yvals, Xvals, weights=weights).fit_regularized(L1_wt=1.,
+                                                                      alpha=np.array([0, 10, 10])/Xvals.shape[0])
+        # Checking mean estimate
+        npt.assert_allclose(estr.theta,
+                            np.asarray(lasso.params),
                             atol=1e-6)
 
     def test_lasso_ols(self, data_c):
