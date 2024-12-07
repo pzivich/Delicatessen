@@ -921,7 +921,8 @@ def ee_dlasso_regression(theta, X, y, model, penalty, s=1e-6, weights=None, cent
 
     .. math::
 
-        \sum_{i=1}^n \left\{(Y_i - X_i^T \theta) X_i - \lambda 2 \Phi(\theta / s) + 2 (\theta / s) \phi(\theta / s) - 1
+        \sum_{i=1}^n \left\{(Y_i - X_i^T \theta) X_i -
+        \lambda \left[ 2 \Phi(\theta / s) + 2 (\theta / s) \phi(\theta / s) - 1 \right]
         \right\} = 0
 
     where :math:`\lambda` is the penalty term, and :math:`\Phi,\phi` are the CDF and PDF for the standard normal.
