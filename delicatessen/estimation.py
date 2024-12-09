@@ -886,6 +886,7 @@ class GMMEstimator(_GeneralEstimator):
             b-by-1 array, which is the sum over n for each b.
         """
         # Option for the subset argument
+        # TODO need to change how subset works here!
         if self._subset_ is None:                      # If NOT subset then,
             full_theta = theta                         # ... then use the full input theta
         else:                                          # If subset then,
@@ -897,7 +898,7 @@ class GMMEstimator(_GeneralEstimator):
         # Evaluating estimating functions
         stacked_equations = np.asarray(self.stacked_equations(full_theta))  # Returning stacked equation
         est_eqtns = self._eval_ee_(stacked_equations=stacked_equations,     # Passing to evaluating function
-                                   subset=self._subset_)                    # ... with specified subset
+                                   subset=None)                             # ... with specified subset
         est_eqtns = est_eqtns / self.n_obs                                  # Scaling EE by n (helpful for minimizer)
 
         # Evaluating GMM estimator at given theta
