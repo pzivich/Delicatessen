@@ -2,9 +2,11 @@
 # Implementation of the M-estimator
 #####################################################################################################################
 
+import warnings
 import numpy as np
-from scipy.optimize import newton, root
+from scipy.optimize import newton, root, minimize
 from scipy.stats import norm
+from scipy.optimize import OptimizeWarning
 
 from delicatessen.sandwich import compute_bread, compute_meat, build_sandwich
 
@@ -626,4 +628,333 @@ class MEstimator(_GeneralEstimator):
                              "documentation for valid options for the optimizer.")
 
         # Return optimized theta array
+        return psi
+
+
+class GMMEstimator(_GeneralEstimator):
+    r"""Generalized Method of Moments (GMM) Estimator for stacked estimating equations.
+
+    Estimating equations are a general approach to point and variance estimation that consists of defining an estimator
+    as the solution to a vector of equations that are equal to zero. The corresponding estimators, often called
+    M-estimators or Z-estimators, satisify the following equation
+
+    .. math::
+
+        \sum_{i=1}^n \psi(O_i, \hat{\theta}) = 0
+
+    where :math:`\psi` is the :math:`v`-dimensional vector of estimating equation(s), :math:`\hat{\theta}` is the
+    :math:`v`-dimensional parameter vector, and :math:`O_i` is the observed data (where units are independent but not
+    necessarily identically distributed).
+
+    Note
+    ----
+    Estimating equations are advantageous in both theoretical and applied research. They simplifies proofs of
+    consistency and asymptotic normality of estimators under a large-sample approximation framework. In application,
+    this approach simplifies variance estimation and automates the delta-method.
+
+    Rather than root-finding for the estimating equations, the GMM estimator instead uses a minimization procedure.
+    Unlike ``MEstimator``, ``GMMEstimator`` allows for over-identified problems. The general form of the GMM estimator
+    is
+
+    .. math::
+
+        \text{argmin}_{\theta} \left[ \sum_{i=1}^n \psi(O_i, \hat{\theta}) \right]
+        \text{\textbf{Q}}
+        \left[ \sum_{i=1}^n \psi(O_i, \hat{\theta}) \right]
+
+
+    Here, :math:`\text{\textbf{Q}}` is a weight matrix that allows for over-identified (i.e., more parameters than
+    estimating functions in :math:`\psi`) problems. Point estimation proceeds by determining the values of
+    :math:`\theta` where this equation is minimized. This is done via standard optimization algorithms.
+
+    For variance estimation, sandwich variance estimator is used. The asymptotic sandwich variance estimator consists of
+
+    .. math::
+
+        V_n(O, \hat{\theta}) = B_n(O, \hat{\theta})^{-1} F_n(O, \hat{\theta}) \left\{B_n(O, \hat{\theta}^{-1})\right\}^T
+
+    where :math:`B` is the 'bread' and :math:`F` is the 'filling' matrix. These matrices are defined as
+
+    .. math::
+
+        B_n(O, \hat{\theta}) = n^{-1} \sum_{i=1}^{n} - \frac{\partial}{\partial \theta} \psi(O_i, \hat{\theta})
+
+    .. math::
+
+        F_n(O, \hat{\theta}) = n^{-1} \sum_{i=1}^{n} \psi(O_i, \hat{\theta}) \psi(O_i, \hat{\theta})^T
+
+    respectively. The partial derivatives for the bread are calculated using either numerical approximation (e.g.,
+    forward difference method) or forward-mode automatic differentiation. Inverting the bread is done via NumPy's
+    ``linalg.pinv``. For the filling, the dot product is taken at :math:`\hat{\theta}`.
+
+    Note
+    ----
+    The difficult part (that must be done by the user) is to specify the estimating equations. Be sure to check the
+    provided examples for the expected format. Pre-built estimating equations for common problems are also made
+    available.
+
+
+    After completion of these steps, point and variance estimates are stored. These can be extracted from
+    ``GMMEstimator``. Further, confidence intervals, Z-scores, P-values, or S-values can all be generated.
+
+    Note
+    ----
+    For complex regression problems, the root-finding algorithms are not as robust relative to maximization approaches.
+    A simple solution for difficult problems is to 'pre-wash' or find the solution to the equations and provide those
+    as the initial starting values.
+
+    Parameters
+    ----------
+    stacked_equations : function, callable
+        Function that returns a `v`-by-`n` NumPy array of the estimating equations. See provided examples in the
+        documentation for how to construct a set of estimating equations.
+    init : list, set, array
+        Initial values for the root-finding algorithm. A total of `v` values should be provided.
+    subset : list, set, array, None, optional
+        Optional argument to conduct the root-finding procedure on a subset of parameters in the estimating equations.
+        The input list is used to location index the parameter array via ``np.take()``. The subset list will
+        only affect the root-finding procedure (i.e., the sandwich variance estimator ignores the subset argument).
+        Default is ``None``, which runs the root-finding procedure for all parameters in the estimating equations.
+
+    Note
+    ----
+    Because the root-finding procedure is NOT ran for parameters outside of the subset, those coefficients *must* be
+    solved outside of ``GMMEstimator``. In general, I do *NOT* recommend using the ``subset`` argument unless a series
+    of complex estimating equations need to be solved. In general, this argument does not massively improve speed until
+    the estimating equations consist of hundreds of parameters.
+
+    Examples
+    --------
+    Loading necessary functions and building a generic data set for estimation of the mean
+
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> from scipy.stats import logistic
+    >>> from delicatessen import GMMEstimator
+    >>> from delicatessen.estimating_equations import ee_mean_variance
+
+    >>> y_dat = [1, 2, 4, 1, 2, 3, 1, 5, 2]
+
+    GMM-estimation with built-in estimating equation for the mean and variance. First, ``psi``, or the stacked
+    estimating equations, is defined
+
+    >>> def psi(theta):
+    >>>     return ee_mean_variance(theta=theta, y=y_dat)
+
+    Calling the M-estimation procedure
+
+    >>> estr = GMMEstimator(stacked_equations=psi, init=[0, 0, ])
+    >>> estr.estimate()
+
+    Inspecting the output results
+
+    >>> estr.theta                                  # Point estimates
+    >>> estr.variance                               # Covariance
+    >>> estr.asymptotic_variance                    # Asymptotic covariance
+    >>> np.sqrt(np.diag(estr.asymptotic_variance))  # Standard deviation
+    >>> estr.variance                               # Covariance
+    >>> np.sqrt(np.diag(estr.variance))             # Standard error
+    >>> estr.confidence_intervals()                 # Confidence intervals
+    >>> estr.z_scores()                             # Z-scores
+    >>> estr.p_values()                             # P-values
+    >>> estr.s_values()                             # S-values
+
+    For more examples on how to apply ``GMMEstimator``, see https://deli.readthedocs.io/en/latest/
+
+    References
+    ----------
+    ...
+    """
+    def estimate(self, solver='bfgs', maxiter=5000, tolerance=1e-9, deriv_method='approx', dx=1e-9, allow_pinv=True):
+        # Evaluate stacked estimating equations at init
+        vals_at_init = self.stacked_equations(theta=self.init)    # Calculating the initial values
+        vals_at_init = np.asarray(vals_at_init                    # Convert output to an array (in case it isn't)
+                                  ).T                             # ... transpose so N is always the 1st element
+
+        # Error checking before running procedure
+        if np.sum(vals_at_init) is None:
+            raise ValueError("When evaluating the estimating equation, `None` was returned. Please check that the "
+                             "stacked_equations returns an array evaluated at theta.")
+        if np.isnan(np.sum(vals_at_init)):         # Check to see if any np.nan's occur with the initial values
+            # Identifying the bad columns
+            nans_in_column = np.sum(np.isnan(vals_at_init), axis=0)        # Counting up all NAN's per estimating eq
+            columns_w_nans = np.argwhere(nans_in_column >= 1).flatten()    # Returning indices that have any NAN's
+            raise ValueError("When evaluated at the initial values, the `stacked_equations` return at least one "
+                             "np.nan at the following estimating equation indices: " +
+                             str(list(columns_w_nans)) + ". "
+                             "As delicatessen does not natively handle missing data, please ensure the "
+                             "provided estimating equations resolve any np.nan values accordingly. For details on "
+                             "how to handle np.nan's see the documentation at: "
+                             "https://deli.readthedocs.io/en/latest/Custom%20Equations.html#handling-np-nan")
+
+        # TODO check the dimensions and ensure there are >= number of parameter
+        if vals_at_init.ndim == 1 and np.asarray(self.init).shape[0] == 1:     # Checks to ensure dimensions align
+            # the starting if-state is to work-around inits=[0, ] (otherwise breaks the first else-if)
+            pass
+        elif vals_at_init.ndim == 1 and np.asarray(self.init).shape[0] != 1:
+            double_eval = True
+            raise ValueError("The number of initial values and the number of rows returned by `stacked_equations` "
+                             "should be equal but there are " + str(np.asarray(self.init).shape[0]) + " initial values "
+                             "and the `stacked_equations` function returns " + str(1) + " row.")
+        elif np.asarray(self.init).shape[0] != vals_at_init.shape[1]:
+            raise ValueError("The number of initial values and the number of rows returned by `stacked_equations` "
+                             "should be equal but there are " + str(np.asarray(self.init).shape[0]) + " initial values "
+                             "and the `stacked_equations` function returns " + str(vals_at_init.shape[1])
+                             + " row(s).")
+        elif vals_at_init.ndim > 2:
+            raise ValueError("A 2-dimensional array is expected, but the `stacked_equations` returns a "
+                             + str(vals_at_init.ndim) + "-dimensional array.")
+        else:
+            pass
+
+        # Trick to get the number of observations from the estimating equations (transposed above)
+        self.n_obs = vals_at_init.shape[0]
+
+        # Obtaining initial weight matrix
+        self.weight_matrix = np.identity(n=len(self.init))
+
+        # STEP 1: solving the M-estimator stacked equations
+        # To allow for optimization of only a subset of parameters in the estimating equation (in theory meant to
+        #   simplify the process of complex stacked estimating equations where pre-washing can be done effectively),
+        #   we do some internal processing. Essentially, we 'freeze' the parameters outside of self._subset_ as their
+        #   inits, and let the root-finding procedure update the self._subset_ parameters. We do this by subsetting out
+        #   the init values then passing them along to root(). Behind the scenes, self._mestimation_answer_() expands
+        #   the parameters (to include everything), calculates the estimating equation at those values, and then
+        #   extracts the corresponding subset.
+        #   This process only takes place within Step 1. There is an inherent danger with this process in that if
+        #   non-subset parameters are not pre-washed, then the returned parameters will not be correct. I am
+        #   considering adding a warning for self_subset_, but I currently just trust the user...
+        # Processing initial values based on whether subset option was specified
+        if self._subset_ is None:                        # If NOT subset,
+            inits = self.init                            # ... give all initial values
+        else:                                            # If subset,
+            inits = np.take(self.init, self._subset_)    # ... then extract initial values for the subset
+
+        # Calculating parameters values via the minimizer (for only the subset of values!)
+        slv_theta = self._solve_coefficients_(stacked_equations=self._gmmestimation_answer_,
+                                              init=inits,
+                                              method=solver,
+                                              maxiter=maxiter,
+                                              tolerance=tolerance)
+
+        # Processing parameters after the root-finding procedure
+        if self._subset_ is None:                        # If NOT subset,
+            self.theta = slv_theta                       # ... then use the full output/solved theta
+        else:                                            # If subset,
+            self.theta = np.asarray(self.init)           # ... copy the initial values
+            for s, n in zip(self._subset_, slv_theta):   # ... then look over the subset and input theta
+                self.theta[s] = n                        # ... and update the subset to the output/solved theta
+
+        # TODO re-apply estimation procedure if needed...
+
+        # STEP 2: calculating the sandwich variance
+        # After solving for the parameters, we now can compute the empirical sandwich variance estimator. This is
+        #   done by compute the bread and meat matrices and then combining them. This is now done by a separate
+        #   functionalities within the `sandwich.py` file as of v2.2.
+        # STEP 2.1: baking the Bread
+        self.bread = compute_bread(stacked_equations=self.stacked_equations,
+                                   theta=self.theta,
+                                   deriv_method=deriv_method,
+                                   dx=dx) / self.n_obs
+
+        # STEP 2.2: slicing the meat
+        self.meat = compute_meat(stacked_equations=self.stacked_equations,
+                                 theta=self.theta) / self.n_obs
+
+        # STEP 2.3: assembling the sandwich (variance)
+        self.asymptotic_variance = build_sandwich(bread=self.bread,
+                                                  meat=self.meat,
+                                                  allow_pinv=allow_pinv)
+        if self.asymptotic_variance is None:
+            self.variance = self.asymptotic_variance
+        else:
+            self.variance = self.asymptotic_variance / self.n_obs
+
+    def _gmmestimation_answer_(self, theta):
+        """Internal function to evaluate the sum of the estimating equations. The summation is internally evaluated
+        since access to the estimating functions is needed for the sandwich variance computations. This function is
+        used by the root-finding procedure (since we need the subset applied).
+
+        Parameters
+        ----------
+        theta : array
+            b-by-n matrix to sum over the values of n.
+
+        Returns
+        -------
+        array :
+            b-by-1 array, which is the sum over n for each b.
+        """
+        # Option for the subset argument
+        if self._subset_ is None:                      # If NOT subset then,
+            full_theta = theta                         # ... then use the full input theta
+        else:                                          # If subset then,
+            full_theta = np.asarray(self.init)         # ... copy the initial values to ndarray
+            np.put(full_theta,                         # ... update in place the previous array
+                   ind=self._subset_,                  # ... go to the subset indices
+                   v=theta)                            # ... then input current iteration values
+
+        # Evaluating estimating functions
+        stacked_equations = np.asarray(self.stacked_equations(full_theta))  # Returning stacked equation
+        est_eqtns = self._eval_ee_(stacked_equations=stacked_equations,     # Passing to evaluating function
+                                   subset=self._subset_)                    # ... with specified subset
+        est_eqtns = est_eqtns / self.n_obs                                  # Scaling EE by n (helpful for minimizer)
+
+        # Evaluating GMM estimator at given theta
+        return np.dot(np.dot(est_eqtns, self.weight_matrix), est_eqtns)
+
+    @staticmethod
+    def _solve_coefficients_(stacked_equations, init, method, maxiter, tolerance):
+        """Calls the root-finding procedure for the values of theta, such that the estimating equations are equal to
+        zero. Default uses the Levenberg-Marquardt algorithm from SciPy.
+
+        Parameters
+        ----------
+        stacked_equations : function
+            Function that contains the estimating equations
+        init : array
+            Initial values for the optimizer
+        method : str, function, callable
+            Method to use for the root finding procedure. Can be either a string or a callable object
+        maxiter : int
+            Maximum iterations to consider for the root finding procedure
+        tolerance : float
+            Maximum tolerance for errors in the root finding. This is SciPy's `tol` argument.
+
+        Returns
+        -------
+        psi: array
+            Solved or optimal values for theta given the estimating equations and data
+        """
+        # Default SciPy minimizers provided that are valid to use here
+        if method.lower() in ['cg', 'bfgs', 'nelder-mead', 'l-bfgs-b', 'powell']:
+            opt = minimize(stacked_equations,            # ... stacked equations to solve (should be written as sums)
+                           x0=np.asarray(init),          # ... initial values for solver
+                           method=method,                #
+                           options={"maxiter": maxiter,  #
+                                    "disp": False},      #
+                           tol=tolerance)                # ... setting some tolerance values (should be able to update)
+            if opt.status != 0:
+                warnings.warn(opt.message, OptimizeWarning)
+            psi = opt.x
+
+        # Callable custom minimizer provided by the user
+        elif callable(method):
+            try:
+                psi = method(stacked_equations=stacked_equations,
+                             init=np.asarray(init))
+            except TypeError:
+                raise TypeError("The user-specified root-finding `solver` must be a function (or callable object) with "
+                                "the following keyword arguments: `stacked_equations`, `init`.")
+            if psi is None:
+                raise ValueError("The user-specified root-finding `solver` must return the solution to the "
+                                 "optimization")
+
+        # Value error for unsupported solvers
+        else:
+            # ... otherwise throw ValueError if no other root-finding steps are triggered.
+            raise ValueError("The solver '" + str(method) + "' is not available. Please see the "
+                             "documentation for valid options for the optimizer.")
+
+        # Returning the theta estimates
         return psi
