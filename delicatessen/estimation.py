@@ -12,22 +12,7 @@ from delicatessen.sandwich import compute_bread, compute_meat, build_sandwich
 
 
 class _GeneralEstimator:
-    """Internal class for M-estimator and GMM-estimator to be built from. Not intended for users. Contains methods for
-    the initial definition procedure and functions to compute confidence intervals, P-values, and their transformations.
-
-    Parameters
-    ----------
-    stacked_equations : function, callable
-        Function that returns a `v`-by-`n` NumPy array of the estimating equations. See provided examples in the
-        documentation for how to construct a set of estimating equations.
-    init : list, set, array
-        Initial values for the root-finding algorithm. A total of `v` values should be provided.
-    subset : list, set, array, None, optional
-        Optional argument to conduct the root-finding procedure on a subset of parameters in the estimating equations.
-        The input list is used to location index the parameter array via ``np.take()``. The subset list will
-        only affect the root-finding procedure (i.e., the sandwich variance estimator ignores the subset argument).
-        Default is ``None``, which runs the root-finding procedure for all parameters in the estimating equations.
-
+    """Internal base class for M-estimator and GMM-estimator to be built from. Not intended for users.
     """
     def __init__(self, stacked_equations, init=None, subset=None):
         self.stacked_equations = stacked_equations     # User-input stacked estimating equations
@@ -45,7 +30,6 @@ class _GeneralEstimator:
         self.variance = None              # Covariance matrix for theta values (calculated later)
         self.asymptotic_variance = None   # Asymptotic covariance matrix for theta values (calculated later)
         self.weight_matrix = None         # Weight matrix for the GMM estimator
-        self.n = None                     # Number of observations (for checks and GMM scaling)
 
     def confidence_intervals(self, alpha=0.05):
         r"""Calculate two-sided Wald-type :math:`(1 - \alpha) \times` 100% confidence intervals using the point
@@ -304,6 +288,20 @@ class MEstimator(_GeneralEstimator):
     solved outside of ``MEstimator``. In general, I do *NOT* recommend using the ``subset`` argument unless a series of
     complex estimating equations need to be solved. In general, this argument does not massively improve speed until
     the estimating equations consist of hundreds of parameters.
+
+
+    Attributes
+    ----------
+    theta : ndarray
+        Parameters for estimating equations. Becomes the estimated parameters after `.estimate()` is called
+    variance : ndarray
+        Covariance matrix for the parameters, in the same order as the parameter vector
+    asymptotic_variance : ndarray
+        Asymptotic covariance matrix for the parameters. Not scaled by :math:`n`
+    bread : ndarray
+        Bread matrix for the parameter vector
+    meat : ndarray
+        Meat matrix for the parameter vector
 
     Examples
     --------
@@ -723,6 +721,22 @@ class GMMEstimator(_GeneralEstimator):
     of complex estimating equations need to be solved. In general, this argument does not massively improve speed until
     the estimating equations consist of hundreds of parameters.
 
+    Attributes
+    ----------
+    theta : ndarray
+        Parameters for estimating equations. Becomes the estimated parameters after `.estimate()` is called
+    variance : ndarray
+        Covariance matrix for the parameters, in the same order as the parameter vector
+    asymptotic_variance : ndarray
+        Asymptotic covariance matrix for the parameters. Not scaled by :math:`n`
+    bread : ndarray
+        Bread matrix for the parameter vector
+    meat : ndarray
+        Meat matrix for the parameter vector
+    weight_matrix : ndarray
+        Weight matrix, :math:`\text{\textbf{Q}}` used. For just-identified problems, the weight matrix is the identity
+        matrix
+
     Examples
     --------
     Loading necessary functions and building a generic data set for estimation of the mean
@@ -763,9 +777,56 @@ class GMMEstimator(_GeneralEstimator):
 
     References
     ----------
-    ...
+    Hansen LP. (1982). Large sample properties of generalized method of moments estimators.
+    *Econometrica: Journal of the Econometric Society*, 1029-1054.
+
+    Jesus J, & Chandler RE. (2011). Estimating functions and the generalized method of moments. *Interface Focus*,
+    1(6), 871-885.
     """
     def estimate(self, solver='bfgs', maxiter=5000, tolerance=1e-9, deriv_method='approx', dx=1e-9, allow_pinv=True):
+        """Run the point and variance estimation procedures for given estimating equation and starting values. This
+        function carries out the point and variance estimation of ``theta``. After this procedure, the point estimates
+        (in ``theta``) and the covariance matrix (in ``variance``) can be extracted from the ``GMMEstimator`` object.
+
+        Parameters
+        ----------
+        solver : str, function, callable, optional
+            Method to use for the minimization procedure. Default is the BFGS algorithm
+            (``scipy.optimize.minimize(method='bfgs')``, specified by ``solver='bfgs'``). Other built-in options are
+            ``'newton'``)
+            'cg', 'bfgs', 'nelder-mead', 'l-bfgs-b', 'powell'
+            , and a modification of the Powell
+            hybrid method (``scipy.optimize.root(method='hybr')``, specified by ``solver='hybr'``). Finally, any generic
+            root-finding algorithm can be used via a user-provided callable object. The function must consist of two
+            keyword arguments: ``stacked_equations``, and ``init``. Additionally, the function should return only the
+            optimized values. Please review the provided example in the documentation for how to implement a custom
+            root-finding algorithm.
+        maxiter : int, optional
+            Maximum iterations to consider for the minimization procedure. Default is 5000 iterations. For complex
+            estimating equations, this value may need to be increased. This argument is not used when a custom
+            minimization method (e.g., ``solver``) is provided.
+        tolerance : float, optional
+            Maximum tolerance for errors in the root finding in ``scipy.optimize``. Default is 1e-9. This argument is
+            not used when a custom minimization method (e.g., ``solver``) is provided.
+        deriv_method : str, optional
+            Method to compute the derivative of the estimating equations for the bread matrix. Default is ``'approx'``.
+            Options include numerical approximation via the forward difference method via SciPy (``'approx'``), forward
+            difference as implemented in delicatessen (`'fapprox'`), backward difference as implemented in delicatessen
+            (`'bapprox'`), central difference implemented as in delicatessen (`'capprox'`), or forward-mode automatic
+            differentiation as implemented in delicatessen(``'exact'``).
+        dx : float, optional
+            Spacing to use to numerically approximate the partial derivatives of the bread matrix. Default is 1e-9.
+            Here, a small value for ``dx`` should be used, since some large values can result in poor approximations.
+            This argument is only used with numerical approximation methods.
+        allow_pinv : bool, optional
+            Whether to allow for the pseudo-inverse (via ``numpy.linalg.pinv``) if the bread matrix is determined to be
+            non-invertible. If you want to disallow the pseudo-inverse (i.e., use ``numpy.linalg.inv``), set this
+            argument to ``False``. Default is ``True``, which  is more robust to the possible bread matrices.
+
+        Returns
+        -------
+        None
+        """
         # Evaluate stacked estimating equations at init
         vals_at_init = self.stacked_equations(theta=self.init)    # Calculating the initial values
         vals_at_init = np.asarray(vals_at_init                    # Convert output to an array (in case it isn't)
@@ -813,6 +874,8 @@ class GMMEstimator(_GeneralEstimator):
         # Obtaining initial weight matrix
         self.weight_matrix = np.identity(n=len(self.init))
 
+        # TODO put iterated GMM in a while loop?
+
         # STEP 1: solving the M-estimator stacked equations
         # To allow for optimization of only a subset of parameters in the estimating equation (in theory meant to
         #   simplify the process of complex stacked estimating equations where pre-washing can be done effectively),
@@ -845,7 +908,7 @@ class GMMEstimator(_GeneralEstimator):
             for s, n in zip(self._subset_, slv_theta):   # ... then look over the subset and input theta
                 self.theta[s] = n                        # ... and update the subset to the output/solved theta
 
-        # TODO re-apply estimation procedure if needed...
+        # TODO re-apply estimation procedure for over-identification...
 
         # STEP 2: calculating the sandwich variance
         # After solving for the parameters, we now can compute the empirical sandwich variance estimator. This is
@@ -871,9 +934,9 @@ class GMMEstimator(_GeneralEstimator):
             self.variance = self.asymptotic_variance / self.n_obs
 
     def _gmmestimation_answer_(self, theta):
-        """Internal function to evaluate the sum of the estimating equations. The summation is internally evaluated
+        """Internal function to evaluate the function to be minimized over. The summation is internally evaluated
         since access to the estimating functions is needed for the sandwich variance computations. This function is
-        used by the root-finding procedure (since we need the subset applied).
+        used by the minimization procedure (since we need the subset applied).
 
         Parameters
         ----------
@@ -906,8 +969,8 @@ class GMMEstimator(_GeneralEstimator):
 
     @staticmethod
     def _solve_coefficients_(stacked_equations, init, method, maxiter, tolerance):
-        """Calls the root-finding procedure for the values of theta, such that the estimating equations are equal to
-        zero. Default uses the Levenberg-Marquardt algorithm from SciPy.
+        """Calls the minimization procedure for the values of theta, such that the estimating equations are equal to
+        zero. Default uses the BFGS algorithm from SciPy.
 
         Parameters
         ----------
@@ -916,11 +979,11 @@ class GMMEstimator(_GeneralEstimator):
         init : array
             Initial values for the optimizer
         method : str, function, callable
-            Method to use for the root finding procedure. Can be either a string or a callable object
+            Method to use for the minimization procedure. Can be either a string or a callable object
         maxiter : int
-            Maximum iterations to consider for the root finding procedure
+            Maximum iterations to consider for the minimization procedure
         tolerance : float
-            Maximum tolerance for errors in the root finding. This is SciPy's `tol` argument.
+            Maximum tolerance for errors in the minimization. This is SciPy's `tol` argument.
 
         Returns
         -------
