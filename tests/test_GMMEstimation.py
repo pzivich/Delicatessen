@@ -474,7 +474,7 @@ class TestGMMEstimation:
             options = {"maxiter": 1000}
             opt = minimize(stacked_equations,
                            x0=np.asarray(init),
-                           method='cg')
+                           method='cg', options=options, tol=1e-9)
             return opt.x
 
         # Estimating the M-Estimator
