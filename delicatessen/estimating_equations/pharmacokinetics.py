@@ -57,7 +57,7 @@ def ee_emax(theta, dose, response):
 
     Examples
     --------
-    Construction of a estimating equations with ``ee_emax_model`` should be done similar to the following
+    Construction of a estimating equations with ``ee_emax`` should be done similar to the following
 
     >>> from delicatessen import MEstimator
     >>> from delicatessen.data import load_inderjit
@@ -72,7 +72,7 @@ def ee_emax(theta, dose, response):
     >>> response = np.max(d[:, 0]) - d[:, 0]  # Response data
     >>> dose = d[:, 1]                        # Dose data
 
-   Defining psi, or the stacked estimating equations
+    Defining psi, or the stacked estimating equations
 
     >>> def psi(theta):
     >>>     return ee_emax(theta=theta, dose=dose, response=response)
@@ -167,7 +167,7 @@ def ee_emax_ed(theta, dose, delta, ed50):
     >>> response = np.max(d[:, 0]) - d[:, 0]  # Response data
     >>> dose = d[:, 1]                        # Dose data
 
-   Defining psi, or the stacked estimating equations
+    Defining psi, or the stacked estimating equations
 
     >>> def psi(theta):
     >>>     e_model = ee_emax(theta=theta, X=dose, y=response)
