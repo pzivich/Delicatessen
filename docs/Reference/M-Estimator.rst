@@ -1,19 +1,20 @@
-M-Estimator
+Estimators
 ===========
-Reference documentation for the M-Estimator available in ``delicatessen``. This is the main utility in the
-``delicatessen`` library. For implementation of your own estimating equations with ``delicatessen``, see the
+Reference documentation for the M-Estimator and GMM-Estimator available in ``delicatessen``. This is the main utility
+in the ``delicatessen`` library. For implementation of your own estimating equations with ``delicatessen``, see the
 documentation and examples provided in the 'Custom Equations' section.
 
 
-M-Estimator
+Estimators
 ---------------------------
 
-.. currentmodule:: delicatessen.mestimation
+.. currentmodule:: delicatessen.estimation
 
 .. autosummary::
    :toctree: generated/
 
    MEstimator
+   GMMEstimator
 
 
 Sandwich Variance Estimator

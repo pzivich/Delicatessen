@@ -222,13 +222,6 @@ class MEstimator(_GeneralEstimator):
     :math:`v`-dimensional parameter vector, and :math:`O_i` is the observed data (where units are independent but not
     necessarily identically distributed).
 
-    Note
-    ----
-    Estimating equations are advantageous in both theoretical and applied research. They simplifies proofs of
-    consistency and asymptotic normality of estimators under a large-sample approximation framework. In application,
-    this approach simplifies variance estimation and automates the delta-method.
-
-
     M-Estimators consists of two broad step: point estimation and variance estimation. Point estimation is carried out
     by determining the values of :math:`\theta` where the sum of the estimating equations are zero. This is done via
     standard root-finding algorithms.
@@ -253,21 +246,8 @@ class MEstimator(_GeneralEstimator):
     forward difference method) or forward-mode automatic differentiation. Inverting the bread is done via NumPy's
     ``linalg.pinv``. For the filling, the dot product is taken at :math:`\hat{\theta}`.
 
-    Note
-    ----
-    The difficult part (that must be done by the user) is to specify the estimating equations. Be sure to check the
-    provided examples for the expected format. Pre-built estimating equations for common problems are also made
-    available.
-
-
     After completion of these steps, point and variance estimates are stored. These can be extracted from
     ``MEstimator``. Further, confidence intervals, Z-scores, P-values, or S-values can all be generated.
-
-    Note
-    ----
-    For complex regression problems, the root-finding algorithms are not as robust relative to maximization approaches.
-    A simple solution for difficult problems is to 'pre-wash' or find the solution to the equations and provide those
-    as the initial starting values.
 
     Parameters
     ----------
@@ -644,12 +624,6 @@ class GMMEstimator(_GeneralEstimator):
     :math:`v`-dimensional parameter vector, and :math:`O_i` is the observed data (where units are independent but not
     necessarily identically distributed).
 
-    Note
-    ----
-    Estimating equations are advantageous in both theoretical and applied research. They simplifies proofs of
-    consistency and asymptotic normality of estimators under a large-sample approximation framework. In application,
-    this approach simplifies variance estimation and automates the delta-method.
-
     Rather than root-finding for the estimating equations, the GMM estimator instead uses a minimization procedure.
     Unlike ``MEstimator``, ``GMMEstimator`` allows for over-identified problems. The general form of the GMM estimator
     is
@@ -657,11 +631,11 @@ class GMMEstimator(_GeneralEstimator):
     .. math::
 
         \text{argmin}_{\theta} \left[ \sum_{i=1}^n \psi(O_i, \hat{\theta}) \right]
-        \text{\textbf{Q}}
+        \text{Q}
         \left[ \sum_{i=1}^n \psi(O_i, \hat{\theta}) \right]
 
 
-    Here, :math:`\text{\textbf{Q}}` is a weight matrix that allows for over-identified (i.e., more parameters than
+    Here, :math:`\text{Q}` is a weight matrix that allows for over-identified (i.e., more parameters than
     estimating functions in :math:`\psi`) problems. Point estimation proceeds by determining the values of
     :math:`\theta` where this equation is minimized. This is done via standard optimization algorithms.
 
@@ -685,20 +659,8 @@ class GMMEstimator(_GeneralEstimator):
     forward difference method) or forward-mode automatic differentiation. Inverting the bread is done via NumPy's
     ``linalg.pinv``. For the filling, the dot product is taken at :math:`\hat{\theta}`.
 
-    Note
-    ----
-    The difficult part (that must be done by the user) is to specify the estimating equations. Be sure to check the
-    provided examples for the expected format. Pre-built estimating equations for common problems are also made
-    available.
-
-
     After completion of these steps, point and variance estimates are stored. These can be extracted from
     ``GMMEstimator``. Further, confidence intervals, Z-scores, P-values, or S-values can all be generated.
-
-    Note
-    ----
-    For complex regression problems, minimization may be difficult. A simple solution for difficult problems is to
-    'pre-wash' or find the solution to the equations and provide those as the initial starting values.
 
     Parameters
     ----------
@@ -733,7 +695,7 @@ class GMMEstimator(_GeneralEstimator):
     meat : ndarray
         Meat matrix for the parameter vector
     weight_matrix : ndarray
-        Weight matrix, :math:`\text{\textbf{Q}}` used. For just-identified problems, the weight matrix is the identity
+        Weight matrix, :math:`\text{Q}` used. For just-identified problems, the weight matrix is the identity
         matrix
 
     Examples
