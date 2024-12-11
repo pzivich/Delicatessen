@@ -697,9 +697,8 @@ class GMMEstimator(_GeneralEstimator):
 
     Note
     ----
-    For complex regression problems, the root-finding algorithms are not as robust relative to maximization approaches.
-    A simple solution for difficult problems is to 'pre-wash' or find the solution to the equations and provide those
-    as the initial starting values.
+    For complex regression problems, minimization may be difficult. A simple solution for difficult problems is to
+    'pre-wash' or find the solution to the equations and provide those as the initial starting values.
 
     Parameters
     ----------
@@ -707,16 +706,16 @@ class GMMEstimator(_GeneralEstimator):
         Function that returns a `v`-by-`n` NumPy array of the estimating equations. See provided examples in the
         documentation for how to construct a set of estimating equations.
     init : list, set, array
-        Initial values for the root-finding algorithm. A total of `v` values should be provided.
+        Initial values for the minimization algorithm. A total of `v` values should be provided.
     subset : list, set, array, None, optional
-        Optional argument to conduct the root-finding procedure on a subset of parameters in the estimating equations.
+        Optional argument to conduct the minimization procedure on a subset of parameters in the estimating equations.
         The input list is used to location index the parameter array via ``np.take()``. The subset list will
-        only affect the root-finding procedure (i.e., the sandwich variance estimator ignores the subset argument).
-        Default is ``None``, which runs the root-finding procedure for all parameters in the estimating equations.
+        only affect the minimization procedure (i.e., the sandwich variance estimator ignores the subset argument).
+        Default is ``None``, which runs the minimization procedure for all parameters in the estimating equations.
 
     Note
     ----
-    Because the root-finding procedure is NOT ran for parameters outside of the subset, those coefficients *must* be
+    Because the minimization procedure is NOT ran for parameters outside of the subset, those coefficients *must* be
     solved outside of ``GMMEstimator``. In general, I do *NOT* recommend using the ``subset`` argument unless a series
     of complex estimating equations need to be solved. In general, this argument does not massively improve speed until
     the estimating equations consist of hundreds of parameters.
@@ -797,10 +796,10 @@ class GMMEstimator(_GeneralEstimator):
             'cg', 'bfgs', 'nelder-mead', 'l-bfgs-b', 'powell'
             , and a modification of the Powell
             hybrid method (``scipy.optimize.root(method='hybr')``, specified by ``solver='hybr'``). Finally, any generic
-            root-finding algorithm can be used via a user-provided callable object. The function must consist of two
+            minimization algorithm can be used via a user-provided callable object. The function must consist of two
             keyword arguments: ``stacked_equations``, and ``init``. Additionally, the function should return only the
             optimized values. Please review the provided example in the documentation for how to implement a custom
-            root-finding algorithm.
+            minimization algorithm.
         maxiter : int, optional
             Maximum iterations to consider for the minimization procedure. Default is 5000 iterations. For complex
             estimating equations, this value may need to be increased. This argument is not used when a custom
@@ -880,7 +879,7 @@ class GMMEstimator(_GeneralEstimator):
         # To allow for optimization of only a subset of parameters in the estimating equation (in theory meant to
         #   simplify the process of complex stacked estimating equations where pre-washing can be done effectively),
         #   we do some internal processing. Essentially, we 'freeze' the parameters outside of self._subset_ as their
-        #   inits, and let the root-finding procedure update the self._subset_ parameters. We do this by subsetting out
+        #   inits, and let the minimization procedure update the self._subset_ parameters. We do this by subsetting out
         #   the init values then passing them along to root(). Behind the scenes, self._mestimation_answer_() expands
         #   the parameters (to include everything), calculates the estimating equation at those values, and then
         #   extracts the corresponding subset.
@@ -900,7 +899,7 @@ class GMMEstimator(_GeneralEstimator):
                                               maxiter=maxiter,
                                               tolerance=tolerance)
 
-        # Processing parameters after the root-finding procedure
+        # Processing parameters after the minimization procedure
         if self._subset_ is None:                        # If NOT subset,
             self.theta = slv_theta                       # ... then use the full output/solved theta
         else:                                            # If subset,
@@ -991,7 +990,7 @@ class GMMEstimator(_GeneralEstimator):
             Solved or optimal values for theta given the estimating equations and data
         """
         # Default SciPy minimizers provided that are valid to use here
-        if method.lower() in ['cg', 'bfgs', 'nelder-mead', 'l-bfgs-b', 'powell']:
+        if method in ['cg', 'bfgs', 'nelder-mead', 'l-bfgs-b', 'powell']:
             opt = minimize(stacked_equations,            # ... stacked equations to solve (should be written as sums)
                            x0=np.asarray(init),          # ... initial values for solver
                            method=method,                #
@@ -1008,15 +1007,15 @@ class GMMEstimator(_GeneralEstimator):
                 psi = method(stacked_equations=stacked_equations,
                              init=np.asarray(init))
             except TypeError:
-                raise TypeError("The user-specified root-finding `solver` must be a function (or callable object) with "
+                raise TypeError("The user-specified minimizer `solver` must be a function (or callable object) with "
                                 "the following keyword arguments: `stacked_equations`, `init`.")
             if psi is None:
-                raise ValueError("The user-specified root-finding `solver` must return the solution to the "
+                raise ValueError("The user-specified minimizer `solver` must return the solution to the "
                                  "optimization")
 
         # Value error for unsupported solvers
         else:
-            # ... otherwise throw ValueError if no other root-finding steps are triggered.
+            # ... otherwise throw ValueError if no other minimizer steps are triggered.
             raise ValueError("The solver '" + str(method) + "' is not available. Please see the "
                              "documentation for valid options for the optimizer.")
 
