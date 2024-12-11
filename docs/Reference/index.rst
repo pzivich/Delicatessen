@@ -10,8 +10,14 @@ the sections provided in the side-bar.
 
 
 .. toctree::
+    :maxdepth: 1
+
+    M-estimator <M-Estimator.rst>
+    GMM-stimator <GMM-Estimator.rst>
+
+
+.. toctree::
     :maxdepth: 2
 
-    Estimators <M-Estimator.rst>
     Estimating Equations <Estimating Equations.rst>
     Utilities <Utilities.rst>
