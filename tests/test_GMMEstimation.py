@@ -9,7 +9,7 @@ import pandas as pd
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
 from scipy.stats import logistic
-from scipy.optimize import root
+from scipy.optimize import minimize
 
 from delicatessen import GMMEstimator
 from delicatessen.utilities import inverse_logit
@@ -61,55 +61,53 @@ class TestGMMEstimation:
         with pytest.raises(ValueError, match="at least one np.nan"):
             estr.estimate()
 
-    # def test_error_rootfinder1(self):
-    #     """Checks for an error when an invalid root finder is provided
-    #     """
-    #     # Data set
-    #     y = np.array([5, 1, 2, 4, 2, 4, 5, 7, 11, 1, 6, 3, 4, 6])
-    #
-    #     def psi(theta):
-    #         return y - theta
-    #
-    #     estr = GMMEstimator(psi, init=[0, ])
-    #     with pytest.raises(ValueError, match="The solver 'not-avail'"):
-    #         estr.estimate(solver='not-avail')
-    #
-    # def test_error_rootfinder2(self):
-    #     """Check that user-specified solver has correct arguments
-    #     """
-    #     # Data set
-    #     y = np.array([5, 1, 2, 4, 2, 4, 5, 7, 11, 1, 6, 3, 4, 6])
-    #
-    #     def psi(theta):
-    #         return y - theta
-    #
-    #     def custom_solver(stacked_equations):
-    #         options = {"maxiter": 1000}
-    #         opt = root(stacked_equations, x0=np.asarray([0, ]),
-    #                    method='lm', tol=1e-9, options=options)
-    #         return opt.x
-    #
-    #     estr = GMMEstimator(psi, init=[0, ])
-    #     with pytest.raises(TypeError, match="The user-specified root-finding `solver` must be a function"):
-    #         estr.estimate(solver=custom_solver)
-    #
-    # def test_error_rootfinder3(self):
-    #     """Check that user-specified solver returns something besides None
-    #     """
-    #     # Data set
-    #     y = np.array([5, 1, 2, 4, 2, 4, 5, 7, 11, 1, 6, 3, 4, 6])
-    #
-    #     def psi(theta):
-    #         return y - theta
-    #
-    #     def custom_solver(stacked_equations, init):
-    #         options = {"maxiter": 1000}
-    #         opt = root(stacked_equations, x0=np.asarray(init),
-    #                    method='lm', tol=1e-9, options=options)
-    #
-    #     mestimator = MEstimator(psi, init=[0, ])
-    #     with pytest.raises(ValueError, match="must return the solution to the"):
-    #         mestimator.estimate(solver=custom_solver)
+    def test_error_minimizer1(self):
+        """Checks for an error when an invalid minimizer is provided
+        """
+        # Data set
+        y = np.array([5, 1, 2, 4, 2, 4, 5, 7, 11, 1, 6, 3, 4, 6])
+
+        def psi(theta):
+            return y - theta
+
+        estr = GMMEstimator(psi, init=[0, ])
+        with pytest.raises(ValueError, match="The solver 'not-avail'"):
+            estr.estimate(solver='not-avail')
+
+    def test_error_minimizer2(self):
+        """Check that user-specified solver has correct arguments
+        """
+        # Data set
+        y = np.array([5, 1, 2, 4, 2, 4, 5, 7, 11, 1, 6, 3, 4, 6])
+
+        def psi(theta):
+            return y - theta
+
+        def custom_solver(stacked_equations):
+            opt = minimize(stacked_equations, x0=np.asarray([0, ]),
+                           method='bfgs')
+            return opt.x
+
+        estr = GMMEstimator(psi, init=[0, ])
+        with pytest.raises(TypeError, match="The user-specified minimizer `solver` must be a function"):
+            estr.estimate(solver=custom_solver)
+
+    def test_error_rootfinder3(self):
+        """Check that user-specified solver returns something besides None
+        """
+        # Data set
+        y = np.array([5, 1, 2, 4, 2, 4, 5, 7, 11, 1, 6, 3, 4, 6])
+
+        def psi(theta):
+            return y - theta
+
+        def custom_solver(stacked_equations, init):
+            opt = minimize(stacked_equations, x0=np.asarray(init),
+                           method='bfgs')
+
+        mestimator = GMMEstimator(psi, init=[0, ])
+        with pytest.raises(ValueError, match="must return the solution to the"):
+            mestimator.estimate(solver=custom_solver)
 
     def test_error_bad_inits1(self):
         # Data set
@@ -461,42 +459,40 @@ class TestGMMEstimation:
                             -1*np.log2(np.asarray(glm.pvalues)),
                             atol=1e-4)
 
-    # def test_custom_solver(self):
-    #     """Test the use of a user-specified root-finding algorithm.
-    #     """
-    #     # Generating some generic data for the mean
-    #     y = np.random.normal(size=1000)
-    #
-    #     # This is the stacked estimating equations that we are solving!!
-    #     def psi(theta):
-    #         return y - theta[0], (y - theta[0]) ** 2 - theta[1]
-    #
-    #     # This is the custom estimating equation
-    #     def custom_solver(stacked_equations, init):
-    #         options = {"maxiter": 1000}
-    #         opt = root(stacked_equations,
-    #                    x0=np.asarray(init),
-    #                    method='lm',
-    #                    tol=1e-9,
-    #                    options=options)
-    #         return opt.x
-    #
-    #     # Estimating the M-Estimator
-    #     mestimator = MEstimator(psi, init=[0, 0])
-    #     mestimator.estimate(solver=custom_solver)
-    #
-    #     # Checking mean estimate
-    #     npt.assert_allclose(mestimator.theta[0],
-    #                         np.mean(y),
-    #                         atol=1e-6)
-    #
-    #     # Checking variance estimates
-    #     npt.assert_allclose(mestimator.theta[1],
-    #                         mestimator.asymptotic_variance[0][0],
-    #                         atol=1e-6)
-    #     npt.assert_allclose(mestimator.theta[1],
-    #                         np.var(y, ddof=0),
-    #                         atol=1e-6)
+    def test_custom_solver(self):
+        """Test the use of a user-specified minimization algorithm.
+        """
+        # Generating some generic data for the mean
+        y = np.random.normal(size=1000)
+
+        # This is the stacked estimating equations that we are solving!!
+        def psi(theta):
+            return y - theta[0], (y - theta[0]) ** 2 - theta[1]
+
+        # This is the custom estimating equation
+        def custom_solver(stacked_equations, init):
+            options = {"maxiter": 1000}
+            opt = minimize(stacked_equations,
+                           x0=np.asarray(init),
+                           method='cg')
+            return opt.x
+
+        # Estimating the M-Estimator
+        estr = GMMEstimator(psi, init=[0, 0])
+        estr.estimate(solver=custom_solver)
+
+        # Checking mean estimate
+        npt.assert_allclose(estr.theta[0],
+                            np.mean(y),
+                            atol=1e-6)
+
+        # Checking variance estimates
+        npt.assert_allclose(estr.theta[1],
+                            estr.asymptotic_variance[0][0],
+                            atol=1e-6)
+        npt.assert_allclose(estr.theta[1],
+                            np.var(y, ddof=0),
+                            atol=1e-6)
 
     def test_no_pderiv_overwrite(self):
         """Test for error found in v0.1b2 (when the `dx` argument was added).
