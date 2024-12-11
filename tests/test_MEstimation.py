@@ -21,6 +21,20 @@ np.random.seed(236461)
 
 class TestMEstimation:
 
+    @pytest.fixture
+    def data_c(self):
+        d = pd.DataFrame()
+        d['W'] = [1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3,
+                  1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3]
+        d['V'] = [1, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 1, 1, 0, 0,
+                  1, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 1, 1, 0, 0]
+        d['A'] = [1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 0, 1, 0, 1,
+                  1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 0, 1, 0, 1]
+        d['Y'] = [3, 5, 1, 5, 2, 5, 2, 1, 4, 2, 3, 4, 2, 5, 5, 3, 5, 1, 5, 2, 5, 2, 1, 4, 2, 3, 4, 2, 5, 5,
+                  3, 5, 1, 5, 2, 5, 2, 1, 4, 2, 3, 4, 2, 5, 5]
+        d['I'] = 1
+        return d
+
     def test_error_none_returned(self):
         """Checks for an error when the estimating equations return None
         """
@@ -501,24 +515,14 @@ class TestMEstimation:
 
         npt.assert_allclose(estr1.theta, estr2.theta)
 
-    def test_subset_params(self):
+    def test_subset_params(self, data_c):
         # Creating data set
-        n = 2500
-        d = pd.DataFrame()
-        d['W'] = np.random.normal(size=n)
-        d['A'] = np.random.binomial(n=1, p=logistic.cdf(d['W']), size=n)
-        d['Y1'] = 1 + 1 * d['W'] + np.random.normal(size=n)
-        d['Y0'] = 0 + 0 * d['W'] + np.random.normal(size=n)
-        d['Y'] = np.where(d['A'] == 1, d['Y1'], d['Y0'])
-        d['AW'] = d['A'] * d['W']
-        d['C'] = 1
-        d['A1'] = 1
-        d['A1W'] = 1 * d['W']
+        data_c['A1'] = 1
 
         # Setting up data from M-estimation
-        x = np.asarray(d[['C', 'A', 'W', 'AW']])
-        x1 = np.asarray(d[['C', 'A1', 'W', 'A1W']])
-        y = np.asarray(d['Y'])
+        x = np.asarray(data_c[['I', 'A', 'W', 'V']])
+        x1 = np.asarray(data_c[['I', 'A1', 'W', 'V']])
+        y = np.asarray(data_c['Y'])
 
         # IPW mean estimating equation
         def psi(theta):
@@ -532,39 +536,29 @@ class TestMEstimation:
         # Full solve
         init = [0, ] + [0, ]*x.shape[1]
         ns = MEstimator(psi, init=init)
-        ns.estimate(solver='lm')
+        ns.estimate(solver='lm', deriv_method='exact')
 
         # Subset solve (using previous regression solutions)
         init = [0, ] + list(ns.theta[1:])
         ys = MEstimator(psi, init=init, subset=[0, ])
-        ys.estimate(solver='lm')
+        ys.estimate(solver='lm', deriv_method='exact')
 
         # Check point estimates are all close
         npt.assert_allclose(ns.theta, ys.theta)
 
         # Check variance estimates are all close
-        npt.assert_allclose(ns.bread, ys.bread, atol=1e-8)
-        npt.assert_allclose(ns.meat, ys.meat, atol=1e-8)
-        npt.assert_allclose(ns.variance, ys.variance, atol=1e-8)
+        npt.assert_allclose(ns.bread, ys.bread, atol=1e-9)
+        npt.assert_allclose(ns.meat, ys.meat, atol=1e-9)
+        npt.assert_allclose(ns.variance, ys.variance, atol=1e-9)
 
-    def test_subset_params2(self):
+    def test_subset_params2(self, data_c):
         # Creating data set
-        n = 2500
-        d = pd.DataFrame()
-        d['W'] = np.random.normal(size=n)
-        d['A'] = np.random.binomial(n=1, p=logistic.cdf(d['W']), size=n)
-        d['Y1'] = 1 + 1 * d['W'] + np.random.normal(size=n)
-        d['Y0'] = 0 + 0 * d['W'] + np.random.normal(size=n)
-        d['Y'] = np.where(d['A'] == 1, d['Y1'], d['Y0'])
-        d['AW'] = d['A'] * d['W']
-        d['C'] = 1
-        d['A1'] = 1
-        d['A1W'] = 1 * d['W']
+        data_c['A1'] = 1
 
         # Setting up data from M-estimation
-        x = np.asarray(d[['C', 'A', 'W', 'AW']])
-        x1 = np.asarray(d[['C', 'A1', 'W', 'A1W']])
-        y = np.asarray(d['Y'])
+        x = np.asarray(data_c[['I', 'A', 'W', 'V']])
+        x1 = np.asarray(data_c[['I', 'A1', 'W', 'V']])
+        y = np.asarray(data_c['Y'])
 
         # IPW mean estimating equation
         def psi(theta):
@@ -578,17 +572,17 @@ class TestMEstimation:
         # Full solve
         init = [0, ] + [0, ]*x.shape[1]
         ns = MEstimator(psi, init=init)
-        ns.estimate(solver='lm', dx=1e-9)
+        ns.estimate(solver='lm', deriv_method='exact')
 
         # Subset solve (using previous regression solutions)
         init = [0, 0, ] + list(ns.theta[2:4]) + [0, ]
         ys = MEstimator(psi, init=init, subset=[0, 1, 4])
-        ys.estimate(solver='lm', dx=1e-9)
+        ys.estimate(solver='lm', deriv_method='exact')
 
         # Check point estimates are all close
-        npt.assert_allclose(ns.theta, ys.theta)
+        npt.assert_allclose(ns.theta, ys.theta, atol=1e-9)
 
         # Check variance estimates are all close
-        npt.assert_allclose(ns.bread, ys.bread, atol=1e-8)
-        npt.assert_allclose(ns.meat, ys.meat, atol=1e-8)
-        npt.assert_allclose(ns.variance, ys.variance, atol=1e-8)
+        npt.assert_allclose(ns.bread, ys.bread, atol=1e-9)
+        npt.assert_allclose(ns.meat, ys.meat, atol=1e-9)
+        npt.assert_allclose(ns.variance, ys.variance, atol=1e-9)
