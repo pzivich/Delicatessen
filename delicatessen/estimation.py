@@ -14,7 +14,7 @@ from delicatessen.sandwich import compute_bread, compute_meat, build_sandwich
 class _GeneralEstimator:
     """Internal base class for M-estimator and GMM-estimator to be built from. Not intended for users.
     """
-    def __init__(self, stacked_equations, init=None, subset=None):
+    def __init__(self, stacked_equations, init, subset=None):
         self.stacked_equations = stacked_equations     # User-input stacked estimating equations
         self.init = init                               # User-input initial starting values for solving estimating eqs
         if subset is None:                             # Handling subset of parameters
@@ -744,6 +744,14 @@ class GMMEstimator(_GeneralEstimator):
     Jesus J, & Chandler RE. (2011). Estimating functions and the generalized method of moments. *Interface Focus*,
     1(6), 871-885.
     """
+    def __init__(self, stacked_equations, init, subset=None, over_id_vector=None, maxiters=5, tolerance=1e-9):
+        super().__init__(stacked_equations=stacked_equations, init=init, subset=subset)
+        # TODO clean up these internals. Better naming convention
+        # TODO docs for additional GMM parameters
+        self._over_id_efs_ = over_id_vector
+        self._over_id_iterations_ = maxiters
+        self._over_id_tolerance_ = tolerance
+
     def estimate(self, solver='bfgs', maxiter=5000, tolerance=1e-9, deriv_method='approx', dx=1e-9, allow_pinv=True):
         """Run the point and variance estimation procedures for given estimating equation and starting values. This
         function carries out the point and variance estimation of ``theta``. After this procedure, the point estimates
@@ -809,6 +817,7 @@ class GMMEstimator(_GeneralEstimator):
                              "how to handle np.nan's see the documentation at: "
                              "https://deli.readthedocs.io/en/latest/Custom%20Equations.html#handling-np-nan")
 
+        # Processing dependent on number of estimating functions
         if vals_at_init.ndim == 1:
             n_params = 1
             over_identified = False
@@ -817,21 +826,34 @@ class GMMEstimator(_GeneralEstimator):
                     "The number of initial values should be less than or equal to the number of rows "
                     "returned by `stacked_equations` but there are " + str(np.asarray(self.init).shape[0])
                     + " initial values and the `stacked_equations` function returns 1 row.")
+        # If estimating functions are of 2 dimensions, need to check for over-identification
         elif vals_at_init.ndim == 2:
+            # TODO better comments to explain these steps (since can be confusing)
             n_params = vals_at_init.shape[1]
             if np.asarray(self.init).shape[0] == n_params:
                 over_identified = False
+                if self._over_id_efs_ is not None:
+                    # TODO improve phrasing on this warning
+                    warnings.warn("The current problem is not over-identified but ... was specified. Therefore, that "
+                                  "argument is being ignored.", UserWarning)
             elif np.asarray(self.init).shape[0] < n_params:
                 over_identified = True
+                if self._over_id_efs_ is None:
+                    # TODO improve phrasing on this error
+                    raise ValueError("Over ID requires the corresponding EFs to be specified")
             else:
                 raise ValueError(
                     "The number of initial values should be less than or equal to the number of rows "
                     "returned by `stacked_equations` but there are " + str(np.asarray(self.init).shape[0])
                     + " initial values and the `stacked_equations` function returns "
                     + str(vals_at_init.shape[1]) + " row(s).")
+
+        # Catching if user provided invalid estimating function shape
         elif vals_at_init.ndim > 2:
             raise ValueError("A 2-dimensional array is expected, but the `stacked_equations` returns a "
                              + str(vals_at_init.ndim) + "-dimensional array.")
+
+        # Nothing should arrive here via logic of previous operations
         else:
             raise ValueError("This ValueError should not be reached by the structure of the problem. If you receive "
                              "this error, please reach out https://github.com/pzivich/Delicatessen")
@@ -841,6 +863,9 @@ class GMMEstimator(_GeneralEstimator):
 
         # Obtaining initial weight matrix
         self.weight_matrix = np.identity(n=n_params)
+
+        # Updating theta to init values for minimization call (since needed in _gmmestimation_answer_)
+        self.theta = self.init
 
         # STEP 1: solving the M-estimator stacked equations
         # To allow for optimization of only a subset of parameters in the estimating equation (in theory meant to
@@ -854,17 +879,15 @@ class GMMEstimator(_GeneralEstimator):
         #   non-subset parameters are not pre-washed, then the returned parameters will not be correct. I am
         #   considering adding a warning for self_subset_, but I currently just trust the user...
         # Processing initial values based on whether subset option was specified
-        self._solve_for_theta_(solver=solver, maxiter=maxiter, tolerance=tolerance)
+        self._solve_for_theta_(solver=solver, maxiter=maxiter, tolerance=tolerance, init=self.theta)
 
-        # over_identified = True
         if over_identified:
-            meat_matrix = compute_meat(stacked_equations=self.stacked_equations,
-                                       theta=self.theta) / self.n_obs
-            if allow_pinv:
-                self.weight_matrix = np.linalg.pinv(meat_matrix)
-            else:
-                self.weight_matrix = np.linalg.inv(meat_matrix)
-            self._solve_for_theta_(solver=solver, maxiter=maxiter, tolerance=tolerance)
+            # TODO 5 iterations here is completely arbitrary. Need to generalize
+            for j in range(self._over_id_iterations_):
+                self.weight_matrix = self._get_q_matrix_(over_id_efs=self._over_id_efs_, allow_pinv=allow_pinv)
+                self._solve_for_theta_(solver=solver, maxiter=maxiter, tolerance=tolerance, init=self.theta)
+                # TODO check tolerance here
+                # TODO warning if hit max tolerance before convergence
 
         # STEP 2: calculating the sandwich variance
         # After solving for the parameters, we now can compute the empirical sandwich variance estimator. This is
@@ -905,11 +928,11 @@ class GMMEstimator(_GeneralEstimator):
             b-by-1 array, which is the sum over n for each b.
         """
         # Option for the subset argument
-        # TODO need to change how subset works here!
+        # TODO need to change how subset works here? Actually I don't think so
         if self._subset_ is None:                      # If NOT subset then,
             full_theta = theta                         # ... then use the full input theta
         else:                                          # If subset then,
-            full_theta = np.asarray(self.init)         # ... copy the initial values to ndarray
+            full_theta = np.asarray(self.theta)        # ... copy the initial values to ndarray
             np.put(full_theta,                         # ... update in place the previous array
                    ind=self._subset_,                  # ... go to the subset indices
                    v=theta)                            # ... then input current iteration values
@@ -923,7 +946,7 @@ class GMMEstimator(_GeneralEstimator):
         # Evaluating GMM estimator at given theta
         return np.dot(np.dot(est_eqtns, self.weight_matrix), est_eqtns)
 
-    def _solve_for_theta_(self, solver, maxiter, tolerance):
+    def _solve_for_theta_(self, solver, maxiter, tolerance, init):
         """Internal function to evaluate and solve the estimating equations for theta. This is expressed as an internal
         function to simplify the iterative procedure for over-identified problems
 
@@ -940,10 +963,11 @@ class GMMEstimator(_GeneralEstimator):
         -------
         None
         """
+        # TODO I added init as an argument rather than calling self.init. I want to think about this more
         if self._subset_ is None:                        # If NOT subset,
-            inits = self.init                            # ... give all initial values
+            inits = init                                 # ... give all initial values
         else:                                            # If subset,
-            inits = np.take(self.init, self._subset_)    # ... then extract initial values for the subset
+            inits = np.take(init, self._subset_)         # ... then extract initial values for the subset
 
         # Calculating parameters values via the minimizer (for only the subset of values!)
         slv_theta = self._solve_coefficients_(stacked_equations=self._gmmestimation_answer_,
@@ -953,13 +977,42 @@ class GMMEstimator(_GeneralEstimator):
                                               tolerance=tolerance)
 
         # Processing parameters after the minimization procedure
-        print('Theta solution', slv_theta)
         if self._subset_ is None:                        # If NOT subset,
             self.theta = slv_theta                       # ... then use the full output/solved theta
         else:                                            # If subset,
-            self.theta = np.asarray(self.init)           # ... copy the initial values
+            self.theta = np.asarray(self.theta)          # ... copy the initial values
             for s, n in zip(self._subset_, slv_theta):   # ... then look over the subset and input theta
                 self.theta[s] = n                        # ... and update the subset to the output/solved theta
+
+    def _get_q_matrix_(self, over_id_efs, allow_pinv):
+        """Internal function to compute the weight matrix Q for over-identified problems
+
+        Returns
+        -------
+
+        """
+        # TODO am I happy with naming convention?
+        # Get previous weight matrix as the starting point
+        q_matrix = self.weight_matrix
+
+        # Compute the outer product (meat matrix)
+        meat_matrix = compute_meat(stacked_equations=self.stacked_equations, theta=self.theta) / self.n_obs
+
+        # Update the previous weight matrix with new meat matrix values
+        for chunk in over_id_efs:
+            # TODO check chunk is a list
+            for j in chunk:
+                for k in chunk:
+                    q_matrix[j, k] = meat_matrix[j, k]
+
+        # Invert Q matrix
+        if allow_pinv:
+            inv_q_matrix = np.linalg.pinv(q_matrix)
+        else:
+            inv_q_matrix = np.linalg.inv(q_matrix)
+
+        # Returning weight matrix Q
+        return inv_q_matrix
 
     @staticmethod
     def _solve_coefficients_(stacked_equations, init, method, maxiter, tolerance):
@@ -997,6 +1050,7 @@ class GMMEstimator(_GeneralEstimator):
             psi = opt.x
 
         # Callable custom minimizer provided by the user
+        # TODO still need to see if pytorch works here
         elif callable(method):
             try:
                 psi = method(stacked_equations=stacked_equations,
