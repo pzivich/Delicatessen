@@ -767,7 +767,7 @@ class GMMEstimator(_GeneralEstimator):
             estimating equations, this value may need to be increased. This argument is not used when a custom
             minimization method (e.g., ``solver``) is provided.
         tolerance : float, optional
-            Maximum tolerance for errors in the root finding in ``scipy.optimize``. Default is 1e-9. This argument is
+            Maximum tolerance for errors in the minimization in ``scipy.optimize``. Default is 1e-9. This argument is
             not used when a custom minimization method (e.g., ``solver``) is provided.
         deriv_method : str, optional
             Method to compute the derivative of the estimating equations for the bread matrix. Default is ``'approx'``.
@@ -809,67 +809,62 @@ class GMMEstimator(_GeneralEstimator):
                              "how to handle np.nan's see the documentation at: "
                              "https://deli.readthedocs.io/en/latest/Custom%20Equations.html#handling-np-nan")
 
-        # TODO check the dimensions and ensure there are >= number of parameter
-        if vals_at_init.ndim == 1 and np.asarray(self.init).shape[0] == 1:     # Checks to ensure dimensions align
-            # the starting if-state is to work-around inits=[0, ] (otherwise breaks the first else-if)
-            pass
-        elif vals_at_init.ndim == 1 and np.asarray(self.init).shape[0] != 1:
-            double_eval = True
-            raise ValueError("The number of initial values and the number of rows returned by `stacked_equations` "
-                             "should be equal but there are " + str(np.asarray(self.init).shape[0]) + " initial values "
-                             "and the `stacked_equations` function returns " + str(1) + " row.")
-        elif np.asarray(self.init).shape[0] != vals_at_init.shape[1]:
-            raise ValueError("The number of initial values and the number of rows returned by `stacked_equations` "
-                             "should be equal but there are " + str(np.asarray(self.init).shape[0]) + " initial values "
-                             "and the `stacked_equations` function returns " + str(vals_at_init.shape[1])
-                             + " row(s).")
+        if vals_at_init.ndim == 1:
+            n_params = 1
+            over_identified = False
+            if np.asarray(self.init).shape[0] > 1:
+                raise ValueError(
+                    "The number of initial values should be less than or equal to the number of rows "
+                    "returned by `stacked_equations` but there are " + str(np.asarray(self.init).shape[0])
+                    + " initial values and the `stacked_equations` function returns 1 row.")
+        elif vals_at_init.ndim == 2:
+            n_params = vals_at_init.shape[1]
+            if np.asarray(self.init).shape[0] == n_params:
+                over_identified = False
+            elif np.asarray(self.init).shape[0] < n_params:
+                over_identified = True
+            else:
+                raise ValueError(
+                    "The number of initial values should be less than or equal to the number of rows "
+                    "returned by `stacked_equations` but there are " + str(np.asarray(self.init).shape[0])
+                    + " initial values and the `stacked_equations` function returns "
+                    + str(vals_at_init.shape[1]) + " row(s).")
         elif vals_at_init.ndim > 2:
             raise ValueError("A 2-dimensional array is expected, but the `stacked_equations` returns a "
                              + str(vals_at_init.ndim) + "-dimensional array.")
         else:
-            pass
+            raise ValueError("This ValueError should not be reached by the structure of the problem. If you receive "
+                             "this error, please reach out https://github.com/pzivich/Delicatessen")
 
         # Trick to get the number of observations from the estimating equations (transposed above)
         self.n_obs = vals_at_init.shape[0]
 
         # Obtaining initial weight matrix
-        self.weight_matrix = np.identity(n=len(self.init))
-
-        # TODO put iterated GMM in a while loop?
+        self.weight_matrix = np.identity(n=n_params)
 
         # STEP 1: solving the M-estimator stacked equations
         # To allow for optimization of only a subset of parameters in the estimating equation (in theory meant to
         #   simplify the process of complex stacked estimating equations where pre-washing can be done effectively),
         #   we do some internal processing. Essentially, we 'freeze' the parameters outside of self._subset_ as their
         #   inits, and let the minimization procedure update the self._subset_ parameters. We do this by subsetting out
-        #   the init values then passing them along to root(). Behind the scenes, self._mestimation_answer_() expands
+        #   the init values then passing them along to solver. Behind the scenes, self._solve_coefficients_() expands
         #   the parameters (to include everything), calculates the estimating equation at those values, and then
         #   extracts the corresponding subset.
         #   This process only takes place within Step 1. There is an inherent danger with this process in that if
         #   non-subset parameters are not pre-washed, then the returned parameters will not be correct. I am
         #   considering adding a warning for self_subset_, but I currently just trust the user...
         # Processing initial values based on whether subset option was specified
-        if self._subset_ is None:                        # If NOT subset,
-            inits = self.init                            # ... give all initial values
-        else:                                            # If subset,
-            inits = np.take(self.init, self._subset_)    # ... then extract initial values for the subset
+        self._solve_for_theta_(solver=solver, maxiter=maxiter, tolerance=tolerance)
 
-        # Calculating parameters values via the minimizer (for only the subset of values!)
-        slv_theta = self._solve_coefficients_(stacked_equations=self._gmmestimation_answer_,
-                                              init=inits,
-                                              method=solver,
-                                              maxiter=maxiter,
-                                              tolerance=tolerance)
-
-        # Processing parameters after the minimization procedure
-        if self._subset_ is None:                        # If NOT subset,
-            self.theta = slv_theta                       # ... then use the full output/solved theta
-        else:                                            # If subset,
-            self.theta = np.asarray(self.init)           # ... copy the initial values
-            for s, n in zip(self._subset_, slv_theta):   # ... then look over the subset and input theta
-                self.theta[s] = n                        # ... and update the subset to the output/solved theta
-
-        # TODO re-apply estimation procedure for over-identification...
+        # over_identified = True
+        if over_identified:
+            meat_matrix = compute_meat(stacked_equations=self.stacked_equations,
+                                       theta=self.theta) / self.n_obs
+            if allow_pinv:
+                self.weight_matrix = np.linalg.pinv(meat_matrix)
+            else:
+                self.weight_matrix = np.linalg.inv(meat_matrix)
+            self._solve_for_theta_(solver=solver, maxiter=maxiter, tolerance=tolerance)
 
         # STEP 2: calculating the sandwich variance
         # After solving for the parameters, we now can compute the empirical sandwich variance estimator. This is
@@ -927,6 +922,44 @@ class GMMEstimator(_GeneralEstimator):
 
         # Evaluating GMM estimator at given theta
         return np.dot(np.dot(est_eqtns, self.weight_matrix), est_eqtns)
+
+    def _solve_for_theta_(self, solver, maxiter, tolerance):
+        """Internal function to evaluate and solve the estimating equations for theta. This is expressed as an internal
+        function to simplify the iterative procedure for over-identified problems
+
+        Parameters
+        ----------
+        solver : str, function, callable, optional
+            Method to use for the minimization procedure.
+        maxiter : int, optional
+            Maximum iterations to consider for the minimization procedure.
+        tolerance : float, optional
+            Maximum tolerance for errors.
+
+        Returns
+        -------
+        None
+        """
+        if self._subset_ is None:                        # If NOT subset,
+            inits = self.init                            # ... give all initial values
+        else:                                            # If subset,
+            inits = np.take(self.init, self._subset_)    # ... then extract initial values for the subset
+
+        # Calculating parameters values via the minimizer (for only the subset of values!)
+        slv_theta = self._solve_coefficients_(stacked_equations=self._gmmestimation_answer_,
+                                              init=inits,
+                                              method=solver,
+                                              maxiter=maxiter,
+                                              tolerance=tolerance)
+
+        # Processing parameters after the minimization procedure
+        print('Theta solution', slv_theta)
+        if self._subset_ is None:                        # If NOT subset,
+            self.theta = slv_theta                       # ... then use the full output/solved theta
+        else:                                            # If subset,
+            self.theta = np.asarray(self.init)           # ... copy the initial values
+            for s, n in zip(self._subset_, slv_theta):   # ... then look over the subset and input theta
+                self.theta[s] = n                        # ... and update the subset to the output/solved theta
 
     @staticmethod
     def _solve_coefficients_(stacked_equations, init, method, maxiter, tolerance):

@@ -117,7 +117,7 @@ class TestGMMEstimation:
             return y - theta[0]
 
         estr = GMMEstimator(psi, init=[0, 0])
-        with pytest.raises(ValueError, match="initial values and the number of rows returned by `stacked_equations`"):
+        with pytest.raises(ValueError, match="should be less than or equal to"):
             estr.estimate()
 
     def test_error_bad_inits2(self):
@@ -129,7 +129,7 @@ class TestGMMEstimation:
                                y**2 - theta[1]))
 
         estr = GMMEstimator(psi, init=[0, 0, 0])
-        with pytest.raises(ValueError, match="initial values and the number of rows returned by `stacked_equations`"):
+        with pytest.raises(ValueError, match="should be less than or equal to"):
             estr.estimate()
 
     def test_error_bad_inits3(self):
