@@ -95,4 +95,6 @@ Causal Inference
   ee_ipw_msm
   ee_aipw
   ee_gestimation_snmm
+  ee_iv_causal
+  ee_2sls
   ee_mean_sensitivity_analysis

@@ -13,7 +13,7 @@ the sections provided in the side-bar.
     :maxdepth: 1
 
     M-estimator <M-Estimator.rst>
-    GMM-stimator <GMM-Estimator.rst>
+    GMM-estimator <GMM-Estimator.rst>
 
 
 .. toctree::
