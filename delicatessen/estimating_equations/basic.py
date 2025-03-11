@@ -20,7 +20,7 @@ def ee_mean(theta, y, weights=None):
 
         \sum_{i=1}^n (Y_i - \theta) = 0
 
-    For the weights mean, the difference in the previous estimating equation is multiplied by the corresponding weight.
+    For the weighted mean, the difference in the previous estimating equation is multiplied by the corresponding weight.
 
     Parameters
     ----------
@@ -165,6 +165,87 @@ def ee_mean_robust(theta, y, k, loss='huber', lower=None, upper=None):
                                  loss=loss,                        # ... chosen loss function to use
                                  a=lower,                          # ... lower limit (Hampel only)
                                  b=upper)                          # ... upper limit (Hampel only)
+
+
+def ee_mean_geometric(theta, y, weights=None, log_theta=True):
+    r"""Estimating equations for the geometric mean. The geometric mean is defined as
+
+    .. math::
+
+        \bar{\mu} = \left( \prod_{i=1}^n Y_i \right)^{1/n}
+
+    where :math:`Y_i` is within the positive reals. This expression can be rewritten as the following estimating
+    equation
+
+    .. math::
+
+        \sum_{i=1}^n \left[ \log(Y_i) - \log(\hat{\mu}) \right] = 0
+
+    For the weighted geometric mean, the difference in the previous estimating equation is multiplied by the
+    corresponding weight.
+
+
+    Parameters
+    ----------
+    theta : ndarray, list, vector
+        Theta in the case of the geomtric mean consists of a single value. Therefore, an initial value like the form of
+        ``[1, ]`` should be provided.
+    y : ndarray, list, vector
+        1-dimensional vector of n observed values.
+    weights : ndarray, list, vector, None, optional
+        1-dimensional vector of `n` weights. Default is ``None``, which assigns a weight of 1 to all observations.
+    log_theta : bool, optional
+        Whether to log-transform the input theta parameter internally. Default is True, which takes ``np.log(theta)``.
+        The choice for this argument should not affect the point estimate, but it can change the confidence intervals.
+
+    Returns
+    -------
+    array :
+        Returns a 1-by-`n` NumPy array evaluated for the input ``theta`` and ``y``
+
+    Examples
+    --------
+    Construction of a estimating equation(s) with ``ee_mean_geometric`` should be done similar to the following
+
+    >>> from delicatessen import MEstimator
+    >>> from delicatessen.estimating_equations import ee_mean_geometric
+
+    Some generic data to estimate the geometric mean for
+
+    >>> y_dat = [10, 1, 2, 4, 1, 2, 3, 1, 5, 2, 33]
+
+    Defining psi, or the stacked estimating equations for the geometric mean
+
+    >>> def psi(theta):
+    >>>     return ee_mean_geometric(theta=theta, y=y_dat)
+
+    Calling the M-estimation procedure
+
+    >>> estr = MEstimator(stacked_equations=psi, init=[2, ])
+    >>> estr.estimate()
+
+    Inspecting the parameter estimates, the variance, and the asymptotic variance
+
+    >>> estr.theta
+    >>> estr.variance
+    >>> estr.asymptotic_variance
+
+    References
+    ----------
+    Lesage É. (2011). The use of estimating equations to perform a calibration on complex parameters.
+    *Survey Methodology*, 37(1), 103-108.
+    """
+    # Convert input y values to NumPy array
+    y_array = np.asarray(y)
+
+    # Allowing for a weighted mean
+    w = generate_weights(weights=weights, n_obs=y_array.shape[0])
+
+    # Output 1-by-n array estimating equation for the mean
+    if log_theta:
+        return w * (np.log(y_array) - np.log(theta))
+    else:
+        return w * (np.log(y_array) - theta)
 
 
 def ee_mean_variance(theta, y):
