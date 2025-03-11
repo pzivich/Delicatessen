@@ -5,9 +5,10 @@
 import numpy as np
 import numpy.testing as npt
 import pytest
+from scipy.stats import gmean
 
 from delicatessen import MEstimator
-from delicatessen.estimating_equations import ee_mean, ee_mean_variance, ee_mean_robust
+from delicatessen.estimating_equations import ee_mean, ee_mean_variance, ee_mean_robust, ee_mean_geometric
 
 
 class TestEstimatingEquationsBase:
@@ -100,3 +101,44 @@ class TestEstimatingEquationsBase:
 
         # Checking variance estimates
         npt.assert_allclose(mcee.asymptotic_variance, mpee.asymptotic_variance, atol=1e-6)
+
+    def test_mean_geometric(self, y):
+        def psi(theta):
+            return ee_mean_geometric(theta, y=y, weights=None, log_theta=True)
+
+        estr = MEstimator(psi, init=[2, ])
+        estr.estimate()
+        mu_deli = estr.theta
+
+        mu_scipy = gmean(y)
+
+        # Checking mean estimate
+        npt.assert_allclose(mu_deli, mu_scipy)
+
+    def test_mean_geometric_weighted(self, y):
+        weights = np.array([1, 1, 2, 1, 2, 1, 5, 1, 1, 1, 1, 3, 1, 1])
+
+        def psi(theta):
+            return ee_mean_geometric(theta, y=y, weights=weights, log_theta=True)
+
+        estr = MEstimator(psi, init=[2, ])
+        estr.estimate()
+        mu_deli = estr.theta
+
+        mu_scipy = gmean(y, weights=weights)
+
+        # Checking mean estimate
+        npt.assert_allclose(mu_deli, mu_scipy)
+
+    def test_mean_geometric_log(self, y):
+        def psi(theta):
+            return ee_mean_geometric(theta, y=y, weights=None, log_theta=False)
+
+        estr = MEstimator(psi, init=[0, ])
+        estr.estimate()
+        mu_deli = np.exp(estr.theta)
+
+        mu_scipy = gmean(y)
+
+        # Checking mean estimate
+        npt.assert_allclose(mu_deli, mu_scipy)

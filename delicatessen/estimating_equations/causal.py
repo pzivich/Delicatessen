@@ -4,6 +4,7 @@
 
 import numpy as np
 
+from .basic import ee_mean
 from .regression import ee_regression, ee_glm
 from delicatessen.utilities import logit, inverse_logit, identity
 
@@ -723,6 +724,288 @@ def ee_aipw(theta, y, A, W, X, X1, X0, truncate=None, force_continuous=False):
                       y0_star[None, :],  # theta[2] is for R0
                       pi_model,          # theta[b] is for the treatment model coefficients
                       m_model))          # theta[c] is for the outcome model coefficients
+
+
+#################################################################
+# Causal Inference (Instrumental) Estimating Equations
+
+def ee_iv_causal(theta, y, A, Z, weights=None):
+    r"""Estimating equation for instrumental variable (IV) analysis with the usual IV. The parameter is the additive
+    effect of action A on outcome Y that leverages the instrument Z. The usual IV estimator is
+
+    .. math::
+
+        \beta = \frac{E[Y \mid Z=1] - E[Y \mid Z=0]}{E[A \mid Z=1] - E[A \mid Z=0]}
+
+    One can build a set of estimating equations that consists of 5 parameters (:math:`\beta` and four conditional
+    mean). To reduce the number of parameters being estimated, the above expression is instead rewritten following some
+    tedious algebra as the following pair of estimating equations
+
+    .. math::
+
+        \sum_{i=1}^n
+        \begin{bmatrix}
+            \left[ Y_i - \beta A_i \right] \times \left[ Z_i - \mu \right] \\
+            Z_i - \mu
+        \end{bmatrix}
+        = 0
+
+    The parameter :math:`\beta` corresponds to the causal effect, interpreted following either a homogeneity
+    assumption or monotonicity assuption. The second parameter is simply the probability of :math:`Z`. Here, the length
+    of the theta vector is 2.
+
+    Parameters
+    ----------
+    theta : ndarray, list, vector
+        Theta consists of 3+`b`+`c` values.
+    y : ndarray, list, vector
+        1-dimensional vector of `n` observed values for the outcome of interest.
+    A : ndarray, list, vector
+        1-dimensional vector of `n` observed values for the action of interest.
+    Z : ndarray, list, vector
+        1-dimensional vector of `n` observed values for the instrumental variable. The Z values should all be 0 or 1.
+    weights : ndarray, list, vector, None, optional
+        1-dimensional vector of n weights. Default is ``None``, which assigns a weight of 1 to all observations. This
+        argument is intended to support the use of sampling or missingness weights.
+
+    Returns
+    -------
+    array :
+        Returns a 2-by-`n` NumPy array evaluated for the input ``theta`` and ``y,A,Z``
+
+    Examples
+    --------
+    Construction of a estimating equation(s) with ``ee_iv_causal`` should be done similar to the following
+
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> from delicatessen import GMMEstimator
+    >>> from delicatessen.estimating_equations import ee_iv_causal
+
+    Some generic data
+
+    >>> n = 200
+    >>> d = pd.DataFrame()
+    >>> d['Z1'] = np.random.binomial(n=1, p=0.5, size=n)
+    >>> d['Z2'] = np.random.binomial(n=1, p=0.5, size=n)
+    >>> d['Z3'] = np.random.binomial(n=1, p=0.5, size=n)
+    >>> d['U'] = np.random.normal(size=n)
+    >>> pr_a = inverse_logit(d['U'] + d['Z1'] + 0.8*d['Z2'] - d['Z3'])
+    >>> d['A'] = np.random.binomial(n=1, p=pr_a, size=n)
+    >>> d['Y'] = 2*d['A'] - d['U'] + np.random.normal(size=n)
+
+    As GMM-estimators are more commonly used in instrumental variable analysis, here the ``GMMEstimator`` is used. To
+    start, consider the just-identified instrumental variable estimator with ``Z1``.
+
+    >>> def psi(theta):
+    >>>     return ee_iv_causal(theta,
+    >>>                         y=d['Y'],
+    >>>                         A=d['A'],
+    >>>                         Z=d['Z1'])
+
+    Calling the GMM-estimator.
+
+    >>> estr = GMMEstimator(psi, init=[0., ])
+    >>> estr.estimate(solver='lm')
+
+    Inspecting the parameter estimates, variance, and 95% confidence intervals
+
+    >>> estr.theta
+    >>> estr.variance
+    >>> estr.confidence_intervals()
+
+    However, there are multiple instruments available for this analysis. The GMM-estimator can also be used for
+    over-identified parameters, as in the case of multiple valid instrumental variables. The following is an example
+    that uses all three available instruments
+
+    >>> def psi(theta):
+    >>>     return ee_iv_causal(theta,
+    >>>                         y=d['Y'],
+    >>>                         A=d['A'],
+    >>>                         Z=d['Z1'])
+
+    >>> estr = GMMEstimator(psi, init=[0., ], paired_ee=[[0, 1, 2], ])
+    >>> estr.estimate(solver='lm')
+
+    >>> estr.theta
+    >>> estr.variance
+    >>> estr.confidence_intervals()
+
+    [...]
+
+    References
+    ----------
+
+    [...]
+    """
+    # Ensuring correct typing
+    y = np.asarray(y)                           # Convert to NumPy array
+    a = np.asarray(A)                           # Convert to NumPy array
+    z = np.asarray(Z)                           # Convert to NumPy array
+
+    # Processing weights argument
+    if weights is None:
+        weight = 1
+    else:
+        weight = np.asarray(weights)
+
+    # Usual Instrumental Variable estimator
+    ee_prz = weight * (z - theta[1])
+    ee_iva = weight * (y - theta[0] * a) * (z - theta[1])
+
+    # Output 2-by-n array
+    return np.vstack([ee_iva, ee_prz])
+
+
+def ee_2sls(theta, y, A, Z, W=None):
+    r"""Estimating equations for Two-Stage Least Squares (2SLS) for instrumental variable (IV) analysis. The pair of
+    estimating equations are
+
+    .. math::
+
+        \sum_{i=1}^n
+        \begin{bmatrix}
+            \left\{ Y_i - \hat{X}_i^T \beta \right\} \hat{X}_i \\
+            \left\{ A_i - X_i^T \alpha \right\} X_i
+        \end{bmatrix}
+        = 0
+
+    where :math:`A` is the action of interest, :math:`Y` is the outcome of interest, :math:`Z` is the instrument,
+    :math:`W` is a set of exogenous variables (possibly the empty set, or none), :math:`X = (1, A, W)`,
+    :math:`X = (1, \hat{A}, W)`, and :math:`\hat{A} = X^T \alpha`. Here, the length of the theta vector is 2 + `b` +
+    2 + `b`, where `b` is the number of covariates in :math:`W`.
+
+    Parameters
+    ----------
+    theta : ndarray, list, vector
+        Theta consists of 2 + `b` + 2 + `b` values. The first set of 2 + `b` parameters are for the second-stage model.
+    y : ndarray, list, vector
+        1-dimensional vector of `n` observed values for the outcome of interest.
+    A : ndarray, list, vector
+        1-dimensional vector of `n` observed values for the action of interest.
+    Z : ndarray, list, vector
+        1-dimensional vector of `n` observed values for the instrumental variable. The Z values should all be 0 or 1.
+    W : ndarray, list, vector, None, optional
+        2-dimensional vector of `n` observed values for `b` exogenous variables. This design matrix is stacked together
+        in the first- and second-stage regression models as provided. Note: no intercept needs to be included in this
+        design matrix.
+
+    Returns
+    -------
+    array :
+        Returns a (4+2`b`)-by-`n` NumPy array evaluated for the input ``theta`` and ``y,A,Z``
+
+    Examples
+    --------
+    Construction of a estimating equation(s) with ``ee_aipw`` should be done similar to the following
+
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> from delicatessen import MEstimator
+    >>> from delicatessen.estimating_equations import ee_2sls
+
+    Some generic data
+
+    >>> n = 200
+    >>> d = pd.DataFrame()
+    >>> d['Z'] = np.random.binomial(n=1, p=0.5, size=n)
+    >>> d['U'] = np.random.normal(size=n)
+    >>> pr_a = inverse_logit(d['U'] + d['Z'])
+    >>> d['A'] = np.random.binomial(n=1, p=pr_a, size=n)
+    >>> d['X'] = np.random.normal(size=n)
+    >>> d['Y'] = 2*d['A'] - d['U'] + 0.1*d['X'] + np.random.normal(size=n)
+
+    To start, consider 2SLS without any exogenous variables. The psi function is
+
+    >>> def psi(theta):
+    >>>     return ee_2sls(theta,
+    >>>                    y=d['Y'],
+    >>>                    A=d['A'],
+    >>>                    Z=d['Z'])
+
+    Calling the M-estimator. 2SLS has 4 parameters with 2 coefficients in the second-stage model, and 2 coefficients
+    in first-stage model. Generally, starting with all 0. as initials is reasonable for 2SLS.
+
+    >>> estr = MEstimator(psi,
+    >>>                   init=[0., 0., 0., 0.])
+    >>> estr.estimate()
+
+    Inspecting the parameter estimates, variance, and 95% confidence intervals
+
+    >>> estr.theta
+    >>> estr.variance
+    >>> estr.confidence_intervals()
+
+    More specifically, the corresponding parameters are
+
+    >>> estr.theta[0:2]   # Second-stage model
+    >>> estr.theta[2:]    # First-stage model
+
+    Generally interest is in ``estr.theta[1]``, which under the IV assumptions is a causal effect of :math:`A` on
+    :math:`Y`.
+
+    In the case of exogenous variables, 2SLS is specified as
+
+    >>> def psi(theta):
+    >>>     return ee_2sls(theta,
+    >>>                    y=d['Y'],
+    >>>                    A=d['A'],
+    >>>                    Z=d['Z'],
+    >>>                    W=d[['X', ]])
+
+    Here, 6 parameters are estimated since there is a single exogenous variable that shows up in both stages of 2SLS
+
+    >>> estr = MEstimator(psi,
+    >>>                   init=[0., 0., 0., 0., 0., 0.])
+    >>> estr.estimate()
+    >>> estr.theta[0:3]   # Second-stage model
+    >>> estr.theta[3:]    # First-stage model
+
+    References
+    ----------
+    Meijer E, & Wansbeek T. (2007). The sample selection model from a method of moments perspective.
+    *Econometric Reviews*, 26(1), 25-51.
+
+    Zivich PN (2024). RE:'Estimating the effect of a treatment when there is non-adherence in a trial'.
+    *American Journal of Epidemiology*, kwae279.
+    """
+    # Ensuring correct typing
+    y = np.asarray(y)                             # Convert to NumPy array
+    a = np.asarray(A)                             # Convert to NumPy array
+    z = np.asarray(Z)                             # Convert to NumPy array
+    c = np.ones(y.shape[0])                       # Generate intercept term
+    if W is not None:                             # Check type of X
+        W = np.asarray(W)                         # ... and convert to NumPy array
+
+    # Processing parameter vector
+    if W is None:                                 # Getting split point for the parameter vector
+        id2s = 2                                  # ... 2 is split if no exogenous covariates
+    else:                                         # Getting split point if given some covariates
+        id2s = 2 + W.shape[1]                     # ... split point for first and second stage parameters
+    beta = theta[:id2s]                           # Second-stage parameters
+    alpha = theta[id2s:]                          # First-stage parameters
+
+    # Creating design matrices
+    dmatrix1 = np.asarray([c, z]).T               # Design matrix for first stage A | Z model
+    if W is not None:                             # Check if exogenous covariates provided
+        dmatrix1 = np.c_[dmatrix1, W]             # ... then stack those into design matrix
+    a_hat = np.dot(dmatrix1, alpha)               # Generating predicted values of A
+    dmatrix2 = np.asarray([c, a_hat]).T           # Design matrix for second stage Y | Z model
+    if W is not None:                             # Check if exogenous covariates provided
+        dmatrix2 = np.c_[dmatrix2, W]             # ... then stack those into design matrix
+
+    # First-stage least squares
+    ee_stageone = ee_regression(theta=alpha,      # First-stage LS regression for A given Z,X
+                                y=a, X=dmatrix1,  # ... variables used
+                                model='linear')   # ... using least squares (linear model)
+
+    # Second-stage least squares
+    ee_stagetwo = ee_regression(theta=beta,       # Second-stage LS regression for Y given \hat{A},X
+                                y=y, X=dmatrix2,  # ... variables used
+                                model='linear')   # ... using least squares (linear model)
+
+    # Output (2+b+2+b)-by-n array
+    return np.vstack([ee_stagetwo, ee_stageone])
 
 
 #################################################################

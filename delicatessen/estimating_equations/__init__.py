@@ -1,7 +1,8 @@
-from .basic import (ee_mean, ee_mean_variance, ee_mean_robust,
+from .basic import (ee_mean, ee_mean_variance, ee_mean_robust, ee_mean_geometric,
                     ee_percentile, ee_positive_mean_deviation)
 
 from .causal import (ee_ipw, ee_ipw_msm, ee_gformula, ee_aipw, ee_gestimation_snmm,
+                     ee_iv_causal, ee_2sls,
                      ee_mean_sensitivity_analysis)
 
 from .pharmacokinetics import (ee_emax, ee_emax_ed,
