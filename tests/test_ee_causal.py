@@ -694,6 +694,17 @@ class TestEstimatingEquationsIV:
 
     @pytest.fixture
     def data_2sls(self):
+        # This data was generated using the following code:
+        # np.random.seed(42)
+        # n = 30
+        # d = pd.DataFrame()
+        # d['X'] = np.random.normal(size=n)
+        # d['Z'] = np.random.normal(size=n)
+        # d['U'] = np.random.normal(size=n)
+        # d['A'] = 0.5*d['Z'] + 0.5*d['X'] + 0.4*d['U'] + np.random.normal(size=n)
+        # d['Y'] = 2*d['X'] - 3*d['A'] + d['U'] + np.random.normal(size=n)
+        # d['C'] = 1
+        # d = np.round(d, decimals=2)
         d = pd.DataFrame()
         d['X'] = [0.5, -0.14, 0.65, 1.52, -0.23, -0.23, 1.58, 0.77, -0.47, 0.54, -0.46, -0.47, 0.24, -1.91, -1.72,
                   -0.56, -1.01, 0.31, -0.91, -1.41, 1.47, -0.23, 0.07, -1.42, -0.54, 0.11, -1.15, 0.38, -0.6, -0.29]
@@ -705,6 +716,32 @@ class TestEstimatingEquationsIV:
                   -6.27, -2.21, -0.95, 1.33, 6.27, 1.78, -1.03, -8.73, -0.82, -1.36, -0.63, 2.77, -3.6, -3.67]
         d['C'] = 1
         return d
+
+    def test_iv_b_justid(self, data_b):
+        d = data_b
+
+        def psi(theta):
+            return ee_iv_causal(theta, y=d['Y'], A=d['A'], Z=d['Z'])
+
+        mestr = MEstimator(psi, init=[0.8, ])
+        mestr.estimate()
+
+        # By-hand
+        d1 = d.loc[d['Z'] == 1].copy()
+        d0 = d.loc[d['Z'] == 0].copy()
+
+        beta = (np.mean(d1['Y']) - np.mean(d0['Y'])) / (np.mean(d1['A']) - np.mean(d0['A']))
+
+        # Checking point estimates
+        npt.assert_allclose(mestr.theta[0], beta, atol=1e-6)
+
+        print()
+        print(mestr.theta)
+        print(mestr.variance)
+
+    # test_iv_c_justid
+    # test_iv_b_overid
+    # test_iv_c_overid
 
     def test_2sls(self, data_2sls):
         d = data_2sls
