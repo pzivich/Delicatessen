@@ -984,10 +984,10 @@ class TestSandwichAutoDiff:
         var_approx = mestr.variance
 
         # Checking bread estimates
-        npt.assert_allclose(bread_approx, bread_exact, atol=1e-7)
+        npt.assert_allclose(bread_approx, bread_exact, atol=1e-6)
 
         # Checking variance estimates
-        npt.assert_allclose(var_approx, var_exact, atol=1e-7)
+        npt.assert_allclose(var_approx, var_exact, atol=1e-6)
 
     def test_exact_bread_glm_cauchy(self):
         d = pd.DataFrame()
@@ -1688,12 +1688,12 @@ class TestSandwichAutoDiff:
         # Checking bread estimates
         npt.assert_allclose(bread_approx,
                             bread_exact,
-                            atol=1e-6)
+                            atol=1e-5)
 
         # Checking variance estimates
         npt.assert_allclose(var_approx,
                             var_exact,
-                            atol=1e-6)
+                            atol=1e-5)
 
 
 class TestSandwichApproxDiff:

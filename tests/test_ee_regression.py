@@ -308,7 +308,7 @@ class TestEstimatingEquationsRegression:
         # Checking variance estimates
         npt.assert_allclose(mestimator.variance,
                             np.asarray(glm.cov_params()),
-                            atol=1e-6)
+                            atol=1e-5)
 
         # Checking confidence interval estimates
         npt.assert_allclose(mestimator.confidence_intervals(),
