@@ -690,6 +690,7 @@ class TestEstimatingEquationsIV:
         d['Z'] = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         d['A'] = [1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0]
         d['Y'] = [1, 1, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 0, 0]
+        d['w'] = [1, 1, 2, 3, 1, 4, 1, 5, 1, 2, 1, 2, 1, 2, 1, 1, 1, 1, 1, 1, 3]
         return d
 
     @pytest.fixture
@@ -715,6 +716,7 @@ class TestEstimatingEquationsIV:
         d['Y'] = [1.75, -6.63, 4.07, 2.17, 0.25, 8.02, -1.39, 1.77, 1.77, 0.31, 1.28, 0.53, 0.27, 2.06, 1.44, 0.97,
                   -6.27, -2.21, -0.95, 1.33, 6.27, 1.78, -1.03, -8.73, -0.82, -1.36, -0.63, 2.77, -3.6, -3.67]
         d['C'] = 1
+        d['w'] = [1, ]*29 + [2, ]
         return d
 
     @pytest.fixture
@@ -733,31 +735,62 @@ class TestEstimatingEquationsIV:
         d['C'] = 1
         return d
 
-    # def test_iv_b_justid(self, data_b):
-    #     d = data_b
-    #
-    #     def psi(theta):
-    #         return ee_iv_causal(theta, y=d['Y'], A=d['A'], Z=d['Z'])
-    #
-    #     mestr = MEstimator(psi, init=[0.8, ])
-    #     mestr.estimate()
-    #
-    #     # By-hand
-    #     d1 = d.loc[d['Z'] == 1].copy()
-    #     d0 = d.loc[d['Z'] == 0].copy()
-    #
-    #     beta = (np.mean(d1['Y']) - np.mean(d0['Y'])) / (np.mean(d1['A']) - np.mean(d0['A']))
-    #
-    #     # Checking point estimates
-    #     npt.assert_allclose(mestr.theta[0], beta, atol=1e-6)
-    #
-    #     print()
-    #     print(mestr.theta)
-    #     print(mestr.variance)
+    def test_usual_iv(self, data_b):
+        d = data_b
+        d['C'] = 1
 
-    # test_iv_c_justid
-    # test_iv_b_overid
-    # test_iv_c_overid
+        def psi(theta):
+            return ee_iv_causal(theta, y=d['Y'], A=d['A'], Z=d['Z'])
+
+        estr = MEstimator(psi, init=[0., 0.])
+        estr.estimate()
+
+        # By-hand
+        d1 = d.loc[d['Z'] == 1].copy()
+        d0 = d.loc[d['Z'] == 0].copy()
+        beta = (np.mean(d1['Y']) - np.mean(d0['Y'])) / (np.mean(d1['A']) - np.mean(d0['A']))
+
+        # 2SLS
+        def psi(theta):
+            return ee_2sls(theta, y=d['Y'], A=d['A'], Z=d[['Z', ]], W=d[['C', ]])
+
+        estr_2sls = MEstimator(psi, init=[0., 0., 0., 0.])
+        estr_2sls.estimate()
+
+        # Checking point estimates versus by-hand
+        npt.assert_allclose(estr.theta[0], beta, atol=1e-6)
+
+        # Checking point estimates versus 2SLS
+        npt.assert_allclose(estr.theta[0], estr_2sls.theta[0], atol=1e-6)
+
+    def test_usual_iv_weights(self, data_b):
+        d = data_b
+        d['C'] = 1
+
+        def psi(theta):
+            return ee_iv_causal(theta, y=d['Y'], A=d['A'], Z=d['Z'], weights=d['w'])
+
+        estr = GMMEstimator(psi, init=[0., 0.])
+        estr.estimate()
+
+        # By-hand
+        d1 = d.loc[d['Z'] == 1].copy()
+        d0 = d.loc[d['Z'] == 0].copy()
+        beta = ((np.average(d1['Y'], weights=d1['w']) - np.average(d0['Y'], weights=d0['w']))
+                / (np.average(d1['A'], weights=d1['w']) - np.average(d0['A'], weights=d0['w'])))
+
+        # 2SLS
+        def psi(theta):
+            return ee_2sls(theta, y=d['Y'], A=d['A'], Z=d[['Z', ]], W=d[['C', ]], weights=d['w'])
+
+        estr_2sls = MEstimator(psi, init=[0., 0., 0., 0.])
+        estr_2sls.estimate()
+
+        # Checking point estimates versus by-hand
+        npt.assert_allclose(estr.theta[0], beta, atol=1e-6)
+
+        # Checking point estimates versus 2SLS
+        npt.assert_allclose(estr.theta[0], estr_2sls.theta[0], atol=1e-6)
 
     def test_2sls(self, data_2sls):
         d = data_2sls
@@ -925,6 +958,49 @@ class TestEstimatingEquationsIV:
         # coef(ivm)
         # ivm$kClass$point.est.other
         tsls_params = [-2.259155, 0.3856519, 1.658916]
+
+        # Checking point estimates are close
+        npt.assert_allclose(estr.theta[:3], tsls_params,
+                            atol=1e-6)
+
+    def test_2sls_weights(self, data_2sls):
+        d = data_2sls
+
+        def psi(theta):
+            return ee_2sls(theta=theta, y=d['Y'], A=d['A'], Z=d[['Z', ]], W=d[['C', 'X']], weights=d['w'])
+
+        estr = GMMEstimator(psi, init=[0, 0, 0, 0, 0, 0])
+        estr.estimate()
+
+        # R code for external reference
+        # library(ivmodel)
+        # library(sandwich)
+        # data = data.frame(x=c(0.5, -0.14, 0.65, 1.52, -0.23, -0.23, 1.58, 0.77, -0.47,
+        #                       0.54, -0.46, -0.47, 0.24, -1.91, -1.72, -0.56, -1.01,
+        #                       0.31, -0.91, -1.41, 1.47, -0.23, 0.07, -1.42, -0.54,
+        #                       0.11, -1.15, 0.38, -0.6, -0.29, -0.29),
+        #                   z=c(-0.6, 1.85, -0.01, -1.06, 0.82, -1.22, 0.21, -1.96, -1.33,
+        #                       0.2, 0.74, 0.17, -0.12, -0.3, -1.48, -0.72, -0.46, 1.06,
+        #                       0.34, -1.76, 0.32, -0.39, -0.68, 0.61, 1.03, 0.93, -0.84,
+        #                       -0.31, 0.33, 0.98, 0.98),
+        #                   a=c(-0.15, 1.75, -0.83, -0.57, 0.23, -1.65, 1.16, 0.07, -0.75,
+        #                       -0.12, -1.13, 0.05, -0.29, -1.28, -2.81, 0.09, 1.18, 0.74,
+        #                       0.01, -2.46, -1.11, -0.19, 0.35, 1.85, -0.27, 0.62, -0.66,
+        #                       -1., 0.8, 1.3, 1.3),
+        #                   y=c(1.75, -6.63, 4.07, 2.17, 0.25, 8.02, -1.39, 1.77, 1.77,
+        #                       0.31, 1.28, 0.53, 0.27, 2.06, 1.44, 0.97, -6.27, -2.21,
+        #                       -0.95, 1.33, 6.27, 1.78, -1.03, -8.73, -0.82, -1.36,
+        #                       -0.63, 2.77, -3.6, -3.67, -3.67)
+        #                   )
+        # data$c = 1
+        # Y = data$y
+        # D = data$a
+        # Z = data$z
+        # X = data[,c("c", "x")]
+        # ivm = ivmodel(Y=Y,D=D,Z=Z,X=X, intercept=F)
+        # coef(ivm)
+        # ivm$kClass$point.est.other
+        tsls_params = [-2.753454, -0.05424833, 1.838784]
 
         # Checking point estimates are close
         npt.assert_allclose(estr.theta[:3], tsls_params,

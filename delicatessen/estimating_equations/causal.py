@@ -730,8 +730,9 @@ def ee_aipw(theta, y, A, W, X, X1, X0, truncate=None, force_continuous=False):
 # Causal Inference (Instrumental) Estimating Equations
 
 def ee_iv_causal(theta, y, A, Z, weights=None):
-    r"""Estimating equation for instrumental variable (IV) analysis with the usual IV. The parameter is the additive
-    effect of action A on outcome Y that leverages the instrument Z. The usual IV estimator is
+    r"""Estimating equation for instrumental variable (IV) analysis with the usual IV. The estimator is also referred to
+    as the Wald estimator or grouping estimator in the literature. The parameter is the additive effect of action A on
+    outcome Y that leverages the instrument Z. The usual IV estimator is
 
     .. math::
 
@@ -819,6 +820,9 @@ def ee_iv_causal(theta, y, A, Z, weights=None):
     ----------
     Boos DD, & Stefanski LA. (2013). M-estimation (estimating equations). In Essential Statistical Inference
     (pp. 307). Springer, New York, NY.
+
+    Wald A. (1940). The fitting of straight lines if both variables are subject to error.
+    *The Annals of Mathematical Statistics* 11(3), 284-300.
     """
     # Ensuring correct typing
     y = np.asarray(y)                           # Convert to NumPy array
