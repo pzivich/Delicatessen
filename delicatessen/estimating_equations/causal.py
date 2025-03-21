@@ -87,7 +87,7 @@ def ee_gformula(theta, y, X, X1, X0=None, force_continuous=False):
 
     Examples
     --------
-    Construction of a estimating equation(s) with ``ee_gformula`` should be done similar to the following
+    Construction of an estimating equation(s) with ``ee_gformula`` should be done similar to the following
 
     >>> import numpy as np
     >>> import pandas as pd
@@ -289,7 +289,7 @@ def ee_ipw(theta, y, A, W, truncate=None, weights=None):
 
     Examples
     --------
-    Construction of a estimating equation(s) with ``ee_ipw`` should be done similar to the following
+    Construction of an estimating equation(s) with ``ee_ipw`` should be done similar to the following
 
     >>> import numpy as np
     >>> import pandas as pd
@@ -439,7 +439,7 @@ def ee_ipw_msm(theta, y, A, W, V, distribution, link, hyperparameter=None, trunc
 
     Examples
     --------
-    Construction of a estimating equation(s) with ``ee_ipw_msm`` should be done similar to the following
+    Construction of an estimating equation(s) with ``ee_ipw_msm`` should be done similar to the following
 
     >>> import numpy as np
     >>> import pandas as pd
@@ -592,7 +592,7 @@ def ee_aipw(theta, y, A, W, X, X1, X0, truncate=None, force_continuous=False):
 
     Examples
     --------
-    Construction of a estimating equation(s) with ``ee_aipw`` should be done similar to the following
+    Construction of an estimating equation(s) with ``ee_aipw`` should be done similar to the following
 
     >>> import numpy as np
     >>> import pandas as pd
@@ -730,7 +730,6 @@ def ee_aipw(theta, y, A, W, X, X1, X0, truncate=None, force_continuous=False):
 # Causal Inference (Instrumental) Estimating Equations
 
 def ee_iv_causal(theta, y, A, Z, weights=None):
-    # TODO
     r"""Estimating equation for instrumental variable (IV) analysis with the usual IV. The parameter is the additive
     effect of action A on outcome Y that leverages the instrument Z. The usual IV estimator is
 
@@ -752,13 +751,12 @@ def ee_iv_causal(theta, y, A, Z, weights=None):
         = 0
 
     The parameter :math:`\beta` corresponds to the causal effect, interpreted following either a homogeneity
-    assumption or monotonicity assuption. The second parameter is simply the probability of :math:`Z`. Here, the length
-    of the theta vector is 2.
+    assumption or monotonicity assuption. The second parameter is simply the mean of :math:`Z`.
 
     Parameters
     ----------
     theta : ndarray, list, vector
-        Theta consists of 3+`b`+`c` values.
+        Theta consists of 2 values.
     y : ndarray, list, vector
         1-dimensional vector of `n` observed values for the outcome of interest.
     A : ndarray, list, vector
@@ -776,37 +774,34 @@ def ee_iv_causal(theta, y, A, Z, weights=None):
 
     Examples
     --------
-    Construction of a estimating equation(s) with ``ee_iv_causal`` should be done similar to the following
+    Construction of an estimating equation(s) with ``ee_iv_causal`` should be done similar to the following
 
     >>> import numpy as np
     >>> import pandas as pd
-    >>> from delicatessen import GMMEstimator
+    >>> from delicatessen import MEstimator
     >>> from delicatessen.estimating_equations import ee_iv_causal
 
     Some generic data
 
     >>> n = 200
     >>> d = pd.DataFrame()
-    >>> d['Z1'] = np.random.binomial(n=1, p=0.5, size=n)
-    >>> d['Z2'] = np.random.binomial(n=1, p=0.5, size=n)
-    >>> d['Z3'] = np.random.binomial(n=1, p=0.5, size=n)
+    >>> d['Z'] = np.random.binomial(n=1, p=0.5, size=n)
     >>> d['U'] = np.random.normal(size=n)
-    >>> pr_a = inverse_logit(d['U'] + d['Z1'] + 0.8*d['Z2'] - d['Z3'])
+    >>> pr_a = inverse_logit(d['U'] + d['Z'])
     >>> d['A'] = np.random.binomial(n=1, p=pr_a, size=n)
     >>> d['Y'] = 2*d['A'] - d['U'] + np.random.normal(size=n)
 
-    As GMM-estimators are more commonly used in instrumental variable analysis, here the ``GMMEstimator`` is used. To
-    start, consider the just-identified instrumental variable estimator with ``Z1``.
+    The psi function for the usual IV can be called as
 
     >>> def psi(theta):
     >>>     return ee_iv_causal(theta,
     >>>                         y=d['Y'],
     >>>                         A=d['A'],
-    >>>                         Z=d['Z1'])
+    >>>                         Z=d['Z'])
 
-    Calling the GMM-estimator.
+    Calling the M-estimator for estimation
 
-    >>> estr = GMMEstimator(psi, init=[0., ])
+    >>> estr = MEstimator(psi, init=[0., 0.5, ])
     >>> estr.estimate(solver='lm')
 
     Inspecting the parameter estimates, variance, and 95% confidence intervals
@@ -815,29 +810,15 @@ def ee_iv_causal(theta, y, A, Z, weights=None):
     >>> estr.variance
     >>> estr.confidence_intervals()
 
-    However, there are multiple instruments available for this analysis. The GMM-estimator can also be used for
-    over-identified parameters, as in the case of multiple valid instrumental variables. The following is an example
-    that uses all three available instruments
+    More specifically, the corresponding parameters are
 
-    >>> def psi(theta):
-    >>>     return ee_iv_causal(theta,
-    >>>                         y=d['Y'],
-    >>>                         A=d['A'],
-    >>>                         Z=d['Z1'])
-
-    >>> estr = GMMEstimator(psi, init=[0., ], paired_ee=[[0, 1, 2], ])
-    >>> estr.estimate(solver='lm')
-
-    >>> estr.theta
-    >>> estr.variance
-    >>> estr.confidence_intervals()
-
-    [...]
+    >>> estr.theta[0]    # Usual IV
+    >>> estr.theta[1]    # Mean of the instrument Z
 
     References
     ----------
-
-    [...]
+    Boos DD, & Stefanski LA. (2013). M-estimation (estimating equations). In Essential Statistical Inference
+    (pp. 307). Springer, New York, NY.
     """
     # Ensuring correct typing
     y = np.asarray(y)                           # Convert to NumPy array
@@ -858,7 +839,7 @@ def ee_iv_causal(theta, y, A, Z, weights=None):
     return np.vstack([ee_iva, ee_prz])
 
 
-def ee_2sls(theta, y, A, Z, W=None):
+def ee_2sls(theta, y, A, Z, W=None, weights=None):
     r"""Estimating equations for Two-Stage Least Squares (2SLS) for instrumental variable (IV) analysis. The pair of
     estimating equations are
 
@@ -891,6 +872,9 @@ def ee_2sls(theta, y, A, Z, W=None):
         2-dimensional vector of `n` observed values for `c` exogenous variables. This design matrix is stacked together
         in the first- and second-stage regression models as provided. This argument allows for the addition of an
         intercept to both regression models. Default is None.
+    weights : ndarray, list, vector, None, optional
+        1-dimensional vector of n weights. Default is ``None``, which assigns a weight of 1 to all observations. This
+        argument is intended to support the use of sampling or missingness weights.
 
     Returns
     -------
@@ -899,7 +883,7 @@ def ee_2sls(theta, y, A, Z, W=None):
 
     Examples
     --------
-    Construction of a estimating equation(s) with ``ee_2sls`` should be done similar to the following
+    Construction of an estimating equation(s) with ``ee_2sls`` should be done similar to the following
 
     >>> import numpy as np
     >>> import pandas as pd
@@ -993,10 +977,10 @@ def ee_2sls(theta, y, A, Z, W=None):
 
     # Processing parameter vector
     if W is None:                                 # Getting split point for the parameter vector
-        id2s = 1                         # ... 2 is split if no exogenous covariates
+        id2s = 1                                  # ... 2 is split if no exogenous covariates
     else:                                         # Getting split point if given some covariates
         W = np.asarray(W)                         # ... and convert to NumPy array
-        id2s = 1 + W.shape[1]            # ... split point for first and second stage parameters
+        id2s = 1 + W.shape[1]                     # ... split point for first and second stage parameters
     beta = theta[:id2s]                           # Second-stage parameters
     alpha = theta[id2s:]                          # First-stage parameters
 
@@ -1014,11 +998,14 @@ def ee_2sls(theta, y, A, Z, W=None):
     # First-stage least squares
     ee_stageone = ee_regression(theta=alpha,      # First-stage LS regression for A given Z,X
                                 y=a, X=dmatrix1,  # ... variables used
-                                model='linear')   # ... using least squares (linear model)
+                                model='linear',   # ... using least squares (linear model)
+                                weights=weights)  # ... with specified weights
     # Second-stage least squares
     ee_stagetwo = ee_regression(theta=beta,       # Second-stage LS regression for Y given \hat{A},X
                                 y=y, X=dmatrix2,  # ... variables used
-                                model='linear')   # ... using least squares (linear model)
+                                model='linear',   # ... using least squares (linear model)
+                                weights=weights)  # ... weight specified weights
+
     # Output (2+2*b)-by-n array
     return np.vstack([ee_stagetwo, ee_stageone])
 
@@ -1117,7 +1104,7 @@ def ee_gestimation_snmm(theta, y, A, W, V, X=None, model='linear', weights=None)
 
     Examples
     --------
-    Construction of a estimating equation(s) with ``ee_gestimation_snmm`` should be done similar to the following
+    Construction of an estimating equation(s) with ``ee_gestimation_snmm`` should be done similar to the following
 
     >>> import numpy as np
     >>> import pandas as pd
@@ -1332,7 +1319,7 @@ def ee_mean_sensitivity_analysis(theta, y, delta, X, q_eval, H_function):
 
     Examples
     --------
-    Construction of a estimating equation(s) with ``ee_mean_sensitivity_analysis`` should be done similar to the
+    Construction of an estimating equation(s) with ``ee_mean_sensitivity_analysis`` should be done similar to the
     following
 
     >>> import numpy as np
