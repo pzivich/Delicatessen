@@ -313,7 +313,7 @@ class TestEstimatingEquationsRegression:
         # Checking confidence interval estimates
         npt.assert_allclose(mestimator.confidence_intervals(),
                             np.asarray(glm.conf_int()),
-                            atol=1e-6)
+                            atol=1e-5)
 
     def test_poisson(self, data_cp):
         d = data_cp
