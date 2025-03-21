@@ -730,6 +730,7 @@ def ee_aipw(theta, y, A, W, X, X1, X0, truncate=None, force_continuous=False):
 # Causal Inference (Instrumental) Estimating Equations
 
 def ee_iv_causal(theta, y, A, Z, weights=None):
+    # TODO
     r"""Estimating equation for instrumental variable (IV) analysis with the usual IV. The parameter is the additive
     effect of action A on outcome Y that leverages the instrument Z. The usual IV estimator is
 
@@ -884,20 +885,20 @@ def ee_2sls(theta, y, A, Z, W=None):
     A : ndarray, list, vector
         1-dimensional vector of `n` observed values for the action of interest.
     Z : ndarray, list, vector
-        1-dimensional vector of `n` observed values for the instrumental variable. The Z values should all be 0 or 1.
+        2-dimensional vector of `n` observed values for the instrumental variable(s).
     W : ndarray, list, vector, None, optional
         2-dimensional vector of `n` observed values for `b` exogenous variables. This design matrix is stacked together
-        in the first- and second-stage regression models as provided. Note: no intercept needs to be included in this
-        design matrix.
+        in the first- and second-stage regression models as provided. This argument allows for the addition of an
+        intercept to both regression models. Default is None.
 
     Returns
     -------
     array :
-        Returns a (4+2`b`)-by-`n` NumPy array evaluated for the input ``theta`` and ``y,A,Z``
+        Returns a (2+2`b`)-by-`n` NumPy array evaluated for the input ``theta`` and ``y,A,Z``
 
     Examples
     --------
-    Construction of a estimating equation(s) with ``ee_aipw`` should be done similar to the following
+    Construction of a estimating equation(s) with ``ee_2sls`` should be done similar to the following
 
     >>> import numpy as np
     >>> import pandas as pd
@@ -921,13 +922,13 @@ def ee_2sls(theta, y, A, Z, W=None):
     >>>     return ee_2sls(theta,
     >>>                    y=d['Y'],
     >>>                    A=d['A'],
-    >>>                    Z=d['Z'])
+    >>>                    Z=d[['Z', ]])
 
     Calling the M-estimator. 2SLS has 4 parameters with 2 coefficients in the second-stage model, and 2 coefficients
     in first-stage model. Generally, starting with all 0. as initials is reasonable for 2SLS.
 
     >>> estr = MEstimator(psi,
-    >>>                   init=[0., 0., 0., 0.])
+    >>>                   init=[0., 0., ])
     >>> estr.estimate()
 
     Inspecting the parameter estimates, variance, and 95% confidence intervals
@@ -938,20 +939,20 @@ def ee_2sls(theta, y, A, Z, W=None):
 
     More specifically, the corresponding parameters are
 
-    >>> estr.theta[0:2]   # Second-stage model
-    >>> estr.theta[2:]    # First-stage model
+    >>> estr.theta[0]   # Second-stage model
+    >>> estr.theta[1]    # First-stage model
 
-    Generally interest is in ``estr.theta[1]``, which under the IV assumptions is a causal effect of :math:`A` on
-    :math:`Y`.
+    Here, the parameter of interest is ``estr.theta[0]``, which under the IV assumptions is a causal effect of
+    :math:`A` on :math:`Y`.
 
-    In the case of exogenous variables, 2SLS is specified as
+    To add an intercept term to the models or add exogenous variables, 2SLS is specified as
 
     >>> def psi(theta):
     >>>     return ee_2sls(theta,
     >>>                    y=d['Y'],
     >>>                    A=d['A'],
     >>>                    Z=d['Z'],
-    >>>                    W=d[['X', ]])
+    >>>                    W=d[['C', 'X']])
 
     Here, 6 parameters are estimated since there is a single exogenous variable that shows up in both stages of 2SLS
 
@@ -961,50 +962,53 @@ def ee_2sls(theta, y, A, Z, W=None):
     >>> estr.theta[0:3]   # Second-stage model
     >>> estr.theta[3:]    # First-stage model
 
+    The parameter of interest is is again ``estr.theta[0]``.
+
     References
     ----------
     Meijer E, & Wansbeek T. (2007). The sample selection model from a method of moments perspective.
     *Econometric Reviews*, 26(1), 25-51.
 
+    Zivich PN, Cole SR, Edwards JK, Mulholland GE, Shook-Sa BE, & Tchetgen Tchetgen EJ. (2023). Introducing proximal
+    causal inference for epidemiologists. *American Journal of Epidemiology*, 192(7), 1224-1227.
+
     Zivich PN (2024). RE:'Estimating the effect of a treatment when there is non-adherence in a trial'.
-    *American Journal of Epidemiology*, kwae279.
+    *American Journal of Epidemiology*, 194(2), 552-553.
     """
     # Ensuring correct typing
     y = np.asarray(y)                             # Convert to NumPy array
     a = np.asarray(A)                             # Convert to NumPy array
-    z = np.asarray(Z)                             # Convert to NumPy array
-    c = np.ones(y.shape[0])                       # Generate intercept term
-    if W is not None:                             # Check type of X
-        W = np.asarray(W)                         # ... and convert to NumPy array
+    Z = np.asarray(Z)                             # Convert to NumPy array
 
     # Processing parameter vector
     if W is None:                                 # Getting split point for the parameter vector
-        id2s = 2                                  # ... 2 is split if no exogenous covariates
+        id2s = Z.shape[1]                         # ... 2 is split if no exogenous covariates
     else:                                         # Getting split point if given some covariates
-        id2s = 2 + W.shape[1]                     # ... split point for first and second stage parameters
+        W = np.asarray(W)                         # ... and convert to NumPy array
+        id2s = Z.shape[1] + W.shape[1]            # ... split point for first and second stage parameters
     beta = theta[:id2s]                           # Second-stage parameters
     alpha = theta[id2s:]                          # First-stage parameters
 
-    # Creating design matrices
-    dmatrix1 = np.asarray([c, z]).T               # Design matrix for first stage A | Z model
+    # Processing for design matrices
     if W is not None:                             # Check if exogenous covariates provided
-        dmatrix1 = np.c_[dmatrix1, W]             # ... then stack those into design matrix
+        dmatrix1 = np.c_[Z, W]                    # ... then stack those into design matrix
+    else:
+        dmatrix1 = Z
     a_hat = np.dot(dmatrix1, alpha)               # Generating predicted values of A
-    dmatrix2 = np.asarray([c, a_hat]).T           # Design matrix for second stage Y | Z model
     if W is not None:                             # Check if exogenous covariates provided
-        dmatrix2 = np.c_[dmatrix2, W]             # ... then stack those into design matrix
+        dmatrix2 = np.c_[a_hat, W]                # ... then stack those into design matrix
+    else:
+        dmatrix2 = a_hat[:, None]
 
     # First-stage least squares
     ee_stageone = ee_regression(theta=alpha,      # First-stage LS regression for A given Z,X
                                 y=a, X=dmatrix1,  # ... variables used
                                 model='linear')   # ... using least squares (linear model)
-
     # Second-stage least squares
     ee_stagetwo = ee_regression(theta=beta,       # Second-stage LS regression for Y given \hat{A},X
                                 y=y, X=dmatrix2,  # ... variables used
                                 model='linear')   # ... using least squares (linear model)
-
-    # Output (2+b+2+b)-by-n array
+    # Output (2+2*b)-by-n array
     return np.vstack([ee_stagetwo, ee_stageone])
 
 

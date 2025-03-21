@@ -8,14 +8,15 @@ import numpy.testing as npt
 import pandas as pd
 import statsmodels.api as sm
 
-from delicatessen import MEstimator
+from delicatessen import MEstimator, GMMEstimator
 from delicatessen.estimating_equations import (ee_regression,
                                                ee_gformula, ee_ipw, ee_ipw_msm, ee_aipw, ee_gestimation_snmm,
+                                               ee_iv_causal, ee_2sls,
                                                ee_mean_sensitivity_analysis)
 from delicatessen.utilities import inverse_logit
 
 
-class TestEstimatingEquationsCausal:
+class TestEstimatingEquationsGMethods:
 
     @pytest.fixture
     def data_causal_b(self):
@@ -678,4 +679,153 @@ class TestEstimatingEquationsCausal:
         # Checking point estimates
         npt.assert_allclose(mestr.theta[0],
                             np.nanmean(d['Y']),
+                            atol=1e-6)
+
+
+class TestEstimatingEquationsIV:
+
+    @pytest.fixture
+    def data_b(self):
+        d = pd.DataFrame()
+        d['Z'] = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        d['A'] = [1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0]
+        d['Y'] = [1, 1, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 0, 0]
+        return d
+
+    @pytest.fixture
+    def data_2sls(self):
+        d = pd.DataFrame()
+        d['X'] = [0.5, -0.14, 0.65, 1.52, -0.23, -0.23, 1.58, 0.77, -0.47, 0.54, -0.46, -0.47, 0.24, -1.91, -1.72,
+                  -0.56, -1.01, 0.31, -0.91, -1.41, 1.47, -0.23, 0.07, -1.42, -0.54, 0.11, -1.15, 0.38, -0.6, -0.29]
+        d['Z'] = [-0.6, 1.85, -0.01, -1.06, 0.82, -1.22, 0.21, -1.96, -1.33, 0.2, 0.74, 0.17, -0.12, -0.3, -1.48, -0.72,
+                  -0.46, 1.06, 0.34, -1.76, 0.32, -0.39, -0.68, 0.61, 1.03, 0.93, -0.84, -0.31, 0.33, 0.98]
+        d['A'] = [-0.15, 1.75, -0.83, -0.57, 0.23, -1.65, 1.16, 0.07, -0.75, -0.12, -1.13, 0.05, -0.29, -1.28, -2.81,
+                  0.09, 1.18, 0.74, 0.01, -2.46, -1.11, -0.19, 0.35, 1.85, -0.27, 0.62, -0.66, -1., 0.8, 1.3]
+        d['Y'] = [1.75, -6.63, 4.07, 2.17, 0.25, 8.02, -1.39, 1.77, 1.77, 0.31, 1.28, 0.53, 0.27, 2.06, 1.44, 0.97,
+                  -6.27, -2.21, -0.95, 1.33, 6.27, 1.78, -1.03, -8.73, -0.82, -1.36, -0.63, 2.77, -3.6, -3.67]
+        d['C'] = 1
+        return d
+
+    def test_2sls(self, data_2sls):
+        d = data_2sls
+
+        def psi(theta):
+            return ee_2sls(theta=theta, y=d['Y'], A=d['A'], Z=d[['Z', ]])
+
+        estr = GMMEstimator(psi, init=[0, 0, ])
+        estr.estimate()
+
+        # R code for external reference
+        # library(ivmodel)
+        # library(sandwich)
+        # data = data.frame(x=c(0.5, -0.14, 0.65, 1.52, -0.23, -0.23, 1.58, 0.77, -0.47,
+        #                       0.54, -0.46, -0.47, 0.24, -1.91, -1.72, -0.56, -1.01,
+        #                       0.31, -0.91, -1.41, 1.47, -0.23, 0.07, -1.42, -0.54,
+        #                       0.11, -1.15, 0.38, -0.6, -0.29),
+        #                   z=c(-0.6, 1.85, -0.01, -1.06, 0.82, -1.22, 0.21, -1.96, -1.33,
+        #                       0.2, 0.74, 0.17, -0.12, -0.3, -1.48, -0.72, -0.46, 1.06,
+        #                       0.34, -1.76, 0.32, -0.39, -0.68, 0.61, 1.03, 0.93, -0.84,
+        #                       -0.31, 0.33, 0.98),
+        #                   a=c(-0.15, 1.75, -0.83, -0.57, 0.23, -1.65, 1.16, 0.07, -0.75,
+        #                       -0.12, -1.13, 0.05, -0.29, -1.28, -2.81, 0.09, 1.18, 0.74,
+        #                       0.01, -2.46, -1.11, -0.19, 0.35, 1.85, -0.27, 0.62, -0.66,
+        #                       -1., 0.8, 1.3),
+        #                   y=c(1.75, -6.63, 4.07, 2.17, 0.25, 8.02, -1.39, 1.77, 1.77,
+        #                       0.31, 1.28, 0.53, 0.27, 2.06, 1.44, 0.97, -6.27, -2.21,
+        #                       -0.95, 1.33, 6.27, 1.78, -1.03, -8.73, -0.82, -1.36,
+        #                       -0.63, 2.77, -3.6, -3.67)
+        #                   )
+        # Y = data$y
+        # D = data$a
+        # Z = data$z
+        # ivm = ivmodel(Y=Y,D=D,Z=Z,intercept=F)
+        # coef(ivm)
+        tsls_params = [-2.468675, ]
+
+        # Checking point estimates are close
+        npt.assert_allclose(estr.theta[:1], tsls_params,
+                            atol=1e-7)
+
+    def test_2sls_intercept(self, data_2sls):
+        d = data_2sls
+
+        def psi(theta):
+            return ee_2sls(theta=theta, y=d['Y'], A=d['A'], Z=d[['Z', ]], W=d[['C', ]])
+
+        estr = GMMEstimator(psi, init=[0, 0, 0, 0])
+        estr.estimate()
+
+        # R code for external reference
+        # library(ivmodel)
+        # library(sandwich)
+        # data = data.frame(x=c(0.5, -0.14, 0.65, 1.52, -0.23, -0.23, 1.58, 0.77, -0.47,
+        #                       0.54, -0.46, -0.47, 0.24, -1.91, -1.72, -0.56, -1.01,
+        #                       0.31, -0.91, -1.41, 1.47, -0.23, 0.07, -1.42, -0.54,
+        #                       0.11, -1.15, 0.38, -0.6, -0.29),
+        #                   z=c(-0.6, 1.85, -0.01, -1.06, 0.82, -1.22, 0.21, -1.96, -1.33,
+        #                       0.2, 0.74, 0.17, -0.12, -0.3, -1.48, -0.72, -0.46, 1.06,
+        #                       0.34, -1.76, 0.32, -0.39, -0.68, 0.61, 1.03, 0.93, -0.84,
+        #                       -0.31, 0.33, 0.98),
+        #                   a=c(-0.15, 1.75, -0.83, -0.57, 0.23, -1.65, 1.16, 0.07, -0.75,
+        #                       -0.12, -1.13, 0.05, -0.29, -1.28, -2.81, 0.09, 1.18, 0.74,
+        #                       0.01, -2.46, -1.11, -0.19, 0.35, 1.85, -0.27, 0.62, -0.66,
+        #                       -1., 0.8, 1.3),
+        #                   y=c(1.75, -6.63, 4.07, 2.17, 0.25, 8.02, -1.39, 1.77, 1.77,
+        #                       0.31, 1.28, 0.53, 0.27, 2.06, 1.44, 0.97, -6.27, -2.21,
+        #                       -0.95, 1.33, 6.27, 1.78, -1.03, -8.73, -0.82, -1.36,
+        #                       -0.63, 2.77, -3.6, -3.67)
+        #                   )
+        # Y = data$y
+        # D = data$a
+        # Z = data$z
+        # ivm = ivmodel(Y=Y,D=D,Z=Z,intercept=T)
+        # coef(ivm)
+        # ivm$LIML$point.est.other
+        tsls_params = [-2.542286, -0.3789797]
+
+        # Checking point estimates are close
+        npt.assert_allclose(estr.theta[:2], tsls_params,
+                            atol=1e-6)
+
+    def test_2sls_exog(self, data_2sls):
+        d = data_2sls
+
+        def psi(theta):
+            return ee_2sls(theta=theta, y=d['Y'], A=d['A'], Z=d[['Z', ]], W=d[['C', 'X']])
+
+        estr = GMMEstimator(psi, init=[0, 0, 0, 0, 0, 0])
+        estr.estimate()
+
+        # R code for external reference
+        # library(ivmodel)
+        # library(sandwich)
+        # data = data.frame(x=c(0.5, -0.14, 0.65, 1.52, -0.23, -0.23, 1.58, 0.77, -0.47,
+        #                       0.54, -0.46, -0.47, 0.24, -1.91, -1.72, -0.56, -1.01,
+        #                       0.31, -0.91, -1.41, 1.47, -0.23, 0.07, -1.42, -0.54,
+        #                       0.11, -1.15, 0.38, -0.6, -0.29),
+        #                   z=c(-0.6, 1.85, -0.01, -1.06, 0.82, -1.22, 0.21, -1.96, -1.33,
+        #                       0.2, 0.74, 0.17, -0.12, -0.3, -1.48, -0.72, -0.46, 1.06,
+        #                       0.34, -1.76, 0.32, -0.39, -0.68, 0.61, 1.03, 0.93, -0.84,
+        #                       -0.31, 0.33, 0.98),
+        #                   a=c(-0.15, 1.75, -0.83, -0.57, 0.23, -1.65, 1.16, 0.07, -0.75,
+        #                       -0.12, -1.13, 0.05, -0.29, -1.28, -2.81, 0.09, 1.18, 0.74,
+        #                       0.01, -2.46, -1.11, -0.19, 0.35, 1.85, -0.27, 0.62, -0.66,
+        #                       -1., 0.8, 1.3),
+        #                   y=c(1.75, -6.63, 4.07, 2.17, 0.25, 8.02, -1.39, 1.77, 1.77,
+        #                       0.31, 1.28, 0.53, 0.27, 2.06, 1.44, 0.97, -6.27, -2.21,
+        #                       -0.95, 1.33, 6.27, 1.78, -1.03, -8.73, -0.82, -1.36,
+        #                       -0.63, 2.77, -3.6, -3.67)
+        #                   )
+        # data$c = 1
+        # Y = data$y
+        # D = data$a
+        # Z = data$z
+        # X = data[,c("c", "x")]
+        # ivm = ivmodel(Y=Y,D=D,Z=Z,X=X, intercept=F)
+        # coef(ivm)
+        # ivm$LIML$point.est.other
+        tsls_params = [-2.784835, -0.07432767, 1.848357]
+
+        # Checking point estimates are close
+        npt.assert_allclose(estr.theta[:3], tsls_params,
                             atol=1e-6)
