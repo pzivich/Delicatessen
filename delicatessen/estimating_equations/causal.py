@@ -871,30 +871,31 @@ def ee_2sls(theta, y, A, Z, W=None):
         \end{bmatrix}
         = 0
 
-    where :math:`A` is the action of interest, :math:`Y` is the outcome of interest, :math:`Z` is the instrument,
-    :math:`W` is a set of exogenous variables (possibly the empty set, or none), :math:`X = (1, A, W)`,
-    :math:`X = (1, \hat{A}, W)`, and :math:`\hat{A} = X^T \alpha`. Here, the length of the theta vector is 2 + `b` +
-    2 + `b`, where `b` is the number of covariates in :math:`W`.
+    where :math:`A` is the action of interest, :math:`Y` is the outcome of interest, :math:`Z` is the instrument(s),
+    :math:`W` is a set of exogenous variables (possibly the empty set, or none), :math:`X = (1, Z, W)`,
+    :math:`\hat{X} = (1, \hat{A}, W)`, and :math:`\hat{A} = X^T \alpha`. Here, the length of the theta vector is 1 +
+    `b` + 2`c`, where `b` is the number of covariates in :math:`Z` and `c` is the number of covariates in :math:`W`.
 
     Parameters
     ----------
     theta : ndarray, list, vector
-        Theta consists of 2 + `b` + 2 + `b` values. The first set of 2 + `b` parameters are for the second-stage model.
+        Theta consists of 1 + `b` + `2c` values. The first set of 1 + `c` parameters are for the second-stage model,
+        with the remainder corresponding to the first-stage model.
     y : ndarray, list, vector
         1-dimensional vector of `n` observed values for the outcome of interest.
     A : ndarray, list, vector
         1-dimensional vector of `n` observed values for the action of interest.
     Z : ndarray, list, vector
-        2-dimensional vector of `n` observed values for the instrumental variable(s).
+        2-dimensional vector of `n` observed values for the `b` instrumental variable(s).
     W : ndarray, list, vector, None, optional
-        2-dimensional vector of `n` observed values for `b` exogenous variables. This design matrix is stacked together
+        2-dimensional vector of `n` observed values for `c` exogenous variables. This design matrix is stacked together
         in the first- and second-stage regression models as provided. This argument allows for the addition of an
         intercept to both regression models. Default is None.
 
     Returns
     -------
     array :
-        Returns a (2+2`b`)-by-`n` NumPy array evaluated for the input ``theta`` and ``y,A,Z``
+        Returns a (1+`b`+2`c`)-by-`n` NumPy array evaluated for the input ``theta`` and ``y,A,Z``
 
     Examples
     --------
@@ -924,8 +925,8 @@ def ee_2sls(theta, y, A, Z, W=None):
     >>>                    A=d['A'],
     >>>                    Z=d[['Z', ]])
 
-    Calling the M-estimator. 2SLS has 4 parameters with 2 coefficients in the second-stage model, and 2 coefficients
-    in first-stage model. Generally, starting with all 0. as initials is reasonable for 2SLS.
+    Calling the M-estimator. 2SLS has 2 parameters with 1 coefficient in the second-stage model, and 1 coefficient
+    in first-stage model. Generally, starting with all ``0.`` as initials is reasonable for 2SLS.
 
     >>> estr = MEstimator(psi,
     >>>                   init=[0., 0., ])
@@ -951,7 +952,7 @@ def ee_2sls(theta, y, A, Z, W=None):
     >>>     return ee_2sls(theta,
     >>>                    y=d['Y'],
     >>>                    A=d['A'],
-    >>>                    Z=d['Z'],
+    >>>                    Z=d[['Z', ]],
     >>>                    W=d[['C', 'X']])
 
     Here, 6 parameters are estimated since there is a single exogenous variable that shows up in both stages of 2SLS
@@ -963,6 +964,16 @@ def ee_2sls(theta, y, A, Z, W=None):
     >>> estr.theta[3:]    # First-stage model
 
     The parameter of interest is is again ``estr.theta[0]``.
+
+    Finally, there is also support for multiple instruments. This can be done by including multiple covariates in ``Z``.
+    Below is an example of how the function would look
+
+    >>> def psi(theta):
+    >>>     return ee_2sls(theta,
+    >>>                    y=d['Y'],
+    >>>                    A=d['A'],
+    >>>                    Z=d[['Z1', 'Z2']],
+    >>>                    W=d[['C', 'X']])
 
     References
     ----------
@@ -982,10 +993,10 @@ def ee_2sls(theta, y, A, Z, W=None):
 
     # Processing parameter vector
     if W is None:                                 # Getting split point for the parameter vector
-        id2s = Z.shape[1]                         # ... 2 is split if no exogenous covariates
+        id2s = 1                         # ... 2 is split if no exogenous covariates
     else:                                         # Getting split point if given some covariates
         W = np.asarray(W)                         # ... and convert to NumPy array
-        id2s = Z.shape[1] + W.shape[1]            # ... split point for first and second stage parameters
+        id2s = 1 + W.shape[1]            # ... split point for first and second stage parameters
     beta = theta[:id2s]                           # Second-stage parameters
     alpha = theta[id2s:]                          # First-stage parameters
 

@@ -717,27 +717,43 @@ class TestEstimatingEquationsIV:
         d['C'] = 1
         return d
 
-    def test_iv_b_justid(self, data_b):
-        d = data_b
+    @pytest.fixture
+    def data_multi_iv(self):
+        d = pd.DataFrame()
+        d['X'] = [0.5, -0.14, 0.65, 1.52, -0.23, -0.23, 1.58, 0.77, -0.47, 0.54, -0.46, -0.47, 0.24, -1.91, -1.72,
+                  -0.56, -1.01, 0.31, -0.91, -1.41, 1.47, -0.23, 0.07, -1.42, -0.54, 0.11, -1.15, 0.38, -0.6, -0.29]
+        d['Z1'] = [-0.6, 1.85, -0.01, -1.06, 0.82, -1.22, 0.21, -1.96, -1.33, 0.2, 0.74, 0.17, -0.12, -0.3, -1.48,
+                   -0.72, -0.46, 1.06, 0.34, -1.76, 0.32, -0.39, -0.68, 0.61, 1.03, 0.93, -0.84, -0.31, 0.33, 0.98]
+        d['Z2'] = [-0.48, -0.19, -1.11, -1.2, 0.81, 1.36, -0.07, 1., 0.36, -0.65, 0.36, 1.54, -0.04, 1.56, -2.62, 0.82,
+                   0.09, -0.3, 0.09, -1.99, -0.22, 0.36, 1.48, -0.52, -0.81, -0.5, 0.92, 0.33, -0.53, 0.51]
+        d['A'] = [0.92, 0.39, 1.77, -0.94, 0.48, 0.47, 0.04, -1.36, -0.91, -0.03, -2.09, -0.71, -1.13, -1.42, -1.8,
+                  0.82, -0.79, 0.52, 0.61, -2.25, 0.42, 0.88, -2.33, 0.92, 0.67, 1.57, -2.52, -1.85, 1., 0.79]
+        d['Y'] = [-1.42, -0.13, -5.4, 5.77, -2.01, -4.06, 5.19, 6.35, 0.59, 1.61, 2.95, 1.56, 4.68, -1.18, 2.75, -2.78,
+                  3.06, 1.13, -3.62, 3.1, -1.14, -3.95, 7.11, -2.8, -3.01, -3.37, 5.24, 6.6, -3.33, 0.53]
+        d['C'] = 1
+        return d
 
-        def psi(theta):
-            return ee_iv_causal(theta, y=d['Y'], A=d['A'], Z=d['Z'])
-
-        mestr = MEstimator(psi, init=[0.8, ])
-        mestr.estimate()
-
-        # By-hand
-        d1 = d.loc[d['Z'] == 1].copy()
-        d0 = d.loc[d['Z'] == 0].copy()
-
-        beta = (np.mean(d1['Y']) - np.mean(d0['Y'])) / (np.mean(d1['A']) - np.mean(d0['A']))
-
-        # Checking point estimates
-        npt.assert_allclose(mestr.theta[0], beta, atol=1e-6)
-
-        print()
-        print(mestr.theta)
-        print(mestr.variance)
+    # def test_iv_b_justid(self, data_b):
+    #     d = data_b
+    #
+    #     def psi(theta):
+    #         return ee_iv_causal(theta, y=d['Y'], A=d['A'], Z=d['Z'])
+    #
+    #     mestr = MEstimator(psi, init=[0.8, ])
+    #     mestr.estimate()
+    #
+    #     # By-hand
+    #     d1 = d.loc[d['Z'] == 1].copy()
+    #     d0 = d.loc[d['Z'] == 0].copy()
+    #
+    #     beta = (np.mean(d1['Y']) - np.mean(d0['Y'])) / (np.mean(d1['A']) - np.mean(d0['A']))
+    #
+    #     # Checking point estimates
+    #     npt.assert_allclose(mestr.theta[0], beta, atol=1e-6)
+    #
+    #     print()
+    #     print(mestr.theta)
+    #     print(mestr.variance)
 
     # test_iv_c_justid
     # test_iv_b_overid
@@ -862,6 +878,53 @@ class TestEstimatingEquationsIV:
         # coef(ivm)
         # ivm$LIML$point.est.other
         tsls_params = [-2.784835, -0.07432767, 1.848357]
+
+        # Checking point estimates are close
+        npt.assert_allclose(estr.theta[:3], tsls_params,
+                            atol=1e-6)
+
+    def test_2sls_multi_iv(self, data_multi_iv):
+        d = data_multi_iv
+
+        def psi(theta):
+            return ee_2sls(theta=theta, y=d['Y'], A=d['A'], Z=d[['Z1', 'Z2']], W=d[['C', 'X']])
+
+        estr = GMMEstimator(psi, init=[0, 0, 0, 0, 0, 0, 0])
+        estr.estimate()
+
+        # R code for external reference
+        # library(ivmodel)
+        # library(sandwich)
+        # data = data.frame(x=c(0.5, -0.14, 0.65, 1.52, -0.23, -0.23, 1.58, 0.77, -0.47,
+        #                       0.54, -0.46, -0.47, 0.24, -1.91, -1.72, -0.56, -1.01,
+        #                       0.31, -0.91, -1.41, 1.47, -0.23, 0.07, -1.42, -0.54,
+        #                       0.11, -1.15, 0.38, -0.6, -0.29),
+        #                   z1=c(-0.6, 1.85, -0.01, -1.06, 0.82, -1.22, 0.21, -1.96,
+        #                        -1.33, 0.2, 0.74, 0.17, -0.12, -0.3, -1.48, -0.72, -0.46,
+        #                        1.06, 0.34, -1.76, 0.32, -0.39, -0.68, 0.61, 1.03, 0.93,
+        #                        -0.84, -0.31, 0.33, 0.98),
+        #                   z2=c(-0.48, -0.19, -1.11, -1.2, 0.81, 1.36, -0.07, 1., 0.36,
+        #                        -0.65, 0.36, 1.54, -0.04, 1.56, -2.62, 0.82, 0.09, -0.3,
+        #                        0.09, -1.99, -0.22, 0.36, 1.48, -0.52, -0.81, -0.5, 0.92,
+        #                        0.33, -0.53, 0.51),
+        #                   a=c(0.92, 0.39, 1.77, -0.94, 0.48, 0.47, 0.04, -1.36, -0.91,
+        #                       -0.03, -2.09, -0.71, -1.13, -1.42, -1.8, 0.82, -0.79,
+        #                       0.52, 0.61, -2.25, 0.42, 0.88, -2.33, 0.92, 0.67, 1.57,
+        #                       -2.52, -1.85, 1., 0.79),
+        #                   y=c(-1.42, -0.13, -5.4, 5.77, -2.01, -4.06, 5.19, 6.35, 0.59,
+        #                       1.61, 2.95, 1.56, 4.68, -1.18, 2.75, -2.78, 3.06, 1.13,
+        #                       -3.62, 3.1, -1.14, -3.95, 7.11, -2.8, -3.01, -3.37, 5.24,
+        #                       6.6, -3.33, 0.53)
+        #                   )
+        # data$c = 1
+        # Y = data$y
+        # D = data$a
+        # Z = data[,c("z1", "z2")]
+        # X = data[,c("c", "x")]
+        # ivm = ivmodel(Y=Y,D=D,Z=Z,X=X, intercept=F)
+        # coef(ivm)
+        # ivm$kClass$point.est.other
+        tsls_params = [-2.259155, 0.3856519, 1.658916]
 
         # Checking point estimates are close
         npt.assert_allclose(estr.theta[:3], tsls_params,
