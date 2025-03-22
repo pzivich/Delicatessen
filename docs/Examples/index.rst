@@ -15,6 +15,7 @@ scientific articles. These examples include built-in estimating equations and us
   Bonate-Pharmaco
   Hernan-Robins-2023
   Morris-Trials-2022
+  GMM-OverID
   Generalized-Additive-Model
 
 
