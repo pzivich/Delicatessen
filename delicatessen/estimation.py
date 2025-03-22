@@ -640,7 +640,7 @@ class GMMEstimator(_GeneralEstimator):
 
     Note
     ----
-    For over-identified settings, ``GMMEstimator`` uses an two-step iterative procedure, where :math:`theta` is
+    For over-identified settings, ``GMMEstimator`` uses an two-step iterative procedure, where :math:`\theta` is
     estimated, then the meat matrix is computed. The meat matrix replaces the identity matrix as :math:`\text{Q}`. Then
     the optimization process is repeated until convergence.
 
@@ -680,8 +680,8 @@ class GMMEstimator(_GeneralEstimator):
         The input list is used to location index the parameter array via ``np.take()``. The subset list will
         only affect the minimization procedure (i.e., the sandwich variance estimator ignores the subset argument).
         Default is ``None``, which runs the minimization procedure for all parameters in the estimating equations.
-    overid_maxiters : int, optional
-        Maximum number of iterations for the two-step GMM-estimation procedure with over-identified parameters. Note
+    overid_maxiter : int, optional
+         Maximum number of iterations for the two-step GMM-estimation procedure with over-identified parameters. Note
          that this procedure is only used for estimating equations that include an over-identified parameter, otherwise
          this argument has no impact. Default is ``10``.
     overid_tolerance : float, optional
@@ -765,12 +765,12 @@ class GMMEstimator(_GeneralEstimator):
 
     Wirjanto T. (1997). Estimating Functions and Over-Identified Models. *Lecture Notes - Monograph Series*, 239-256.
     """
-    def __init__(self, stacked_equations, init, subset=None, overid_maxiters=10, overid_tolerance=1e-9):
+    def __init__(self, stacked_equations, init, subset=None, overid_maxiter=10, overid_tolerance=1e-9):
         # Calling BaseClass for the initial setup
         super().__init__(stacked_equations=stacked_equations, init=init, subset=subset)
 
         # Processing GMM-specific arguments
-        self._over_id_iterations_ = overid_maxiters
+        self._over_id_iterations_ = overid_maxiter
         self._over_id_tolerance_ = overid_tolerance
 
     def estimate(self, solver='bfgs', maxiter=5000, tolerance=1e-9, deriv_method='approx', dx=1e-9, allow_pinv=True):
@@ -783,14 +783,14 @@ class GMMEstimator(_GeneralEstimator):
         solver : str, function, callable, optional
             Method to use for the minimization procedure. Default is the BFGS algorithm
             (``scipy.optimize.minimize(method='bfgs')``, specified by ``solver='bfgs'``). Other built-in options are
-            ``'newton'``)
-            'cg', 'bfgs', 'nelder-mead', 'l-bfgs-b', 'powell'
-            , and a modification of the Powell
-            hybrid method (``scipy.optimize.root(method='hybr')``, specified by ``solver='hybr'``). Finally, any generic
-            minimization algorithm can be used via a user-provided callable object. The function must consist of two
-            keyword arguments: ``stacked_equations``, and ``init``. Additionally, the function should return only the
-            optimized values. Please review the provided example in the documentation for how to implement a custom
-            minimization algorithm.
+            the L-BFGS-B algorithm (``'l-bfgs-b'``),
+            the conjugate gradient algorithm (``'cg'``),
+            Nelder-Mead (``'nelder-mead'``),
+            and the modified Powell algorithm (``'powell'``).
+            Finally, any generic minimization algorithm can be used via a user-provided callable object. The function
+            must consist of two keyword arguments: ``stacked_equations``, and ``init``. Additionally, the function
+            should return only the optimized values. Please review the provided example in the documentation for how to
+            implement a custom minimization algorithm.
         maxiter : int, optional
             Maximum iterations to consider for the minimization procedure. Default is 5000 iterations. For complex
             estimating equations, this value may need to be increased. This argument is not used when a custom

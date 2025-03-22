@@ -683,7 +683,7 @@ class TestGMMEstimationOverID:
             ee_z2 = z2*(y - theta[0]*a)
             return np.vstack([ee_z1, ee_z2])
 
-        estr = GMMEstimator(psi, init=[0, ], overid_maxiters=1)
+        estr = GMMEstimator(psi, init=[0, ], overid_maxiter=1)
         with pytest.warns(UserWarning, match="exceeded for the iterative GMM updating"):
             estr.estimate()
 
