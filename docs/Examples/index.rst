@@ -1,8 +1,10 @@
 Applied Examples
 ==========================
 
-This section provides illustrative applications. This includes the replication of examples from textbooks and published
-scientific articles. These examples include built-in estimating equations and use of user-built estimating equations.
+This section provides illustrative applications of the estimators provided in ``delicatessen``. These examples include
+replication of examples from textbooks, published scientific articles, and custom examples. Both built-in estimating
+equations and use of user-built estimating equations are illustrated. If there are applications you would like to see
+added to this documentations, please contact us.
 
 
 .. toctree::
