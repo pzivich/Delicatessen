@@ -256,13 +256,12 @@ def ee_mean_variance(theta, y):
 
         \sum_{i=1}^n
         \begin{bmatrix}
-            Y_i - \theta_1 = 0 \\
+            Y_i - \theta_1 \\
             (Y_i - \theta_1)^2 - \theta_2
         \end{bmatrix}
         = 0
 
-    Unlike ``ee_mean``, ``theta`` consists of 2 parameters. The output covariance matrix will also provide estimates
-    for each of the ``theta`` values.
+    Unlike ``ee_mean``, ``theta`` consists of 2 parameters.
 
     Parameters
     ----------

@@ -218,7 +218,7 @@ class MEstimator(_GeneralEstimator):
 
         \sum_{i=1}^n \psi(O_i, \hat{\theta}) = 0
 
-    where :math:`\psi` is the :math:`v`-dimensional vector of estimating equation(s), :math:`\hat{\theta}` is the
+    where :math:`\psi` is the :math:`v`-dimensional vector of estimating function(s), :math:`\hat{\theta}` is the
     :math:`v`-dimensional parameter vector, and :math:`O_i` is the observed data (where units are independent but not
     necessarily identically distributed).
 
@@ -613,19 +613,8 @@ class GMMEstimator(_GeneralEstimator):
     r"""Generalized Method of Moments (GMM) Estimator for stacked estimating equations.
 
     Estimating equations are a general approach to point and variance estimation that consists of defining an estimator
-    as the solution to a vector of equations that are equal to zero. The corresponding estimators, often called
-    M-estimators or Z-estimators, satisify the following equation
-
-    .. math::
-
-        \sum_{i=1}^n \psi(O_i, \hat{\theta}) = 0
-
-    where :math:`\psi` is the :math:`v`-dimensional vector of estimating equation(s), :math:`\hat{\theta}` is the
-    :math:`v`-dimensional parameter vector, and :math:`O_i` is the observed data (where units are independent but not
-    necessarily identically distributed).
-
-    Rather than root-finding for the estimating equations, the GMM estimator instead uses a minimization procedure.
-    The general form of the GMM estimator is
+    as the solution to a vector of equations that are equal to zero. The corresponding GMM estimator satisifies the
+    following equation
 
     .. math::
 
@@ -633,16 +622,19 @@ class GMMEstimator(_GeneralEstimator):
         \text{Q}
         \left[ \sum_{i=1}^n \psi(O_i, \hat{\theta}) \right]
 
+    where :math:`\psi` is the :math:`\ge v`-dimensional vector of estimating function(s), :math:`\hat{\theta}` is the
+    :math:`v`-dimensional parameter vector, :math:`\text{Q}` is a weight matrix, and :math:`O_i` is the observed data
+    (where units are independent but not necessarily identically distributed).
 
-    Here, :math:`\text{Q}` is a weight matrix. Initially this matrix is the identity matrix. Point estimation proceeds
-    by determining the values of :math:`\theta` where this equation is minimized. This is done via standard
-    optimization algorithms.
+    GMM estimators consists of two broad step: point estimation and variance estimation. Point estimation is carried
+    out by finding where the minimum of the negative product of the estimating equations is. Initially :math:`\text{Q}`
+    is set to be the identity matrix. This process is done via standard minimization algorithms.
 
     Note
     ----
     For over-identified settings, ``GMMEstimator`` uses an two-step iterative procedure, where :math:`\theta` is
     estimated, then the meat matrix is computed. The meat matrix replaces the identity matrix as :math:`\text{Q}`. Then
-    the optimization process is repeated until convergence.
+    the optimization process is repeated.
 
 
     For variance estimation, sandwich variance estimator is used. The asymptotic sandwich variance estimator consists of
@@ -681,9 +673,9 @@ class GMMEstimator(_GeneralEstimator):
         only affect the minimization procedure (i.e., the sandwich variance estimator ignores the subset argument).
         Default is ``None``, which runs the minimization procedure for all parameters in the estimating equations.
     overid_maxiter : int, optional
-         Maximum number of iterations for the two-step GMM-estimation procedure with over-identified parameters. Note
-         that this procedure is only used for estimating equations that include an over-identified parameter, otherwise
-         this argument has no impact. Default is ``10``.
+        Maximum number of iterations for the two-step GMM-estimation procedure with over-identified parameters. Note
+        that this procedure is only used for estimating equations that include an over-identified parameter, otherwise
+        this argument has no impact. Default is ``10``.
     overid_tolerance : float, optional
         Error tolerance for the two-step GMM-estimation procedure with over-identified parameters. Note that this
         procedure is only used for estimating equations that include an over-identified parameter, otherwise this

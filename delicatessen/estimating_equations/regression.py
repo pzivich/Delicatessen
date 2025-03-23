@@ -489,8 +489,7 @@ def ee_mlogit(theta, X, y, weights=None, offset=None):
 
 def ee_robust_regression(theta, X, y, model, k, loss='huber', weights=None, upper=None, lower=None, offset=None):
     r"""Estimating equations for (unscaled) robust regression. Robust linear regression is robust to outlying
-    observations of the outcome variable. Currently, only linear regression is supported by
-    ``ee_robust_regression``. The estimating equation is
+    observations of the outcome variable. Currently, only linear regression is supported. The estimating equation is
 
     .. math::
 
