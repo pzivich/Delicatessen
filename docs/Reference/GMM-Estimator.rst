@@ -7,4 +7,3 @@ GMM-estimator
    :members:
    :undoc-members:
    :inherited-members:
-   :no-index:
