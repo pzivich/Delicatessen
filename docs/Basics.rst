@@ -33,12 +33,16 @@ The generalized method of moments (GMM) estimator is instead defined as the solu
         \left[ \sum_{i=1}^n \psi(O_i, \hat{\theta}) \right]
 
 
-Here, :math:`\text{\Q}` is a weight matrix. Note that solving this equation is equivalent to the M-estimator is
-the case when the dimensions of the parameters and estimating functions match. When there are more estimating functions
-than parameters (i.e., over-identified), the M-estimator can no longer be applied but the GMM-estimator can be.
+where :math:`\text{\Q}` is a weight matrix. In general, the weight matrix begins as the identity matrix as implemented
+in ``delicatessen``.
 
-Unlike the M-estimator, we use a minimization algorithm to solve for :math:`\theta`. This is accomplished in
-``delicatessen`` by using SciPy's root-finding algorithms.
+For this equation, we use a *minimization* algorithm to solve for :math:`\theta`. This is accomplished in
+``delicatessen`` by using SciPy's minimization routines.
+
+Note that solving this equation is equivalent to the M-estimator when the dimension of the parameters and estimating
+equations match. However, the GMM estimator can also be used when there is more estimating equations than parameters.
+This is referred to as *over-identification*. In these settings ``GMMEstimator`` can be used, but ``MEstimator``
+cannot.
 
 Variance Estimation
 -------------------------------
@@ -66,6 +70,13 @@ The sandwich variance requires finding the derivative of the estimating function
 can get the computer to complete all these calculations for us. For the derivative, ``delicatessen`` offers two
 options: numerical approximation or forward-mode automatic differentiation.
 
+After computing the derivatives, the filling is computed via a dot product. The bread is then inverted using NumPy.
+If the pseudo-inverse is allowed, the Moore-Penrose inverse is used. Finally, the bread and filling matrices are
+combined via dot products.
+
+This introduction has all been a little abstract. In the Applied Examples, you can see how these estimators can be used
+to address a variety of different computational problems.
+
 Automatic Differentiation Caveats
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -75,10 +86,12 @@ log at zero internally. When using these specialty functions are necessary, it i
 for differentiation. The second is regarding discontinuities. Consider the following function :math:`f(x) = x**2` if
 :math:`x \ge 1` and :math:`f(x) = 0` otherwise. Because of how automatic differentiation operates, the derivative at
 :math:`x=1` will result in :math:`2x` (this is the same behavior as other automatic differentiation software, like
-autograd).
+``autograd``).
 
-After computing the derivatives, the filling is computed via a dot product. The bread is then inverted using NumPy.
-Finally, the bread and filling matrices are combined via dot products.
+Code and Issue Tracker
+-----------------------------
 
-This introduction has all been a little abstract. In the following Examples section, we will see how M-estimators can
-be used to address specific estimation problems.
+Please report any bugs, issues, or feature requests on GitHub
+at `pzivich/Delicatessen <https://github.com/pzivich/Delicatessen/>`_.
+
+Otherwise, you may contact me via email (gmail: zivich.5).

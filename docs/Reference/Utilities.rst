@@ -1,8 +1,8 @@
 Utilities
 =====================
 For manipulation of output or inputs, there are several basic utility functionalities for transformation of variables,
-predicted parameters, or computations. Some are used internally by the estimating equations but are also made
-available to users.
+predicted parameters, or computations. Some are used internally by the built-in estimating equations but these methods
+are also made available to users.
 
 Data transformations
 ---------------------

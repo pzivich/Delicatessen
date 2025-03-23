@@ -1,7 +1,8 @@
 Estimating Equations
 =====================
 To ease use, ``delicatessen`` comes with a variety of built-in estimating equations, covering a variety of common use
-cases. Below is reference documentation for currently supported estimating equations.
+cases. Below is reference documentation for the currently supported estimating equations. Please contact the
+development team if there are estimating equations you would like to see added.
 
 
 Basic
