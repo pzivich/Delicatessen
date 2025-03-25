@@ -618,9 +618,9 @@ class GMMEstimator(_GeneralEstimator):
 
     .. math::
 
-        \text{argmin}_{\theta} \left[ \sum_{i=1}^n \psi(O_i, \hat{\theta}) \right]
+        \text{argmin}_{\theta} \left[ \sum_{i=1}^n \psi(O_i, \hat{\theta}) \right]^T
         \text{Q}
-        \left[ \sum_{i=1}^n \psi(O_i, \hat{\theta}) \right]
+        \left[ \sum_{i=1}^n \psi(O_i, \hat{\theta}) \right]^T
 
     where :math:`\psi` is the :math:`\ge v`-dimensional vector of estimating function(s), :math:`\hat{\theta}` is the
     :math:`v`-dimensional parameter vector, :math:`\text{Q}` is a weight matrix, and :math:`O_i` is the observed data
