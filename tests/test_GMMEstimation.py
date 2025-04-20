@@ -390,6 +390,12 @@ class TestGMMEstimation:
                             -1 * np.log2(np.asarray(glm.pvalues)),
                             atol=1e-4)
 
+        # Checking influence function
+        ifunc = estr.influence_functions()
+        npt.assert_allclose(np.dot(ifunc.T, ifunc) / (data.shape[0]**2),
+                            estr.variance,
+                            atol=1e-6)
+
     def test_logistic(self):
         """Tests linear regression by-hand with a single estimating equation.
         """
@@ -441,6 +447,12 @@ class TestGMMEstimation:
         npt.assert_allclose(estr.s_values(null=0),
                             -1 * np.log2(np.asarray(glm.pvalues)),
                             atol=1e-4)
+
+        # Checking influence function
+        ifunc = estr.influence_functions()
+        npt.assert_allclose(np.dot(ifunc.T, ifunc) / (data.shape[0]**2),
+                            estr.variance,
+                            atol=1e-6)
 
     def test_custom_solver(self):
         """Test the use of a user-specified minimization algorithm.
