@@ -14,7 +14,7 @@ def logit(prob):
 
     Parameters
     ----------
-    prob : float, ndarray
+    prob : float, ndarray, list
         A single probability or an array of probabilities
 
     Returns
@@ -22,7 +22,8 @@ def logit(prob):
     array :
         logit-transformed values
     """
-    return np.log(prob / (1 - prob))
+    p = np.asarray(prob)
+    return np.log(p / (1 - p))
 
 
 def inverse_logit(logodds):
@@ -34,7 +35,7 @@ def inverse_logit(logodds):
 
     Parameters
     ----------
-    logodds : float, ndarray
+    logodds : float, ndarray, list
         A single log-odd or an array of log-odds
 
     Returns
@@ -42,7 +43,8 @@ def inverse_logit(logodds):
     array :
         inverse-logit transformed values
     """
-    return 1 / (1 + np.exp(-logodds))
+    lodds = np.asarray(logodds)
+    return 1 / (1 + np.exp(-lodds))
 
 
 def identity(value):
@@ -55,7 +57,7 @@ def identity(value):
 
     Parameters
     ----------
-    value : float, ndarray
+    value : float, ndarray, list
         A single value or an array of values
 
     Returns

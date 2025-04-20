@@ -55,7 +55,7 @@ class TestFunctions:
         npt.assert_allclose(inverse_logit(1.098612288668), 0.75)
 
     def test_logit_backtransform(self):
-        """Checks the inverse logit transformation of a single observation
+        """Checks the interative applications of logit and expit transformations of a single observation
         """
         original = 0.6521
         original_logit = logit(original)
@@ -75,7 +75,7 @@ class TestFunctions:
                             original_logit)
 
     def test_identity_array(self):
-        """Checks the inverse logit transformation of an array
+        """Checks the identity transformation of an array
         """
         vals = np.array([0.5, 0.25, 0.75, 0.5])
         npt.assert_allclose(identity(vals), vals)
@@ -85,6 +85,36 @@ class TestFunctions:
         """
         prbs = np.array([0.5, 0.25, 0.75, 0.5])
         odds = np.array([0., -1.098612288668, 1.098612288668, 0.])
+
+        npt.assert_allclose(logit(prbs), odds)
+
+    def test_expit_array(self):
+        """Checks the inverse logit transformation of an array
+        """
+        prbs = np.array([0.5, 0.25, 0.75, 0.5])
+        odds = np.array([0., -1.098612288668, 1.098612288668, 0.])
+
+        npt.assert_allclose(inverse_logit(odds), prbs)
+
+    def test_identity_list(self):
+        """Checks the identity transformation of a list
+        """
+        vals = [0.5, 0.25, 0.75, 0.5]
+        npt.assert_allclose(identity(vals), vals)
+
+    def test_logit_list(self):
+        """Checks the logit transformation of a list
+        """
+        prbs = [0.5, 0.25, 0.75, 0.5]
+        odds = [0., -1.098612288668, 1.098612288668, 0.]
+
+        npt.assert_allclose(logit(prbs), odds)
+
+    def test_expit_list(self):
+        """Checks the inverse logit transformation of a list
+        """
+        prbs = [0.5, 0.25, 0.75, 0.5]
+        odds = [0., -1.098612288668, 1.098612288668, 0.]
 
         npt.assert_allclose(logit(prbs), odds)
 
