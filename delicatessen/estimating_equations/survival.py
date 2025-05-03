@@ -950,6 +950,12 @@ def ee_aft(theta, X, t, delta, distribution, weights=None):
     >>> estr = MEstimator(stacked_equations=psi, init=[2., 0., 0.])
     >>> estr.estimate(solver='lm')
 
+    Note
+    ----
+    Optimization of the AFT model can be difficult. It may help to fit an exponential AFT model first and then use
+    those coefficients as starting values for a more general model.
+
+
     Inspecting the parameter estimates, variance, and confidence intervals
 
     >>> estr.theta
