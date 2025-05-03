@@ -164,6 +164,53 @@ class _GeneralEstimator:
         s_values = -1 * np.log2(p_values)            # Transform into S-values
         return s_values                              # Return S-values to the user
 
+    def influence_functions(self, allow_pinv=True):
+        r"""Calculate the influence function values for individual observations. Note that the influence function for
+        :math:`i` is computed using the following equality
+
+        .. math::
+
+            IF(O_i; \theta) = \frac{\psi(O_i; \theta)}{B_n(O, theta)}
+
+        or that the influence functions is equal to the estimating function scaled by the inverse of the bread matrix.
+        While this approach was historically used to derive the influence function, there are more general alternatives.
+        `delicatessen` offers this implementation since
+
+        Returns
+        -------
+        array :
+            Returns a `n`-by-`b` NumPy array evaluated for the input ``theta``.
+
+        References
+        ----------
+        Fisher A, & Kennedy EH. (2021). Visually communicating and teaching intuition for influence functions.
+        *The American Statistician*, 75(2), 162-172.
+
+        Hines O, Dukes O, Diaz-Ordaz K, & Vansteelandt S. (2022). Demystifying statistical learning based on efficient
+        influence functions. *The American Statistician*, 76(3), 292-304.
+
+        Stefanski LA, & Boos DD. (2002). The calculus of M-estimation. *The American Statistician*, 56(1), 29-38.
+        """
+        # Check that estimate() has been called
+        if self.variance is None:
+            raise ValueError("Either theta has not been estimated yet, or there is a np.nan in the bread matrix. "
+                             "Therefore, confidence_intervals() cannot be called.")
+
+        # Calculating estimating function
+        efunc_i = self.stacked_equations(theta=self.theta)   # Computing estimating function at theta-hat
+        if efunc_i.ndim == 1:                                # Checking if one dimension
+            efunc_i = np.asarray([efunc_i, ])                # ... so can make 2D for dot product
+
+        # Calculating inverse of bread matrix
+        if allow_pinv:                                       # Allowing the pseudo-inverse
+            bread_invert = np.linalg.pinv(self.bread)        # ... then call pinv
+        else:                                                # Only allowing the actual inverse
+            bread_invert = np.linalg.inv(self.bread)         # ... then call inv
+
+        # Calculating influence function
+        ifunc_i = np.dot(bread_invert, efunc_i)
+        return ifunc_i.T
+
     @staticmethod
     def _eval_ee_(stacked_equations, subset):
         """Function to evaluate the estimating equations over the :math:`n` units for a given set of parameters

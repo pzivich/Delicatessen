@@ -179,6 +179,23 @@ class TestMEstimation:
                             np.var(y, ddof=0),
                             atol=1e-6)
 
+    def test_mean_influence_function(self):
+        # Data set
+        y = np.array([5, 1, 2, 4, 2, 4, 5, 7, 11, 1, 6, 3, 4, 6])
+
+        def psi(theta):
+            return y - theta
+
+        estr = MEstimator(psi, init=[0, ])
+        estr.estimate()
+        ifunc = estr.influence_functions()
+
+        # IF for the mean is simply the EF
+        efunc = psi(estr.theta)
+
+        # Checking mean estimate
+        npt.assert_allclose(ifunc[:, 0], efunc, atol=1e-6)
+
     def test_mean_variance_1eq_lm_solver(self):
         """Tests the mean / variance with a single estimating equation.
         """
@@ -393,6 +410,12 @@ class TestMEstimation:
                             -1*np.log2(np.asarray(glm.pvalues)),
                             atol=1e-4)
 
+        # Checking influence function
+        ifunc = mestimator.influence_functions()
+        npt.assert_allclose(np.dot(ifunc.T, ifunc) / (data.shape[0]**2),
+                            mestimator.variance,
+                            atol=1e-6)
+
     def test_logistic(self):
         """Tests linear regression by-hand with a single estimating equation.
         """
@@ -444,6 +467,12 @@ class TestMEstimation:
         npt.assert_allclose(mestimator.s_values(null=0),
                             -1*np.log2(np.asarray(glm.pvalues)),
                             atol=1e-4)
+
+        # Checking influence function
+        ifunc = mestimator.influence_functions()
+        npt.assert_allclose(np.dot(ifunc.T, ifunc) / (data.shape[0]**2),
+                            mestimator.variance,
+                            atol=1e-6)
 
     def test_custom_solver(self):
         """Test the use of a user-specified root-finding algorithm.
