@@ -10,7 +10,8 @@ from lifelines import ExponentialFitter, WeibullFitter, WeibullAFTFitter
 
 from delicatessen import MEstimator
 from delicatessen.estimating_equations import (ee_exponential_model, ee_exponential_measure, ee_weibull_model,
-                                               ee_weibull_measure, ee_aft_weibull, ee_aft_weibull_measure)
+                                               ee_weibull_measure, ee_aft_weibull, ee_aft_weibull_measure,
+                                               ee_aft)
 
 
 class TestEstimatingEquationsSurvParam:
@@ -316,6 +317,21 @@ class TestEstimatingEquationsSurvParam:
 class TestEstimatingEquationsAFT:
 
     @pytest.fixture
+    def collett_bc(self):
+        arr = [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+               [23, 47, 69, 70, 71, 100, 101, 148, 181, 198, 208, 212, 224, 5, 8, 10, 13, 18, 24, 26, 26, 31, 35, 40,
+                41, 48, 50, 59, 61, 68, 71, 76, 105, 107, 109, 113, 116, 118, 143, 154, 162, 188, 212, 217, 225],
+               [1, 1, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0,
+                0, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0]]
+        d = pd.DataFrame()
+        d['X'] = arr[0]
+        d['time'] = arr[1]
+        d['delta'] = arr[2]
+        d['C'] = 1
+        return d
+
+    @pytest.fixture
     def data_sc(self):
         d = pd.DataFrame()
         d['X'] = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
@@ -324,6 +340,128 @@ class TestEstimatingEquationsAFT:
         d['delta'] = [1, 0, 0, 1, 0, 1, 1, 0, 1, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0]
         d['weight'] = [1, 2, 1, 0.1, 1, 1, 1, 3, 1, 1, 3, 1, 2, 1, 1, 2, 1, 2, 1, 1, 2, 1, 1, 1, 1, 1, 6, 1, 1, 1, 1, 2, 1, 4, 1]
         return d
+
+    def test_aft_exponential(self, collett_bc):
+        # R code
+        # library(survival)
+        # library(collett)
+        # library(sandwich)
+        # bcancer$stain = bcancer$stain - 1
+        # bcancer$delta = bcancer$status
+        # sr = survreg(Surv(time,delta)~stain, bcancer, dist='exponential')
+        # sr$coefficients
+        # sandwich(sr)
+        comparison_theta = np.asarray([5.8003040, -0.9516276])
+        comparison_var = np.asarray([[0.1855775, -0.1855775],
+                                     [-0.1855775, 0.2473048]])
+
+        d = collett_bc
+
+        def psi(theta):
+            return ee_aft(theta=theta, t=d['time'], delta=d['delta'], X=d[['C', 'X']], distribution='exponential')
+
+        # M-estimator with built-in Weibull AFT
+        estr = MEstimator(psi, init=[5., 0.])
+        estr.estimate(solver="lm")
+
+        # Checking mean estimate
+        npt.assert_allclose(estr.theta, comparison_theta, atol=1e-7)
+
+        # Checking variance estimate
+        npt.assert_allclose(estr.variance, comparison_var, atol=1e-6)
+
+    def test_aft_weibull(self, collett_bc):
+        # R code
+        # library(survival)
+        # library(collett)
+        # library(sandwich)
+        # bcancer$stain = bcancer$stain - 1
+        # bcancer$delta = bcancer$status
+        # sr = survreg(Surv(time,delta)~stain, bcancer, dist='weibull')
+        # sr$coefficients
+        # sr$scale
+        # sandwich(sr)
+        comparison_theta = np.asarray([5.8543638, -0.9966647, np.log(1 / 1.066777)])
+        comparison_var = np.asarray([[0.23281646, -0.2231509, -0.02183579],
+                                     [-0.22315087, 0.2827840, 0.01221040],
+                                     [-0.02183579, 0.0122104, 0.01580507]])
+
+        d = collett_bc
+
+        def psi(theta):
+            return ee_aft(theta=theta, t=d['time'], delta=d['delta'], X=d[['C', 'X']], distribution='weibull')
+
+        # M-estimator with built-in Weibull AFT
+        estr = MEstimator(psi, init=[5., 0., 0.])
+        estr.estimate(solver="lm")
+
+        # Checking mean estimate
+        npt.assert_allclose(estr.theta, comparison_theta, atol=1e-6)
+
+        # Checking variance estimate
+        npt.assert_allclose(estr.variance, comparison_var, atol=1e-5)
+
+    def test_aft_loglogistic(self, collett_bc):
+        # R code
+        # library(survival)
+        # library(collett)
+        # library(sandwich)
+        # bcancer$stain = bcancer$stain - 1
+        # bcancer$delta = bcancer$status
+        # sr = survreg(Surv(time,delta)~stain, bcancer, dist='loglogistic')
+        # sr$coefficients
+        # sr$scale
+        # sandwich(sr)
+        comparison_theta = np.asarray([5.461100, -1.149056, np.log(1 / 0.8047005)])
+        comparison_var = np.asarray([[0.19819085, -0.188012820, -0.017487829],
+                                     [-0.18801282, 0.255164051, 0.003017458],
+                                     [-0.01748783, 0.003017458, 0.021047226]])
+
+        d = collett_bc
+
+        def psi(theta):
+            return ee_aft(theta=theta, t=d['time'], delta=d['delta'], X=d[['C', 'X']], distribution='log-logistic')
+
+        # M-estimator with built-in Weibull AFT
+        estr = MEstimator(psi, init=[5., 0., 0.])
+        estr.estimate(solver="lm")
+
+        # Checking mean estimate
+        npt.assert_allclose(estr.theta, comparison_theta, atol=1e-6)
+
+        # Checking variance estimate
+        npt.assert_allclose(estr.variance, comparison_var, atol=1e-5)
+
+    def test_aft_lognormal(self, collett_bc):
+        # R code
+        # library(survival)
+        # library(collett)
+        # library(sandwich)
+        # bcancer$stain = bcancer$stain - 1
+        # bcancer$delta = bcancer$status
+        # sr = survreg(Surv(time,delta)~stain, bcancer, dist='lognormal')
+        # sr$coefficients
+        # sr$scale
+        # sandwich(sr)
+        comparison_theta = np.asarray([5.491726, -1.151172, np.log(1 / 1.359451)])
+        comparison_var = np.asarray([[0.2027042, -0.187832061, -0.020758604],
+                                     [-0.1878321, 0.247731353, 0.006169943],
+                                     [-0.0207586, 0.006169943, 0.018085983]])
+
+        d = collett_bc
+
+        def psi(theta):
+            return ee_aft(theta=theta, t=d['time'], delta=d['delta'], X=d[['C', 'X']], distribution='log-normal')
+
+        # M-estimator with built-in Weibull AFT
+        estr = MEstimator(psi, init=[5., 0., 0.])
+        estr.estimate(solver="lm")
+
+        # Checking mean estimate
+        npt.assert_allclose(estr.theta, comparison_theta, atol=1e-6)
+
+        # Checking variance estimate
+        npt.assert_allclose(estr.variance, comparison_var, atol=1e-5)
 
     def test_weibull_aft(self, data_sc):
         def psi(theta):

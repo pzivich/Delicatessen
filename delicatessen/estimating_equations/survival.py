@@ -5,6 +5,7 @@
 import numpy as np
 
 from delicatessen.estimating_equations.processing import generate_weights
+from delicatessen.utilities import standard_normal_cdf, standard_normal_pdf
 
 
 #################################################################
@@ -854,3 +855,67 @@ def ee_aft_weibull_measure(theta, times, X, measure, mu, beta, sigma):
             metric_t = calculate_metric(time=t, theta_t=thet)    # ... ... calculate the transformation
             stacked_time_evals.append(metric_t)                  # ... ... stack transformation into storage
         return np.vstack(stacked_time_evals)                     # ... return a vstack of the equations
+
+
+def ee_aft(theta, X, t, delta, distribution, weights=None):
+    r"""Estimating equation for a generalized accelerated failure time (AFT) model. Let :math:`T_i` indicate the time
+    of the event and :math:`C_i` indicate the time to right censoring. Therefore, the observable data consists of
+    :math:`t_i = min(T_i, C_i)` and :math:`\Delta_i = I(t_i = T_i)`. The estimating equations are
+
+    Parameters
+    ----------
+    theta
+    X
+    t
+    delta
+    weights
+
+    Returns
+    -------
+
+    """
+    X = np.asarray(X)                          # Convert to NumPy array
+    t = np.asarray(t)[:, None]                 # Convert to NumPy array and ensure correct shape for matrix algebra
+    delta = np.asarray(delta)[:, None]         # Convert to NumPy array and ensure correct shape for matrix algebra
+    beta_dim = X.shape[1]
+
+    # Extract coefficients
+    beta = np.asarray(theta[:beta_dim])[:, None]
+    if distribution == 'exponential':
+        sigma = 1
+    else:
+        sigma = np.exp(-theta[-1])
+
+    # Computing error distribution for each observation
+    z_i = (np.log(t) - np.dot(X, beta)) / sigma
+
+    # Allowing for a weighted Weibull-AFT model
+    if weights is None:                         # If weights is unspecified
+        w = np.ones(X.shape[0])                 # ... assign weight of 1 to all observations
+    else:                                       # Otherwise
+        w = np.asarray(weights)                 # ... set weights as input vector
+
+    # Handling different distribution specifications
+    if distribution in ['exponential', 'weibull']:
+        df_f = 1 - np.exp(z_i)
+        dS_S = np.exp(z_i)
+    elif distribution in ['log-logistic', 'loglogistic']:
+        df_f = 1 - (2 * np.exp(z_i)) / (1 + np.exp(z_i))
+        dS_S = np.exp(z_i) / (1 + np.exp(z_i))
+    elif distribution in ['log-normal', 'lognormal']:
+        df_f = -z_i
+        dS_S = standard_normal_pdf(z_i) / (1 - standard_normal_cdf(z_i))
+    else:
+        raise ValueError("Invalid distribution: " + str(distribution))
+    lambda_epsilon = delta*df_f - (1-delta)*dS_S
+
+    # Contributions to the estimating functions
+    score_scale = -1/sigma * lambda_epsilon * X
+    if distribution == 'exponential':
+        efunc = w * score_scale.T
+    else:
+        score_shape = (-1 / sigma * lambda_epsilon * z_i) - (delta / sigma)
+        efunc = np.vstack((w * score_scale.T, w * score_shape.T))
+
+    # Output b-by-n matrix
+    return efunc
