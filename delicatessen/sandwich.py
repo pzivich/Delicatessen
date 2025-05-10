@@ -297,3 +297,97 @@ def build_sandwich(bread, meat, allow_pinv=True):
 
     # Return the sandwich covariance matrix
     return sandwich
+
+
+def delta_method(theta, g, covariance, deriv_method='exact', dx=1e-9):
+    r"""Function to apply the delta method for a given parameter vector and transformation. The delta method is defined
+    as
+
+    .. math::
+
+        var(\theta) = ...
+
+    where [...]
+    In words, the variance of the transformation of the parameters is equal to [...].
+
+    As described elsewhere, the sandwich variance estimator automates the delta method. Therefore, one can simply
+    program the corresponding estimating equation to estimate the variance. However, this can be computationally
+    inefficient when :math:`g` outputs a large vector. This functionality offers a way to apply the delta method
+    outside of ``MEstimator`` and ``GMMEstimator``. This function is also used internally for some prediction functions
+    to easily get the corresponding variance.
+
+    Parameters
+    ----------
+    theta : ndarray
+        Parameter vector of dimension `v` to apply the transformation function ``g`` with.
+    g : function, callable
+        Function that transforms the `v` dimension parameter vector ``theta`` into a `w` dimensional vector.
+    covariance :
+        Covariance matrix for the parameter vector ``x``.
+    deriv_method : str, optional
+        Method to compute the derivative of the function ``g``. Default is ``'exact'``. Options include numerical
+        approximation via the forward difference method via SciPy (``'approx'``), forward difference implemented by-hand
+        (`'fapprox'`), backward difference implemented by-hand (`'bapprox'`),  central difference implemented by-hand
+        (`'capprox'`), or forward-mode automatic differentiation (``'exact'``).
+    dx : float, optional
+        Spacing to use to numerically approximate the partial derivatives of the bread matrix. Here, a small value
+        for ``dx`` should be used, since some large values can result in poor approximations. This argument is only
+        used when numerical approximation methods. Default is ``1e-9``.
+
+    Returns
+    -------
+    array :
+        Returns a `p`-by-`p` NumPy array for the input ``theta``, where `p` is the length of the output vector from the
+        function :math:`g`
+
+    Examples
+    --------
+
+    References
+    ----------
+    Cox C. (2005). Delta method. *Encyclopedia of Biostatistics*.
+
+    Oehlert GW. (1992). A Note on the Delta Method. *The American Statistician*, 46(1), 27-29.
+    """
+    # Setup
+    covariance = np.asarray(covariance)
+    j = covariance.shape[0]
+    k = covariance.shape[1]
+
+    def g_array(theta):
+        # Function to convert user function g to always return a NumPy array
+        return np.asarray(g(theta))
+
+    # Computing g(\theta)
+    theta_star = g_array(theta)
+    theta_dim = theta_star.shape
+    v = len(theta)
+
+    # Checking dimensions of parameter vector
+    if len(theta_dim) > 1:
+        raise ValueError("Output from function `g` must be a one-dimensional array")
+    if j != k:
+        raise ValueError("Input covariance matrix must be symmetric. Input matrix had dimensions " + str(j)
+                         + " rows and " + str(k) + " columns")
+    if j != v:
+        raise ValueError("Input parameter vector and covariance matrix must share a dimension, but theta has " + str(v)
+                         + " as its dimension and the matrix had dimension " + str(j))
+
+    # Computing derivative for g(x)
+    if deriv_method.lower() == "exact":
+        g_prime = auto_differentiation(xk=theta, f=g_array)
+    elif deriv_method.lower() == 'approx':
+        g_prime = approx_fprime(xk=theta, f=g_array, epsilon=dx)
+        if g_prime.ndim == 1:
+            g_prime = np.asarray([g_prime, ])
+    elif deriv_method.lower() in ['capprox', 'fapprox', 'bapprox']:
+        g_prime = approx_differentiation(xk=theta, f=g_array, method=deriv_method.lower(), epsilon=dx)
+    else:
+        raise ValueError("The input for deriv_method was " + str(deriv_method)
+                         + ", but only 'approx', 'fapprox', 'capprox', 'bapprox' and 'exact' are available.")
+
+    # Applying delta method to get the variance
+    covariance_g = np.dot(np.dot(g_prime, covariance), g_prime.T)
+
+    # Returning the covariance matrix for g(x)
+    return covariance_g

@@ -12,4 +12,4 @@ $ python -m pip install delicatessen
 from .version import __version__
 
 from .estimation import MEstimator, GMMEstimator
-from .sandwich import compute_sandwich
+from .sandwich import compute_sandwich, delta_method
