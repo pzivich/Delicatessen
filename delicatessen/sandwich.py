@@ -305,7 +305,7 @@ def delta_method(theta, g, covariance, deriv_method='exact', dx=1e-9):
 
     .. math::
 
-        Var \left[ g(\theta) \right] \approx g'(\theta) \Sigma_{\theta} g'(\theta)^T
+        Var \left[ g(\theta) \right] \approx g'(\theta) \; \Sigma_{\theta} \; g'(\theta)^T
 
     where :math:`\theta` is the parameter vector, :math:`g` is a vector-valued function that returns a 1 dimensional
     vector, :math:`g'` is the gradient (or partial derivatives), and :math:`\Sigma_{\theta}` is the covariance matrix
@@ -325,7 +325,7 @@ def delta_method(theta, g, covariance, deriv_method='exact', dx=1e-9):
     theta : ndarray, list, set
         Parameter vector of dimension `v` to apply the transformation function ``g`` with.
     g : function, callable
-        Function that transforms the `v` dimension parameter vector ``theta`` into a `w` dimensional vector.
+        Vector function that transforms the `v` dimension parameter vector ``theta`` into a `w` dimensional vector.
     covariance : ndarray, list, set
         Covariance matrix for the parameter vector ``x``.
     deriv_method : str, optional
