@@ -6,8 +6,8 @@ import pytest
 import numpy as np
 import numpy.testing as npt
 import pandas as pd
-from delicatessen import compute_sandwich, MEstimator
-from delicatessen.estimating_equations import ee_mean_variance, ee_glm
+from delicatessen import compute_sandwich, MEstimator, delta_method
+from delicatessen.estimating_equations import ee_mean_variance, ee_glm, ee_gformula, ee_ipw
 from delicatessen.sandwich import compute_bread, compute_meat, build_sandwich
 
 
@@ -220,3 +220,89 @@ class TestComputeSandwich:
 
         # Checking variance estimates
         npt.assert_allclose(var_build, var_compute, atol=1e-7)
+
+
+class TestDeltaMethod:
+
+    @pytest.fixture
+    def db(self):
+        d = pd.DataFrame()
+        d['W'] = [1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3,
+                  1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3]
+        d['V'] = [1, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 1, 1, 0, 0,
+                  1, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 1, 1, 0, 0]
+        d['A'] = [1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 0, 1, 0, 1,
+                  1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 0, 1, 0, 1]
+        d['Y'] = [0, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 0, 1, 1, 1, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0,
+                  1, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0]
+        d['I'] = 1
+        return d
+
+    def test_delta_method_1(self, db):
+        d1 = db.copy()
+        d1['A'] = 1
+        d0 = db.copy()
+        d0['A'] = 0
+
+        # M-estimation
+        def psi(theta):
+            log_rr = theta[0]
+            ee_gform = ee_gformula(theta[1:],
+                                   y=db['Y'], X=db[['I', 'A', 'W']],
+                                   X1=d1[['I', 'A', 'W']], X0=d0[['I', 'A', 'W']])
+            ee_logrr = np.ones(db.shape[0]) * (np.log(theta[2]) - np.log(theta[3])) - log_rr
+            return np.vstack([ee_logrr, ee_gform])
+
+        estr = MEstimator(psi, init=[0., 0., 0.5, 0.5, 0., 0., 0.])
+        estr.estimate(solver='lm', deriv_method='exact')
+
+        # Delta Method
+        def g_transform(theta):
+            risk1, risk0 = theta
+            return np.log(risk1) - np.log(risk0), risk1 - risk0
+
+        risks = estr.theta[2:4]
+        risks_covar = estr.variance[2:4, 2:4]
+        log_rr, rd = g_transform(theta=risks)
+        covar = delta_method(theta=risks, g=g_transform, covariance=risks_covar)
+
+        # Checking mean estimates
+        npt.assert_allclose([log_rr, rd],
+                            estr.theta[:2],
+                            atol=1e-8)
+
+        # Checking covariance
+        npt.assert_allclose(estr.variance[:2, :2],
+                            covar,
+                            atol=1e-8)
+
+    def test_delta_method_2(self, db):
+        # M-estimation
+        def psi(theta):
+            log_rr = theta[0]
+            ee_gform = ee_ipw(theta[1:], y=db['Y'], A=db['A'], W=db[['I', 'W']])
+            ee_logrr = np.ones(db.shape[0]) * (np.log(theta[2]) - np.log(theta[3])) - log_rr
+            return np.vstack([ee_logrr, ee_gform])
+
+        estr = MEstimator(psi, init=[0., 0., 0.5, 0.5, 0., 0.])
+        estr.estimate(solver='lm', deriv_method='exact')
+
+        # Delta Method
+        def g_transform(theta):
+            risk1, risk0 = theta
+            return np.log(risk1) - np.log(risk0), risk1 - risk0
+
+        risks = estr.theta[2:4]
+        risks_covar = estr.variance[2:4, 2:4]
+        log_rr, rd = g_transform(theta=risks)
+        covar = delta_method(theta=risks, g=g_transform, covariance=risks_covar)
+
+        # Checking mean estimates
+        npt.assert_allclose([log_rr, rd],
+                            estr.theta[:2],
+                            atol=1e-8)
+
+        # Checking covariance
+        npt.assert_allclose(estr.variance[:2, :2],
+                            covar,
+                            atol=1e-8)
