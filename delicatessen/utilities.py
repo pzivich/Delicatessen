@@ -1,8 +1,10 @@
 import warnings
+import numbers
 import numpy as np
 import scipy as sp
 from scipy.stats import norm
 from delicatessen.derivative import PrimalTangentPairs as PTPair
+from delicatessen.sandwich import delta_method
 
 
 def logit(prob):
@@ -441,6 +443,187 @@ def regression_predictions(X, theta, covariance, offset=None, alpha=0.05):
 
     # Return estimates and variance
     return np.vstack([yhat, yhat_var, lower_ci, upper_ci]).T
+
+
+def aft_predictions_individual(X, times, theta, distribution, measure='survival'):
+    r"""
+
+    Returns
+    -------
+
+    """
+    if isinstance(times, (numbers.Number, np.number)):
+        # Preparing inputs
+        X = np.asarray(X)
+        theta = np.asarray(theta)
+
+        # Extracting parameters from input vector
+        beta_dim = X.shape[1]
+        beta = np.asarray(theta[:beta_dim])[:, None]
+        if distribution == 'exponential':
+            sigma = 1
+        else:
+            sigma = np.exp(-theta[-1])
+
+        # Predicted survival at times
+        if distribution in ['exponential', 'weibull']:
+            z_i = np.exp(-np.dot(X, beta) / sigma)
+            survival_t = np.exp(-z_i * times ** (1 / sigma))
+        elif distribution in ['lognormal', 'log-normal']:
+            z_i = (np.log(times) - np.dot(X, beta)) / sigma
+            survival_t = 1 - standard_normal_cdf(z_i)
+        elif distribution in ['loglogistic', 'log-logistic']:
+            z_i = np.exp((np.log(times) - np.dot(X, beta)) / sigma)
+            survival_t = 1 / (1 + z_i)
+        else:
+            raise ValueError("...")
+        survival_t = survival_t.T[0]
+
+        # Converting survival to measures
+        if measure == "survival":
+            metric = survival_t                       # S(t) = S(t)
+        elif measure == "risk":
+            metric = 1 - survival_t                   # F(t) = 1 - S(t)
+        elif measure == "cumulative_hazard":
+            metric = -1 * np.log(survival_t)          # H(t) = -log(S(t))
+        elif measure == "hazard":
+            metric = hazard_t                         # h(t) = h(t)
+        elif measure == "density":
+            metric = hazard_t * survival_t            # f(t) = h(t) * S(t)
+        else:
+            raise ValueError("The measure '" + str(measure) + "' is not supported. "
+                             "Please select one of the following: survival, density, risk, hazard, cumulative_hazard.")
+        return metric
+
+    else:
+        predictions = []
+        for t in times:
+            pred_t = aft_predictions_individual(X=X, times=t, theta=theta,
+                                                distribution=distribution, measure=measure)
+            predictions.append(pred_t)
+
+        return np.asarray(predictions)
+
+
+def aft_predictions_function(X, times, theta, covariance, distribution, measure='survival', alpha=0.05):
+    r"""Generate predicted values of
+
+    given a design matrix, point estimates, and covariance matrix.
+    This functionality computes :math:`\hat{Y}`, :math:`\hat{Var}\left(\hat{Y}\right)`, and corresponding Wald-type
+    :math:`(1 - \alpha) \times` 100% confidence intervals from estimated coefficients and covariance of an accelerated
+    failure time model for a specific covariate pattern.
+
+    This function is a helper function to compute functions and point-wise confidence intervals over time for plotting
+    purposes.
+
+    the predictions from a regression model for a set of given :math:`X`
+    values. Importantly, this method allows for the variance of :math:`\hat{Y}` to be estimated without having to expand
+    the estimating equations. As such, this functionality is meant to be used after ``MEstimator`` has been used to
+    estimate the coefficients (i.e., this function is for use after the M-estimator has computed the results for the
+    chosen regression model). Therefore, this function should be viewed as a post-processing functionality for
+    generating plots or tables.
+
+    Parameters
+    ----------
+    X : ndarray, list, vector
+        2-dimensional vector of values to generate predicted variances for. The number of columns must match the number
+        of coefficients / parameters in ``theta``.
+    theta : ndarray
+        Estimated coefficients from ``MEstimator.theta``.
+    covariance : ndarray
+        Estimated covariance matrix from ``MEstimator.variance``.
+    distribution : str
+        Distribution of the AFT model, which should match the distribution specified in ``ee_aft``. See ``ee_aft`` for
+        available options.
+    alpha : float, optional
+        The :math:`\alpha` level for the corresponding confidence intervals. Default is 0.05, which calculate the
+        95% confidence intervals. Notice that :math:`0<\alpha<1`.
+
+    Returns
+    -------
+    array :
+        Returns a t-by-4 NumPy array with the 4 columns correspond to the predicted outcome, variance of the predictied
+        outcome, lower confidence limit, and upper confidence limit.
+
+    Examples
+    --------
+    The following is a simple example demonstrating how this function can be used to plot a regression line and
+    corresponding 95% confidence intervals.
+
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> import matplotlib.pyplot as plt
+    >>> from delicatessen import MEstimator
+    >>> from delicatessen.estimating_equations import ee_regression
+    >>> from delicatessen.utilities import regression_predictions
+
+    Some generic data to estimate the regression model with
+
+    >>> n = 50
+    >>> data = pd.DataFrame()
+    >>> data['X'] = np.random.normal(size=n)
+    >>> data['Z'] = np.random.normal(size=n)
+    >>> data['Y'] = 0.5 + 2*data['X'] - 1*data['Z'] + np.random.normal(loc=0, size=n)
+    >>> data['C'] = 1
+
+    Estimating the corresponding regression model parameters
+
+    >>> def psi(theta):
+    >>>     return ee_regression(theta=theta, X=data[['C', 'X', 'Z']], y=data['Y'], model='linear')
+
+    >>> estr = MEstimator(stacked_equations=psi, init=[0., 0., 0.,])
+    >>> estr.estimate(solver='lm')
+
+    To create a line plot of our regression line, we need to first create a new set of covariate values that are evenly
+    spaced across the range of the predictor values. Here, we will plot the relationship between ``Z`` and ``Y`` while
+    holding ``X=0``.
+
+    >>> pred = pd.DataFrame()
+    >>> pred['Z'] = np.linspace(np.min(data['Z']), np.max(data['Z']), 200)
+    >>> pred['X'] = 0
+    >>> pred['C'] = 1
+
+    Now the predicted values of the outcome, and confidence intervals to plot
+
+    >>> Xp = pred[['C', 'X', 'Z']]
+    >>> yhat = regression_predictions(X=Xp, theta=estr.theta, covariance=estr.variance)
+
+    Finally, the predicted values can be plotted (using matplotlib)
+
+    >>> plt.plot(pred['Z'], yhat[:, 0], '-', color='blue')
+    >>> plt.fill_between(pred['Z'], yhat[:, 2], yhat[:, 3], alpha=0.25, color='blue')
+    >>> plt.show()
+
+    """
+    def predictions_aft(theta):
+        # Wrapped prediction function for call with delta_method
+        preds = aft_predictions_individual(X=X, times=times, theta=theta, distribution=distribution, measure=measure)
+        return preds.T[0]
+
+    # Check valid alpha value is being provided
+    if not 0 < alpha < 1:
+        raise ValueError("`alpha` must be 0 < a < 1")
+
+    # Check X has only 1 row (error otherwise, since difficult to keep track of multiple covariate patterns and var)
+    X = np.asarray(X)
+    if X.shape[0] > 1:
+        raise ValueError("...only one covariate pattern at a time...")
+
+    # Predicted measure at given times
+    est = predictions_aft(theta=theta)
+
+    # Covariance for measure at given times
+    covariance_m = delta_method(theta=theta, g=predictions_aft, covariance=covariance)
+    variance_m = np.diag(covariance_m)
+
+    # Confidence limit of predictions
+    yhat_se = np.sqrt(variance_m)                      # Taking square root to get SE
+    z_alpha = norm.ppf(1 - alpha/2, loc=0, scale=1)    # Z_alpha value for CI
+    lower_ci = est - z_alpha*yhat_se                   # Lower CI
+    upper_ci = est + z_alpha*yhat_se                   # Upper CI
+
+    # Return estimates and variance
+    return np.vstack([est, variance_m, lower_ci, upper_ci]).T
 
 
 def spline(variable, knots, power=3, restricted=True, normalized=False):
