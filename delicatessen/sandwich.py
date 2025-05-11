@@ -300,29 +300,33 @@ def build_sandwich(bread, meat, allow_pinv=True):
 
 
 def delta_method(theta, g, covariance, deriv_method='exact', dx=1e-9):
-    r"""Function to apply the delta method for a given parameter vector and transformation. The delta method is defined
+    r"""Function to apply the Delta Method for a given parameter vector and transformation. The Delta Method is defined
     as
 
     .. math::
 
-        var(\theta) = ...
+        Var \left[ g(\theta) \right] \approx g'(\theta) \Sigma_{\theta} g'(\theta)^T
 
-    where [...]
-    In words, the variance of the transformation of the parameters is equal to [...].
+    where :math:`\theta` is the parameter vector, :math:`g` is a vector-valued function that returns a 1 dimensional
+    vector, :math:`g'` is the gradient (or partial derivatives), and :math:`\Sigma_{\theta}` is the covariance matrix
+    for :math:`\theta`. In words, the variance of the transformation of the parameters is equal to covariance of the
+    parameters sandwiched between the derivatives of the transformation functions. This expression then provides a
+    variance estimator when replacing :math:`\theta` and :math:`\Sigma` with :math:`\hat{\theta}` and
+    :math:`\hat{\Sigma}`, respectively.
 
-    As described elsewhere, the sandwich variance estimator automates the delta method. Therefore, one can simply
-    program the corresponding estimating equation to estimate the variance. However, this can be computationally
-    inefficient when :math:`g` outputs a large vector. This functionality offers a way to apply the delta method
-    outside of ``MEstimator`` and ``GMMEstimator``. This function is also used internally for some prediction functions
-    to easily get the corresponding variance.
+    As described elsewhere, the sandwich variance estimator automates the Delta Method. Therefore, one can simply
+    program the corresponding estimating equation to estimate the variance for that transformation. However, this can be
+    computationally inefficient when :math:`g` outputs a large vector. This functionality offers a way to apply the
+    Delta Method outside of ``MEstimator`` and ``GMMEstimator``. Internally, this function is used for some prediction
+    functionalities.
 
     Parameters
     ----------
-    theta : ndarray
+    theta : ndarray, list, set
         Parameter vector of dimension `v` to apply the transformation function ``g`` with.
     g : function, callable
         Function that transforms the `v` dimension parameter vector ``theta`` into a `w` dimensional vector.
-    covariance :
+    covariance : ndarray, list, set
         Covariance matrix for the parameter vector ``x``.
     deriv_method : str, optional
         Method to compute the derivative of the function ``g``. Default is ``'exact'``. Options include numerical
@@ -411,9 +415,7 @@ def delta_method(theta, g, covariance, deriv_method='exact', dx=1e-9):
     >>> rr_lcl, rr_ucl = np.exp(log_rr - 1.96*rr_stderr), np.exp(log_rr + 1.96*rr_stderr)
 
     While these transformations are straightforward to stack as estimating functions, ``delta_method`` offers another
-    option for estimating the variance of transformations. This option is likely to be of the most help with there is
-    a large number of returned parameters by :math:`g` (e.g., survival curves) because optimization processes are not
-    necessary with ``delta_method``.
+    option for estimating the variance of transformations that has computational benefits in some settings.
 
     References
     ----------

@@ -31,7 +31,7 @@ class TestBread:
         with pytest.raises(ValueError, match="input for deriv_method"):
             compute_bread(psi, theta=[mean, ], deriv_method='wrong')
 
-    def test_error_nan(self, y):
+    def test_warn_nan(self, y):
         def psi(theta):
             return y - theta
 
@@ -237,6 +237,48 @@ class TestDeltaMethod:
                   1, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0]
         d['I'] = 1
         return d
+
+    def test_error_2d_output(self):
+        def g_transform(theta):
+            return [[theta[0] + theta[1], theta[0] / theta[1]],
+                    [theta[0] + theta[2], theta[0] * theta[2] / theta[1]]]
+
+        theta_vector = [1, 5, 3]
+        covar = [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
+
+        with pytest.raises(ValueError, match="Output from function `g`"):
+            delta_method(theta=theta_vector, g=g_transform, covariance=covar)
+
+    def test_error_covar_asym(self):
+        def g_transform(theta):
+            return theta[0] + theta[1], theta[0] / theta[1], theta[0] + theta[2], theta[0] * theta[2] / theta[1]
+
+        theta_vector = [1, 5, 3]
+        covar = [[1, 0, 0], [0, 1, 0]]
+
+        with pytest.raises(ValueError, match="matrix must be symmetric"):
+            delta_method(theta=theta_vector, g=g_transform, covariance=covar)
+
+        covar = [[1, 0], [0, 1], [0, 0]]
+
+        with pytest.raises(ValueError, match="matrix must be symmetric"):
+            delta_method(theta=theta_vector, g=g_transform, covariance=covar)
+
+    def test_error_match_dims(self):
+        def g_transform(theta):
+            return theta[0] + theta[1], theta[0] / theta[1], theta[0] + theta[2], theta[0] * theta[2] / theta[1]
+
+        theta_vector = [1, 5, 3]
+        covar = [[1, 0], [0, 1]]
+
+        with pytest.raises(ValueError, match="vector and covariance matrix must share"):
+            delta_method(theta=theta_vector, g=g_transform, covariance=covar)
+
+        theta_vector = [1, 5, 3, -3]
+        covar = [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
+
+        with pytest.raises(ValueError, match="vector and covariance matrix must share"):
+            delta_method(theta=theta_vector, g=g_transform, covariance=covar)
 
     def test_delta_method_1(self, db):
         d1 = db.copy()
