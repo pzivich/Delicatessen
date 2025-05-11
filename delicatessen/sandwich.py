@@ -342,9 +342,84 @@ def delta_method(theta, g, covariance, deriv_method='exact', dx=1e-9):
 
     Examples
     --------
+    Using ``delta_method`` to compute the variance should be done similar to the following
+
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> from delicatessen import MEstimator, delta_method
+    >>> from delicatessen.estimating_equations import ee_ipw
+
+    To illustrate how ``delta_method`` is intended to be used, we will first use an M-estimator to compute the point
+    and variance estimates for the parameter vector :math:`\theta`. Here, we will replicate the example from the
+    documentation for ``ee_ipw``.
+
+    >>> n = 200
+    >>> d = pd.DataFrame()
+    >>> d['W'] = np.random.binomial(1, p=0.5, size=n)
+    >>> d['A'] = np.random.binomial(1, p=(0.25 + 0.5*d['W']), size=n)
+    >>> d['Ya0'] = np.random.binomial(1, p=(0.75 - 0.5*d['W']), size=n)
+    >>> d['Ya1'] = np.random.binomial(1, p=(0.75 - 0.5*d['W'] - 0.1*1), size=n)
+    >>> d['Y'] = (1-d['A'])*d['Ya0'] + d['A']*d['Ya1']
+    >>> d['C'] = 1
+
+    Defining psi, or the stacked estimating equations
+
+    >>> def psi(theta):
+    >>>     return ee_ipw(theta, y=d['Y'], A=d['A'],
+    >>>                   W=d[['C', 'W']])
+
+    Calling the M-estimation procedure
+
+    >>> estr = MEstimator(stacked_equations=psi, init=[0., 0.5, 0.5, 0., 0.])
+    >>> estr.estimate(solver='lm')
+
+    Per the documentation for ``ee_ipw``, the average causal effect (or risk difference) is given by the following
+
+    >>> estr.theta[0]        # causal mean difference of 1 versus 0
+    >>> estr.variance[0, 0]  # corresponding variance estimate
+
+    Suppose that ``ee_ipw`` did not directly provide the risk difference. Further, imagine we were interested in the
+    risk ratio (log-transformed). Both of these quantities are transformations of the risk under action 1
+    (i.e., ``theta[1]``) and the risk under action 0 (i.e., ``theta[2]``). The following is a function that applies and
+    returns those transformations
+
+    >>> def causal_contrasts(theta):
+    >>>     risk1, risk0 = theta
+    >>>     risk_diff = risk1 - risk0
+    >>>     log_risk_ratio = np.log(risk1) - np.log(risk0)
+    >>>     return risk_diff, log_risk_ratio
+
+    To estimate the variance for this transformation, one can now use the *delta method*. While one could manually
+    compute the derivatives for this function, ``delta_method`` automates this procedure for you (using either automatic
+    or numerical approximation methods). Below is how ``delta_method`` can be applied to compute the variance for the
+    risk difference and risk ratio
+
+    >>> risks = estr.theta[1:3]                     # Risks
+    >>> risks_c0var = estr.variance[1:3, 1:3]       # Variance for risks
+    >>> rd, log_rr = causal_contrasts(theta=risks)  # RD, log(RR)
+
+    >>> covar = delta_method(theta=risks,             # Delta method
+    >>>                      g=causal_contrasts,      # ... function g
+    >>>                      covariance=risks_c0var)  # ... covariance
+
+    The output from ``delta_method`` is the corresponding covariance matrix for risk difference and risk ratio. We can
+    get the corresponding 95% confidence intervals via
+
+    >>> rd_stderr = np.sqrt(covar[0, 0])
+    >>> rd_lcl, rd_ucl = rd - 1.96*rd_stderr, rd + 1.96*rd_stderr
+    >>> rr_stderr = np.sqrt(covar[1, 1])
+    >>> rr_lcl, rr_ucl = np.exp(log_rr - 1.96*rr_stderr), np.exp(log_rr + 1.96*rr_stderr)
+
+    While these transformations are straightforward to stack as estimating functions, ``delta_method`` offers another
+    option for estimating the variance of transformations. This option is likely to be of the most help with there is
+    a large number of returned parameters by :math:`g` (e.g., survival curves) because optimization processes are not
+    necessary with ``delta_method``.
 
     References
     ----------
+    Boos DD, & Stefanski LA. (2013). Large Sample Theory: The Basics, In
+    *Essential Statistical Inference: Theory and Methods*, 237-240.
+
     Cox C. (2005). Delta method. *Encyclopedia of Biostatistics*.
 
     Oehlert GW. (1992). A Note on the Delta Method. *The American Statistician*, 46(1), 27-29.

@@ -45,7 +45,7 @@ Differentiation
   auto_differentiation
 
 
-Sandwich Variance Estimator
+Variance Estimators
 ---------------------------
 
 .. currentmodule:: delicatessen.sandwich
@@ -54,3 +54,4 @@ Sandwich Variance Estimator
    :toctree: generated/
 
    compute_sandwich
+   delta_method
