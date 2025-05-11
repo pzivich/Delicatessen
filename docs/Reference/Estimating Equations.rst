@@ -66,6 +66,7 @@ Survival
   ee_exponential_measure
   ee_weibull_model
   ee_weibull_measure
+  ee_aft
   ee_aft_weibull
   ee_aft_weibull_measure
 
