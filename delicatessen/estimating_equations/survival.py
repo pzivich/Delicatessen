@@ -569,7 +569,7 @@ def ee_aft_weibull(theta, X, t, delta, weights=None):
     >>> from delicatessen import MEstimator
     >>> from delicatessen.estimating_equations import ee_aft_weibull
 
-    Some generic survival data to estimate a Weibull AFT regresion model
+    Some generic survival data to estimate a Weibull AFT regression model
 
     >>> n = 100
     >>> data = pd.DataFrame()
@@ -613,7 +613,7 @@ def ee_aft_weibull(theta, X, t, delta, weights=None):
     Collett D. (2015). Accelerated failure time and other parametric models. In: Modelling survival data in medical
     research. CRC press. pg171-220
     """
-    warnings.warn("ee_aft_weibull will be removed in v4.0. Please use ee_aft instead.", FutureWarning)
+    # warnings.warn("ee_aft_weibull will be removed in v4.0. Please use ee_aft instead.", FutureWarning)
     X = np.asarray(X)                          # Convert to NumPy array
     t = np.asarray(t)[:, None]                 # Convert to NumPy array and ensure correct shape for matrix algebra
     delta = np.asarray(delta)[:, None]         # Convert to NumPy array and ensure correct shape for matrix algebra
@@ -867,8 +867,8 @@ def ee_aft(theta, X, t, delta, distribution, weights=None):
 
         \sum_{i=1}^n =
         \begin{bmatrix}
-            - \sigma^{-1} \lambda_\epsilon X^T \\
-            - \sigma^{-1} \lambda_\epsilon  Z_i - \delta \sigma^{-1} \\
+            - \frac{1}{\sigma} \lambda_\epsilon (Z_i) X^T \\
+            - \frac{1}{\sigma} \lambda_\epsilon (Z_i) \times  Z_i - \frac{\Delta_i}{\sigma} \\
         \end{bmatrix}
         = 0
 
@@ -880,9 +880,36 @@ def ee_aft(theta, X, t, delta, distribution, weights=None):
                            - (1 - \Delta_i) \frac{S_\epsilon'(Z_i)}{S_\epsilon(Z_i)}.
 
     Here the choice of the distribution for :math:`f_\epsilon` and :math:`S_\epsilon` are determined by the specified
-    distributions. Options include exponential, Weibull, log-logistic, and log-normal. The design matrix :math:`X`
-    should include an intercept term. Note that for optimization, the starting values for the intercept term should be
-    a positive number (e.g., :math:`5`).
+    distributions. Options include exponential, Weibull, log-logistic, and log-normal. These functions are described in
+    the following table
+
+    .. list-table::
+       :widths: 25 25 25 25
+       :header-rows: 1
+
+       * - Distribution
+         - Keyword
+         - :math:`f_\epsilon' / f_\epsilon`
+         - :math:`S_\epsilon' / S_\epsilon`
+       * - Exponential
+         - ``exponential``
+         - :math:`1-\exp(Z_i)`
+         - :math:`\exp(Z_i)`
+       * - Weibull
+         - ``weibull``
+         - :math:`1-\exp(Z_i)`
+         - :math:`\exp(Z_i)`
+       * - Log-Logistic
+         - ``log-logistic``
+         - :math:`1 - \frac{2 \exp(Z_i)}{1 + \exp(Z_i)}`
+         - :math:`\frac{\exp(Z_i)}{1 + \exp(Z_i)}`
+       * - Log-Normal
+         - ``log-normal``
+         - :math:`- Z_i`
+         - :math:`\frac{\phi(Z_i)}{1 - \Phi(Z_i)}`
+
+    The design matrix :math:`X` should include an intercept term. Note that for optimization, the starting values for
+    the intercept term likely be a positive number (e.g., :math:`5`).
 
     Note
     ----
@@ -890,7 +917,7 @@ def ee_aft(theta, X, t, delta, distribution, weights=None):
     the inverse of the scale is equal to the R implementation.
 
 
-    Here, :math:`\theta` is a 1-by-(`b`+1) array, where `b` is the distinct covariates included as part of ``X``. For
+    Here, :math:`\theta` is a 1-by-(`b` + 1) array, where `b` is the distinct covariates included as part of ``X``. For
     example, if ``X`` is a 3-by-`n` matrix, then theta will be a 1-by-4 array. The code is general to allow for an
     arbitrary dimension of ``X``.
 
@@ -915,7 +942,7 @@ def ee_aft(theta, X, t, delta, distribution, weights=None):
     Returns
     -------
     array :
-        Returns a `b`+1-by-`n` NumPy array evaluated for the input ``theta``.
+        Returns a (`b` + 1)-by-`n` NumPy array evaluated for the input ``theta``.
 
     Examples
     --------
