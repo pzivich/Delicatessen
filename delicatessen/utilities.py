@@ -465,21 +465,26 @@ def aft_predictions_individual(X, times, theta, distribution, measure='survival'
         else:
             sigma = np.exp(-theta[-1])
 
-        # Predicted survival at times
+        # Predicted survival at times, comes from Table 6.2 on page 242 of Collett 2015
+        t_hat = np.dot(X, beta)
+        log_t = np.log(times)
+        epsilon_i = (log_t - t_hat) / sigma
+        hazard_scaler = 1 / (sigma * times)
         if distribution in ['exponential', 'weibull']:
-            z_i = np.exp(-np.dot(X, beta) / sigma)
-            survival_t = np.exp(-z_i * times ** (1 / sigma))
+            survival_t = np.exp(-np.exp(epsilon_i))
+            hazard_t = hazard_scaler * np.exp(epsilon_i)
         elif distribution in ['lognormal', 'log-normal']:
-            z_i = (np.log(times) - np.dot(X, beta)) / sigma
-            survival_t = 1 - standard_normal_cdf(z_i)
+            survival_t = 1 - standard_normal_cdf(epsilon_i)
+            hazard_t = hazard_scaler * np.exp(-epsilon_i**2 / 2) / (survival_t * np.sqrt(2 * np.pi))
         elif distribution in ['loglogistic', 'log-logistic']:
-            z_i = np.exp((np.log(times) - np.dot(X, beta)) / sigma)
-            survival_t = 1 / (1 + z_i)
+            survival_t = 1 / (1 + np.exp(epsilon_i))
+            hazard_t = hazard_scaler * 1 / (1 + np.exp(-epsilon_i))
         else:
             raise ValueError("...")
         survival_t = survival_t.T[0]
+        hazard_t = hazard_t.T[0]
 
-        # Converting survival to measures
+        # Converting survival or hazard to desired measure
         if measure == "survival":
             metric = survival_t                       # S(t) = S(t)
         elif measure == "risk":
