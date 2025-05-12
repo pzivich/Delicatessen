@@ -245,6 +245,67 @@ class TestFunctions:
             robust_loss_functions(residual=residuals, loss='hampel',
                                   k=1.5, a=1, b=2)
 
+    def test_spline_unnormed(self):
+        vars = [1, 5, 10, 15, 20]
+
+        # Spline setup 1
+        expected = np.array([[0.0, 0.0, 0.0, 0.0, 4.0], ]).T
+        returned = spline(variable=vars, knots=[16, ], power=1, restricted=False, normalized=False)
+        npt.assert_allclose(returned, expected)
+
+        # Spline setup 2
+        expected = np.array([[0.0, 0.0, 0.0, 0.0, 16.0], ]).T
+        returned = spline(variable=vars, knots=[16, ], power=2, restricted=False, normalized=False)
+        npt.assert_allclose(returned, expected)
+
+        # Spline setup 3
+        expected = np.array([[0.0, 0.0, 0.0, 5.0**1.5, 10.0**1.5],
+                             [0.0, 0.0, 0.0, 0.0, 4.0**1.5]]).T
+        returned = spline(variable=vars, knots=[10, 16], power=1.5, restricted=False, normalized=False)
+        npt.assert_allclose(returned, expected)
+
+        # Spline setup 4
+        expected = np.array([[0.0, 0.0, 0.0, 5.0, 6.0], ]).T
+        returned = spline(variable=vars, knots=[10, 16], power=1, restricted=True, normalized=False)
+        npt.assert_allclose(returned, expected)
+
+        # Spline setup 5
+        expected = np.array([[0.0, 0.0, 5.0**2, 10.0**2, 15.0**2 - 4.0**2], ]).T
+        returned = spline(variable=vars, knots=[5, 16], power=2, restricted=True, normalized=False)
+        npt.assert_allclose(returned, expected)
+
+    def test_spline_normed(self):
+        vars = [1, 5, 10, 15, 20]
+
+        # Spline setup 1
+        expected = np.array([[0.0, 0.0, 0.0, 0.0, 4.0], ]).T / 16
+        returned = spline(variable=vars, knots=[16, ], power=1, restricted=False, normalized=True)
+        npt.assert_allclose(returned, expected)
+
+        # Spline setup 2
+        expected = np.array([[0.0, 0.0, 0.0, 0.0, 16.0], ]).T / 16**2
+        returned = spline(variable=vars, knots=[16, ], power=2, restricted=False, normalized=True)
+        npt.assert_allclose(returned, expected)
+
+        # Spline setup 3
+        expected = np.array([[0.0, 0.0, 0.0, 5.0**1.5, 10.0**1.5],
+                             [0.0, 0.0, 0.0, 0.0, 4.0**1.5]]).T / (16 - 10)**1.5
+        returned = spline(variable=vars, knots=[10, 16], power=1.5, restricted=False, normalized=True)
+        npt.assert_allclose(returned, expected)
+
+        # Spline setup 4
+        expected = np.array([[0.0, 0.0, 0.0, 5.0, 6.0], ]).T / (16 - 10)
+        returned = spline(variable=vars, knots=[10, 16], power=1, restricted=True, normalized=True)
+        npt.assert_allclose(returned, expected)
+
+        # Spline setup 5
+        expected = np.array([[0.0, 0.0, 5.0**2, 10.0**2, 15.0**2 - 4.0**2], ]).T / (16 - 5)**2
+        returned = spline(variable=vars, knots=[5, 16], power=2, restricted=True, normalized=True)
+        npt.assert_allclose(returned, expected)
+
+
+class TestPredictions:
+
     def test_regression_predictions_linear(self):
         n = 500
         data = pd.DataFrame()
@@ -328,63 +389,8 @@ class TestFunctions:
         npt.assert_allclose(returned[:, 2], np.log(expected[:, 2]), atol=1e-6)
         npt.assert_allclose(returned[:, 3], np.log(expected[:, 3]), atol=1e-6)
 
-    def test_spline_unnormed(self):
-        vars = [1, 5, 10, 15, 20]
 
-        # Spline setup 1
-        expected = np.array([[0.0, 0.0, 0.0, 0.0, 4.0], ]).T
-        returned = spline(variable=vars, knots=[16, ], power=1, restricted=False, normalized=False)
-        npt.assert_allclose(returned, expected)
-
-        # Spline setup 2
-        expected = np.array([[0.0, 0.0, 0.0, 0.0, 16.0], ]).T
-        returned = spline(variable=vars, knots=[16, ], power=2, restricted=False, normalized=False)
-        npt.assert_allclose(returned, expected)
-
-        # Spline setup 3
-        expected = np.array([[0.0, 0.0, 0.0, 5.0**1.5, 10.0**1.5],
-                             [0.0, 0.0, 0.0, 0.0, 4.0**1.5]]).T
-        returned = spline(variable=vars, knots=[10, 16], power=1.5, restricted=False, normalized=False)
-        npt.assert_allclose(returned, expected)
-
-        # Spline setup 4
-        expected = np.array([[0.0, 0.0, 0.0, 5.0, 6.0], ]).T
-        returned = spline(variable=vars, knots=[10, 16], power=1, restricted=True, normalized=False)
-        npt.assert_allclose(returned, expected)
-
-        # Spline setup 5
-        expected = np.array([[0.0, 0.0, 5.0**2, 10.0**2, 15.0**2 - 4.0**2], ]).T
-        returned = spline(variable=vars, knots=[5, 16], power=2, restricted=True, normalized=False)
-        npt.assert_allclose(returned, expected)
-
-    def test_spline_normed(self):
-        vars = [1, 5, 10, 15, 20]
-
-        # Spline setup 1
-        expected = np.array([[0.0, 0.0, 0.0, 0.0, 4.0], ]).T / 16
-        returned = spline(variable=vars, knots=[16, ], power=1, restricted=False, normalized=True)
-        npt.assert_allclose(returned, expected)
-
-        # Spline setup 2
-        expected = np.array([[0.0, 0.0, 0.0, 0.0, 16.0], ]).T / 16**2
-        returned = spline(variable=vars, knots=[16, ], power=2, restricted=False, normalized=True)
-        npt.assert_allclose(returned, expected)
-
-        # Spline setup 3
-        expected = np.array([[0.0, 0.0, 0.0, 5.0**1.5, 10.0**1.5],
-                             [0.0, 0.0, 0.0, 0.0, 4.0**1.5]]).T / (16 - 10)**1.5
-        returned = spline(variable=vars, knots=[10, 16], power=1.5, restricted=False, normalized=True)
-        npt.assert_allclose(returned, expected)
-
-        # Spline setup 4
-        expected = np.array([[0.0, 0.0, 0.0, 5.0, 6.0], ]).T / (16 - 10)
-        returned = spline(variable=vars, knots=[10, 16], power=1, restricted=True, normalized=True)
-        npt.assert_allclose(returned, expected)
-
-        # Spline setup 5
-        expected = np.array([[0.0, 0.0, 5.0**2, 10.0**2, 15.0**2 - 4.0**2], ]).T / (16 - 5)**2
-        returned = spline(variable=vars, knots=[5, 16], power=2, restricted=True, normalized=True)
-        npt.assert_allclose(returned, expected)
+class TestDesignMatrix:
 
     def test_adm_error_noknots(self, design_matrix):
         # Testing error when dictionary with no knots given

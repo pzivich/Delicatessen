@@ -490,4 +490,4 @@ class TestEstimatingEquationsAFT:
                             np.asarray(results[:, 0]),
                             atol=1e-5)
 
-        # No variance check, since lifelines uses a different estimator
+        # No variance check, since lifelines uses a different variance estimator
