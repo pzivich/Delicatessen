@@ -17,7 +17,7 @@ from .regression import (ee_regression, ee_glm, ee_mlogit,
                          ee_elasticnet_regression, ee_bridge_regression,
                          ee_additive_regression)
 
-from .survival import (ee_exponential_model, ee_weibull_model,
+from .survival import (ee_survival_model, ee_exponential_model, ee_weibull_model,
                        ee_exponential_measure, ee_weibull_measure,
                        ee_aft_weibull, ee_aft_weibull_measure,
                        ee_aft)

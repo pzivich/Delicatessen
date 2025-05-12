@@ -12,6 +12,137 @@ from delicatessen.utilities import standard_normal_cdf, standard_normal_pdf
 #################################################################
 # Parametric Survival Estimating Equations
 
+def ee_survival_model(theta, t, delta, distribution):
+    r"""Estimating equation for a parametric survival models. Let :math:`T_i` indicate the time of the event and
+    :math:`C_i` indicate the time to right censoring. Therefore, the observable data consists of
+    :math:`t_i = min(T_i, C_i)` and :math:`\Delta_i = I(t_i = T_i)`. The estimating equations are
+
+    .. math::
+
+        \sum_{i=1}^n =
+        \begin{bmatrix}
+            \frac{\Delta_i}{\lambda} -  t_i^{\gamma} \\
+            \frac{\Delta_i}{\gamma} + \Delta_i \log(t_i) - \lambda t_i^{\gamma} \log(t_i)
+        \end{bmatrix}
+        = 0
+
+    Here, :math:`\theta` consists of two parameters for the Weibull model: the scale (:math:`\lambda`) and the shape
+    (:math:`\gamma`). The parameterization of the different survival analysis models are described in the following
+    table
+
+    .. list-table::
+       :widths: 25 25 25 25
+       :header-rows: 1
+
+       * - Distribution
+         - Keyword
+         - Parameters
+         - :math:`h(t)`
+       * - Exponential
+         - ``exponential``
+         - :math:`\lambda`
+         - :math:`\lambda t`
+       * - Weibull
+         - ``weibull``
+         - :math:`\lambda, \gamma`
+         - :math:`\lambda \gamma t^{\gamma - 1}`
+
+
+    Parameters
+    ----------
+    theta : ndarray, list, vector
+        Theta in the case of the Weibull model consists of two values. Furthermore, the parameter will be
+        non-negative. Therefore, an initial value like the ``[1, ]`` is recommended.
+    t : ndarray, list, vector
+        1-dimensional vector of `n` observed times. No missing data should be included (missing data may cause
+        unexpected behavior).
+    delta : ndarray, list, vector
+        1-dimensional vector of `n` event indicators, where 1 indicates an event and 0 indicates right censoring. No
+        missing data should be included (missing data may cause unexpected behavior).
+    distribution : str
+        Distribution for the parametric survival model.
+
+    Returns
+    -------
+    array :
+        Returns a `p`-by-`n` NumPy array evaluated for the input ``theta``, where `p` is the number of parameters in
+        the model.
+
+    Examples
+    --------
+    Construction of a estimating equation(s) with ``ee_survival_model`` should be done similar to the following
+
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> from delicatessen import MEstimator
+    >>> from delicatessen.estimating_equations import ee_survival_model
+
+    Some generic survival data to estimate a parametric survival model with
+
+    >>> n = 100
+    >>> data = pd.DataFrame()
+    >>> data['C'] = np.random.weibull(a=1, size=n)
+    >>> data['C'] = np.where(data['C'] > 5, 5, data['C'])
+    >>> data['T'] = 0.8*np.random.weibull(a=0.8, size=n)
+    >>> data['delta'] = np.where(data['T'] < data['C'], 1, 0)
+    >>> data['t'] = np.where(data['delta'] == 1, data['T'], data['C'])
+
+    Defining psi, or the stacked estimating equations
+
+    >>> def psi(theta):
+    >>>         return ee_survival_model(theta=theta,
+    >>>                                  t=data['t'], delta=data['delta'],
+    >>>                                  distribution='weibull')
+
+    Calling the M-estimator
+
+    >>> estr = MEstimator(stacked_equations=psi, init=[1., 1.])
+    >>> estr.estimate(solver='lm')
+
+    Inspecting the parameter estimates, variance, and confidence intervals
+
+    >>> estr.theta
+    >>> estr.variance
+    >>> estr.confidence_intervals()
+
+    Inspecting parameter the specific parameter estimates
+
+    >>> estr.theta[0]     # lambda (scale)
+    >>> estr.theta[1]     # gamma  (shape)
+
+    To generate predictions from this model, please use ``delicatessen.utilities.survival_predictions``. See the
+    corresponding documentation for further details.
+
+    References
+    ----------
+    Collett D. (2015). Parametric proportional hazards models In: Modelling Survival Data in Medical Research.
+    CRC press. pg 178-192
+    """
+    # Converting input to NumPy arrays
+    delta = np.asarray(delta)
+    t = np.asarray(t)
+    distribution = distribution.lower()
+
+    # Extracting and naming parameters for my convenience
+    if distribution == 'exponential':
+        lambd = theta[0]
+        gamma = 1
+    else:
+        lambd, gamma = theta[0], theta[1]
+
+    # Calculating the contributions
+    contribution_1 = (delta/lambd) - t**gamma     # Calculating estimating equation for lambda
+    contribution_2 = ((delta/gamma)               # Calculating estimating equation for gamma
+                      + (delta*np.log(t))
+                      - (lambd * (t**gamma) * np.log(t)))
+
+    # Returning stacked estimating equations
+    if distribution == 'exponential':
+        return contribution_1
+    else:
+        return np.vstack((contribution_1,
+                          contribution_2))
+
 
 def ee_exponential_model(theta, t, delta):
     r"""Estimating equation for an exponential model. Let :math:`T_i` indicate the
@@ -88,6 +219,7 @@ def ee_exponential_model(theta, t, delta):
     ----------
     Collett D. (2015). Modelling survival data in medical research. CRC press.
     """
+    warnings.warn("ee_exponential_model will be removed in v4.0. Please use ee_survival_model instead.", FutureWarning)
     # Converting input to NumPy arrays
     delta = np.asarray(delta)
     t = np.asarray(t)
@@ -179,6 +311,7 @@ def ee_weibull_model(theta, t, delta):
     ----------
     Collett D. (2015). Modelling survival data in medical research. CRC press.
     """
+    warnings.warn("ee_weibull_model will be removed in v4.0. Please use ee_survival_model instead.", FutureWarning)
     # Converting input to NumPy arrays
     delta = np.asarray(delta)
     t = np.asarray(t)
@@ -331,6 +464,8 @@ def ee_exponential_measure(theta, times, n, measure, scale):
     ----------
     Collett D. (2015). Modelling survival data in medical research. CRC press.
     """
+    warnings.warn("ee_exponential_measure will be removed in v4.0. Please use survival_predictions with "
+                  "ee_survival_model instead.", FutureWarning)
     # Lazy approach that just calls existing weibull measure function (exponential is a Weibull with shape=1
     return ee_weibull_measure(theta=theta, times=times,
                               n=n, measure=measure,
@@ -473,6 +608,8 @@ def ee_weibull_measure(theta, times, n, measure, scale, shape):
     ----------
     Collett D. (2015). Modelling survival data in medical research. CRC press.
     """
+    warnings.warn("ee_weibull_measure will be removed in v4.0. Please use survival_predictions with "
+                  "ee_survival_model instead.", FutureWarning)
     lambd, gamma = scale, shape
 
     def calculate_metric(time, theta_t):
@@ -607,13 +744,13 @@ def ee_aft_weibull(theta, X, t, delta, weights=None):
 
     References
     ----------
-    Collett D. (2015). Parametric proportional hazards models In: Modelling survival data in medical research.
-    CRC press. pg171-220
+    Collett D. (2015). Parametric proportional hazards models In: Modelling Survival Data in Medical Research.
+    CRC press. pg 171-220
 
-    Collett D. (2015). Accelerated failure time and other parametric models. In: Modelling survival data in medical
-    research. CRC press. pg171-220
+    Collett D. (2015). Accelerated failure time and other parametric models. In: Modelling Survival Data in Medical
+    Research. CRC press. pg 171-220
     """
-    # warnings.warn("ee_aft_weibull will be removed in v4.0. Please use ee_aft instead.", FutureWarning)
+    warnings.warn("ee_aft_weibull will be removed in v4.0. Please use ee_aft instead.", FutureWarning)
     X = np.asarray(X)                          # Convert to NumPy array
     t = np.asarray(t)[:, None]                 # Convert to NumPy array and ensure correct shape for matrix algebra
     delta = np.asarray(delta)[:, None]         # Convert to NumPy array and ensure correct shape for matrix algebra
@@ -812,8 +949,10 @@ def ee_aft_weibull_measure(theta, times, X, measure, mu, beta, sigma):
     References
     ----------
     Collett D. (2015). Accelerated failure time and other parametric models. In: Modelling survival data in medical
-    research. CRC press. pg171-220
+    research. CRC press. pg 171-220
     """
+    warnings.warn("ee_aft_weibull_measure will be removed in v4.0. Please use aft_predictions_function with "
+                  "ee_aft instead.", FutureWarning)
     X = np.asarray(X)                      # Convert to NumPy array
 
     # Extract coefficients
@@ -934,8 +1073,7 @@ def ee_aft(theta, X, t, delta, distribution, weights=None):
     delta : ndarray, list, vector
         1-dimensional vector of `n` values indicating whether the time was an event or censoring.
     distribution : str
-        Distribution to use for the AFT model. Options are ``'exponential'`` (exponential), ``'weibull'`` (Weibull),
-        ``'log-logistic'`` (log-logistic), and ``'log-normal'`` (log-normal).
+        Distribution to use for the AFT model. See table for options.
     weights : ndarray, list, vector, None, optional
         1-dimensional vector of `n` weights. Default is ``None``, which assigns a weight of 1 to all observations.
 
@@ -997,8 +1135,8 @@ def ee_aft(theta, X, t, delta, distribution, weights=None):
 
     References
     ----------
-    Collett D. (2015). Accelerated failure time and other parametric models. In: Modelling survival data in medical
-    research. CRC press. pg171-220
+    Collett D. (2015). Accelerated failure time and other parametric models. In: Modelling Survival Data in Medical
+    Research. CRC press. pg 236-250
     """
     X = np.asarray(X)                          # Convert to NumPy array
     t = np.asarray(t)[:, None]                 # Convert to NumPy array and ensure correct shape for matrix algebra
