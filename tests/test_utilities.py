@@ -659,6 +659,114 @@ class TestPredictions:
                             byhand,
                             atol=1e-7)
 
+    def test_aft_ind_survival(self, bcancer):
+        dist = 'weibull'
+        measure = 'survival'
+        times, events = bcancer['t'], bcancer['delta']
+        dmatrix = bcancer[['C', 'X']]
+        times_to_predict = [10, 50, 150, 200]
+
+        # M-estimator with built-in Weibull AFT
+        def psi(theta):
+            return ee_aft(theta=theta, X=dmatrix, t=times, delta=events, distribution=dist)
+
+        estr = MEstimator(psi, init=[6, -1, 0])
+        estr.estimate()
+
+        s_i_hat = aft_predictions_individual(X=dmatrix, times=times_to_predict, theta=estr.theta,
+                                             distribution=dist, measure=measure)
+
+        # Predictions from Weibull AFT from lifelines for comparison
+        waft = WeibullAFTFitter()
+        waft.fit(bcancer[['X', 't', 'delta']], 't', 'delta', ancillary=False, robust=True)
+        preds = waft.predict_survival_function(bcancer, times=times_to_predict)
+
+        # Checking mean estimate
+        npt.assert_allclose(s_i_hat,
+                            np.asarray(preds).T,
+                            atol=1e-5)
+
+    def test_aft_ind_risk(self, bcancer):
+        dist = 'weibull'
+        measure = 'risk'
+        times, events = bcancer['t'], bcancer['delta']
+        dmatrix = bcancer[['C', 'X']]
+        times_to_predict = [10, 50, 150, 250]
+
+        # M-estimator with built-in Weibull AFT
+        def psi(theta):
+            return ee_aft(theta=theta, X=dmatrix, t=times, delta=events, distribution=dist)
+
+        estr = MEstimator(psi, init=[6, -1, 0])
+        estr.estimate()
+
+        s_i_hat = aft_predictions_individual(X=dmatrix, times=times_to_predict, theta=estr.theta,
+                                             distribution=dist, measure=measure)
+
+        # Predictions from Weibull AFT from lifelines for comparison
+        waft = WeibullAFTFitter()
+        waft.fit(bcancer[['X', 't', 'delta']], 't', 'delta', ancillary=False, robust=True)
+        preds = 1 - waft.predict_survival_function(bcancer, times=times_to_predict)
+
+        # Checking mean estimate
+        npt.assert_allclose(s_i_hat,
+                            np.asarray(preds).T,
+                            atol=1e-5)
+
+    def test_aft_ind_hazard(self, bcancer):
+        dist = 'weibull'
+        measure = 'hazard'
+        times, events = bcancer['t'], bcancer['delta']
+        dmatrix = bcancer[['C', 'X']]
+        times_to_predict = [10, 50, 150, 250]
+
+        # M-estimator with built-in Weibull AFT
+        def psi(theta):
+            return ee_aft(theta=theta, X=dmatrix, t=times, delta=events, distribution=dist)
+
+        estr = MEstimator(psi, init=[6, -1, 0])
+        estr.estimate()
+
+        s_i_hat = aft_predictions_individual(X=dmatrix, times=times_to_predict, theta=estr.theta,
+                                             distribution=dist, measure=measure)
+
+        # Predictions from Weibull AFT from lifelines for comparison
+        waft = WeibullAFTFitter()
+        waft.fit(bcancer[['X', 't', 'delta']], 't', 'delta', ancillary=False, robust=True)
+        preds = waft.predict_hazard(bcancer, times=times_to_predict)
+
+        # Checking mean estimate
+        npt.assert_allclose(s_i_hat,
+                            np.asarray(preds).T,
+                            atol=1e-5)
+
+    def test_aft_ind_chazard(self, bcancer):
+        dist = 'weibull'
+        measure = 'cumulative_hazard'
+        times, events = bcancer['t'], bcancer['delta']
+        dmatrix = bcancer[['C', 'X']]
+        times_to_predict = [10, 50, 150, 250]
+
+        # M-estimator with built-in Weibull AFT
+        def psi(theta):
+            return ee_aft(theta=theta, X=dmatrix, t=times, delta=events, distribution=dist)
+
+        estr = MEstimator(psi, init=[6, -1, 0])
+        estr.estimate()
+
+        s_i_hat = aft_predictions_individual(X=dmatrix, times=times_to_predict, theta=estr.theta,
+                                             distribution=dist, measure=measure)
+
+        # Predictions from Weibull AFT from lifelines for comparison
+        waft = WeibullAFTFitter()
+        waft.fit(bcancer[['X', 't', 'delta']], 't', 'delta', ancillary=False, robust=True)
+        preds = waft.predict_cumulative_hazard(bcancer, times=times_to_predict)
+
+        # Checking mean estimate
+        npt.assert_allclose(s_i_hat,
+                            np.asarray(preds).T,
+                            atol=1e-5)
+
 
 class TestDesignMatrix:
 
