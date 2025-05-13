@@ -449,9 +449,9 @@ def regression_predictions(X, theta, covariance, offset=None, alpha=0.05):
 
 def survival_predictions(times, theta, covariance, distribution, measure='survival', alpha=0.05):
     r"""Compute estimated functions for survival analysis measures from a parametric survival analysis model across
-    a specified time period. The function is meant to be used with ``ee_survival_model`` and is a simple way to compute
-    a values of a survival analysis metric (and the corresponding point-wise confidence intervals) at user-specified
-    time points. This functionality is particular helpful for generating plots.
+    a specified time period. This function is meant to be used with ``ee_survival_model`` and is a simple way to compute
+    values of a survival analysis metric (and the corresponding point-wise confidence intervals) at user-specified
+    time points. This functionality is meant to help with generating plots or describing results.
 
     To generate predicted values of the desired measure, the survival and hazard are computed using
 
@@ -657,6 +657,48 @@ def aft_predictions_individual(X, times, theta, distribution, measure='survival'
 
     Examples
     --------
+    The following illustrates how to use ``aft_predictions_function`` to generate predicted survival probabilites at
+    specific times for individuals.
+
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> import matplotlib.pyplot as plt
+    >>> from delicatessen import MEstimator
+    >>> from delicatessen.estimating_equations import ee_aft
+    >>> from delicatessen.utilities import aft_predictions_individual
+    >>> from delicatessen.data import load_breast_cancer
+
+    Loading breast cancer data from Collett 2015
+
+    >>> dat = load_breast_cancer()
+    >>> delta = dat[:, 0]
+    >>> t = dat[:, 1]
+    >>> covars = np.asarray([np.ones(dat.shape[0]), dat[:, 0]]).T
+
+    Estimating the parameters of a Weibull AFT model
+
+    >>> def psi(theta):
+    >>>     return ee_aft(theta=theta, t=t, delta=delta,
+    >>>                   X=covars, distribution='weibull')
+
+    >>> estr = MEstimator(psi, init=[5., 0., 0.])
+    >>> estr.estimate()
+
+    Now we can generate predicted values of survival for each observation. Suppose we wanted the survival at time 50
+    for all units. The following code gives us predicted survival for all units
+
+    >>> aft_predictions_individual(X=covars, times=50.,
+    >>>                            theta=estr.theta,
+    >>>                            distribution='weibull')
+
+    Alternatively, we can request the predicted survival at multiple points at once. The following code computes the
+    predicted survival at times 50, 100, 150, 200, 250 for all units.
+
+    >>> aft_predictions_individual(X=covars, times=[50, 100, 150, 200, 250],
+    >>>                            theta=estr.theta,
+    >>>                            distribution='weibull')
+
+    Different survival measures can be requested through the optional ``measure`` argument.
 
     References
     ----------
@@ -711,99 +753,139 @@ def aft_predictions_individual(X, times, theta, distribution, measure='survival'
 
 def aft_predictions_function(X, times, theta, covariance, distribution, measure='survival', alpha=0.05):
     r"""Compute estimated functions for survival analysis measures from an accelerated failure time (AFT) model across
-    a specified time period.
+    a specified time period. This function is meant to be used with ``ee_aft`` and is a simple way to compute values of
+    a survival analysis metric (and the corresponding point-wise confidence intervals) at user-specified
+    time points for a given pattern of covariates. This functionality is meant to help with generating plots or
+    describing results.
 
-    given a design matrix, point estimates, and covariance matrix.
-    This functionality computes :math:`\hat{Y}`, :math:`\hat{Var}\left(\hat{Y}\right)`, and corresponding Wald-type
-    :math:`(1 - \alpha) \times` 100% confidence intervals from estimated coefficients and covariance of an accelerated
-    failure time model for a specific covariate pattern.
+    To generate predicted values of the desired measure, the survival and hazard are computed using
 
-    This function is a helper function to compute functions and point-wise confidence intervals over time for plotting
-    purposes.
+    .. math::
 
-    the predictions from a regression model for a set of given :math:`X`
-    values. Importantly, this method allows for the variance of :math:`\hat{Y}` to be estimated without having to expand
-    the estimating equations. As such, this functionality is meant to be used after ``MEstimator`` has been used to
-    estimate the coefficients (i.e., this function is for use after the M-estimator has computed the results for the
-    chosen regression model). Therefore, this function should be viewed as a post-processing functionality for
-    generating plots or tables.
+        S(t) = S_{\epsilon}\left( \frac{\log(t) - X \beta^T}{\sigma} \right) \\
+        h(t) = (\sigma t)^{-1} h_{\epsilon}\left( \frac{\log(t) - X \beta^T}{\sigma} \right)
+
+    where the corresponding function for the given AFT distribution is
+
+    .. list-table::
+       :widths: 25 25 25 25
+       :header-rows: 1
+
+       * - Distribution
+         - Keyword
+         - :math:`S_\epsilon(x)`
+         - :math:`h_\epsilon(x)`
+       * - Exponential
+         - ``exponential``
+         - :math:`\exp(-\exp(x))`
+         - :math:`\exp(x)`
+       * - Weibull
+         - ``weibull``
+         - :math:`\exp(-\exp(x))`
+         - :math:`\exp(x)`
+       * - Log-Logistic
+         - ``log-logistic``
+         - :math:`(1 - \exp(x))^{-1}`
+         - :math:`(1 - \exp(-x))^{-1}`
+       * - Log-Normal
+         - ``log-normal``
+         - :math:`1 - \Phi(x)`
+         - :math:`\frac{\exp(-x^2 / 2)}{[1 - \Phi(x)] \sqrt{2 \pi }}`
+
+    Note that one only needs to ensure that ``distribution`` is set to the same argument as the one used in ``ee_aft``
+
+    From these values, the specified measure is computed (see ``convert_survival_measures`` for details). The
+    variance for the chosen measure is then computed using the Delta Method with automatic differentiation via the
+    ``delta_method`` function. Corresponding :math:`1-\alpha`% Wald-type point-wise confidence intervals are then
+    computed using this variance
 
     Parameters
     ----------
-    X : ndarray, list, vector
-        2-dimensional vector of values to generate predicted variances for. The number of columns must match the number
-        of coefficients / parameters in ``theta``.
-    theta : ndarray
-        Estimated coefficients from ``MEstimator.theta`` with ``ee_aft``.
-    covariance : ndarray
-        Estimated covariance matrix from ``MEstimator.variance`` with ``ee_aft``.
-    distribution : str
-        Distribution of the AFT model, which should match the distribution specified in ``ee_aft``. See ``ee_aft`` for
-        available options.
-    alpha : float, optional
-        The :math:`\alpha` level for the corresponding confidence intervals. Default is 0.05, which calculate the
-        95% confidence intervals. Notice that :math:`0<\alpha<1`.
 
     Returns
     -------
     array :
-        Returns a t-by-4 NumPy array with the 4 columns correspond to the predicted outcome, variance of the predictied
-        outcome, lower confidence limit, and upper confidence limit.
+        Returns a `t`-by-`4` NumPy array of predictions, where the first column is the survival metric, the second is
+        the corresponding variance, and the last two columns are the lower confidence limit and upper confidence limit,
+        respectively.
 
     Examples
     --------
-    The following is a simple example demonstrating how this function can be used to plot a regression line and
-    corresponding 95% confidence intervals.
+    The following illustrates how to use ``aft_predictions_function`` to generate a plot of the risk function. Other
+    metrics can be plotted using a similar approach.
 
     >>> import numpy as np
     >>> import pandas as pd
     >>> import matplotlib.pyplot as plt
     >>> from delicatessen import MEstimator
-    >>> from delicatessen.estimating_equations import ee_regression
-    >>> from delicatessen.utilities import regression_predictions
+    >>> from delicatessen.estimating_equations import ee_aft
+    >>> from delicatessen.utilities import aft_predictions_function
+    >>> from delicatessen.data import load_breast_cancer
 
-    Some generic data to estimate the regression model with
+    Loading breast cancer data from Collett 2015
 
-    >>> n = 50
-    >>> data = pd.DataFrame()
-    >>> data['X'] = np.random.normal(size=n)
-    >>> data['Z'] = np.random.normal(size=n)
-    >>> data['Y'] = 0.5 + 2*data['X'] - 1*data['Z'] + np.random.normal(loc=0, size=n)
-    >>> data['C'] = 1
+    >>> dat = load_breast_cancer()
+    >>> delta = dat[:, 0]
+    >>> t = dat[:, 1]
+    >>> covars = np.asarray([np.ones(dat.shape[0]), dat[:, 0]]).T
 
-    Estimating the corresponding regression model parameters
+    Estimating the parameters of a Weibull AFT model
 
     >>> def psi(theta):
-    >>>     return ee_regression(theta=theta, X=data[['C', 'X', 'Z']], y=data['Y'], model='linear')
+    >>>     return ee_aft(theta=theta, t=t, delta=delta,
+    >>>                   X=covars, distribution='weibull')
 
-    >>> estr = MEstimator(stacked_equations=psi, init=[0., 0., 0.,])
-    >>> estr.estimate(solver='lm')
+    >>> estr = MEstimator(psi, init=[5., 0., 0.])
+    >>> estr.estimate()
 
-    To create a line plot of our regression line, we need to first create a new set of covariate values that are evenly
-    spaced across the range of the predictor values. Here, we will plot the relationship between ``Z`` and ``Y`` while
-    holding ``X=0``.
+    Now we can generate predicted values of the risk at specified times for a specific covariate pattern. Suppose we
+    wanted the risk at a time of 50 for those with a negative stain and the corresponding confidence intervals. The
+    following code gives us the risk, variance, and confidence intervals
 
-    >>> pred = pd.DataFrame()
-    >>> pred['Z'] = np.linspace(np.min(data['Z']), np.max(data['Z']), 200)
-    >>> pred['X'] = 0
-    >>> pred['C'] = 1
+    >>> aft_predictions_function(times=50., theta=estr.theta, covariance=estr.variance,
+    >>>                          X=[[1, 0]],  # Intercept-only
+    >>>                          distribution='weibull', measure='risk')
 
-    Now the predicted values of the outcome, and confidence intervals to plot
+    We can do the same process for those with a positive stain by switching out the design matrix
 
-    >>> Xp = pred[['C', 'X', 'Z']]
-    >>> yhat = regression_predictions(X=Xp, theta=estr.theta, covariance=estr.variance)
+    >>> aft_predictions_function(times=50., theta=estr.theta, covariance=estr.variance,
+    >>>                          X=[[1, 1]],  # Intercept and positive stain
+    >>>                          distribution='weibull', measure='risk')
 
-    Finally, the predicted values can be plotted (using matplotlib)
+    Now, we will use these predictions to plot the risk function over the time period. We generate a vector of times
+    for the plot. These should be chosen 'densely', so the plot appears smooth
 
-    >>> plt.plot(pred['Z'], yhat[:, 0], '-', color='blue')
-    >>> plt.fill_between(pred['Z'], yhat[:, 2], yhat[:, 3], alpha=0.25, color='blue')
+    >>> # Time steps to generate predictions for
+    >>> times = np.linspace(0.01, 230, 100)
+    >>> # Generating predictions
+    >>> s0_hat = survival_predictions(times=times, theta=estr.theta, covariance=estr.variance,
+    >>>                               X=[[1, 0]],  # Intercept only
+    >>>                               distribution='weibull', measure='risk')
+    >>> s1_hat = survival_predictions(times=times, theta=estr.theta, covariance=estr.variance,
+    >>>                               X=[[1, 1]],  # Intercept and positive stain
+    >>>                               distribution='weibull', measure='risk')
+    >>> # Plot
+    >>> plt.fill_between(times, s1_hat[:, 2], s1_hat[:, 3], color='blue', alpha=0.3)
+    >>> plt.fill_between(times, s0_hat[:, 2], s0_hat[:, 3], color='red', alpha=0.3)
+    >>> plt.plot(times, s1_hat[:, 0], '-', color='blue', alpha=0.3, label='Pos')
+    >>> plt.plot(times, s0_hat[:, 0], '-', color='red', alpha=0.3, label='Neg')
+    >>> plt.xlabel("Time")
+    >>> plt.ylabel("Risk")
+    >>> plt.legend()
     >>> plt.show()
 
+    Here, the ``fill_between` displays the point-wise 95% confidence intervals. Other survival measures can be
+    requested through the optional ``measure`` argument.
+
+    References
+    ----------
+    Collett D. (2015). Accelerated failure time and other parametric models. In: Modelling survival data in medical
+    research. CRC press. pg 242
     """
     def predictions_aft(theta):
         # Wrapped prediction function for call with delta_method
         preds = aft_predictions_individual(X=X, times=times, theta=theta, distribution=distribution, measure=measure)
-        return preds.T[0]
+        return preds[0]
 
     # Check valid alpha value is being provided
     if not 0 < alpha < 1:
