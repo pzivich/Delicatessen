@@ -122,3 +122,33 @@ def load_robust_regress(outlier=True):
         weight[8] += 3
 
     return np.array([height, weight]).T
+
+
+def load_breast_cancer():
+    """Loads example survival data from Collett (2015) on the survival times of 45 women with breast cancer in
+    Middlesex Hospital July 1987 (Table 1.2).
+
+    Notes
+    -----
+    From left to right, the columns in the array correspond to:
+        * delta - event indicator
+        * times - observation time
+        * stain - tumor HPA stain indicator (1 if positive, 0 if negative)
+
+    Returns
+    -------
+    array :
+        Returns a 45-by-3 NumPy array.
+
+    References
+    ----------
+    Collett, D. (2015). Survival analysis. In Modelling survival data in medical research. 3rd Ed. Chapman and Hall/CRC.
+    pg 6-7
+    """
+    delta = [1, 1, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0,
+             0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0]
+    times = [23, 47, 69, 70, 71, 100, 101, 148, 181, 198, 208, 212, 224, 5, 8, 10, 13, 18, 24, 26, 26, 31, 35, 40,
+             41, 48, 50, 59, 61, 68, 71, 76, 105, 107, 109, 113, 116, 118, 143, 154, 162, 188, 212, 217, 225]
+    stain = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+             1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    return np.asarray([delta, times, stain]).T
