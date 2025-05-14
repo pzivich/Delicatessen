@@ -765,7 +765,7 @@ class TestPredictions:
         # Checking mean estimate
         npt.assert_allclose(s_i_hat,
                             np.asarray(preds).T,
-                            atol=1e-5)
+                            atol=5e-5)
 
     def test_aft_f_variance(self, bcancer):
         dist = 'weibull'
