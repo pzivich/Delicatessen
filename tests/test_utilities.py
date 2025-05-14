@@ -767,6 +767,43 @@ class TestPredictions:
                             np.asarray(preds).T,
                             atol=1e-5)
 
+    def test_aft_f_variance(self, bcancer):
+        dist = 'weibull'
+        measure = 'survival'
+        times, events = bcancer['t'], bcancer['delta']
+        dmatrix = bcancer[['C', 'X']]
+        times_to_predict = [10, 50, 150, 250]
+        n = bcancer.shape[0]
+
+        def psi(theta):
+            return ee_aft(theta=theta, X=dmatrix, t=times, delta=events, distribution=dist)
+
+        estr = MEstimator(psi, init=[6, -1, 0])
+        estr.estimate()
+        s_t_hat = aft_predictions_function(X=[[1, 0], ], times=times_to_predict,
+                                           theta=estr.theta, covariance=estr.variance,
+                                           distribution=dist, measure=measure)
+
+        # Stacked estimating functions version of delta method
+        def psi(theta):
+            ee_sm = ee_aft(theta=theta[:3], X=dmatrix, t=times, delta=events, distribution=dist)
+            param = aft_predictions_individual(X=[[1, 0]], times=times_to_predict,
+                                               theta=theta[:3], distribution=dist, measure=measure)
+            ee_sp = []
+            for p_t, p in zip(theta[3:], param[0]):
+                ee_sp.append(np.ones(n) * p - p_t)
+            return np.vstack([ee_sm, ee_sp])
+
+        estr = MEstimator(psi, init=[5.8, -1., -0.1, 0.96, 0.85, 0.64, 0.5])
+        estr.estimate(deriv_method='exact')
+        ci = estr.confidence_intervals()
+        byhand = np.asarray([estr.theta[3:], np.diag(estr.variance)[3:], ci[3:, 0], ci[3:, 1]]).T
+
+        # Checking outputs are equal
+        npt.assert_allclose(s_t_hat,
+                            byhand,
+                            atol=1e-7)
+
 
 class TestDesignMatrix:
 
