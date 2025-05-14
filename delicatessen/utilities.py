@@ -874,7 +874,7 @@ def aft_predictions_function(X, times, theta, covariance, distribution, measure=
     >>> plt.legend()
     >>> plt.show()
 
-    Here, the ``fill_between` displays the point-wise 95% confidence intervals. Other survival measures can be
+    Here, the ``fill_between`` displays the point-wise 95% confidence intervals. Other survival measures can be
     requested through the optional ``measure`` argument.
 
     References

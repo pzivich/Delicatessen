@@ -37,7 +37,7 @@ def ee_survival_model(theta, t, delta, distribution):
        * - Distribution
          - Keyword
          - Parameters
-         - :math:`h(t)`
+         - :math:`H(t)`
        * - Exponential
          - ``exponential``
          - :math:`\lambda`
@@ -45,7 +45,7 @@ def ee_survival_model(theta, t, delta, distribution):
        * - Weibull
          - ``weibull``
          - :math:`\lambda, \gamma`
-         - :math:`\lambda \gamma t^{\gamma - 1}`
+         - :math:`\lambda t^{\gamma}`
 
 
     Parameters

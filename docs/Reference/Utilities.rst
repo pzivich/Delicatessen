@@ -17,7 +17,6 @@ Data transformations
   identity
   robust_loss_functions
   spline
-  regression_predictions
   polygamma
   digamma
   standard_normal_cdf
@@ -31,6 +30,19 @@ Design matrices
   :toctree: generated/
 
   additive_design_matrix
+
+
+Model predictions
+---------------------
+
+.. currentmodule:: delicatessen.utilities
+
+.. autosummary::
+  :toctree: generated/
+
+  regression_predictions
+  aft_predictions_individual
+  aft_predictions_function
 
 
 Differentiation
