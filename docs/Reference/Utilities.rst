@@ -17,7 +17,6 @@ Data transformations
   identity
   robust_loss_functions
   spline
-  regression_predictions
   polygamma
   digamma
   standard_normal_cdf
@@ -33,6 +32,19 @@ Design matrices
   additive_design_matrix
 
 
+Model predictions
+---------------------
+
+.. currentmodule:: delicatessen.utilities
+
+.. autosummary::
+  :toctree: generated/
+
+  regression_predictions
+  aft_predictions_individual
+  aft_predictions_function
+
+
 Differentiation
 ---------------------
 
@@ -45,7 +57,7 @@ Differentiation
   auto_differentiation
 
 
-Sandwich Variance Estimator
+Variance Estimators
 ---------------------------
 
 .. currentmodule:: delicatessen.sandwich
@@ -54,3 +66,4 @@ Sandwich Variance Estimator
    :toctree: generated/
 
    compute_sandwich
+   delta_method

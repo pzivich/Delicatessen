@@ -10,14 +10,16 @@ import pandas as pd
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
 from scipy.stats import logistic
+from lifelines import ExponentialFitter, WeibullFitter, WeibullAFTFitter
 
 from delicatessen import MEstimator
-from delicatessen.estimating_equations import ee_regression
+from delicatessen.estimating_equations import ee_regression, ee_survival_model, ee_aft
 from delicatessen.utilities import (identity, inverse_logit, logit,
                                     polygamma, digamma,
                                     robust_loss_functions,
-                                    regression_predictions,
                                     spline,
+                                    regression_predictions, survival_predictions,
+                                    aft_predictions_individual, aft_predictions_function,
                                     additive_design_matrix)
 
 np.random.seed(80958151)
@@ -55,7 +57,7 @@ class TestFunctions:
         npt.assert_allclose(inverse_logit(1.098612288668), 0.75)
 
     def test_logit_backtransform(self):
-        """Checks the inverse logit transformation of a single observation
+        """Checks the interative applications of logit and expit transformations of a single observation
         """
         original = 0.6521
         original_logit = logit(original)
@@ -75,7 +77,7 @@ class TestFunctions:
                             original_logit)
 
     def test_identity_array(self):
-        """Checks the inverse logit transformation of an array
+        """Checks the identity transformation of an array
         """
         vals = np.array([0.5, 0.25, 0.75, 0.5])
         npt.assert_allclose(identity(vals), vals)
@@ -85,6 +87,36 @@ class TestFunctions:
         """
         prbs = np.array([0.5, 0.25, 0.75, 0.5])
         odds = np.array([0., -1.098612288668, 1.098612288668, 0.])
+
+        npt.assert_allclose(logit(prbs), odds)
+
+    def test_expit_array(self):
+        """Checks the inverse logit transformation of an array
+        """
+        prbs = np.array([0.5, 0.25, 0.75, 0.5])
+        odds = np.array([0., -1.098612288668, 1.098612288668, 0.])
+
+        npt.assert_allclose(inverse_logit(odds), prbs)
+
+    def test_identity_list(self):
+        """Checks the identity transformation of a list
+        """
+        vals = [0.5, 0.25, 0.75, 0.5]
+        npt.assert_allclose(identity(vals), vals)
+
+    def test_logit_list(self):
+        """Checks the logit transformation of a list
+        """
+        prbs = [0.5, 0.25, 0.75, 0.5]
+        odds = [0., -1.098612288668, 1.098612288668, 0.]
+
+        npt.assert_allclose(logit(prbs), odds)
+
+    def test_expit_list(self):
+        """Checks the inverse logit transformation of a list
+        """
+        prbs = [0.5, 0.25, 0.75, 0.5]
+        odds = [0., -1.098612288668, 1.098612288668, 0.]
 
         npt.assert_allclose(logit(prbs), odds)
 
@@ -215,6 +247,80 @@ class TestFunctions:
             robust_loss_functions(residual=residuals, loss='hampel',
                                   k=1.5, a=1, b=2)
 
+    def test_spline_unnormed(self):
+        vars = [1, 5, 10, 15, 20]
+
+        # Spline setup 1
+        expected = np.array([[0.0, 0.0, 0.0, 0.0, 4.0], ]).T
+        returned = spline(variable=vars, knots=[16, ], power=1, restricted=False, normalized=False)
+        npt.assert_allclose(returned, expected)
+
+        # Spline setup 2
+        expected = np.array([[0.0, 0.0, 0.0, 0.0, 16.0], ]).T
+        returned = spline(variable=vars, knots=[16, ], power=2, restricted=False, normalized=False)
+        npt.assert_allclose(returned, expected)
+
+        # Spline setup 3
+        expected = np.array([[0.0, 0.0, 0.0, 5.0**1.5, 10.0**1.5],
+                             [0.0, 0.0, 0.0, 0.0, 4.0**1.5]]).T
+        returned = spline(variable=vars, knots=[10, 16], power=1.5, restricted=False, normalized=False)
+        npt.assert_allclose(returned, expected)
+
+        # Spline setup 4
+        expected = np.array([[0.0, 0.0, 0.0, 5.0, 6.0], ]).T
+        returned = spline(variable=vars, knots=[10, 16], power=1, restricted=True, normalized=False)
+        npt.assert_allclose(returned, expected)
+
+        # Spline setup 5
+        expected = np.array([[0.0, 0.0, 5.0**2, 10.0**2, 15.0**2 - 4.0**2], ]).T
+        returned = spline(variable=vars, knots=[5, 16], power=2, restricted=True, normalized=False)
+        npt.assert_allclose(returned, expected)
+
+    def test_spline_normed(self):
+        vars = [1, 5, 10, 15, 20]
+
+        # Spline setup 1
+        expected = np.array([[0.0, 0.0, 0.0, 0.0, 4.0], ]).T / 16
+        returned = spline(variable=vars, knots=[16, ], power=1, restricted=False, normalized=True)
+        npt.assert_allclose(returned, expected)
+
+        # Spline setup 2
+        expected = np.array([[0.0, 0.0, 0.0, 0.0, 16.0], ]).T / 16**2
+        returned = spline(variable=vars, knots=[16, ], power=2, restricted=False, normalized=True)
+        npt.assert_allclose(returned, expected)
+
+        # Spline setup 3
+        expected = np.array([[0.0, 0.0, 0.0, 5.0**1.5, 10.0**1.5],
+                             [0.0, 0.0, 0.0, 0.0, 4.0**1.5]]).T / (16 - 10)**1.5
+        returned = spline(variable=vars, knots=[10, 16], power=1.5, restricted=False, normalized=True)
+        npt.assert_allclose(returned, expected)
+
+        # Spline setup 4
+        expected = np.array([[0.0, 0.0, 0.0, 5.0, 6.0], ]).T / (16 - 10)
+        returned = spline(variable=vars, knots=[10, 16], power=1, restricted=True, normalized=True)
+        npt.assert_allclose(returned, expected)
+
+        # Spline setup 5
+        expected = np.array([[0.0, 0.0, 5.0**2, 10.0**2, 15.0**2 - 4.0**2], ]).T / (16 - 5)**2
+        returned = spline(variable=vars, knots=[5, 16], power=2, restricted=True, normalized=True)
+        npt.assert_allclose(returned, expected)
+
+
+class TestPredictions:
+
+    @pytest.fixture
+    def bcancer(self):
+        # Collett Breast Cancer data set
+        d = pd.DataFrame()
+        d['X'] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+        d['delta'] = [1, 1, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0,
+                      0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0]
+        d['t'] = [23, 47, 69, 70, 71, 100, 101, 148, 181, 198, 208, 212, 224, 5, 8, 10, 13, 18, 24, 26, 26, 31, 35, 40,
+                  41, 48, 50, 59, 61, 68, 71, 76, 105, 107, 109, 113, 116, 118, 143, 154, 162, 188, 212, 217, 225]
+        d['C'] = 1
+        return d
+
     def test_regression_predictions_linear(self):
         n = 500
         data = pd.DataFrame()
@@ -298,63 +404,408 @@ class TestFunctions:
         npt.assert_allclose(returned[:, 2], np.log(expected[:, 2]), atol=1e-6)
         npt.assert_allclose(returned[:, 3], np.log(expected[:, 3]), atol=1e-6)
 
-    def test_spline_unnormed(self):
-        vars = [1, 5, 10, 15, 20]
+    def test_survival_exp_survival(self, bcancer):
+        times, events = bcancer['t'], bcancer['delta']
+        times_to_predict = [10, 20, 30, 50, 80, 90, 100, 150, 175, 200, 250]
+        dist = 'exponential'
 
-        # Spline setup 1
-        expected = np.array([[0.0, 0.0, 0.0, 0.0, 4.0], ]).T
-        returned = spline(variable=vars, knots=[16, ], power=1, restricted=False, normalized=False)
-        npt.assert_allclose(returned, expected)
+        def psi(theta):
+            return ee_survival_model(theta=theta, t=times, delta=events,
+                                     distribution=dist)
 
-        # Spline setup 2
-        expected = np.array([[0.0, 0.0, 0.0, 0.0, 16.0], ]).T
-        returned = spline(variable=vars, knots=[16, ], power=2, restricted=False, normalized=False)
-        npt.assert_allclose(returned, expected)
+        estr = MEstimator(psi, init=[1., ])
+        estr.estimate()
+        s_hat = survival_predictions(times=times_to_predict, theta=estr.theta, covariance=estr.variance,
+                                     distribution=dist, measure='survival')
 
-        # Spline setup 3
-        expected = np.array([[0.0, 0.0, 0.0, 5.0**1.5, 10.0**1.5],
-                             [0.0, 0.0, 0.0, 0.0, 4.0**1.5]]).T
-        returned = spline(variable=vars, knots=[10, 16], power=1.5, restricted=False, normalized=False)
-        npt.assert_allclose(returned, expected)
+        # Exponential fitter
+        exf = ExponentialFitter()
+        exf.fit(times, events)
+        results = np.asarray(exf.survival_function_at_times(times=times_to_predict))
 
-        # Spline setup 4
-        expected = np.array([[0.0, 0.0, 0.0, 5.0, 6.0], ]).T
-        returned = spline(variable=vars, knots=[10, 16], power=1, restricted=True, normalized=False)
-        npt.assert_allclose(returned, expected)
+        # Checking mean estimate
+        npt.assert_allclose(s_hat[:, 0],
+                            results,
+                            atol=1e-5)
 
-        # Spline setup 5
-        expected = np.array([[0.0, 0.0, 5.0**2, 10.0**2, 15.0**2 - 4.0**2], ]).T
-        returned = spline(variable=vars, knots=[5, 16], power=2, restricted=True, normalized=False)
-        npt.assert_allclose(returned, expected)
+    def test_survival_exp_risk(self, bcancer):
+        times, events = bcancer['t'], bcancer['delta']
+        times_to_predict = [10, 20, 30, 50, 80, 90, 100, 150, 175, 200, 250]
+        dist = 'exponential'
 
-    def test_spline_normed(self):
-        vars = [1, 5, 10, 15, 20]
+        def psi(theta):
+            return ee_survival_model(theta=theta, t=times, delta=events,
+                                     distribution=dist)
 
-        # Spline setup 1
-        expected = np.array([[0.0, 0.0, 0.0, 0.0, 4.0], ]).T / 16
-        returned = spline(variable=vars, knots=[16, ], power=1, restricted=False, normalized=True)
-        npt.assert_allclose(returned, expected)
+        estr = MEstimator(psi, init=[1., ])
+        estr.estimate()
+        s_hat = survival_predictions(times=times_to_predict, theta=estr.theta, covariance=estr.variance,
+                                     distribution=dist, measure='risk')
 
-        # Spline setup 2
-        expected = np.array([[0.0, 0.0, 0.0, 0.0, 16.0], ]).T / 16**2
-        returned = spline(variable=vars, knots=[16, ], power=2, restricted=False, normalized=True)
-        npt.assert_allclose(returned, expected)
+        # Exponential fitter
+        exf = ExponentialFitter()
+        exf.fit(times, events)
+        results = exf.cumulative_density_at_times(times=times_to_predict)
 
-        # Spline setup 3
-        expected = np.array([[0.0, 0.0, 0.0, 5.0**1.5, 10.0**1.5],
-                             [0.0, 0.0, 0.0, 0.0, 4.0**1.5]]).T / (16 - 10)**1.5
-        returned = spline(variable=vars, knots=[10, 16], power=1.5, restricted=False, normalized=True)
-        npt.assert_allclose(returned, expected)
+        # Checking mean estimate
+        npt.assert_allclose(s_hat[:, 0],
+                            results,
+                            atol=1e-5)
 
-        # Spline setup 4
-        expected = np.array([[0.0, 0.0, 0.0, 5.0, 6.0], ]).T / (16 - 10)
-        returned = spline(variable=vars, knots=[10, 16], power=1, restricted=True, normalized=True)
-        npt.assert_allclose(returned, expected)
+    def test_survival_exp_hazard(self, bcancer):
+        times, events = bcancer['t'], bcancer['delta']
+        times_to_predict = [10, 20, 30, 50, 80, 90, 100, 150, 175, 200, 250]
+        dist = 'exponential'
 
-        # Spline setup 5
-        expected = np.array([[0.0, 0.0, 5.0**2, 10.0**2, 15.0**2 - 4.0**2], ]).T / (16 - 5)**2
-        returned = spline(variable=vars, knots=[5, 16], power=2, restricted=True, normalized=True)
-        npt.assert_allclose(returned, expected)
+        def psi(theta):
+            return ee_survival_model(theta=theta, t=times, delta=events,
+                                     distribution=dist)
+
+        estr = MEstimator(psi, init=[1., ])
+        estr.estimate()
+        s_hat = survival_predictions(times=times_to_predict, theta=estr.theta, covariance=estr.variance,
+                                     distribution=dist, measure='hazard')
+
+        # Exponential fitter
+        exf = ExponentialFitter()
+        exf.fit(times, events)
+        results = np.asarray(exf.summary['coef'])[0]
+
+        # Checking mean estimate
+        npt.assert_allclose(s_hat[:, 0],
+                            1 / results,
+                            atol=1e-5)
+
+    def test_survival_exp_chazard(self, bcancer):
+        times, events = bcancer['t'], bcancer['delta']
+        times_to_predict = [10, 20, 30, 50, 80, 90, 100, 150, 175, 200, 250]
+        dist = 'exponential'
+
+        def psi(theta):
+            return ee_survival_model(theta=theta, t=times, delta=events,
+                                     distribution=dist)
+
+        estr = MEstimator(psi, init=[1., ])
+        estr.estimate()
+        s_hat = survival_predictions(times=times_to_predict, theta=estr.theta, covariance=estr.variance,
+                                     distribution=dist, measure='cumulative_hazard')
+
+        # Exponential fitter
+        exf = ExponentialFitter()
+        exf.fit(times, events)
+        results = exf.cumulative_hazard_at_times(times=times_to_predict)
+
+        # Checking mean estimate
+        npt.assert_allclose(s_hat[:, 0],
+                            results,
+                            atol=1e-5)
+
+    def test_survival_weibull_survival(self, bcancer):
+        times, events = bcancer['t'], bcancer['delta']
+        times_to_predict = [10, 20, 30, 50, 80, 90, 100, 150, 175, 200, 250]
+        dist = 'weibull'
+
+        def psi(theta):
+            return ee_survival_model(theta=theta, t=times, delta=events,
+                                     distribution=dist)
+
+        estr = MEstimator(psi, init=[0.05, 1.])
+        estr.estimate()
+        s_hat = survival_predictions(times=times_to_predict, theta=estr.theta, covariance=estr.variance,
+                                     distribution=dist, measure='survival')
+
+        # Lifelines Weibull for comparison
+        wbf = WeibullFitter()
+        wbf.fit(times, events)
+        results = np.asarray(wbf.survival_function_at_times(times=times_to_predict))
+
+        # Checking mean estimate
+        npt.assert_allclose(s_hat[:, 0],
+                            results,
+                            atol=1e-5)
+
+    def test_survival_weibull_risk(self, bcancer):
+        times, events = bcancer['t'], bcancer['delta']
+        times_to_predict = [10, 20, 30, 50, 80, 90, 100, 150, 175, 200, 250]
+        dist = 'weibull'
+
+        def psi(theta):
+            return ee_survival_model(theta=theta, t=times, delta=events,
+                                     distribution=dist)
+
+        estr = MEstimator(psi, init=[0.05, 1.])
+        estr.estimate()
+        s_hat = survival_predictions(times=times_to_predict, theta=estr.theta, covariance=estr.variance,
+                                     distribution=dist, measure='risk')
+
+        # Lifelines Weibull for comparison
+        wbf = WeibullFitter()
+        wbf.fit(times, events)
+        results = np.asarray(wbf.cumulative_density_at_times(times=times_to_predict))
+
+        # Checking mean estimate
+        npt.assert_allclose(s_hat[:, 0],
+                            results,
+                            atol=1e-5)
+
+    def test_survival_weibull_hazard(self, bcancer):
+        times, events = bcancer['t'], bcancer['delta']
+        times_to_predict = [10, 20, 30, 50, 80, 90, 100, 150, 175, 200, 250]
+        dist = 'weibull'
+
+        def psi(theta):
+            return ee_survival_model(theta=theta, t=times, delta=events,
+                                     distribution=dist)
+
+        estr = MEstimator(psi, init=[0.05, 1.])
+        estr.estimate()
+        s_hat = survival_predictions(times=times_to_predict, theta=estr.theta, covariance=estr.variance,
+                                     distribution=dist, measure='hazard')
+
+        # Lifelines Weibull for comparison
+        wbf = WeibullFitter()
+        wbf.fit(times, events)
+        results = np.asarray(wbf.hazard_at_times(times=times_to_predict))
+
+        # Checking mean estimate
+        npt.assert_allclose(s_hat[:, 0],
+                            results,
+                            atol=1e-5)
+
+    def test_survival_weibull_chazard(self, bcancer):
+        times, events = bcancer['t'], bcancer['delta']
+        times_to_predict = [10, 20, 30, 50, 80, 90, 100, 150, 175, 200, 250]
+        dist = 'weibull'
+
+        def psi(theta):
+            return ee_survival_model(theta=theta, t=times, delta=events,
+                                     distribution=dist)
+
+        estr = MEstimator(psi, init=[0.05, 1.])
+        estr.estimate()
+        s_hat = survival_predictions(times=times_to_predict, theta=estr.theta, covariance=estr.variance,
+                                     distribution=dist, measure='cumulative_hazard')
+
+        # Lifelines Weibull for comparison
+        wbf = WeibullFitter()
+        wbf.fit(times, events)
+        results = np.asarray(wbf.cumulative_hazard_at_times(times=times_to_predict))
+
+        # Checking mean estimate
+        npt.assert_allclose(s_hat[:, 0],
+                            results,
+                            atol=1e-5)
+
+    def test_survival_weibull_density(self, bcancer):
+        times, events = bcancer['t'], bcancer['delta']
+        times_to_predict = [10, 20, 30, 50, 80, 90, 100, 150, 175, 200, 250]
+        dist = 'weibull'
+
+        def psi(theta):
+            return ee_survival_model(theta=theta, t=times, delta=events,
+                                     distribution=dist)
+
+        estr = MEstimator(psi, init=[0.05, 1.])
+        estr.estimate()
+        s_hat = survival_predictions(times=times_to_predict, theta=estr.theta, covariance=estr.variance,
+                                     distribution=dist, measure='density')
+
+        # Lifelines Weibull for comparison
+        wbf = WeibullFitter()
+        wbf.fit(times, events)
+        results = np.asarray(wbf.density_at_times(times=times_to_predict))
+
+        # Checking mean estimate
+        npt.assert_allclose(s_hat[:, 0],
+                            results,
+                            atol=1e-5)
+
+    def test_survival_model_variance(self, bcancer):
+        times, events = bcancer['t'], bcancer['delta']
+        n = bcancer.shape[0]
+        times_to_predict = [10, 50, 150, 250]
+        dist = 'weibull'
+
+        def psi(theta):
+            return ee_survival_model(theta=theta, t=times, delta=events,
+                                     distribution=dist)
+
+        # Built-in functionality via Delta Method
+        estr = MEstimator(psi, init=[0.05, 1.])
+        estr.estimate()
+        s_hat = survival_predictions(times=times_to_predict, theta=estr.theta, covariance=estr.variance,
+                                     distribution=dist, measure='survival')
+
+        # Stacked estimating functions version of delta method
+        def convert_to_survival(t, theta):
+            lambd, gamma = theta[0], theta[1]
+            return np.exp(-lambd * (t ** gamma))
+
+        def psi(theta):
+            ee_sm = ee_survival_model(theta=theta[:2], t=times, delta=events, distribution=dist)
+            ee_sp = []
+            for t, p in zip(times_to_predict, theta[2:]):
+                s_t = convert_to_survival(t=t, theta=theta[:2])
+                ee_sp.append(np.ones(n) * s_t - p)
+            return np.vstack([ee_sm, ee_sp])
+
+        estr = MEstimator(psi, init=[0.05, 1., 0.5, 0.5, 0.5, 0.5])
+        estr.estimate(deriv_method='exact')
+        ci = estr.confidence_intervals()
+        byhand = np.asarray([estr.theta[2:], np.diag(estr.variance)[2:], ci[2:, 0], ci[2:, 1]]).T
+
+        # Checking outputs are equal
+        npt.assert_allclose(s_hat,
+                            byhand,
+                            atol=1e-7)
+
+    def test_aft_ind_survival(self, bcancer):
+        dist = 'weibull'
+        measure = 'survival'
+        times, events = bcancer['t'], bcancer['delta']
+        dmatrix = bcancer[['C', 'X']]
+        times_to_predict = [10, 50, 150, 200]
+
+        # M-estimator with built-in Weibull AFT
+        def psi(theta):
+            return ee_aft(theta=theta, X=dmatrix, t=times, delta=events, distribution=dist)
+
+        estr = MEstimator(psi, init=[6, -1, 0])
+        estr.estimate()
+
+        s_i_hat = aft_predictions_individual(X=dmatrix, times=times_to_predict, theta=estr.theta,
+                                             distribution=dist, measure=measure)
+
+        # Predictions from Weibull AFT from lifelines for comparison
+        waft = WeibullAFTFitter()
+        waft.fit(bcancer[['X', 't', 'delta']], 't', 'delta', ancillary=False, robust=True)
+        preds = waft.predict_survival_function(bcancer, times=times_to_predict)
+
+        # Checking mean estimate
+        npt.assert_allclose(s_i_hat,
+                            np.asarray(preds).T,
+                            atol=1e-5)
+
+    def test_aft_ind_risk(self, bcancer):
+        dist = 'weibull'
+        measure = 'risk'
+        times, events = bcancer['t'], bcancer['delta']
+        dmatrix = bcancer[['C', 'X']]
+        times_to_predict = [10, 50, 150, 250]
+
+        # M-estimator with built-in Weibull AFT
+        def psi(theta):
+            return ee_aft(theta=theta, X=dmatrix, t=times, delta=events, distribution=dist)
+
+        estr = MEstimator(psi, init=[6, -1, 0])
+        estr.estimate()
+
+        s_i_hat = aft_predictions_individual(X=dmatrix, times=times_to_predict, theta=estr.theta,
+                                             distribution=dist, measure=measure)
+
+        # Predictions from Weibull AFT from lifelines for comparison
+        waft = WeibullAFTFitter()
+        waft.fit(bcancer[['X', 't', 'delta']], 't', 'delta', ancillary=False, robust=True)
+        preds = 1 - waft.predict_survival_function(bcancer, times=times_to_predict)
+
+        # Checking mean estimate
+        npt.assert_allclose(s_i_hat,
+                            np.asarray(preds).T,
+                            atol=1e-5)
+
+    def test_aft_ind_hazard(self, bcancer):
+        dist = 'weibull'
+        measure = 'hazard'
+        times, events = bcancer['t'], bcancer['delta']
+        dmatrix = bcancer[['C', 'X']]
+        times_to_predict = [10, 50, 150, 250]
+
+        # M-estimator with built-in Weibull AFT
+        def psi(theta):
+            return ee_aft(theta=theta, X=dmatrix, t=times, delta=events, distribution=dist)
+
+        estr = MEstimator(psi, init=[6, -1, 0])
+        estr.estimate()
+
+        s_i_hat = aft_predictions_individual(X=dmatrix, times=times_to_predict, theta=estr.theta,
+                                             distribution=dist, measure=measure)
+
+        # Predictions from Weibull AFT from lifelines for comparison
+        waft = WeibullAFTFitter()
+        waft.fit(bcancer[['X', 't', 'delta']], 't', 'delta', ancillary=False, robust=True)
+        preds = waft.predict_hazard(bcancer, times=times_to_predict)
+
+        # Checking mean estimate
+        npt.assert_allclose(s_i_hat,
+                            np.asarray(preds).T,
+                            atol=1e-5)
+
+    def test_aft_ind_chazard(self, bcancer):
+        dist = 'weibull'
+        measure = 'cumulative_hazard'
+        times, events = bcancer['t'], bcancer['delta']
+        dmatrix = bcancer[['C', 'X']]
+        times_to_predict = [10, 50, 150, 250]
+
+        # M-estimator with built-in Weibull AFT
+        def psi(theta):
+            return ee_aft(theta=theta, X=dmatrix, t=times, delta=events, distribution=dist)
+
+        estr = MEstimator(psi, init=[6, -1, 0])
+        estr.estimate()
+
+        s_i_hat = aft_predictions_individual(X=dmatrix, times=times_to_predict, theta=estr.theta,
+                                             distribution=dist, measure=measure)
+
+        # Predictions from Weibull AFT from lifelines for comparison
+        waft = WeibullAFTFitter()
+        waft.fit(bcancer[['X', 't', 'delta']], 't', 'delta', ancillary=False, robust=True)
+        preds = waft.predict_cumulative_hazard(bcancer, times=times_to_predict)
+
+        # Checking mean estimate
+        npt.assert_allclose(s_i_hat,
+                            np.asarray(preds).T,
+                            atol=5e-5)
+
+    def test_aft_f_variance(self, bcancer):
+        dist = 'weibull'
+        measure = 'survival'
+        times, events = bcancer['t'], bcancer['delta']
+        dmatrix = bcancer[['C', 'X']]
+        times_to_predict = [10, 50, 150, 250]
+        n = bcancer.shape[0]
+
+        def psi(theta):
+            return ee_aft(theta=theta, X=dmatrix, t=times, delta=events, distribution=dist)
+
+        estr = MEstimator(psi, init=[6, -1, 0])
+        estr.estimate()
+        s_t_hat = aft_predictions_function(X=[[1, 0], ], times=times_to_predict,
+                                           theta=estr.theta, covariance=estr.variance,
+                                           distribution=dist, measure=measure)
+
+        # Stacked estimating functions version of delta method
+        def psi(theta):
+            ee_sm = ee_aft(theta=theta[:3], X=dmatrix, t=times, delta=events, distribution=dist)
+            param = aft_predictions_individual(X=[[1, 0]], times=times_to_predict,
+                                               theta=theta[:3], distribution=dist, measure=measure)
+            ee_sp = []
+            for p_t, p in zip(theta[3:], param[0]):
+                ee_sp.append(np.ones(n) * p - p_t)
+            return np.vstack([ee_sm, ee_sp])
+
+        estr = MEstimator(psi, init=[5.8, -1., -0.1, 0.96, 0.85, 0.64, 0.5])
+        estr.estimate(deriv_method='exact')
+        ci = estr.confidence_intervals()
+        byhand = np.asarray([estr.theta[3:], np.diag(estr.variance)[3:], ci[3:, 0], ci[3:, 1]]).T
+
+        # Checking outputs are equal
+        npt.assert_allclose(s_t_hat,
+                            byhand,
+                            atol=1e-7)
+
+
+class TestDesignMatrix:
 
     def test_adm_error_noknots(self, design_matrix):
         # Testing error when dictionary with no knots given

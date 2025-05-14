@@ -4,7 +4,7 @@
 
 import pytest
 
-from delicatessen.data import load_shaq_free_throws, load_inderjit
+from delicatessen.data import load_shaq_free_throws, load_inderjit, load_breast_cancer
 
 
 class TestDataSets:
@@ -18,3 +18,9 @@ class TestDataSets:
         d = load_inderjit()          # Loading the data
         assert d.shape[0] == 24      # Checking number of rows
         assert d.shape[1] == 2       # Checking number of columns
+
+    def test_bcancer(self):
+        d = load_breast_cancer()     # Loading the data
+        assert d.shape[0] == 45      # Checking number of rows
+        assert d.shape[1] == 3       # Checking number of columns
+

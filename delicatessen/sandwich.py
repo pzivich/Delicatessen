@@ -297,3 +297,174 @@ def build_sandwich(bread, meat, allow_pinv=True):
 
     # Return the sandwich covariance matrix
     return sandwich
+
+
+def delta_method(theta, g, covariance, deriv_method='exact', dx=1e-9):
+    r"""Function to apply the Delta Method for a given parameter vector and transformation. The Delta Method is defined
+    as
+
+    .. math::
+
+        Var \left[ g(\theta) \right] \approx g'(\theta) \; \Sigma_{\theta} \; g'(\theta)^T
+
+    where :math:`\theta` is the parameter vector, :math:`g` is a vector-valued function that returns a 1 dimensional
+    vector, :math:`g'` is the gradient (or partial derivatives), and :math:`\Sigma_{\theta}` is the covariance matrix
+    for :math:`\theta`. In words, the variance of the transformation of the parameters is equal to covariance of the
+    parameters sandwiched between the derivatives of the transformation functions. This expression then provides a
+    variance estimator when replacing :math:`\theta` and :math:`\Sigma` with :math:`\hat{\theta}` and
+    :math:`\hat{\Sigma}`, respectively.
+
+    As described elsewhere, the sandwich variance estimator automates the Delta Method. Therefore, one can simply
+    program the corresponding estimating equation to estimate the variance for that transformation. However, this can be
+    computationally inefficient when :math:`g` outputs a large vector. This functionality offers a way to apply the
+    Delta Method outside of ``MEstimator`` and ``GMMEstimator``. Internally, this function is used for some prediction
+    functionalities.
+
+    Parameters
+    ----------
+    theta : ndarray, list, set
+        Parameter vector of dimension `v` to apply the transformation function ``g`` with.
+    g : function, callable
+        Vector function that transforms the `v` dimension parameter vector ``theta`` into a `w` dimensional vector.
+    covariance : ndarray, list, set
+        Covariance matrix for the parameter vector ``x``.
+    deriv_method : str, optional
+        Method to compute the derivative of the function ``g``. Default is ``'exact'``. Options include numerical
+        approximation via the forward difference method via SciPy (``'approx'``), forward difference implemented by-hand
+        (`'fapprox'`), backward difference implemented by-hand (`'bapprox'`),  central difference implemented by-hand
+        (`'capprox'`), or forward-mode automatic differentiation (``'exact'``).
+    dx : float, optional
+        Spacing to use to numerically approximate the partial derivatives of the bread matrix. Here, a small value
+        for ``dx`` should be used, since some large values can result in poor approximations. This argument is only
+        used when numerical approximation methods. Default is ``1e-9``.
+
+    Returns
+    -------
+    array :
+        Returns a `p`-by-`p` NumPy array for the input ``theta``, where `p` is the length of the output vector from the
+        function :math:`g`
+
+    Examples
+    --------
+    Using ``delta_method`` to compute the variance should be done similar to the following
+
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> from delicatessen import MEstimator, delta_method
+    >>> from delicatessen.estimating_equations import ee_ipw
+
+    To illustrate how ``delta_method`` is intended to be used, we will first use an M-estimator to compute the point
+    and variance estimates for the parameter vector :math:`\theta`. Here, we will replicate the example from the
+    documentation for ``ee_ipw``.
+
+    >>> n = 200
+    >>> d = pd.DataFrame()
+    >>> d['W'] = np.random.binomial(1, p=0.5, size=n)
+    >>> d['A'] = np.random.binomial(1, p=(0.25 + 0.5*d['W']), size=n)
+    >>> d['Ya0'] = np.random.binomial(1, p=(0.75 - 0.5*d['W']), size=n)
+    >>> d['Ya1'] = np.random.binomial(1, p=(0.75 - 0.5*d['W'] - 0.1*1), size=n)
+    >>> d['Y'] = (1-d['A'])*d['Ya0'] + d['A']*d['Ya1']
+    >>> d['C'] = 1
+
+    Defining psi, or the stacked estimating equations
+
+    >>> def psi(theta):
+    >>>     return ee_ipw(theta, y=d['Y'], A=d['A'],
+    >>>                   W=d[['C', 'W']])
+
+    Calling the M-estimation procedure
+
+    >>> estr = MEstimator(stacked_equations=psi, init=[0., 0.5, 0.5, 0., 0.])
+    >>> estr.estimate(solver='lm')
+
+    Per the documentation for ``ee_ipw``, the average causal effect (or risk difference) is given by the following
+
+    >>> estr.theta[0]        # causal mean difference of 1 versus 0
+    >>> estr.variance[0, 0]  # corresponding variance estimate
+
+    Suppose that ``ee_ipw`` did not directly provide the risk difference. Further, imagine we were interested in the
+    risk ratio (log-transformed). Both of these quantities are transformations of the risk under action 1
+    (i.e., ``theta[1]``) and the risk under action 0 (i.e., ``theta[2]``). The following is a function that applies and
+    returns those transformations
+
+    >>> def causal_contrasts(theta):
+    >>>     risk1, risk0 = theta
+    >>>     risk_diff = risk1 - risk0
+    >>>     log_risk_ratio = np.log(risk1) - np.log(risk0)
+    >>>     return risk_diff, log_risk_ratio
+
+    To estimate the variance for this transformation, one can now use the *delta method*. While one could manually
+    compute the derivatives for this function, ``delta_method`` automates this procedure for you (using either automatic
+    or numerical approximation methods). Below is how ``delta_method`` can be applied to compute the variance for the
+    risk difference and risk ratio
+
+    >>> risks = estr.theta[1:3]                     # Risks
+    >>> risks_c0var = estr.variance[1:3, 1:3]       # Variance for risks
+    >>> rd, log_rr = causal_contrasts(theta=risks)  # RD, log(RR)
+
+    >>> covar = delta_method(theta=risks,             # Delta method
+    >>>                      g=causal_contrasts,      # ... function g
+    >>>                      covariance=risks_c0var)  # ... covariance
+
+    The output from ``delta_method`` is the corresponding covariance matrix for risk difference and risk ratio. We can
+    get the corresponding 95% confidence intervals via
+
+    >>> rd_stderr = np.sqrt(covar[0, 0])
+    >>> rd_lcl, rd_ucl = rd - 1.96*rd_stderr, rd + 1.96*rd_stderr
+    >>> rr_stderr = np.sqrt(covar[1, 1])
+    >>> rr_lcl, rr_ucl = np.exp(log_rr - 1.96*rr_stderr), np.exp(log_rr + 1.96*rr_stderr)
+
+    While these transformations are straightforward to stack as estimating functions, ``delta_method`` offers another
+    option for estimating the variance of transformations that has computational benefits in some settings.
+
+    References
+    ----------
+    Boos DD, & Stefanski LA. (2013). Large Sample Theory: The Basics, In
+    *Essential Statistical Inference: Theory and Methods*, 237-240.
+
+    Cox C. (2005). Delta method. *Encyclopedia of Biostatistics*.
+
+    Oehlert GW. (1992). A Note on the Delta Method. *The American Statistician*, 46(1), 27-29.
+    """
+    # Setup
+    covariance = np.asarray(covariance)
+    j = covariance.shape[0]
+    k = covariance.shape[1]
+
+    def g_array(theta):
+        # Function to convert user function g to always return a NumPy array
+        return np.asarray(g(theta))
+
+    # Computing g(\theta)
+    theta_star = g_array(theta)
+    theta_dim = theta_star.shape
+    v = len(theta)
+
+    # Checking dimensions of parameter vector
+    if len(theta_dim) > 1:
+        raise ValueError("Output from function `g` must be a one-dimensional array")
+    if j != k:
+        raise ValueError("Input covariance matrix must be symmetric. Input matrix had dimensions " + str(j)
+                         + " rows and " + str(k) + " columns")
+    if j != v:
+        raise ValueError("Input parameter vector and covariance matrix must share a dimension, but theta has " + str(v)
+                         + " as its dimension and the matrix had dimension " + str(j))
+
+    # Computing derivative for g(x)
+    if deriv_method.lower() == "exact":
+        g_prime = auto_differentiation(xk=theta, f=g_array)
+    elif deriv_method.lower() == 'approx':
+        g_prime = approx_fprime(xk=theta, f=g_array, epsilon=dx)
+        if g_prime.ndim == 1:
+            g_prime = np.asarray([g_prime, ])
+    elif deriv_method.lower() in ['capprox', 'fapprox', 'bapprox']:
+        g_prime = approx_differentiation(xk=theta, f=g_array, method=deriv_method.lower(), epsilon=dx)
+    else:
+        raise ValueError("The input for deriv_method was " + str(deriv_method)
+                         + ", but only 'approx', 'fapprox', 'capprox', 'bapprox' and 'exact' are available.")
+
+    # Applying delta method to get the variance
+    covariance_g = np.dot(np.dot(g_prime, covariance), g_prime.T)
+
+    # Returning the covariance matrix for g(x)
+    return covariance_g

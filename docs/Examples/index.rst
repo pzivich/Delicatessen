@@ -17,6 +17,7 @@ added to this documentations, please contact us.
   Bonate-Pharmaco
   Hernan-Robins-2023
   Morris-Trials-2022
+  Collett-Survival
   GMM-OverID
   Generalized-Additive-Model
 

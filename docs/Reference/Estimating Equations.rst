@@ -62,12 +62,8 @@ Survival
 .. autosummary::
   :toctree: generated/
 
-  ee_exponential_model
-  ee_exponential_measure
-  ee_weibull_model
-  ee_weibull_measure
-  ee_aft_weibull
-  ee_aft_weibull_measure
+  ee_survival_model
+  ee_aft
 
 
 Pharmacokinetic Models
