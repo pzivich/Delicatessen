@@ -8,6 +8,7 @@ from scipy.optimize import newton, root, minimize
 from scipy.stats import norm
 from scipy.optimize import OptimizeWarning
 
+from delicatessen.errors import check_alpha_level, check_variance_is_not_none
 from delicatessen.sandwich import compute_bread, compute_meat, build_sandwich
 
 
@@ -55,13 +56,11 @@ class _GeneralEstimator:
             b-by-2 array, where row 1 is the confidence intervals for :math:`\theta_1`, ..., and row b is the confidence
             intervals for :math:`\theta_b`
         """
-        # Check that estimate() has been called
-        if self.variance is None:
-            raise ValueError("Either theta has not been estimated yet, or there is a np.nan in the bread matrix. "
-                             "Therefore, confidence_intervals() cannot be called.")
+        # Check that variance has been estimated
+        check_variance_is_not_none(variance=self.variance)
+
         # Check valid alpha value is being provided
-        if not 0 < alpha < 1:
-            raise ValueError("`alpha` must be 0 < a < 1")
+        check_alpha_level(alpha=alpha)
 
         # 'Looking up' via Z table
         z_alpha = norm.ppf(1 - alpha / 2, loc=0, scale=1)   # Z_alpha value for CI
@@ -94,10 +93,8 @@ class _GeneralEstimator:
         array :
             Array of Z-scores for :math:`\theta_1, ..., \theta_b`, respectively
         """
-        # Check that self.estimate() has been called
-        if self.variance is None:
-            raise ValueError("Either theta has not been estimated yet, or there is a np.nan in the bread matrix. "
-                             "Therefore, z_scores() cannot be called.")
+        # Check that variance has been estimated
+        check_variance_is_not_none(variance=self.variance)
 
         # Calculating Z-scores
         se = np.sqrt(np.diag(self.variance))       # Extract the standard error estimates from the sandwich
@@ -191,10 +188,8 @@ class _GeneralEstimator:
 
         Stefanski LA, & Boos DD. (2002). The calculus of M-estimation. *The American Statistician*, 56(1), 29-38.
         """
-        # Check that estimate() has been called
-        if self.variance is None:
-            raise ValueError("Either theta has not been estimated yet, or there is a np.nan in the bread matrix. "
-                             "Therefore, confidence_intervals() cannot be called.")
+        # Check that variance has been estimated
+        check_variance_is_not_none(variance=self.variance)
 
         # Calculating estimating function
         efunc_i = self.stacked_equations(theta=self.theta)   # Computing estimating function at theta-hat
@@ -252,6 +247,24 @@ class _GeneralEstimator:
 
         # Return the calculated values of theta
         return vals
+
+    @staticmethod
+    def _error_checker_(vals_at_init):
+        # Error checking before running procedure
+        if np.sum(vals_at_init) is None:
+            raise ValueError("When evaluating the estimating equation, `None` was returned. Please check that the "
+                             "stacked_equations returns an array evaluated at theta.")
+        if np.isnan(np.sum(vals_at_init)):         # Check to see if any np.nan's occur with the initial values
+            # Identifying the bad columns
+            nans_in_column = np.sum(np.isnan(vals_at_init), axis=0)        # Counting up all NAN's per estimating eq
+            columns_w_nans = np.argwhere(nans_in_column >= 1).flatten()    # Returning indices that have any NAN's
+            raise ValueError("When evaluated at the initial values, the `stacked_equations` return at least one "
+                             "np.nan at the following estimating equation indices: " +
+                             str(list(columns_w_nans)) + ". "
+                             "As delicatessen does not natively handle missing data, please ensure the "
+                             "provided estimating equations resolve any np.nan values accordingly. For details on "
+                             "how to handle np.nan's see the documentation at: "
+                             "https://deli.readthedocs.io/en/latest/Custom-EE.html#Handling-np.nan")
 
 
 class MEstimator(_GeneralEstimator):
@@ -461,22 +474,10 @@ class MEstimator(_GeneralEstimator):
         vals_at_init = np.asarray(vals_at_init                    # Convert output to an array (in case it isn't)
                                   ).T                             # ... transpose so N is always the 1st element
 
-        # Error checking before running procedure
-        if np.sum(vals_at_init) is None:
-            raise ValueError("When evaluating the estimating equation, `None` was returned. Please check that the "
-                             "stacked_equations returns an array evaluated at theta.")
-        if np.isnan(np.sum(vals_at_init)):         # Check to see if any np.nan's occur with the initial values
-            # Identifying the bad columns
-            nans_in_column = np.sum(np.isnan(vals_at_init), axis=0)        # Counting up all NAN's per estimating eq
-            columns_w_nans = np.argwhere(nans_in_column >= 1).flatten()    # Returning indices that have any NAN's
-            raise ValueError("When evaluated at the initial values, the `stacked_equations` return at least one "
-                             "np.nan at the following estimating equation indices: " +
-                             str(list(columns_w_nans)) + ". "
-                             "As delicatessen does not natively handle missing data, please ensure the "
-                             "provided estimating equations resolve any np.nan values accordingly. For details on "
-                             "how to handle np.nan's see the documentation at: "
-                             "https://deli.readthedocs.io/en/latest/Custom-EE.html#Handling-np.nan")
+        # Error checking for inputs
+        self._error_checker_(vals_at_init=vals_at_init)
 
+        # Checking dimensions of output for M-estimator
         if vals_at_init.ndim == 1 and np.asarray(self.init).shape[0] == 1:     # Checks to ensure dimensions align
             # the starting if-state is to work-around inits=[0, ] (otherwise breaks the first else-if)
             pass
@@ -861,21 +862,8 @@ class GMMEstimator(_GeneralEstimator):
         vals_at_init = np.asarray(vals_at_init                    # Convert output to an array (in case it isn't)
                                   ).T                             # ... transpose so N is always the 1st element
 
-        # Error checking before running procedure
-        if np.sum(vals_at_init) is None:
-            raise ValueError("When evaluating the estimating equation, `None` was returned. Please check that the "
-                             "stacked_equations returns an array evaluated at theta.")
-        if np.isnan(np.sum(vals_at_init)):         # Check to see if any np.nan's occur with the initial values
-            # Identifying the bad columns
-            nans_in_column = np.sum(np.isnan(vals_at_init), axis=0)        # Counting up all NAN's per estimating eq
-            columns_w_nans = np.argwhere(nans_in_column >= 1).flatten()    # Returning indices that have any NAN's
-            raise ValueError("When evaluated at the initial values, the `stacked_equations` return at least one "
-                             "np.nan at the following estimating equation indices: " +
-                             str(list(columns_w_nans)) + ". "
-                             "As delicatessen does not natively handle missing data, please ensure the "
-                             "provided estimating equations resolve any np.nan values accordingly. For details on "
-                             "how to handle np.nan's see the documentation at: "
-                             "https://deli.readthedocs.io/en/latest/Custom-EE.html#Handling-np.nan")
+        # Error checking for inputs
+        self._error_checker_(vals_at_init=vals_at_init)
 
         # Processing dependent on number of estimating functions
         if vals_at_init.ndim == 1:

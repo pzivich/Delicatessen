@@ -5,6 +5,7 @@ import scipy as sp
 from scipy.stats import norm
 
 from delicatessen.derivative import PrimalTangentPairs as PTPair
+from delicatessen.errors import check_alpha_level
 from delicatessen.sandwich import delta_method
 from delicatessen.helper import convert_survival_measures
 
@@ -315,7 +316,7 @@ def robust_loss_functions(residual, loss, k, a=None, b=None):
 
     # Catch-all value error for the provided loss function
     else:
-        raise ValueError("The loss function "+str(loss)+" is not available.")
+        raise ValueError("The loss function `"+str(loss)+"` is not available.")
 
     # Returning the updated values
     return xr
@@ -416,8 +417,7 @@ def regression_predictions(X, theta, covariance, offset=None, alpha=0.05):
     ``numpy.exp``.
     """
     # Check valid alpha value is being provided
-    if not 0 < alpha < 1:
-        raise ValueError("`alpha` must be 0 < a < 1")
+    check_alpha_level(alpha=alpha)
 
     # Process offset term
     if offset is None:                                 # When offset is None
@@ -572,8 +572,7 @@ def survival_predictions(times, theta, covariance, distribution, measure='surviv
         return predict_metric(times=times, theta=theta, distribution=distribution)
 
     # Check valid alpha value is being provided
-    if not 0 < alpha < 1:
-        raise ValueError("`alpha` must be 0 < a < 1")
+    check_alpha_level(alpha=alpha)
 
     # Predicted measure at given times
     est = predict_function_differentiable(theta=theta)
@@ -733,7 +732,8 @@ def aft_predictions_individual(X, times, theta, distribution, measure='survival'
             survival_t = 1 / (1 + np.exp(epsilon_i))
             hazard_t = hazard_scaler * 1 / (1 + np.exp(-epsilon_i))
         else:
-            raise ValueError("...")
+            raise ValueError("The specified distribution `" + str(distribution)
+                             + "` is not supported")
         survival_t = survival_t.T[0]
         hazard_t = hazard_t.T[0]
 
@@ -888,13 +888,13 @@ def aft_predictions_function(X, times, theta, covariance, distribution, measure=
         return preds[0]
 
     # Check valid alpha value is being provided
-    if not 0 < alpha < 1:
-        raise ValueError("`alpha` must be 0 < a < 1")
+    check_alpha_level(alpha=alpha)
 
     # Check X has only 1 row (error otherwise, since difficult to keep track of multiple covariate patterns and var)
     X = np.asarray(X)
     if X.shape[0] > 1:
-        raise ValueError("...only one covariate pattern at a time...")
+        raise ValueError("Only one covariate pattern at a time can be specified, so `X` should only consist of a "
+                         "single row. However, " + str(X.shape[0]) + " rows were provided.")
 
     # Predicted measure at given times
     est = predictions_aft(theta=theta)
