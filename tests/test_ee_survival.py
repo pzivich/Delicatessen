@@ -20,6 +20,28 @@ class TestEstimatingEquationsSurvParam:
         event = np.array([1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0])
         return times, event
 
+    def test_survival_model_error1(self, data_s):
+        times, events = data_s
+        events[0] = 10
+
+        def psi(theta):
+            return ee_survival_model(theta=theta, t=times, delta=events, distribution='exponential')
+
+        estr = MEstimator(psi, init=[0.1])
+        with pytest.raises(ValueError, match="non-missing event indicator"):
+            estr.estimate()
+
+    def test_survival_model_error2(self, data_s):
+        times, events = data_s
+        times[0] = -3
+
+        def psi(theta):
+            return ee_survival_model(theta=theta, t=times, delta=events, distribution='exponential')
+
+        estr = MEstimator(psi, init=[0.1])
+        with pytest.raises(ValueError, match="non-missing observed times"):
+            estr.estimate()
+
     def test_survival_model_exponential(self, data_s):
         times, events = data_s
 
@@ -133,6 +155,28 @@ class TestEstimatingEquationsAFT:
         d['C'] = 1
         return d
 
+    def test_aft_error1(self, collett_bc):
+        d = collett_bc
+        d.loc[0, 'delta'] = 10
+
+        def psi(theta):
+            return ee_aft(theta=theta, t=d['time'], delta=d['delta'], X=d[['C', 'X']], distribution='exponential')
+
+        estr = MEstimator(psi, init=[2., 0.])
+        with pytest.raises(ValueError, match="non-missing event indicator"):
+            estr.estimate()
+
+    def test_aft_error2(self, collett_bc):
+        d = collett_bc
+        d.loc[0, 'time'] = -3
+
+        def psi(theta):
+            return ee_aft(theta=theta, t=d['time'], delta=d['delta'], X=d[['C', 'X']], distribution='exponential')
+
+        estr = MEstimator(psi, init=[2., 0.])
+        with pytest.raises(ValueError, match="non-missing observed times"):
+            estr.estimate()
+
     def test_aft_exponential(self, collett_bc):
         # R code
         # library(survival)
@@ -152,7 +196,7 @@ class TestEstimatingEquationsAFT:
         def psi(theta):
             return ee_aft(theta=theta, t=d['time'], delta=d['delta'], X=d[['C', 'X']], distribution='exponential')
 
-        # M-estimator with built-in Weibull AFT
+        # M-estimator with built-in exponential AFT
         estr = MEstimator(psi, init=[2., 0.])
         estr.estimate(solver="lm")
 
