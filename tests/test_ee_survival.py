@@ -78,6 +78,27 @@ class TestEstimatingEquationsSurvParam:
         #                     np.asarray(results[0, 2:]),
         #                     atol=1e-5)
 
+    def test_survival_model_gompertz(self, data_s):
+        # R code
+        # library(flexsurv)
+        # times = c(1, 2, 3, 4, 5, 1, 1, 2, 2.5, 3, 4, 5)
+        # event = c(1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0)
+        # fit <- flexsurv::flexsurvreg(Surv(times, event) ~ 1, dist = "gompertz")
+        # exp(fit$coefficients['rate'])  # 0.02600121
+        # fit$coefficients['shape']      # 0.7871837
+        comparison_theta = np.asarray([0.02600120662398, 0.78718366977333])
+
+        times, events = data_s
+
+        def psi(theta):
+            return ee_survival_model(theta=theta, t=times, delta=events, distribution='gompertz')
+
+        estr = MEstimator(psi, init=[0.01, 0.1])
+        estr.estimate(solver="lm")
+
+        # Checking mean estimate
+        npt.assert_allclose(estr.theta, comparison_theta, atol=1e-6)
+
 
 class TestEstimatingEquationsAFT:
 
