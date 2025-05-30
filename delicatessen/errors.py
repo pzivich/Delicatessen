@@ -67,6 +67,19 @@ def check_penalty_shape(theta, penalty, center):
 
 
 def check_survival_data_valid(delta, time):
+    """Error checking function to verify input survival data is valid.
+
+    Parameters
+    ----------
+    delta : ndarray
+        User-provided event indicator
+    time : ndarray
+        User-provided times
+
+    Returns
+    -------
+    None
+    """
     delta_no_nan = delta[~np.isnan(delta)]
     if not np.isin(delta_no_nan, [0, 1]).all():
         raise ValueError("All non-missing event indicator values must be either zero or one for survival models.")
