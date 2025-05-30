@@ -5,6 +5,7 @@
 import warnings
 import numpy as np
 
+from delicatessen.errors import check_survival_data_valid
 from delicatessen.estimating_equations.processing import generate_weights
 from delicatessen.utilities import standard_normal_cdf, standard_normal_pdf
 
@@ -126,6 +127,9 @@ def ee_survival_model(theta, t, delta, distribution):
     delta = np.asarray(delta)
     t = np.asarray(t)
     distribution = distribution.lower()
+
+    # Error checking for survival data formatting
+    check_survival_data_valid(delta=delta, time=t)
 
     # Extracting and naming parameters for my convenience
     if distribution == 'exponential':
@@ -1156,6 +1160,9 @@ def ee_aft(theta, X, t, delta, distribution, weights=None):
     t = np.asarray(t)[:, None]                 # Convert to NumPy array and ensure correct shape for matrix algebra
     delta = np.asarray(delta)[:, None]         # Convert to NumPy array and ensure correct shape for matrix algebra
     beta_dim = X.shape[1]
+
+    # Error checking for survival data formatting
+    check_survival_data_valid(delta=delta, time=t)
 
     # Extract coefficients
     beta = np.asarray(theta[:beta_dim])[:, None]

@@ -64,3 +64,13 @@ def check_penalty_shape(theta, penalty, center):
     # Checking the penalty term is non-negative
     if np.any(penalty < 0):
         raise ValueError("All penalty terms must be non-negative")
+
+
+def check_survival_data_valid(delta, time):
+    delta_no_nan = delta[~np.isnan(delta)]
+    if not np.isin(delta_no_nan, [0, 1]).all():
+        raise ValueError("All non-missing event indicator values must be either zero or one for survival models.")
+
+    time_no_nan = time[~np.isnan(time)]
+    if not np.where(time_no_nan > 0, 1, 0).all():
+        raise ValueError("All non-missing observed times must be non-negative for survival models.")
