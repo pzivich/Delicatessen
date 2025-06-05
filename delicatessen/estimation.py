@@ -167,7 +167,7 @@ class _GeneralEstimator:
 
         .. math::
 
-            IF(O_i; \theta) = \frac{\psi(O_i; \theta)}{B_n(O, theta)}
+            IF(O_i; \theta) = \left\{ B_n(theta) \right\}^{-1} \psi(O_i; \theta)
 
         or that the influence functions is equal to the estimating function scaled by the inverse of the bread matrix.
         While this approach was historically used to derive the influence function, there are more general alternatives.
