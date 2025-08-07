@@ -9,7 +9,7 @@ from scipy.stats import norm
 from scipy.optimize import OptimizeWarning
 
 from delicatessen.errors import check_alpha_level, check_variance_is_not_none
-from delicatessen.sandwich import compute_bread, compute_meat, build_sandwich
+from delicatessen.sandwich import compute_bread, compute_meat, build_sandwich, compute_confidence_bands
 
 
 class _GeneralEstimator:
@@ -205,6 +205,78 @@ class _GeneralEstimator:
         # Calculating influence function
         ifunc_i = np.dot(bread_invert, efunc_i)
         return ifunc_i.T
+
+    def confidence_bands(self, subset=None, alpha=0.05, method='supt', n_draws=100000, seed=None):
+        r"""Calculate two-sided :math:`(1 - \alpha) \times` 100% confidence bands from the point and sandwich variance
+        estimates. Rather than cover a single parameter, the confidence bands provide coverage for parameter *vectors*.
+        The formula for the confidence bands is
+
+        .. math::
+
+            \hat{\theta} \pm \hat{c}_{\alpha / 2} \times \widehat{SE}(\hat{\theta})
+
+        Note
+        ----
+        The ``.estimate()`` function must be called before the confidence bands can be calculated.
+
+
+        This formula looks very similar to the confidence interval formula, but there is a different critical value.
+        Note that the formula above has a hat on the critical value, :math:`c`, to denote it is being estimated.
+        Currently, only the sup-t method for estimating the critical value is supported.
+
+        Parameters
+        ----------
+        subset : list, set, array, None, optional
+            Optional argument to compute the confidence bands for a subset of parameters. Note that this argument is
+            distinct from the overall ``subset`` argument and is only used for the confidence bands. Default is
+            ``None``, which computes the confidence bands for all parameters (as if they are are all the parameters of
+            interest).
+        alpha : float, optional
+            The :math:`0 < \alpha < 1` level for the corresponding confidence bands. Default is 0.05, which
+            corresponds to 95% confidence bands.
+        method : str, optional
+            Method to compute the confidence bands. Currently, only the sup-t and Bonferroni method are supported.
+            Default is ``'supt'``
+        n_draws : int, optional
+            Number of random draws to use for any methods based on simulated approximation. Default is ``100000``.
+        seed : int, optional
+            Seed to intialize a pseudo RNG for methods based on simulated approximations. Default is ``None``
+            which does not use a reproducible seed. To consistently obtain the same confidence bands with approximation
+            methods, please use a seed.
+
+        Returns
+        -------
+        array :
+            b-by-2 array, where row 1 is the confidence intervals for :math:`\theta_1`, ..., and row b is the confidence
+            intervals for :math:`\theta_b`
+
+        References
+        ----------
+        Montiel Olea JL & Plagborg‐Møller M. (2019). Simultaneous confidence bands: Theory, implementation, and an
+        application to SVARs. *Journal of Applied Econometrics*, 34(1), 1-17.
+        """
+        # Check that variance has been estimated
+        check_variance_is_not_none(variance=self.variance)
+
+        # Check valid alpha value is being provided
+        check_alpha_level(alpha=alpha)
+
+        # Processing parameter vector
+        if subset is None:
+            theta = self.theta
+            covar = self.variance
+        else:
+            theta = self.theta[subset]
+            covar = self.variance[np.ix_(subset, subset)]
+
+        # Calculating confidence bands
+        cb = compute_confidence_bands(theta=theta, covariance=covar,
+                                      alpha=alpha,
+                                      method=method,
+                                      n_draws=n_draws, seed=seed)
+
+        # Return 2D array of lower and upper confidence bands
+        return cb
 
     @staticmethod
     def _eval_ee_(stacked_equations, subset):
