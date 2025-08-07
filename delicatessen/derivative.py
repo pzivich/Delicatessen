@@ -126,7 +126,9 @@ def approx_differentiation(xk, f, epsilon=1e-9, method='capprox'):
         f1 = generate_matrix(x_shift=upper, f=f)      # ... output for upper shift
         deriv = (f1 - f0).T / epsilon                 # ... forward difference approximation
     else:                                             # Otherwise error
-        raise ValueError("Method chosen is not supported")
+        raise ValueError("The chosen method `"
+                         + str(method)
+                         + "` chosen is not supported")
 
     # Processing the final return based on parameter shape
     if xp == 1:

@@ -5,6 +5,7 @@
 import warnings
 import numpy as np
 
+from delicatessen.errors import check_survival_data_valid
 from delicatessen.estimating_equations.processing import generate_weights
 from delicatessen.utilities import standard_normal_cdf, standard_normal_pdf
 
@@ -37,15 +38,19 @@ def ee_survival_model(theta, t, delta, distribution):
        * - Distribution
          - Keyword
          - Parameters
-         - :math:`H(t)`
+         - :math:`h(t)`
        * - Exponential
          - ``exponential``
          - :math:`\lambda`
-         - :math:`\lambda t`
+         - :math:`\lambda`
        * - Weibull
          - ``weibull``
          - :math:`\lambda, \gamma`
-         - :math:`\lambda t^{\gamma}`
+         - :math:`\lambda \gamma t^{\gamma - 1}`
+       * - Gompertz
+         - ``weibull``
+         - :math:`\lambda, \gamma`
+         - :math:`\lambda \exp(\gamma t)`
 
 
     Parameters
@@ -123,25 +128,38 @@ def ee_survival_model(theta, t, delta, distribution):
     t = np.asarray(t)
     distribution = distribution.lower()
 
+    # Error checking for survival data formatting
+    check_survival_data_valid(delta=delta, time=t)
+
     # Extracting and naming parameters for my convenience
     if distribution == 'exponential':
         lambd = theta[0]
         gamma = 1
+    # When implementing generalized gamma, can use
+    # elif distribution == 'generalized-gamma': lambd, gamma, [...] = theta[0], theta[1], theta[2]
     else:
         lambd, gamma = theta[0], theta[1]
 
-    # Calculating the contributions
-    contribution_1 = (delta/lambd) - t**gamma     # Calculating estimating equation for lambda
-    contribution_2 = ((delta/gamma)               # Calculating estimating equation for gamma
-                      + (delta*np.log(t))
-                      - (lambd * (t**gamma) * np.log(t)))
+    # Handling specified distribution
+    if distribution in ['exponential', 'weibull']:
+        # Calculating the contributions
+        ef_lambda = (delta/lambd) - t**gamma     # Calculating estimating equation for lambda
+        ef_gamma = ((delta/gamma)                # Calculating estimating equation for gamma
+                    + (delta*np.log(t))
+                    - (lambd * (t**gamma) * np.log(t)))
+    elif distribution == 'gompertz':
+        exp_gt = np.exp(gamma*t)
+        ef_lambda = delta/lambd - (exp_gt - 1)/gamma
+        ef_gamma = lambd/(gamma**2)*(exp_gt-1) + delta*t - (lambd/gamma)*exp_gt*t
+    else:
+        raise ValueError("Invalid distribution...")
 
     # Returning stacked estimating equations
     if distribution == 'exponential':
-        return contribution_1
+        return ef_lambda
     else:
-        return np.vstack((contribution_1,
-                          contribution_2))
+        return np.vstack((ef_lambda,
+                          ef_gamma))
 
 
 def ee_exponential_model(theta, t, delta):
@@ -1142,6 +1160,9 @@ def ee_aft(theta, X, t, delta, distribution, weights=None):
     t = np.asarray(t)[:, None]                 # Convert to NumPy array and ensure correct shape for matrix algebra
     delta = np.asarray(delta)[:, None]         # Convert to NumPy array and ensure correct shape for matrix algebra
     beta_dim = X.shape[1]
+
+    # Error checking for survival data formatting
+    check_survival_data_valid(delta=delta, time=t)
 
     # Extract coefficients
     beta = np.asarray(theta[:beta_dim])[:, None]
