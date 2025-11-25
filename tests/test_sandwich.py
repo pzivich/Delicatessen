@@ -6,9 +6,11 @@ import pytest
 import numpy as np
 import numpy.testing as npt
 import pandas as pd
+from scipy.stats import norm
 from delicatessen import compute_sandwich, MEstimator, delta_method
 from delicatessen.estimating_equations import ee_mean_variance, ee_glm, ee_gformula, ee_ipw
-from delicatessen.sandwich import compute_bread, compute_meat, build_sandwich
+from delicatessen.sandwich import (compute_bread, compute_meat, build_sandwich,
+                                   compute_critical_value_bands, compute_confidence_bands)
 
 
 @pytest.fixture
@@ -348,3 +350,129 @@ class TestDeltaMethod:
         npt.assert_allclose(estr.variance[:2, :2],
                             covar,
                             atol=1e-8)
+
+
+class TestConfBands:
+
+    def test_error_cv_theta_shape(self, y):
+        theta = [[1, 2], [3, 4]]
+        covar = [[1, 0], [0, 1]]
+        with pytest.raises(ValueError, match="1-dimensional vector"):
+            compute_critical_value_bands(theta, covar, method='supt')
+
+    def test_error_cv_covar_shape(self, y):
+        theta = [1, 2]
+        covar = [1, 0]
+        with pytest.raises(ValueError, match="2-dimensional matrix"):
+            compute_critical_value_bands(theta, covar, method='supt')
+
+        covar = [[[1, 0], ], ]
+        with pytest.raises(ValueError, match="2-dimensional matrix"):
+            compute_critical_value_bands(theta, covar, method='supt')
+
+    def test_error_cv_covar_square(self, y):
+        theta = [1, 2]
+        covar = [[1, 0], [0, 1], [1, 1]]
+        with pytest.raises(ValueError, match="covariance matrix must be square"):
+            compute_critical_value_bands(theta, covar, method='supt')
+
+    def test_error_cv_dim_mismatch(self, y):
+        theta = [1, 2, 3]
+        covar = [[1, 0], [0, 1]]
+        with pytest.raises(ValueError, match="theta vector and covariance matrix must be equal"):
+            compute_critical_value_bands(theta, covar, method='supt')
+
+        theta = [1, 2]
+        covar = [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
+        with pytest.raises(ValueError, match="theta vector and covariance matrix must be equal"):
+            compute_critical_value_bands(theta, covar, method='supt')
+
+    def test_error_cv_method(self, y):
+        theta = [1, 2]
+        covar = [[1, 0], [0, 1]]
+        with pytest.raises(ValueError, match="only the following methods"):
+            compute_critical_value_bands(theta, covar, method='not-a-method')
+
+    def test_cv_bonferroni1(self):
+        alpha = 0.05
+        expected = norm.ppf(1 - alpha / (2 * 1), loc=0, scale=1)
+        c_alpha = compute_critical_value_bands(theta=[0], covariance=[[1, ], ], alpha=alpha, method='bonferroni')
+        npt.assert_allclose(c_alpha, expected, atol=1e-8)
+
+        alpha = 0.10
+        expected = norm.ppf(1 - alpha / (2 * 1), loc=0, scale=1)
+        c_alpha = compute_critical_value_bands(theta=[0], covariance=[[1, ], ], alpha=alpha, method='bonferroni')
+        npt.assert_allclose(c_alpha, expected, atol=1e-8)
+
+    def test_cv_bonferroni3(self):
+        alpha = 0.05
+        expected = norm.ppf(1 - alpha / (2 * 3), loc=0, scale=1)
+        c_alpha = compute_critical_value_bands(theta=[0, 0, 0],
+                                               covariance=[[1, 0, 0],
+                                                           [0, 1, 0],
+                                                           [0, 0, 1]], alpha=alpha, method='bonferroni')
+        npt.assert_allclose(c_alpha, expected, atol=1e-8)
+
+        alpha = 0.10
+        expected = norm.ppf(1 - alpha / (2 * 3), loc=0, scale=1)
+        c_alpha = compute_critical_value_bands(theta=[0, 0, 0],
+                                               covariance=[[1, 0, 0],
+                                                           [0, 1, 0],
+                                                           [0, 0, 1]], alpha=alpha, method='bonferroni')
+        npt.assert_allclose(c_alpha, expected, atol=1e-8)
+
+    def test_cv_supt1(self):
+        # When single parameter, should be near usual critical value
+        alpha = 0.05
+        expected = norm.ppf(1 - alpha / (2 * 1), loc=0, scale=1)
+        c_alpha = compute_critical_value_bands(theta=[0], covariance=[[1, ], ], alpha=alpha,
+                                               method='supt', n_draws=10000000)
+        npt.assert_allclose(c_alpha, expected, atol=1e-1)
+
+    def test_cv_supt3(self):
+        # When parameters are independent, equivalent to Bonferroni correction
+        alpha = 0.10
+        expected = norm.ppf(1 - alpha / (2 * 3), loc=0, scale=1)
+        c_alpha = compute_critical_value_bands(theta=[0, 0, 0],
+                                               covariance=[[1, 0, 0],
+                                                           [0, 1, 0],
+                                                           [0, 0, 1]],
+                                               alpha=alpha, method='supt', n_draws=10000000)
+        npt.assert_allclose(c_alpha, expected, atol=1e-1)
+
+    def test_cv_supt_corr(self):
+        # When parameters are independent, equivalent to Bonferroni correction
+        alpha = 0.05
+        expected = norm.ppf(1 - alpha / (2 * 3), loc=0, scale=1)
+        c_alpha = compute_critical_value_bands(theta=[0, 0, 0],
+                                               covariance=[[1, 0.2, 0.2],
+                                                           [0.2, 1, 0.2],
+                                                           [0.2, 0.2, 1]],
+                                               alpha=alpha, method='supt')
+        assert c_alpha < expected
+
+    def test_bands_bonferroni(self):
+        alpha = 0.05
+        theta = [0, 1, -2, 0]
+        covar = [[1,    0.1, -0.2, 0],
+                 [0.1,   1,    .3, 0],
+                 [-0.2, .3,  0.85, 0],
+                 [0,     0,     0, 0.9]]
+        z_alpha = norm.ppf(1 - alpha / (2 * 4), loc=0, scale=1)
+        expected = [np.asarray(theta) - z_alpha * np.sqrt(np.diag(covar)),
+                    np.asarray(theta) + z_alpha * np.sqrt(np.diag(covar))]
+        cbands = compute_confidence_bands(theta=theta, covariance=covar, alpha=alpha, method='bonferroni')
+        npt.assert_allclose(cbands, np.asarray(expected).T, atol=1e-3)
+
+    # def test_bands_supt(self):
+    #     expected = [[-2.4856891, 2.4856891],
+    #                 [-1.4856891, 3.4856891],
+    #                 [-4.29169212, 0.29169212],
+    #                 [-2.35813173, 2.35813173]]
+    #     cbands = compute_confidence_bands(theta=[0, 1, -2, 0],
+    #                                       covariance=[[1, 0.1, -0.2, 0],
+    #                                                   [0.1, 1, .3, 0],
+    #                                                   [-0.2, .3, 0.85, 0],
+    #                                                   [0, 0, 0, 0.9]],
+    #                                       method='supt', seed=123477, n_draws=2500000)
+    #     npt.assert_allclose(cbands, expected, atol=1e-3)

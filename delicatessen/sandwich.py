@@ -550,7 +550,7 @@ def compute_critical_value_bands(theta, covariance, alpha=0.05, method='supt', n
     elif method.lower() == 'bonferroni':
         critical_value = norm.ppf(1 - alpha / (2 * k), loc=0, scale=1)
     else:
-        raise ValueError("The confidence band method '" + str(method) + "' was specified, but only the following "
+        raise ValueError("The method '" + str(method) + "' was specified, but only the following "
                          "methods are supported: 'supt', 'bonferroni'.")
 
     # Returning the corresponding critical value
@@ -604,9 +604,9 @@ def compute_confidence_bands(theta, covariance, alpha=0.05, method='supt', n_dra
     Outcomes, Effect Modifiers, and Other Multiple Comparisons, *arXiv:2510.07076*
     """
     # Computing the critical value
-    critical_value = compute_confidence_bands(theta=theta, covariance=theta,
-                                              alpha=alpha, method=method,
-                                              n_draws=n_draws, seed=seed)
+    critical_value = compute_critical_value_bands(theta=theta, covariance=covariance,
+                                                  alpha=alpha, method=method,
+                                                  n_draws=n_draws, seed=seed)
 
     # Processing inputs
     theta = np.asarray(theta)

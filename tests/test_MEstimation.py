@@ -395,6 +395,11 @@ class TestMEstimation:
                             np.asarray(glm.conf_int()),
                             atol=1e-6)
 
+        # Checking confidence bands
+        npt.assert_allclose(mestimator.confidence_bands(method='bonferroni'),
+                            mestimator.confidence_intervals(alpha=0.05 / len(mestimator.theta)),
+                            atol=1e-6)
+
         # Checking Z-scores
         npt.assert_allclose(mestimator.z_scores(null=0),
                             np.asarray(glm.tvalues),
