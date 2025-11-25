@@ -1773,7 +1773,9 @@ def _distribution_variance_(dist, mu, hyperparameter=None, alpha=None):
                              "hyperparameter to be non-negative (>0)")
         v = mu**hyperparameter
     else:
-        raise ValueError("invalid distribution")
+        raise ValueError("The distribution '" + str(dist) + "' was specified, but only the following "
+                         "distributions are supported: " +
+                         "'normal', 'poisson', 'binomial', 'gamma', 'inverse_normal', 'tweedie'.")
     return v
 
 
