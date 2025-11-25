@@ -9,6 +9,7 @@ import pandas as pd
 from lifelines import ExponentialFitter, WeibullFitter, WeibullAFTFitter
 
 from delicatessen import MEstimator
+from delicatessen.data import load_breast_cancer
 from delicatessen.estimating_equations import ee_survival_model, ee_aft
 
 
