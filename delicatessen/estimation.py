@@ -8,7 +8,8 @@ from scipy.optimize import newton, root, minimize
 from scipy.stats import norm
 from scipy.optimize import OptimizeWarning
 
-from delicatessen.sandwich import compute_bread, compute_meat, build_sandwich
+from delicatessen.errors import check_alpha_level, check_variance_is_not_none
+from delicatessen.sandwich import compute_bread, compute_meat, build_sandwich, compute_confidence_bands
 
 
 class _GeneralEstimator:
@@ -55,13 +56,11 @@ class _GeneralEstimator:
             b-by-2 array, where row 1 is the confidence intervals for :math:`\theta_1`, ..., and row b is the confidence
             intervals for :math:`\theta_b`
         """
-        # Check that estimate() has been called
-        if self.variance is None:
-            raise ValueError("Either theta has not been estimated yet, or there is a np.nan in the bread matrix. "
-                             "Therefore, confidence_intervals() cannot be called.")
+        # Check that variance has been estimated
+        check_variance_is_not_none(variance=self.variance)
+
         # Check valid alpha value is being provided
-        if not 0 < alpha < 1:
-            raise ValueError("`alpha` must be 0 < a < 1")
+        check_alpha_level(alpha=alpha)
 
         # 'Looking up' via Z table
         z_alpha = norm.ppf(1 - alpha / 2, loc=0, scale=1)   # Z_alpha value for CI
@@ -94,10 +93,8 @@ class _GeneralEstimator:
         array :
             Array of Z-scores for :math:`\theta_1, ..., \theta_b`, respectively
         """
-        # Check that self.estimate() has been called
-        if self.variance is None:
-            raise ValueError("Either theta has not been estimated yet, or there is a np.nan in the bread matrix. "
-                             "Therefore, z_scores() cannot be called.")
+        # Check that variance has been estimated
+        check_variance_is_not_none(variance=self.variance)
 
         # Calculating Z-scores
         se = np.sqrt(np.diag(self.variance))       # Extract the standard error estimates from the sandwich
@@ -170,7 +167,7 @@ class _GeneralEstimator:
 
         .. math::
 
-            IF(O_i; \theta) = \frac{\psi(O_i; \theta)}{B_n(O, theta)}
+            IF(O_i; \theta) = \left\{ B_n(theta) \right\}^{-1} \psi(O_i; \theta)
 
         or that the influence functions is equal to the estimating function scaled by the inverse of the bread matrix.
         While this approach was historically used to derive the influence function, there are more general alternatives.
@@ -191,10 +188,8 @@ class _GeneralEstimator:
 
         Stefanski LA, & Boos DD. (2002). The calculus of M-estimation. *The American Statistician*, 56(1), 29-38.
         """
-        # Check that estimate() has been called
-        if self.variance is None:
-            raise ValueError("Either theta has not been estimated yet, or there is a np.nan in the bread matrix. "
-                             "Therefore, confidence_intervals() cannot be called.")
+        # Check that variance has been estimated
+        check_variance_is_not_none(variance=self.variance)
 
         # Calculating estimating function
         efunc_i = self.stacked_equations(theta=self.theta)   # Computing estimating function at theta-hat
@@ -210,6 +205,79 @@ class _GeneralEstimator:
         # Calculating influence function
         ifunc_i = np.dot(bread_invert, efunc_i)
         return ifunc_i.T
+
+    def confidence_bands(self, subset=None, alpha=0.05, method='supt', n_draws=1000000, seed=None):
+        r"""Calculate two-sided :math:`(1 - \alpha) \times` 100% confidence bands from the point and sandwich variance
+        estimates. Rather than cover a single parameter, the confidence bands provide coverage for parameter *vectors*.
+        The formula for the confidence bands is
+
+        .. math::
+
+            \hat{\theta} \pm \hat{c}_{\alpha / 2} \times \widehat{SE}(\hat{\theta})
+
+        Note
+        ----
+        The ``.estimate()`` function must be called before the confidence bands can be calculated.
+
+
+        This formula looks very similar to the confidence interval formula, but there is a different critical value.
+        Note that the formula above has a hat on the critical value, :math:`c`, to denote it is being estimated.
+        Currently, only the sup-t method for estimating the critical value is supported.
+
+        Parameters
+        ----------
+        subset : list, set, array, None, optional
+            Optional argument to compute the confidence bands for a subset of parameters. Note that this argument is
+            distinct from the overall ``subset`` argument and is only used for the confidence bands. Default is
+            ``None``, which computes the confidence bands for all parameters (as if they are are all the parameters of
+            interest).
+        alpha : float, optional
+            The :math:`0 < \alpha < 1` level for the corresponding confidence bands. Default is 0.05, which
+            corresponds to 95% confidence bands.
+        method : str, optional
+            Method to compute the confidence bands. Currently, only the sup-t and Bonferroni method are supported.
+            Default is ``'supt'``
+        n_draws : int, optional
+            Number of random draws to use for any methods based on simulated approximation. Default is one million,
+            ``1000000``.
+        seed : int, optional
+            Seed to initialize a pseudo RNG for methods based on simulated approximations. Default is ``None``
+            which does not use a reproducible seed. To consistently obtain the same confidence bands with approximation
+            methods, please use a seed.
+
+        Returns
+        -------
+        array :
+            b-by-2 array, where row 1 is the confidence intervals for :math:`\theta_1`, ..., and row b is the confidence
+            intervals for :math:`\theta_b`
+
+        References
+        ----------
+        Montiel Olea JL & Plagborg‐Møller M. (2019). Simultaneous confidence bands: Theory, implementation, and an
+        application to SVARs. *Journal of Applied Econometrics*, 34(1), 1-17.
+        """
+        # Check that variance has been estimated
+        check_variance_is_not_none(variance=self.variance)
+
+        # Check valid alpha value is being provided
+        check_alpha_level(alpha=alpha)
+
+        # Processing parameter vector
+        if subset is None:
+            theta = self.theta
+            covar = self.variance
+        else:
+            theta = self.theta[subset]
+            covar = self.variance[np.ix_(subset, subset)]
+
+        # Calculating confidence bands
+        cb = compute_confidence_bands(theta=theta, covariance=covar,
+                                      alpha=alpha,
+                                      method=method,
+                                      n_draws=n_draws, seed=seed)
+
+        # Return 2D array of lower and upper confidence bands
+        return cb
 
     @staticmethod
     def _eval_ee_(stacked_equations, subset):
@@ -252,6 +320,24 @@ class _GeneralEstimator:
 
         # Return the calculated values of theta
         return vals
+
+    @staticmethod
+    def _error_checker_(vals_at_init):
+        # Error checking before running procedure
+        if np.sum(vals_at_init) is None:
+            raise ValueError("When evaluating the estimating equation, `None` was returned. Please check that the "
+                             "stacked_equations returns an array evaluated at theta.")
+        if np.isnan(np.sum(vals_at_init)):         # Check to see if any np.nan's occur with the initial values
+            # Identifying the bad columns
+            nans_in_column = np.sum(np.isnan(vals_at_init), axis=0)        # Counting up all NAN's per estimating eq
+            columns_w_nans = np.argwhere(nans_in_column >= 1).flatten()    # Returning indices that have any NAN's
+            raise ValueError("When evaluated at the initial values, the `stacked_equations` return at least one "
+                             "np.nan at the following estimating equation indices: " +
+                             str(list(columns_w_nans)) + ". "
+                             "As delicatessen does not natively handle missing data, please ensure the "
+                             "provided estimating equations resolve any np.nan values accordingly. For details on "
+                             "how to handle np.nan's see the documentation at: "
+                             "https://deli.readthedocs.io/en/latest/Custom-EE.html#Handling-np.nan")
 
 
 class MEstimator(_GeneralEstimator):
@@ -461,22 +547,10 @@ class MEstimator(_GeneralEstimator):
         vals_at_init = np.asarray(vals_at_init                    # Convert output to an array (in case it isn't)
                                   ).T                             # ... transpose so N is always the 1st element
 
-        # Error checking before running procedure
-        if np.sum(vals_at_init) is None:
-            raise ValueError("When evaluating the estimating equation, `None` was returned. Please check that the "
-                             "stacked_equations returns an array evaluated at theta.")
-        if np.isnan(np.sum(vals_at_init)):         # Check to see if any np.nan's occur with the initial values
-            # Identifying the bad columns
-            nans_in_column = np.sum(np.isnan(vals_at_init), axis=0)        # Counting up all NAN's per estimating eq
-            columns_w_nans = np.argwhere(nans_in_column >= 1).flatten()    # Returning indices that have any NAN's
-            raise ValueError("When evaluated at the initial values, the `stacked_equations` return at least one "
-                             "np.nan at the following estimating equation indices: " +
-                             str(list(columns_w_nans)) + ". "
-                             "As delicatessen does not natively handle missing data, please ensure the "
-                             "provided estimating equations resolve any np.nan values accordingly. For details on "
-                             "how to handle np.nan's see the documentation at: "
-                             "https://deli.readthedocs.io/en/latest/Custom-EE.html#Handling-np.nan")
+        # Error checking for inputs
+        self._error_checker_(vals_at_init=vals_at_init)
 
+        # Checking dimensions of output for M-estimator
         if vals_at_init.ndim == 1 and np.asarray(self.init).shape[0] == 1:     # Checks to ensure dimensions align
             # the starting if-state is to work-around inits=[0, ] (otherwise breaks the first else-if)
             pass
@@ -861,21 +935,8 @@ class GMMEstimator(_GeneralEstimator):
         vals_at_init = np.asarray(vals_at_init                    # Convert output to an array (in case it isn't)
                                   ).T                             # ... transpose so N is always the 1st element
 
-        # Error checking before running procedure
-        if np.sum(vals_at_init) is None:
-            raise ValueError("When evaluating the estimating equation, `None` was returned. Please check that the "
-                             "stacked_equations returns an array evaluated at theta.")
-        if np.isnan(np.sum(vals_at_init)):         # Check to see if any np.nan's occur with the initial values
-            # Identifying the bad columns
-            nans_in_column = np.sum(np.isnan(vals_at_init), axis=0)        # Counting up all NAN's per estimating eq
-            columns_w_nans = np.argwhere(nans_in_column >= 1).flatten()    # Returning indices that have any NAN's
-            raise ValueError("When evaluated at the initial values, the `stacked_equations` return at least one "
-                             "np.nan at the following estimating equation indices: " +
-                             str(list(columns_w_nans)) + ". "
-                             "As delicatessen does not natively handle missing data, please ensure the "
-                             "provided estimating equations resolve any np.nan values accordingly. For details on "
-                             "how to handle np.nan's see the documentation at: "
-                             "https://deli.readthedocs.io/en/latest/Custom-EE.html#Handling-np.nan")
+        # Error checking for inputs
+        self._error_checker_(vals_at_init=vals_at_init)
 
         # Processing dependent on number of estimating functions
         if vals_at_init.ndim == 1:
