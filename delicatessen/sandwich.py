@@ -544,6 +544,9 @@ def compute_critical_value_bands(theta, covariance, alpha=0.05, method='supt', n
     k = len(theta)
     if method.lower() in ['supt', 'sup-t']:
         mvn = rng.multivariate_normal([0., ] * k, cov=covariance, size=n_draws)
+        if (stderr <= 0).any():
+            raise ValueError("There is at least one parameter with a standard error of zero or less. The sup-t method "
+                             "cannot be applied as it would require division by zero for the rescaling process.")
         scaled_mvn = np.abs(mvn / stderr)
         ts = np.max(scaled_mvn, axis=1)
         critical_value = np.percentile(ts, q=(1 - alpha) * 100)
