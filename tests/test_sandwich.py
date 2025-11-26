@@ -445,9 +445,9 @@ class TestConfBands:
         alpha = 0.05
         expected = norm.ppf(1 - alpha / (2 * 3), loc=0, scale=1)
         c_alpha = compute_critical_value_bands(theta=[0, 0, 0],
-                                               covariance=[[1, 0.2, 0.2],
-                                                           [0.2, 1, 0.2],
-                                                           [0.2, 0.2, 1]],
+                                               covariance=[[1, 0.9, 0.9],
+                                                           [0.9, 1, 0.9],
+                                                           [0.9, 0.9, 1]],
                                                alpha=alpha, method='supt')
         assert c_alpha < expected
 
