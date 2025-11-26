@@ -19,6 +19,7 @@ added to this documentations, please contact us.
   Morris-Trials-2022
   Collett-Survival
   Ash-JCheminform-2022
+  Zivich-CBands
   GMM-OverID
   Generalized-Additive-Model
 
