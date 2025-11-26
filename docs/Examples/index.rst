@@ -18,6 +18,7 @@ added to this documentations, please contact us.
   Hernan-Robins-2023
   Morris-Trials-2022
   Collett-Survival
+  Ash-JCheminform-2022
   GMM-OverID
   Generalized-Additive-Model
 
