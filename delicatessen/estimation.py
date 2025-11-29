@@ -32,6 +32,16 @@ class _GeneralEstimator:
         self.asymptotic_variance = None   # Asymptotic covariance matrix for theta values (calculated later)
         self.weight_matrix = None         # Weight matrix for the GMM estimator
 
+        # Storage for results to display when requested
+        self._label_ = "General"  # Estimator's name
+        self._solver_ = ''        # Solving algorithm name
+        self._maxiter_ = ''       # Maximum iterations allowed
+        self._tol_ = ''           # Tolerance for solving
+        self._deriv_ = ''         # Derivative method
+        self._dx_ = ''            # Derivative approximation error
+        self._pinv_ = ''          # Pseudo-inverse
+        self._over_identified_ = None
+
     def confidence_intervals(self, alpha=0.05):
         r"""Calculate two-sided Wald-type :math:`(1 - \alpha) \times` 100% confidence intervals using the point
         and sandwich variance estimates. The formula for the confidence intervals is
@@ -278,6 +288,72 @@ class _GeneralEstimator:
 
         # Return 2D array of lower and upper confidence bands
         return cb
+
+    def print_results(self, subset=None, decimals=2, alpha=0.05):
+        r"""Display estimator results to the console. This function prints the results of the estimator object (point
+        estimates, standard error, confidence intervals, P-value, S-value) to the console. This function is only meant
+        as an easy way to display the underlying results to the console without having to call each function separately.
+
+        Parameters
+        ----------
+        subset : list, set, array, None, optional
+            List of indices of a subset of parameters to display in the table. Default is ``None``, which displays all
+            the paramters in the table.
+        decimals : int, optional
+            Number of decimals to display in the table. Default is ``2``. The spacing of the table may be skewed when
+            ``decimals > 5``.
+        alpha : float, optional
+            The :math:`0 < \alpha < 1` level for the corresponding confidence bands. Default is 0.05, which
+            corresponds to 95% confidence intervals.
+
+        Returns
+        -------
+        None
+        """
+        # Some setup for values
+        n_params = len(self.theta)
+        if subset is None:
+            p_to_print = range(n_params)
+        else:
+            p_to_print = subset
+
+        # Computing all quantities needed
+        var = np.diag(self.variance)
+        ci = self.confidence_intervals(alpha=alpha)
+        zscr = self.z_scores(null=0)
+        pval = self.p_values(null=0)
+        sval = self.s_values(null=0)
+
+        # Displaying the estimator information
+        print("==============================================================")
+        print("              Estimation Method: " + self._label_)
+        print("--------------------------------------------------------------")
+        fmt = "No. Observations:  {:>10} | No. Parameters:     {:>10}"
+        print(fmt.format(self.n_obs, n_params))
+        fmt = "Solving algorithm: {:>10} | Max Iterations:     {:>10}"
+        print(fmt.format(self._solver_, self._maxiter_))
+        fmt = "Solving tolerance: {:>10} | Allow P-Inverse:    {:>10}"
+        print(fmt.format(self._tol_, self._pinv_))
+        fmt = "Derivative Method: {:>10} | Deriv Approx:       {:>10}"
+        print(fmt.format(self._deriv_, self._dx_))
+
+        # Extra results for GMM in the over-identified setting
+        if self._label_ == 'GMM-estimator' and self._over_identified_:
+            fmt = "OverID Iteration:  {:>10} | OverID Tolerance:   {:>10}"
+            print(fmt.format(self._over_id_iterations_, self._over_id_tolerance_))
+        print("==============================================================")
+
+        # Printing tabled results for various metrics
+        fmt = "{:>8} "*7
+        print(fmt.format("Theta", "StdErr", "Z-score", "LCL", "UCL", "P-value", "S-value"))
+        print("--------------------------------------------------------------")
+        decimals_str = str(decimals)
+        fmt_base = "{:8." + decimals_str + "f} "
+        fmt = fmt_base * 7
+        for p in p_to_print:
+            print(fmt.format(self.theta[p], var[p]**0.5, zscr[p],
+                             ci[p, 0], ci[p, 1], pval[p], sval[p]))
+        print("==============================================================")
 
     @staticmethod
     def _eval_ee_(stacked_equations, subset):
@@ -542,6 +618,15 @@ class MEstimator(_GeneralEstimator):
         -------
         None
         """
+        # Setting up labels for print_results
+        self._label_ = "M-estimator"   # Naming estimator via label
+        self._solver_ = solver         # Solving algorithm name
+        self._maxiter_ = maxiter       # Maximum iterations allowed
+        self._tol_ = tolerance         # Tolerance for solving
+        self._deriv_ = deriv_method    # Derivative method
+        self._dx_ = dx                 # Derivative approximation error
+        self._pinv_ = allow_pinv       # Pseudo-inverse
+
         # Evaluate stacked estimating equations at init
         vals_at_init = self.stacked_equations(theta=self.init)    # Calculating the initial values
         vals_at_init = np.asarray(vals_at_init                    # Convert output to an array (in case it isn't)
@@ -930,6 +1015,15 @@ class GMMEstimator(_GeneralEstimator):
         -------
         None
         """
+        # Setting up labels for print_results
+        self._label_ = "GMM-estimator"  # Estimator name
+        self._solver_ = solver          # Solving algorithm name
+        self._maxiter_ = maxiter        # Maximum iterations allowed
+        self._tol_ = tolerance          # Tolerance for solving
+        self._deriv_ = deriv_method     # Derivative method
+        self._dx_ = dx                  # Derivative approximation error
+        self._pinv_ = allow_pinv        # Pseudo-inverse
+
         # Evaluate stacked estimating equations at init
         vals_at_init = self.stacked_equations(theta=self.init)    # Calculating the initial values
         vals_at_init = np.asarray(vals_at_init                    # Convert output to an array (in case it isn't)
@@ -941,7 +1035,7 @@ class GMMEstimator(_GeneralEstimator):
         # Processing dependent on number of estimating functions
         if vals_at_init.ndim == 1:
             n_params = 1
-            over_identified = False
+            self._over_identified_ = False
             if np.asarray(self.init).shape[0] > 1:
                 raise ValueError(
                     "The number of initial values should be less than or equal to the number of rows "
@@ -951,9 +1045,9 @@ class GMMEstimator(_GeneralEstimator):
         elif vals_at_init.ndim == 2:
             n_params = vals_at_init.shape[1]                        # Getting the number of parameters
             if np.asarray(self.init).shape[0] == n_params:          # Finding if the problem is just-identified
-                over_identified = False                             # ... flag for over-ID iteration procedure
+                self._over_identified_ = False                      # ... flag for over-ID iteration procedure
             elif np.asarray(self.init).shape[0] < n_params:         # Finding if the problem is over-identified
-                over_identified = True                              # ... flag for over-ID iteration procedure
+                self._over_identified_ = True                       # ... flag for over-ID iteration procedure
             else:                                                   # Under-identified parameters are not supported
                 raise ValueError(
                     "The number of initial values should be less than or equal to the number of rows "
@@ -995,7 +1089,7 @@ class GMMEstimator(_GeneralEstimator):
         self._solve_for_theta_(solver=solver, maxiter=maxiter, tolerance=tolerance, init=self.theta)
 
         # STEP 1.2: Iterative procedure if we are in the over-identified setting
-        if over_identified:
+        if self._over_identified_:
             # Iterative process argument processing
             current_iteration = 0
             if self._over_id_iterations_ < 1:
