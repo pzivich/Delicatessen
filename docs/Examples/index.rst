@@ -8,7 +8,7 @@ added to this documentations, please contact us.
 
 
 .. toctree::
-  :maxdepth: 2
+  :maxdepth: 1
 
   Ross-IJE-2024
   LifeScienceExamples
@@ -18,6 +18,9 @@ added to this documentations, please contact us.
   Hernan-Robins-2023
   Morris-Trials-2022
   Collett-Survival
+  Ash-JCheminform-2022
+  Zivich-CBands
+  SDSS-Quasar
   GMM-OverID
   Generalized-Additive-Model
 

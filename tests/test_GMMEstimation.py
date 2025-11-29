@@ -375,6 +375,11 @@ class TestGMMEstimation:
                             np.asarray(glm.conf_int()),
                             atol=1e-6)
 
+        # Checking confidence bands
+        npt.assert_allclose(estr.confidence_bands(method='bonferroni'),
+                            estr.confidence_intervals(alpha=0.05 / len(estr.theta)),
+                            atol=1e-6)
+
         # Checking Z-scores
         npt.assert_allclose(estr.z_scores(null=0),
                             np.asarray(glm.tvalues),

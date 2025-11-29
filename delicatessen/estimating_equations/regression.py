@@ -5,6 +5,7 @@
 import warnings
 import numpy as np
 
+from delicatessen.errors import check_penalty_shape
 from delicatessen.utilities import (logit, inverse_logit, identity,
                                     robust_loss_functions,
                                     additive_design_matrix,
@@ -1671,7 +1672,7 @@ def _model_transform_(model, assert_linear_model=False):
     if isinstance(model, str):              # If string, convert to lower-case for internal handling
         model = model.lower()
     else:
-        raise ValueError("The model argument must be a str object.")
+        raise ValueError("The model argument must be a `str` object.")
 
     # forcing model to be 'linear' (used by ee_robust_regression)
     if assert_linear_model and model != 'linear':
@@ -1735,7 +1736,8 @@ def _inverse_link_(betax, link):
         py = betax**2                           # Inverse link
         dpy = 2 * betax                         # Derivative of inverse link
     else:
-        raise ValueError("invalid link")
+        raise ValueError("The provided link function `" + str(link)
+                         + "` is not valid")
     return py, dpy
 
 
@@ -1768,10 +1770,12 @@ def _distribution_variance_(dist, mu, hyperparameter=None, alpha=None):
     elif dist == 'tweedie':
         if 0 > hyperparameter:
             raise ValueError("The Tweedie distribution requires the "
-                             "hyperparameter to be non-negative, i.e., >0.")
+                             "hyperparameter to be non-negative (>0)")
         v = mu**hyperparameter
     else:
-        raise ValueError("invalid distribution")
+        raise ValueError("The distribution '" + str(dist) + "' was specified, but only the following "
+                         "distributions are supported: " +
+                         "'normal', 'poisson', 'binomial', 'gamma', 'inverse_normal', 'tweedie'.")
     return v
 
 
@@ -1813,13 +1817,8 @@ def _bridge_penalty_(theta, gamma, penalty, n_obs, center):
     -------
     ndarray
     """
-    # Checking the penalty term is non-negative
-    if penalty.size != 1:
-        if penalty.shape[0] != len(theta):
-            raise ValueError("The penalty term must be either a single number or the same length as theta.")
-    if center.size != 1:
-        if center.shape[0] != len(theta):
-            raise ValueError("The center term must be either a single number or the same length as theta.")
+    # Checking the penalty term is valid
+    check_penalty_shape(theta=theta, penalty=penalty, center=center)
 
     # Checking a valid hyperparameter is being provided
     if gamma < 1:
@@ -1861,13 +1860,8 @@ def _dlasso_penalty_(theta, penalty, s, n_obs, center):
     -------
     ndarray
     """
-    # Checking the penalty term is non-negative
-    if penalty.size != 1:
-        if penalty.shape[0] != len(theta):
-            raise ValueError("The penalty term must be either a single number or the same length as theta.")
-    if center.size != 1:
-        if center.shape[0] != len(theta):
-            raise ValueError("The center term must be either a single number or the same length as theta.")
+    # Checking the penalty term is the correct shape
+    check_penalty_shape(theta=theta, penalty=penalty, center=center)
 
     # Checking a valid hyperparameter is being provided
     if s < 0:

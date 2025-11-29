@@ -5,6 +5,7 @@
 import warnings
 import numpy as np
 
+from delicatessen.errors import check_survival_data_valid
 from delicatessen.estimating_equations.processing import generate_weights
 from delicatessen.utilities import standard_normal_cdf, standard_normal_pdf
 
@@ -15,20 +16,19 @@ from delicatessen.utilities import standard_normal_cdf, standard_normal_pdf
 def ee_survival_model(theta, t, delta, distribution):
     r"""Estimating equation for a parametric survival models. Let :math:`T_i` indicate the time of the event and
     :math:`C_i` indicate the time to right censoring. Therefore, the observable data consists of
-    :math:`t_i = min(T_i, C_i)` and :math:`\Delta_i = I(t_i = T_i)`. The estimating equations are
+    :math:`t_i = min(T_i, C_i)` and :math:`\Delta_i = I(t_i = T_i)`. The general estimating equations are
 
     .. math::
 
         \sum_{i=1}^n =
         \begin{bmatrix}
-            \frac{\Delta_i}{\lambda} -  t_i^{\gamma} \\
-            \frac{\Delta_i}{\gamma} + \Delta_i \log(t_i) - \lambda t_i^{\gamma} \log(t_i)
+            \Delta_i \frac{f'(t_i; \theta)}{f(t_i; \theta)} + (1-\Delta_i) \frac{S'(t_i; \theta)}{S(t_i; \theta)}
         \end{bmatrix}
         = 0
 
-    Here, :math:`\theta` consists of two parameters for the Weibull model: the scale (:math:`\lambda`) and the shape
-    (:math:`\gamma`). The parameterization of the different survival analysis models are described in the following
-    table
+    Here, :math:`\theta` consists of parameters for the corresponding model. Note that this estimating equation
+    implicitly assumes that the event and censoring times are independent. See the table below for the different
+    survival models and their parametrization in terms of the hazard function.
 
     .. list-table::
        :widths: 25 25 25 25
@@ -37,15 +37,19 @@ def ee_survival_model(theta, t, delta, distribution):
        * - Distribution
          - Keyword
          - Parameters
-         - :math:`H(t)`
+         - :math:`h(t)`
        * - Exponential
          - ``exponential``
          - :math:`\lambda`
-         - :math:`\lambda t`
+         - :math:`\lambda`
        * - Weibull
          - ``weibull``
          - :math:`\lambda, \gamma`
-         - :math:`\lambda t^{\gamma}`
+         - :math:`\lambda \gamma t^{\gamma - 1}`
+       * - Gompertz
+         - ``weibull``
+         - :math:`\lambda, \gamma`
+         - :math:`\lambda \exp(\gamma t)`
 
 
     Parameters
@@ -107,8 +111,7 @@ def ee_survival_model(theta, t, delta, distribution):
 
     Inspecting parameter the specific parameter estimates
 
-    >>> estr.theta[0]     # lambda (scale)
-    >>> estr.theta[1]     # gamma  (shape)
+    >>> estr.theta
 
     To generate predictions from this model, please use ``delicatessen.utilities.survival_predictions``. See the
     corresponding documentation for further details.
@@ -123,25 +126,39 @@ def ee_survival_model(theta, t, delta, distribution):
     t = np.asarray(t)
     distribution = distribution.lower()
 
+    # Error checking for survival data formatting
+    check_survival_data_valid(delta=delta, time=t)
+
     # Extracting and naming parameters for my convenience
     if distribution == 'exponential':
         lambd = theta[0]
         gamma = 1
+    # When implementing generalized gamma, can use
+    # elif distribution == 'generalized-gamma': lambd, gamma, [...] = theta[0], theta[1], theta[2]
     else:
         lambd, gamma = theta[0], theta[1]
 
-    # Calculating the contributions
-    contribution_1 = (delta/lambd) - t**gamma     # Calculating estimating equation for lambda
-    contribution_2 = ((delta/gamma)               # Calculating estimating equation for gamma
-                      + (delta*np.log(t))
-                      - (lambd * (t**gamma) * np.log(t)))
+    # Handling specified distribution
+    if distribution in ['exponential', 'weibull']:
+        # Calculating the contributions
+        ef_lambda = (delta/lambd) - t**gamma     # Calculating estimating equation for lambda
+        ef_gamma = ((delta/gamma)                # Calculating estimating equation for gamma
+                    + (delta*np.log(t))
+                    - (lambd * (t**gamma) * np.log(t)))
+    elif distribution == 'gompertz':
+        exp_gt = np.exp(gamma*t)
+        ef_lambda = delta/lambd - (exp_gt - 1)/gamma
+        ef_gamma = lambd/(gamma**2)*(exp_gt-1) + delta*t - (lambd/gamma)*exp_gt*t
+    else:
+        raise ValueError("The distribution '" + str(distribution) + "' was specified, but only the following "
+                         "distributions are supported: 'exponential', 'weibull', 'gompertz'.")
 
     # Returning stacked estimating equations
     if distribution == 'exponential':
-        return contribution_1
+        return ef_lambda
     else:
-        return np.vstack((contribution_1,
-                          contribution_2))
+        return np.vstack((ef_lambda,
+                          ef_gamma))
 
 
 #################################################################
@@ -293,6 +310,9 @@ def ee_aft(theta, X, t, delta, distribution, weights=None):
     delta = np.asarray(delta)[:, None]         # Convert to NumPy array and ensure correct shape for matrix algebra
     beta_dim = X.shape[1]
 
+    # Error checking for survival data formatting
+    check_survival_data_valid(delta=delta, time=t)
+
     # Extract coefficients
     beta = np.asarray(theta[:beta_dim])[:, None]
     if distribution == 'exponential':
@@ -320,7 +340,10 @@ def ee_aft(theta, X, t, delta, distribution, weights=None):
         df_f = -z_i
         dS_S = standard_normal_pdf(z_i) / (1 - standard_normal_cdf(z_i))
     else:
-        raise ValueError("Invalid distribution: " + str(distribution))
+        raise ValueError("The distribution '" + str(distribution) + "' was specified, but only the following "
+                         "distributions are supported: 'exponential', 'weibull', 'log-logistic', 'log-normal'.")
+
+    # Individual contributions
     lambda_epsilon = delta*df_f - (1-delta)*dS_S
 
     # Contributions to the estimating functions

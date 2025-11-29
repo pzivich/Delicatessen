@@ -9,6 +9,7 @@ import pandas as pd
 from lifelines import ExponentialFitter, WeibullFitter, WeibullAFTFitter
 
 from delicatessen import MEstimator
+from delicatessen.data import load_breast_cancer
 from delicatessen.estimating_equations import ee_survival_model, ee_aft
 
 
@@ -19,6 +20,28 @@ class TestEstimatingEquationsSurvParam:
         times = np.array([1, 2, 3, 4, 5, 1, 1, 2, 2.5, 3, 4, 5])
         event = np.array([1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0])
         return times, event
+
+    def test_survival_model_error1(self, data_s):
+        times, events = data_s
+        events[0] = 10
+
+        def psi(theta):
+            return ee_survival_model(theta=theta, t=times, delta=events, distribution='exponential')
+
+        estr = MEstimator(psi, init=[0.1])
+        with pytest.raises(ValueError, match="non-missing event indicator"):
+            estr.estimate()
+
+    def test_survival_model_error2(self, data_s):
+        times, events = data_s
+        times[0] = -3
+
+        def psi(theta):
+            return ee_survival_model(theta=theta, t=times, delta=events, distribution='exponential')
+
+        estr = MEstimator(psi, init=[0.1])
+        with pytest.raises(ValueError, match="non-missing observed times"):
+            estr.estimate()
 
     def test_survival_model_exponential(self, data_s):
         times, events = data_s
@@ -78,6 +101,27 @@ class TestEstimatingEquationsSurvParam:
         #                     np.asarray(results[0, 2:]),
         #                     atol=1e-5)
 
+    def test_survival_model_gompertz(self, data_s):
+        # R code
+        # library(flexsurv)
+        # times = c(1, 2, 3, 4, 5, 1, 1, 2, 2.5, 3, 4, 5)
+        # event = c(1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0)
+        # fit <- flexsurv::flexsurvreg(Surv(times, event) ~ 1, dist = "gompertz")
+        # exp(fit$coefficients['rate'])  # 0.02600121
+        # fit$coefficients['shape']      # 0.7871837
+        comparison_theta = np.asarray([0.02600120662398, 0.78718366977333])
+
+        times, events = data_s
+
+        def psi(theta):
+            return ee_survival_model(theta=theta, t=times, delta=events, distribution='gompertz')
+
+        estr = MEstimator(psi, init=[0.01, 0.1])
+        estr.estimate(solver="lm")
+
+        # Checking mean estimate
+        npt.assert_allclose(estr.theta, comparison_theta, atol=1e-6)
+
 
 class TestEstimatingEquationsAFT:
 
@@ -112,6 +156,28 @@ class TestEstimatingEquationsAFT:
         d['C'] = 1
         return d
 
+    def test_aft_error1(self, collett_bc):
+        d = collett_bc
+        d.loc[0, 'delta'] = 10
+
+        def psi(theta):
+            return ee_aft(theta=theta, t=d['time'], delta=d['delta'], X=d[['C', 'X']], distribution='exponential')
+
+        estr = MEstimator(psi, init=[2., 0.])
+        with pytest.raises(ValueError, match="non-missing event indicator"):
+            estr.estimate()
+
+    def test_aft_error2(self, collett_bc):
+        d = collett_bc
+        d.loc[0, 'time'] = -3
+
+        def psi(theta):
+            return ee_aft(theta=theta, t=d['time'], delta=d['delta'], X=d[['C', 'X']], distribution='exponential')
+
+        estr = MEstimator(psi, init=[2., 0.])
+        with pytest.raises(ValueError, match="non-missing observed times"):
+            estr.estimate()
+
     def test_aft_exponential(self, collett_bc):
         # R code
         # library(survival)
@@ -131,7 +197,7 @@ class TestEstimatingEquationsAFT:
         def psi(theta):
             return ee_aft(theta=theta, t=d['time'], delta=d['delta'], X=d[['C', 'X']], distribution='exponential')
 
-        # M-estimator with built-in Weibull AFT
+        # M-estimator with built-in exponential AFT
         estr = MEstimator(psi, init=[2., 0.])
         estr.estimate(solver="lm")
 

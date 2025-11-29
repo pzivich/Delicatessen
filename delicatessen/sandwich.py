@@ -9,7 +9,9 @@ import warnings
 
 import numpy as np
 from scipy.optimize import approx_fprime
+from scipy.stats import norm
 
+from delicatessen.errors import check_alpha_level
 from delicatessen.derivative import auto_differentiation, approx_differentiation
 
 
@@ -468,3 +470,155 @@ def delta_method(theta, g, covariance, deriv_method='exact', dx=1e-9):
 
     # Returning the covariance matrix for g(x)
     return covariance_g
+
+
+def compute_critical_value_bands(theta, covariance, alpha=0.05, method='supt', n_draws=100000, seed=None):
+    """Function to compute the critical value for parameter vectors.
+
+    Confidence bands are an extension of confidence intervals. Confidence intervals claim to cover the true parameter
+    under infinite repetitions at the :math:`1-\alpha` proportion. However, when considering vectors of parameters,
+    confidence interval coverage is below this proportion (can be thought of as a multiple-testing problem). Confidence
+    bands instead work to ensure :math:`1-\alpha` coverage of *the parameter vector*. Many of the algorithms for
+    confidence bands operate by adjusting the critical value. This function offers several methods to compute the
+    critical value for confidence bands
+
+    Parameters
+    ----------
+    theta : ndarray, list, set
+        Parameter vector of dimension `v` to compute confidence bands for. This vector should consist of all parameters
+        that inference is being jointly drawn for.
+    covariance : ndarray, list, set
+        Covariance matrix of dimension `v`. This should be the empirical sandwich covariance matrix for the parameter.
+    alpha : float, optional
+        The :math:`0 < \alpha < 1` level for the corresponding confidence bands. Default is 0.05, which
+        corresponds to 95% confidence bands.
+    method : str, optional
+        Method to compute the confidence bands. Currently, only the sup-t and Bonferroni method are supported.
+        Default is ``'supt'``
+    n_draws : int, optional
+        Number of random draws to use for any methods based on simulated approximation. Default is ``100000``.
+    seed : int, optional
+        Seed to intialize a pseudo RNG for methods based on simulated approximations. Default is ``None``
+        which does not use a reproducible seed. To consistently obtain the exact same confidence bands, please use
+        a seed.
+
+    Returns
+    -------
+    float :
+        Corresponding critical value for given method and inputs
+
+    References
+    ----------
+    Montiel Olea JL & Plagborg‐Møller M. (2019). Simultaneous confidence bands: Theory, implementation, and an
+    application to SVARs. *Journal of Applied Econometrics*, 34(1), 1-17.
+
+    Zivich PN, Cole SR, Greifer N, Montoya LM, Kosorok MR, Edwards JK. (2025). Confidence Regions for Multiple
+    Outcomes, Effect Modifiers, and Other Multiple Comparisons, *arXiv:2510.07076*
+    """
+    # Pre-processing inputs
+    theta = np.asarray(theta)
+    covariance = np.asarray(covariance)
+
+    # Error checking for inputs
+    if len(theta.shape) != 1:
+        raise ValueError("The input theta vector must be a 1-dimensional vector. Instead, the input theta vector "
+                         "has a dimension of " + str(len(theta.shape)))
+    if len(covariance.shape) != 2:
+        raise ValueError("The input covariance matrix must be a 2-dimensional matrix. Instead, the input covariance "
+                         "matrix has a dimension of " + str(len(covariance.shape)))
+    if covariance.shape[0] != covariance.shape[1]:
+        raise ValueError("The input covariance matrix must be square (i.e., have the same number of rows and columns). "
+                         "Instead, the input covariance matrix has " + str(covariance.shape[0]) + " rows and "
+                         + str(covariance.shape[1]) + " columns.")
+    if theta.shape[0] != covariance.shape[0]:
+        raise ValueError("The dimension of the theta vector and covariance matrix must be equal. Instead, the theta "
+                         "vector has " + str(theta.shape[0]) + " elements and the covariance matrix is dimension "
+                         + str(covariance.shape[0]))
+    check_alpha_level(alpha=alpha)
+
+    # Processing
+    stderr = np.diag(covariance) ** 0.5
+
+    # Approximate c
+    rng = np.random.default_rng(seed=seed)
+    k = len(theta)
+    if method.lower() in ['supt', 'sup-t']:
+        mvn = rng.multivariate_normal([0., ] * k, cov=covariance, size=n_draws)
+        if (stderr <= 0).any():
+            raise ValueError("There is at least one parameter with a standard error of zero or less. The sup-t method "
+                             "cannot be applied as it would require division by zero for the rescaling process.")
+        scaled_mvn = np.abs(mvn / stderr)
+        ts = np.max(scaled_mvn, axis=1)
+        critical_value = np.percentile(ts, q=(1 - alpha) * 100)
+    elif method.lower() == 'bonferroni':
+        critical_value = norm.ppf(1 - alpha / (2 * k), loc=0, scale=1)
+    else:
+        raise ValueError("The method '" + str(method) + "' was specified, but only the following "
+                         "methods are supported: 'supt', 'bonferroni'.")
+
+    # Returning the corresponding critical value
+    return critical_value
+
+
+def compute_confidence_bands(theta, covariance, alpha=0.05, method='supt', n_draws=100000, seed=None):
+    r"""Function to compute the confidence bands for a given parameter vector and covariance matrix.
+
+    Confidence bands are an extension of confidence intervals. Confidence intervals claim to cover the true parameter
+    under infinite repetitions at the :math:`1-\alpha` proportion. However, when considering vectors of parameters,
+    confidence interval coverage is below this proportion (can be thought of as a multiple-testing problem). Confidence
+    bands instead work to ensure :math:`1-\alpha` coverage of *the parameter vector*. Many of the algorithms for
+    confidence bands operate by adjusting the critical value.
+
+    Parameters
+    ----------
+    theta : ndarray, list, set
+        Parameter vector of dimension `v` to compute confidence bands for. This vector should consist of all parameters
+        that inference is being jointly drawn for.
+    covariance : ndarray, list, set
+        Covariance matrix of dimension `v`. This should be the empirical sandwich covariance matrix for the parameter.
+    alpha : float, optional
+        The :math:`0 < \alpha < 1` level for the corresponding confidence bands. Default is 0.05, which
+        corresponds to 95% confidence bands.
+    method : str, optional
+        Method to compute the confidence bands. Currently, only the sup-t and Bonferroni method are supported.
+        Default is ``'supt'``
+    n_draws : int, optional
+        Number of random draws to use for any methods based on simulated approximation. Default is ``100000``.
+    seed : int, optional
+        Seed to intialize a pseudo RNG for methods based on simulated approximations. Default is ``None``
+        which does not use a reproducible seed. To consistently obtain the exact same confidence bands, please use
+        a seed.
+
+    Returns
+    -------
+    array :
+        b-by-2 array, where row 1 is the confidence intervals for :math:`\theta_1`, ..., and row b is the confidence
+        intervals for :math:`\theta_b`
+
+    Examples
+    --------
+
+    References
+    ----------
+    Montiel Olea JL & Plagborg‐Møller M. (2019). Simultaneous confidence bands: Theory, implementation, and an
+    application to SVARs. *Journal of Applied Econometrics*, 34(1), 1-17.
+
+    Zivich PN, Cole SR, Greifer N, Montoya LM, Kosorok MR, Edwards JK. (2025). Confidence Regions for Multiple
+    Outcomes, Effect Modifiers, and Other Multiple Comparisons, *arXiv:2510.07076*
+    """
+    # Computing the critical value
+    critical_value = compute_critical_value_bands(theta=theta, covariance=covariance,
+                                                  alpha=alpha, method=method,
+                                                  n_draws=n_draws, seed=seed)
+
+    # Processing inputs
+    theta = np.asarray(theta)
+    covariance = np.asarray(covariance)
+    stderr = np.diag(covariance) ** 0.5
+
+    # Computing the corresponding confidence bands
+    conf_bands = np.asarray([theta - critical_value * stderr,
+                             theta + critical_value * stderr])
+
+    # Returning confidence bands
+    return conf_bands.T
