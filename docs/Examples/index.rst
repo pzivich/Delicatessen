@@ -8,7 +8,7 @@ added to this documentations, please contact us.
 
 
 .. toctree::
-  :maxdepth: 2
+  :maxdepth: 1
 
   Ross-IJE-2024
   LifeScienceExamples
