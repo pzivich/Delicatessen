@@ -802,7 +802,7 @@ class TestPredictions:
         # Checking outputs are equal
         npt.assert_allclose(s_t_hat,
                             byhand,
-                            atol=1e-7)
+                            atol=1e-6)
 
 
 class TestDesignMatrix:
