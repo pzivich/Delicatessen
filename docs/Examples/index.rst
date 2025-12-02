@@ -17,6 +17,7 @@ added to this documentations, please contact us.
   Bonate-Pharmaco
   Hernan-Robins-2023
   Morris-Trials-2022
+  Mroz-1987
   Collett-Survival
   Ash-JCheminform-2022
   Zivich-CBands
