@@ -18,6 +18,8 @@ added to this documentations, please contact us.
   Hernan-Robins-2023
   Morris-Trials-2022
   Mroz-1987
+  Cole-AJE-2022
+  Cole-EPID-2023
   Collett-Survival
   Ash-JCheminform-2022
   Zivich-CBands
