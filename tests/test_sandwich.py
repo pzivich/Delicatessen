@@ -6,9 +6,11 @@ import pytest
 import numpy as np
 import numpy.testing as npt
 import pandas as pd
+import statsmodels.api as sm
+import statsmodels.formula.api as smf
 from scipy.stats import norm
 from delicatessen import compute_sandwich, MEstimator, delta_method
-from delicatessen.estimating_equations import ee_mean_variance, ee_glm, ee_gformula, ee_ipw
+from delicatessen.estimating_equations import ee_mean_variance, ee_regression, ee_glm, ee_gformula, ee_ipw
 from delicatessen.sandwich import (compute_bread, compute_meat, build_sandwich,
                                    compute_critical_value_bands, compute_confidence_bands)
 
@@ -222,6 +224,33 @@ class TestComputeSandwich:
 
         # Checking variance estimates
         npt.assert_allclose(var_build, var_compute, atol=1e-7)
+
+    def test_compute_small_n_hc1(self):
+        d = pd.DataFrame()
+        d['X'] = [1, -1, 0, 1, 2, 1, -2, -1, 0, 3, -3, 1, 1, -1, -1, -2, 2, 0, -1, 0]
+        d['Z'] = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        d['Y'] = [1, 5, 1, 9, -1, 4, 3, 3, 1, -2, 4, -2, 3, 6, 6, 8, 7, 1, -2, 5]
+        d['I'] = 1
+        n = d.shape[0]
+
+        # M-estimation negative binomial
+        def psi(theta):
+            return ee_regression(theta, X=d[['I', 'X', 'Z']], y=d['Y'], model='linear')
+
+        mestr = MEstimator(psi, init=[0., 0., 0.])
+        mestr.estimate(solver='lm')
+
+        # Compute sandwich calculations
+        var_compute = compute_sandwich(psi, theta=mestr.theta, deriv_method='approx', small_n_adjust="HC1") / n
+
+        # External reference point
+        glm = smf.glm("Y ~ X + Z", d).fit(cov_type="HC1",
+                                          cov_kwds={'scaling_factor': n / (n - 3)})
+
+        # Checking variance estimates
+        npt.assert_allclose(var_compute,
+                            np.asarray(glm.cov_params()),
+                            atol=1e-6)
 
 
 class TestDeltaMethod:

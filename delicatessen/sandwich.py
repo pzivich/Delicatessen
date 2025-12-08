@@ -15,7 +15,7 @@ from delicatessen.errors import check_alpha_level
 from delicatessen.derivative import auto_differentiation, approx_differentiation
 
 
-def compute_sandwich(stacked_equations, theta, deriv_method='approx', dx=1e-9, allow_pinv=True):
+def compute_sandwich(stacked_equations, theta, deriv_method='approx', dx=1e-9, allow_pinv=True, small_n_adjust=None):
     r"""Compute the empirical sandwich variance estimator given a set of estimating equations and parameter estimates.
     Note that this functionality does not solve for the parameter estimates (unlike ``MEstimator``). Instead, it
     only computes the sandwich for the provided value.
@@ -68,6 +68,10 @@ def compute_sandwich(stacked_equations, theta, deriv_method='approx', dx=1e-9, a
         Whether to allow for the pseudo-inverse (via ``numpy.linalg.pinv``) if the bread matrix is determined to be
         non-invertible. If you want to disallow the pseudo-inverse (i.e., use ``numpy.linalg.inv``), set this
         argument to ``False``. Default is ``True``, which  is more robust to the possible bread matrices.
+    small_n_adjust : str, None, optional
+        Whether to apply a finite-sample correction when computing the empirical sandwich variance estimator. Default is
+        ``None``, which applies no correction. Corrections options include: HC1. The HC1 correction replaces the
+        scaling by :math:`n` with :math:`n-p` where :math:`p` is the number of parameters.
 
     Returns
     -------
@@ -124,8 +128,10 @@ def compute_sandwich(stacked_equations, theta, deriv_method='approx', dx=1e-9, a
     evald_theta = np.asarray(stacked_equations(theta=theta))        # Evaluating EE at theta-hat
     if len(theta) == 1:                                             # Number of parameters
         n_obs = evald_theta.shape[0]                                # ... to get number of obs
+        n_params = 1                                                # ... and number of parameters
     else:                                                           # Number of parameters
         n_obs = evald_theta.shape[1]                                # ... to get number of obs
+        n_params = evald_theta.shape[0]                             # ... and number of parameters
 
     # Step 1: Compute the bread matrix
     bread = compute_bread(stacked_equations=stacked_equations,      # Call the bread matrix function
@@ -138,6 +144,14 @@ def compute_sandwich(stacked_equations, theta, deriv_method='approx', dx=1e-9, a
     meat = compute_meat(stacked_equations=stacked_equations,        # Call the meat matrix function
                         theta=theta)                                # ... at given theta-hat
     meat = meat / n_obs                                             # Scale meat by number of obs
+
+    if small_n_adjust is not None:
+        n_adjust = small_n_adjust.upper()
+        if n_adjust.upper() == "HC1":
+            meat = meat * n_obs / (n_obs - n_params)
+        else:
+            raise ValueError("The requested finite-sample correction '" + str(small_n_adjust) + "' is not available. "
+                             "Supported options include the following: None, HC1.")
 
     # Step 3: Construct sandwich from the bread and meat matrices
     sandwich = build_sandwich(bread=bread,                          # Call the sandwich constructor
