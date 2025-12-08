@@ -17,6 +17,7 @@ added to this documentations, please contact us.
   Bonate-Pharmaco
   Hernan-Robins-2023
   Morris-Trials-2022
+  Coffman-2021
   Mroz-1987
   Cole-AJE-2022
   Cole-EPID-2023
