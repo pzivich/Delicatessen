@@ -17,7 +17,7 @@ from delicatessen.data import load_inderjit
 from delicatessen.estimating_equations import (ee_mean_variance, ee_mean_robust,
                                                ee_regression, ee_glm, ee_robust_regression, ee_ridge_regression,
                                                ee_additive_regression,
-                                               ee_weibull_model, ee_aft_weibull,
+                                               ee_survival_model, ee_aft,
                                                ee_loglogistic, ee_loglogistic_ed,
                                                ee_gformula, ee_ipw, ee_ipw_msm, ee_aipw, ee_gestimation_snmm,
                                                ee_mean_sensitivity_analysis)
@@ -1314,8 +1314,9 @@ class TestSandwichAutoDiff:
         events = np.array([1, 0, 0, 0, 1, 1, 1, 0, 0, 1])
 
         def psi(theta):
-            return ee_weibull_model(theta=theta,
-                                    t=times, delta=events)
+            return ee_survival_model(theta=theta,
+                                     t=times, delta=events,
+                                     distribution='weibull')
 
         mestr = MEstimator(psi, init=[1., 1.])
 
@@ -1347,8 +1348,9 @@ class TestSandwichAutoDiff:
         d['I'] = 1
 
         def psi(theta):
-            return ee_aft_weibull(theta=theta,
-                                  t=d['t'], delta=d['d'], X=d[['X', ]])
+            return ee_aft(theta=theta,
+                          t=d['t'], delta=d['d'], X=d[['I', 'X', ]],
+                          distribution='weibull')
 
         mestr = MEstimator(psi, init=[1.387, 0.107, 0.911])
 

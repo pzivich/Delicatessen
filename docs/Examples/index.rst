@@ -12,6 +12,7 @@ added to this documentations, please contact us.
 
   Ross-IJE-2024
   LifeScienceExamples
+  Agresti-Crime
   Cole-AJE-2023
   Boos-Stefanski-Ch7
   Bonate-Pharmaco

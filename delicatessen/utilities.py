@@ -207,7 +207,31 @@ def robust_loss_functions(residual, loss, k, a=None, b=None):
 
         f_k(x) = x I(-k < x < k) + x \left( 1 - (x/k)^2 \right)^2
 
-    Hampel (Hampel's add two additional parameters, :math:`a` and :math:`b`)
+    Fair
+
+    .. math::
+
+        f_k(x) = \frac{x}{1 + |x|/k}
+
+    Cauchy
+
+    .. math::
+
+        f_k(x) = \frac{x}{1 + (x/k)^2}
+
+    Ullah
+
+    .. math::
+
+        f_k(x) = x \left[ 1 + (x/k)^4 \right]^-2
+
+    Welsch
+
+    .. math::
+
+        f_k(x) = x \exp(-x^2 / (2k^2))
+
+    Hampel (Hampel's requires two additional parameters, :math:`a` and :math:`b`)
 
     .. math::
 
@@ -227,7 +251,8 @@ def robust_loss_functions(residual, loss, k, a=None, b=None):
         observed value and the predicted value). For the robust mean, this is :math:`Y_i - \mu`. For robust regression,
         this is :math:`Y_i - X_i^T \beta`
     loss : str
-        Loss function to use. Options include: 'andrew', 'hampel', 'huber', 'minimax', 'tukey'
+        Loss function to use. Options include: `'andrew'`, `'huber'`, `'tukey'`, `'fair'`, `'cauchy'`, `'ullah'`,
+        `'welsch'`, `'hampel'`
     k : int, float
         Tuning parameter for the corresponding loss function. Note: no default is provided, since each loss function
         has different recommendations.
@@ -264,9 +289,26 @@ def robust_loss_functions(residual, loss, k, a=None, b=None):
 
     >>> robust_loss_functions(residuals, loss='tukey', k=4.685)
 
+    Fair
+
+    >>> robust_loss_functions(residuals, loss='fair', k=1.3998)
+
+    Cauchy
+
+    >>> robust_loss_functions(residuals, loss='cauchy', k=2.3849)
+
+    Ullah
+
+    >>> robust_loss_functions(residuals, loss='ullah', k=3.2296)
+
+    Welsch
+
+    >>> robust_loss_functions(residuals, loss='welsch', k=2.9846)
+
     Hampel's loss function
 
     >>> robust_loss_functions(residuals, loss='hampel', k=8, a=2, b=4)
+
 
     References
     ----------
@@ -280,29 +322,53 @@ def robust_loss_functions(residual, loss, k, a=None, b=None):
 
     Huber PJ. (1964). Robust Estimation of a Location Parameter. *The Annals of Mathematical Statistics*, 35(1), 73–101.
 
-    Huber PJ, Ronchetti EM. (2009) Robust Statistics 2nd Edition. Wiley. pgs 98-100
+    Huber PJ, Ronchetti EM. (2009) *Robust Statistics* 2nd Edition. Wiley. pgs 98-100
+
+    de Menezes DQF, Prata DM, Secchi AR, & Pinto JC. (2021). A review on robust M-estimators for regression analysis.
+    *Computers & Chemical Engineering*, 147, 107254.
+
+    Rey WJ. (1983). Type M estimators. In *Introduction to Robust and Quasi-Robust Statistical Methods* (pp. 134-189).
+    Berlin, Heidelberg: Springer Berlin Heidelberg.
     """
     # Checking type for later .lower() calls so informative error
     if not isinstance(loss, str):
         raise ValueError("The provided loss function should be a string.")
 
+    loss_l = loss.lower()
+
     # Huber function
-    elif loss.lower() == "huber":
+    if loss_l == "huber":
         xr = np.clip(residual, a_min=-k, a_max=k)
 
     # Tukey's biweight
-    elif loss.lower() == "tukey":
+    elif loss_l == "tukey":
         xr = np.where(np.abs(residual) <= k, residual * (1-(residual/k)**2)**2, 0)
 
     # Andrew's Sine
-    elif loss.lower() == "andrew":
+    elif loss_l == "andrew":
         xr = np.where(np.abs(residual) <= k*np.pi,
                       np.sin(residual/k), np.nan)
         xr = np.where(residual > k*np.pi, 0, xr)
         xr = np.where(residual < -k*np.pi, 0, xr)
 
+    # Fair
+    elif loss_l == "fair":
+        xr = residual / (1 + np.abs(residual) / k)
+
+    # Cauchy
+    elif loss_l == "cauchy":
+        xr = residual / (1 + (residual / k)**2)
+
+    # Ullah
+    elif loss_l == "ullah":
+        xr = residual * (1 + (residual/k)**4)**(-2)
+
+    # Welsch
+    elif loss_l == "welsch":
+        xr = residual * np.exp(-residual**2 / (2 * k**2))
+
     # Hampel
-    elif loss.lower() == "hampel":
+    elif loss_l == "hampel":
         if a is None or b is None:
             raise ValueError("The 'hampel' loss function requires the optional `a` and `b` arguments")
         if not a < b < k:
