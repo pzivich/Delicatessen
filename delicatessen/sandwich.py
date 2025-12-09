@@ -15,7 +15,7 @@ from delicatessen.errors import check_alpha_level
 from delicatessen.derivative import auto_differentiation, approx_differentiation
 
 
-def compute_sandwich(stacked_equations, theta, deriv_method='approx', dx=1e-9, allow_pinv=True, small_n_adjust=None):
+def compute_sandwich(stacked_equations, theta, deriv_method='approx', dx=1e-9, allow_pinv=True, finite_correction=None):
     r"""Compute the empirical sandwich variance estimator given a set of estimating equations and parameter estimates.
     Note that this functionality does not solve for the parameter estimates (unlike ``MEstimator``). Instead, it
     only computes the sandwich for the provided value.
@@ -68,7 +68,7 @@ def compute_sandwich(stacked_equations, theta, deriv_method='approx', dx=1e-9, a
         Whether to allow for the pseudo-inverse (via ``numpy.linalg.pinv``) if the bread matrix is determined to be
         non-invertible. If you want to disallow the pseudo-inverse (i.e., use ``numpy.linalg.inv``), set this
         argument to ``False``. Default is ``True``, which  is more robust to the possible bread matrices.
-    small_n_adjust : str, None, optional
+    finite_correction : str, None, optional
         Whether to apply a finite-sample correction when computing the empirical sandwich variance estimator. Default is
         ``None``, which applies no correction. Corrections options include: HC1. The HC1 correction replaces the
         scaling by :math:`n` with :math:`n-p` where :math:`p` is the number of parameters.
@@ -144,14 +144,10 @@ def compute_sandwich(stacked_equations, theta, deriv_method='approx', dx=1e-9, a
     meat = compute_meat(stacked_equations=stacked_equations,        # Call the meat matrix function
                         theta=theta)                                # ... at given theta-hat
     meat = meat / n_obs                                             # Scale meat by number of obs
-
-    if small_n_adjust is not None:
-        n_adjust = small_n_adjust.upper()
-        if n_adjust.upper() == "HC1":
-            meat = meat * n_obs / (n_obs - n_params)
-        else:
-            raise ValueError("The requested finite-sample correction '" + str(small_n_adjust) + "' is not available. "
-                             "Supported options include the following: None, HC1.")
+    meat = finite_sample_correction(adjustment=finite_correction,   # Finite-sample correction
+                                    meat=meat,                      # ... to meat matrix
+                                    n_obs=n_obs,                    # ... based on number of observations
+                                    n_params=n_params)              # ... and number of parameters
 
     # Step 3: Construct sandwich from the bread and meat matrices
     sandwich = build_sandwich(bread=bread,                          # Call the sandwich constructor
@@ -313,6 +309,38 @@ def build_sandwich(bread, meat, allow_pinv=True):
 
     # Return the sandwich covariance matrix
     return sandwich
+
+
+def finite_sample_correction(adjustment, meat, n_obs, n_params):
+    """Function to apply the finite-sample corrections.
+
+    Parameters
+    ----------
+    adjustment : str, None
+        Finite-sample correction method to use. Options are ``None`` or one of the following methods: HC1
+    meat : ndarray
+        NumPy square matrix corresponding to the meat matrix
+    n_obs : int, float
+        Number of observations
+    n_params : int, float
+        Number of parameters
+
+    Returns
+    -------
+    ndarray :
+        Returns the post-processed meat matrix
+    """
+    # What to apply for the adjustment if requested
+    if adjustment is not None:
+        n_adjust = adjustment.upper()
+        if n_adjust.upper() == "HC1":
+            meat = meat * n_obs / (n_obs - n_params)
+        else:
+            raise ValueError("The requested finite-sample correction '" + str(adjustment) + "' is not available. "
+                             "Supported options include the following: None, HC1.")
+
+    # Return (possibly further processed) meat matrix
+    return meat
 
 
 def delta_method(theta, g, covariance, deriv_method='exact', dx=1e-9):
