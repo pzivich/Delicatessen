@@ -526,7 +526,8 @@ def ee_robust_regression(theta, X, y, model, k, loss='huber', weights=None, uppe
         Tuning or hyperparameter for the chosen loss function. Notice that the choice of hyperparameter should depend
         on the chosen loss function.
     loss : str, optional
-        Robust loss function to use. Default is ``'huber'``. Options include ``'andrew'``, ``'hampel'``, ``'tukey'``.
+        Robust loss function to use. Default is ``'huber'``. See the ``robust_loss_functions`` documentation for the
+        complete list of options.
     weights : ndarray, list, vector, None, optional
         1-dimensional vector of `n` weights. Default is ``None``, which assigns a weight of 1 to all observations.
     lower : int, float, None, optional
