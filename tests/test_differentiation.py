@@ -553,7 +553,7 @@ class TestApproxDifferentiation:
         dx_approx = approx_fprime(xinput, f, epsilon=1e-9)
 
         # Checking
-        npt.assert_allclose(dx_approx, dx_byhand, atol=1e-5)
+        npt.assert_allclose(dx_approx, dx_byhand, rtol=5e-5)
 
     def test_compare_elementary_operators_c(self):
         # Defining the functions to check
