@@ -13,10 +13,11 @@ from scipy.stats import logistic
 from lifelines import ExponentialFitter, WeibullFitter, WeibullAFTFitter
 
 from delicatessen import MEstimator
-from delicatessen.estimating_equations import ee_regression, ee_survival_model, ee_aft
+from delicatessen.estimating_equations import ee_mean, ee_regression, ee_survival_model, ee_aft
 from delicatessen.utilities import (identity, inverse_logit, logit,
                                     polygamma, digamma,
                                     robust_loss_functions,
+                                    aggregate_efuncs,
                                     spline,
                                     regression_predictions, survival_predictions,
                                     aft_predictions_individual, aft_predictions_function,
@@ -304,6 +305,96 @@ class TestFunctions:
         expected = np.array([[0.0, 0.0, 5.0**2, 10.0**2, 15.0**2 - 4.0**2], ]).T / (16 - 5)**2
         returned = spline(variable=vars, knots=[5, 16], power=2, restricted=True, normalized=True)
         npt.assert_allclose(returned, expected)
+
+
+class TestGroupedData:
+
+    @pytest.fixture
+    def data(self):
+        d = pd.DataFrame()
+        d['X'] = [1, 0, 1, 0, 1, 1, 1, 0, 0, 1]
+        d['Y'] = [1, -1, 0, 3, 2, -3, -2, -1, 1, 0]
+        d['group'] = [1, 1, 1, 2, 2, 3, 4, 4, 5, 6]
+        d['C'] = 1
+        return d
+
+    def test_error_1dim(self, data):
+        group = list(data['group'])[:-1]
+
+        def psi(theta):
+            return aggregate_efuncs(ee_mean(theta=theta, y=data['Y']),
+                                    group=group)
+
+        estr = MEstimator(psi, init=[0., ])
+        with pytest.raises(ValueError, match="vector must match the number of units"):
+            estr.estimate()
+
+    def test_error_2dim(self, data):
+        group = list(data['group'])[:-1]
+
+        def psi(theta):
+            return aggregate_efuncs(ee_regression(theta=theta, X=data[['C', 'X']], y=data['Y'], model='linear'),
+                                    group=group)
+
+        estr = MEstimator(psi, init=[0., 0.])
+        with pytest.raises(ValueError, match="vector must match the number of units"):
+            estr.estimate()
+
+    def test_grouped_mean(self, data):
+
+        def psi(theta):
+            return aggregate_efuncs(ee_mean(theta=theta, y=data['Y']),
+                                    group=data['group'])
+
+        estr = MEstimator(psi, init=[0., ])
+        estr.estimate()
+
+        gee = smf.gee("Y ~ 1", "group", data,
+                      cov_struct=sm.cov_struct.Independence(),
+                      family=sm.families.Gaussian()).fit()
+
+        # Checking mean estimate
+        npt.assert_allclose(estr.theta,
+                            np.asarray(gee.params),
+                            atol=1e-6)
+
+        # Checking variance estimates
+        npt.assert_allclose(estr.variance,
+                            np.asarray(gee.cov_params()),
+                            atol=1e-6)
+
+        # Checking confidence interval estimates
+        npt.assert_allclose(estr.confidence_intervals(),
+                            np.asarray(gee.conf_int()),
+                            atol=1e-6)
+
+    def test_grouped_regression(self, data):
+
+        def psi(theta):
+            return aggregate_efuncs(ee_regression(theta=theta, X=data[['C', 'X']], y=data['Y'], model='linear'),
+                                    group=data['group'])
+
+        estr = MEstimator(psi, init=[0., 0.])
+        estr.estimate()
+
+        gee = smf.gee("Y ~ X", "group", data,
+                      cov_struct=sm.cov_struct.Independence(),
+                      family=sm.families.Gaussian()).fit()
+
+        # Checking mean estimate
+        npt.assert_allclose(estr.theta,
+                            np.asarray(gee.params),
+                            atol=1e-6)
+
+        # Checking variance estimates
+        npt.assert_allclose(estr.variance,
+                            np.asarray(gee.cov_params()),
+                            atol=1e-6)
+
+        # Checking confidence interval estimates
+        npt.assert_allclose(estr.confidence_intervals(),
+                            np.asarray(gee.conf_int()),
+                            atol=1e-6)
 
 
 class TestPredictions:

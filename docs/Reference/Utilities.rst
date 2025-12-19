@@ -16,6 +16,7 @@ Data transformations
   inverse_logit
   identity
   robust_loss_functions
+  aggregate_efuncs
   spline
   polygamma
   digamma
