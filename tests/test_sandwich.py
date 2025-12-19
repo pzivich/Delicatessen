@@ -241,7 +241,7 @@ class TestComputeSandwich:
         mestr.estimate(solver='lm')
 
         # Compute sandwich calculations
-        var_compute = compute_sandwich(psi, theta=mestr.theta, deriv_method='approx', small_n_adjust="HC1") / n
+        var_compute = compute_sandwich(psi, theta=mestr.theta, deriv_method='approx', finite_correction='HC1') / n
 
         # External reference point
         glm = smf.glm("Y ~ X + Z", d).fit(cov_type="HC1",
