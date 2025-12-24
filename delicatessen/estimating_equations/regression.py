@@ -388,7 +388,7 @@ def ee_mlogit(theta, X, y, weights=None, offset=None):
 
     Examples
     --------
-    Construction of a estimating equation(s) with ``ee_regression`` should be done similar to the following
+    Construction of an estimating equation(s) with ``ee_regression`` should be done similar to the following
 
     >>> import numpy as np
     >>> import pandas as pd
@@ -495,9 +495,7 @@ def ee_beta_regression(theta, X, y, weights=None, offset=None):
         \beta = (1 - \mu) \phi, \qquad
         \phi > 0
 
-    where :\math:`\mu` is the regression model and defined as :math:`g^{-1}(X_i \eta^T)` and :math:`g^{-1}` is the
-    inverse link function.
-
+    where :\math:`\mu = g^{-1}(X_i \eta^T)` is the regression model and :math:`g^{-1}` is the inverse link function.
     The corresponding estimating equation for beta regression are
 
     .. math::
@@ -537,14 +535,58 @@ def ee_beta_regression(theta, X, y, weights=None, offset=None):
 
     Examples
     --------
-    Construction of a estimating equation(s) with ``ee_beta_regression`` should be done similar to the following
+    Construction of an estimating equation(s) with ``ee_beta_regression`` should be done similar to the following
+
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> from delicatessen import MEstimator
+    >>> from delicatessen.estimating_equations import ee_beta_regression
+
+    Some generic data to estimate a beta regression model with
+
+    >>> d = pd.DataFrame()
+    >>> d['W'] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1]
+    >>> d['Y'] = [0.1, 0.2, 0.7, 0.11, 0.3, 0.4, 0.65, 0.01, 0.14, 0.9, 0.8, 0.56, 0.99, 0.82]
+    >>> d['C'] = 1
+
+    >>> y = d['Y']
+    >>> X = d[['C', 'W']]
+
+    Defining psi, or the stacked estimating equations
+
+    >>> def psi(theta):
+    >>>     return ee_beta_regression(theta, X=X, y=y)
+
+    Calling the M-estimator (note that ``init`` requires 4 values, since ``X.shape[1]`` is 3).
+
+    >>> estr = MEstimator(stacked_equations=psi, init=[0., 0., 0., 0.])
+    >>> estr.estimate()
+
+    Inspecting the parameter estimates, variance, and confidence intervals
+
+    >>> estr.theta
+    >>> estr.variance
+    >>> estr.confidence_intervals()
+
+    Here, the first three values of ``theta`` correspond to the regression and the last value of ``theta`` corresponds
+    to the precision parameter (on the natural log scale).
+
+    Weighted beta regression can be implemented by specifying the ``weights`` argument. An offset can be added by
+    specifying the ``offset`` argument.
+
+    References
+    ----------
+    Ferrari S, & Cribari-Neto F. (2004). Beta regression for modelling rates and proportions.
+    *Journal of Applied Statistics*, 31(7), 799-815.
+
+    
     """
     # Preparation of input shapes and object types
     X, y, theta, offset = _prep_inputs_(X=X, y=y, theta=theta, penalty=None, offset=offset, reshape_y=False)
     w = generate_weights(weights=weights, n_obs=X.shape[0])            # Compute the corresponding weight vector
-    beta = theta[:-1]                                                  #
-    phi = np.exp(theta[-1])                                            #
-    y = y[:, None]                                                     #
+    beta = theta[:-1]                                                  # Pull out the regression model coefficients
+    phi = np.exp(theta[-1])                                            # Exponentiate dispersal parameter
+    y = y[:, None]                                                     # Reshape the y vector for later calculations
 
     # Processing some variables for later
     yhat = inverse_logit(np.dot(X, beta) + offset)                     # Predicted value of Y
