@@ -207,7 +207,31 @@ def robust_loss_functions(residual, loss, k, a=None, b=None):
 
         f_k(x) = x I(-k < x < k) + x \left( 1 - (x/k)^2 \right)^2
 
-    Hampel (Hampel's add two additional parameters, :math:`a` and :math:`b`)
+    Fair
+
+    .. math::
+
+        f_k(x) = \frac{x}{1 + |x|/k}
+
+    Cauchy
+
+    .. math::
+
+        f_k(x) = \frac{x}{1 + (x/k)^2}
+
+    Ullah
+
+    .. math::
+
+        f_k(x) = x \left[ 1 + (x/k)^4 \right]^-2
+
+    Welsch
+
+    .. math::
+
+        f_k(x) = x \exp(-x^2 / (2k^2))
+
+    Hampel (Hampel's requires two additional parameters, :math:`a` and :math:`b`)
 
     .. math::
 
@@ -227,7 +251,8 @@ def robust_loss_functions(residual, loss, k, a=None, b=None):
         observed value and the predicted value). For the robust mean, this is :math:`Y_i - \mu`. For robust regression,
         this is :math:`Y_i - X_i^T \beta`
     loss : str
-        Loss function to use. Options include: 'andrew', 'hampel', 'huber', 'minimax', 'tukey'
+        Loss function to use. Options include: `'andrew'`, `'huber'`, `'tukey'`, `'fair'`, `'cauchy'`, `'ullah'`,
+        `'welsch'`, `'hampel'`
     k : int, float
         Tuning parameter for the corresponding loss function. Note: no default is provided, since each loss function
         has different recommendations.
@@ -264,9 +289,26 @@ def robust_loss_functions(residual, loss, k, a=None, b=None):
 
     >>> robust_loss_functions(residuals, loss='tukey', k=4.685)
 
+    Fair
+
+    >>> robust_loss_functions(residuals, loss='fair', k=1.3998)
+
+    Cauchy
+
+    >>> robust_loss_functions(residuals, loss='cauchy', k=2.3849)
+
+    Ullah
+
+    >>> robust_loss_functions(residuals, loss='ullah', k=3.2296)
+
+    Welsch
+
+    >>> robust_loss_functions(residuals, loss='welsch', k=2.9846)
+
     Hampel's loss function
 
     >>> robust_loss_functions(residuals, loss='hampel', k=8, a=2, b=4)
+
 
     References
     ----------
@@ -280,29 +322,53 @@ def robust_loss_functions(residual, loss, k, a=None, b=None):
 
     Huber PJ. (1964). Robust Estimation of a Location Parameter. *The Annals of Mathematical Statistics*, 35(1), 73–101.
 
-    Huber PJ, Ronchetti EM. (2009) Robust Statistics 2nd Edition. Wiley. pgs 98-100
+    Huber PJ, Ronchetti EM. (2009) *Robust Statistics* 2nd Edition. Wiley. pgs 98-100
+
+    de Menezes DQF, Prata DM, Secchi AR, & Pinto JC. (2021). A review on robust M-estimators for regression analysis.
+    *Computers & Chemical Engineering*, 147, 107254.
+
+    Rey WJ. (1983). Type M estimators. In *Introduction to Robust and Quasi-Robust Statistical Methods* (pp. 134-189).
+    Berlin, Heidelberg: Springer Berlin Heidelberg.
     """
     # Checking type for later .lower() calls so informative error
     if not isinstance(loss, str):
         raise ValueError("The provided loss function should be a string.")
 
+    loss_l = loss.lower()
+
     # Huber function
-    elif loss.lower() == "huber":
+    if loss_l == "huber":
         xr = np.clip(residual, a_min=-k, a_max=k)
 
     # Tukey's biweight
-    elif loss.lower() == "tukey":
+    elif loss_l == "tukey":
         xr = np.where(np.abs(residual) <= k, residual * (1-(residual/k)**2)**2, 0)
 
     # Andrew's Sine
-    elif loss.lower() == "andrew":
+    elif loss_l == "andrew":
         xr = np.where(np.abs(residual) <= k*np.pi,
                       np.sin(residual/k), np.nan)
         xr = np.where(residual > k*np.pi, 0, xr)
         xr = np.where(residual < -k*np.pi, 0, xr)
 
+    # Fair
+    elif loss_l == "fair":
+        xr = residual / (1 + np.abs(residual) / k)
+
+    # Cauchy
+    elif loss_l == "cauchy":
+        xr = residual / (1 + (residual / k)**2)
+
+    # Ullah
+    elif loss_l == "ullah":
+        xr = residual * (1 + (residual/k)**4)**(-2)
+
+    # Welsch
+    elif loss_l == "welsch":
+        xr = residual * np.exp(-residual**2 / (2 * k**2))
+
     # Hampel
-    elif loss.lower() == "hampel":
+    elif loss_l == "hampel":
         if a is None or b is None:
             raise ValueError("The 'hampel' loss function requires the optional `a` and `b` arguments")
         if not a < b < k:
@@ -320,6 +386,107 @@ def robust_loss_functions(residual, loss, k, a=None, b=None):
 
     # Returning the updated values
     return xr
+
+
+def aggregate_efuncs(est_funcs, group):
+    r"""Aggregate estimating function contributions from the individual-level to the specified group-level. This
+    function is intended to simply estimation with grouped or clustered data. Briefly, the input matrix of estimating
+    function contributions is collapsed from `n` unit-level contributions into `m` group-level contributions under the
+    assumption that observations within groups are independent (see later notes). This function should be used whenever
+    observations are not independent and there is a group-level ID variable for appropriate statistical inference.
+
+    This function is intended to be called after the estimating functions have been stacked, but before they are
+    returned in a ``psi`` function. See the examples below for details on the intended use.
+
+    Note
+    ----
+    Here, an independent working correlation structure is assumed.
+
+
+    The assumption of an independent working correlation structure is done for two reasons: computational simplification
+    and it does not rely on an extra assumption. Without needing to specify a more detailed structure, the aggregation
+    of observations is straightforward for an arbitrary set of estimating functions. This means this procedure is
+    flexible with any general input matrix of estimating function contributions. Regarding the second reason, as
+    described in Pepe & Anderson (1994) and Pan et al. (2000), use of non-diagonal working correlation matrices (i.e.,
+    other options than independent) relies on an additional assumption that may not hold. When this assumption does not
+    hold, *point* estimates may be biased. Given that the empirical sandwich variance estimator is consistent under
+    misspecification of the working correlation structure, the philosophy of this utility is to maintain unbiased point
+    estimation at the potential cost of some statistical efficiency (when the correlation structure is correctly
+    specified and the additional assumption holds).
+
+
+    Parameters
+    ----------
+    est_funcs : ndarray, list, vector
+        Input `p`-by-`n` matrix to collapse into a `p`-by-`m` matrix, where `n` is the number of units and `m` is the
+        number of groups.
+    group : ndarray, list, vector
+        A vector of length `n` designating the group identifiers for each unit-level observation.
+
+    Returns
+    -------
+    array :
+        Returns a `p`-by-`m` NumPy array
+
+    Examples
+    --------
+    Using the ``aggregate_estimating_functions`` utility for grouped or clustered data
+
+    >>> import numpy as np
+    >>> from delicatessen import MEstimator
+    >>> from delicatessen.estimating_equations import ee_mean
+    >>> from delicatessen.utilities import aggregate_efuncs
+
+    Some generic data for clustered-observations
+
+    >>> y = [1, -1, 0, 3, 2, -3, -2, -1, 1, 0]
+    >>> group = [1, 1, 1, 2, 2, 3, 4, 4, 5, 6]
+
+    Here, we are interested in estimating the mean of Y. There are 10 observations, but these observations only come
+    from 6 unique groups (clusters). Therefore, we aggregate the estimating functions for the mean of Y by the group
+    IDs. To apply this, we (1) compute the estimating functions at the unit-level, (2) aggregate the contributions at
+    the group level (using ``aggregate_estimating_functions``), and (3) return the group-level estimating functions to
+    ``MEstimator`` (or ``GMMEstimator``). The following blocks of code illustrate this process
+
+    >>> def psi(theta):
+    >>>     ee_ind_level = ee_mean(theta=theta, y=y)
+    >>>     ee_group_level = aggregate_efuncs(ee_ind_level, group=group)
+    >>>     return ee_group_level
+
+    >>> estr = MEstimator(psi, init=[0., ])
+    >>> estr.estimate()
+
+    By aggregating estimating functions prior to providing to ``MEstimator``, we change the effective sample size and
+    modify the inputs to the empirical sandwich variance estimator. This aggregation can be done for more than 1
+    parameter and helps to simplify inference for grouped or clustered data.
+
+    References
+    ----------
+    Pepe SM & Anderson GL (1994). A cautionary note on inference for marginal regression models with longitudinal data
+    and general correlated response data. *Communications in Statistics-Simulation and Computation*, 23, 939-951.
+
+    Pan W, Louis TA, & Connett JE. (2000). A note on marginal linear regression with correlated response data.
+    *The American Statistician*, 54(3), 191-195.
+    """
+    id_vector = np.asarray(group)                           # Converting input into NumPy array
+    est_funcs = np.asarray(est_funcs)                       # Converting input into NumPy array
+    unique_ids = np.unique(id_vector)                       # Collecting all the unique group IDs
+
+    # Error checking
+    if len(est_funcs.shape) == 1:
+        n_obs = est_funcs.shape[0]
+    else:
+        n_obs = est_funcs.shape[1]
+    if id_vector.shape[0] != n_obs:
+        raise ValueError("The length of the `group` vector must match the number of units in the provided estimating "
+                         "functions. Instead, there were "+str(id_vector.shape[0])+" units and there were "
+                         +str(n_obs)+" estimating function contributions.")
+
+    # Creating a matrix of group membership IDs to collapse observations by
+    cluster_matrix = (id_vector == unique_ids[:, None]).T   # Creates a n-by-m matrix
+
+    # Return the aggregated estimating function contributions
+    return np.dot(est_funcs, cluster_matrix)
 
 
 def regression_predictions(X, theta, covariance, offset=None, alpha=0.05):

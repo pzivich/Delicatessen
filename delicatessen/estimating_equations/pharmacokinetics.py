@@ -4,8 +4,10 @@
 
 import numpy as np
 
+from delicatessen.utilities import robust_loss_functions
 
-def ee_emax(theta, dose, response):
+
+def ee_emax(theta, dose, response, robust=None, k=None):
     r"""Estimating equations for the (hyperbolic) E-max model, or Hill Equation.
 
     The E-max model describes the dose-response relationship as concave monotone defined by three parameters: the
@@ -38,22 +40,29 @@ def ee_emax(theta, dose, response):
     Note
     ----
     This implementation supports both the E-max model (dose increases response) and the I-max model (dose decreases
-    response). Depending on the relationship observed in the data, set the starting values for the `lower` and `upper`
-    parameters according (i.e., E-max has `upper > lower` and I-max has `upper < lower`).
+    response). Depending on the relationship observed in the data, set the starting values for the zero dose and
+    maximum response starting values (i.e., E-max has ``zero < max`` and I-max has ``zero > max``).
 
     Parameters
     ----------
     theta : ndarray, list, vector
-        Theta in this case consists of 2 values.
+        Theta consists of 3 values.
     dose : ndarray, list, vector
         1-dimensional vector of `n` dose values.
     response : ndarray, list, vector
         1-dimensional vector of `n` response values.
+    robust : None, str, optional
+        Robust loss function to control the influence of outliers. Default is ``None``, which uses the standard
+        (non-outlier) robust version of the model. For a complete set of options for the outlier-robust functions, see
+        the ``robust_loss_functions`` documentation.
+    k : None, int, float, optional
+        Tuning or hyperparameter for the chosen outlier-robust function. Notice that the choice of hyperparameter
+        should depend on the chosen loss function.
 
     Returns
     -------
     array :
-        Returns a 2-by-`n` NumPy array evaluated for the input ``theta``.
+        Returns a 3-by-`n` NumPy array evaluated for the input ``theta``.
 
     Examples
     --------
@@ -91,7 +100,7 @@ def ee_emax(theta, dose, response):
 
     Inspecting the parameter estimates
 
-    >>> estr.theta[0]    # Minimum response
+    >>> estr.theta[0]    # Zero-dose response
     >>> estr.theta[1]    # Maximum response
     >>> estr.theta[2]    # Dose that results in 50% of max response
 
@@ -112,12 +121,19 @@ def ee_emax(theta, dose, response):
     e_max = theta[1]                                             # Max effect parameter
     e_50 = theta[2]                                              # 50% max effect parameter
 
-    # Computing estimating equations
+    # Computing predicted value and residuals
     yhat = e_0 + (e_max * X) / (e_50 + X)                        # Predicted response
-    r_contribution = y - yhat                                    # Response-contribution
-    ee_0 = r_contribution                                        # E_min estimating equation
-    ee_max = r_contribution * (X / (e_50 + X))                   # E_max estimating equation
-    ee_ec50 = r_contribution * ((-e_max * X) / ((e_50 + X)**2))  # E_50 estimating equation
+    residual = y - yhat                                          # Response-contribution
+
+    # Outlier-robust function
+    if robust is not None:
+        residual = robust_loss_functions(residual=residual,
+                                         loss=robust, k=k)
+
+    # Computing estimating equations
+    ee_0 = residual                                        # E_min estimating equation
+    ee_max = residual * (X / (e_50 + X))                   # E_max estimating equation
+    ee_ec50 = residual * ((-e_max * X) / ((e_50 + X)**2))  # E_50 estimating equation
 
     # Returning stacked estimating equations
     return np.vstack([ee_0, ee_max, ee_ec50])
@@ -207,7 +223,7 @@ def ee_emax_ed(theta, dose, delta, ed50):
     return size * ed_delta   # Returning estimating equations
 
 
-def ee_loglogistic(theta, dose, response):
+def ee_loglogistic(theta, dose, response, robust=None, k=None):
     r"""Estimating equations for the 4 parameter log-logistic dose-response model. The log-logistic model describes the
     dose-response relationship in terms of four parameters: the zero-dose response, the maximum response (E-max), the
     dose producing half maximal effect (ED50), and steepness of the dose-response curve. The assumed model is
@@ -243,20 +259,27 @@ def ee_loglogistic(theta, dose, response):
     Note
     ----
     This implementation supports models where dose increases response and dose decreases response. Depending on the
-    relationship observed in the data, set the starting values for the `lower` and `upper` parameters according (i.e.,
-    increasing has `upper > lower` and descresing has `upper < lower`). Additionally, the `steepness` parameter should
-    be positive for increasing and negative for decreasing. If starting parameters are not chosen well, the model
-    may not converge or converge to nonsensical values.
+    relationship observed in the data, set the starting values for the lower and upper responses according (i.e.,
+    increasing has ``lower < upper`` and descreasing has `` lower > upper``). The `steepness` parameter should be
+    positive for increasing and negative for decreasing. If starting parameters are not chosen well, the model may not
+    converge or converge to nonsensical values.
 
     Parameters
     ----------
     theta : ndarray, list, vector
-        Theta in this case consists of 4 values. Outside of steepness (i.e., ``theta[2]``)In general, starting values
-        :math:`>0` are recommended for the log-logistic model.
+        Theta in this case consists of 4 values. Outside of steepness (i.e., ``theta[2]``), non-negative starting values
+        are recommended for the log-logistic model.
     dose : ndarray, list, vector
         1-dimensional vector of `n` dose values.
     response : ndarray, list, vector
         1-dimensional vector of `n` response values.
+    robust : None, str, optional
+        Robust loss function to control the influence of outliers. Default is ``None``, which uses the standard
+        (non-outlier) robust version of the model. For a complete set of options for the outlier-robust functions, see
+        the ``robust_loss_functions`` documentation.
+    k : None, int, float, optional
+        Tuning or hyperparameter for the chosen outlier-robust function. Notice that the choice of hyperparameter
+        should depend on the chosen loss function.
 
     Returns
     -------
@@ -369,6 +392,12 @@ def ee_loglogistic(theta, dose, response):
     # nested_log = np.log(X / e_50,                    # ... to avoid dose=0 issues only take log
     #                     where=0 < X)                 # ... where dose>0 (otherwise puts zero in place)
     nested_log = np.where(X > 0, np.log(X / e_50), 0)  # Handling when dose = 0
+    residual = y - yhat
+
+    # Outlier-robust function
+    if robust is not None:
+        residual = robust_loss_functions(residual=residual,
+                                         loss=robust, k=k)
 
     # Score functions of the log-logistic model
     llimit = 1 - 1/(1 + rho)                                     # Gradient for lower limit
@@ -378,7 +407,7 @@ def ee_loglogistic(theta, dose, response):
     deriv = np.array([llimit, ulimit, ed50, steepness])          # Stacking the gradients together
 
     # Returning stacked estimating equations
-    return (y - yhat) * deriv
+    return residual * deriv
 
 
 def ee_loglogistic_ed(theta, dose, delta, lower, upper, ed50, steepness):

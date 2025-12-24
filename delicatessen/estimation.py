@@ -6,16 +6,19 @@ import warnings
 import numpy as np
 from scipy.optimize import newton, root, minimize
 from scipy.stats import norm
+from scipy.stats import t as tdist
 from scipy.optimize import OptimizeWarning
 
 from delicatessen.errors import check_alpha_level, check_variance_is_not_none
-from delicatessen.sandwich import compute_bread, compute_meat, build_sandwich, compute_confidence_bands
+from delicatessen.sandwich import (compute_bread, compute_meat, build_sandwich,
+                                   finite_sample_correction,
+                                   compute_confidence_bands)
 
 
 class _GeneralEstimator:
     """Internal base class for M-estimator and GMM-estimator to be built from. Not intended for users.
     """
-    def __init__(self, stacked_equations, init, subset=None):
+    def __init__(self, stacked_equations, init, subset=None, finite_correction=None):
         self.stacked_equations = stacked_equations     # User-input stacked estimating equations
         self.init = init                               # User-input initial starting values for solving estimating eqs
         if subset is None:                             # Handling subset of parameters
@@ -23,14 +26,28 @@ class _GeneralEstimator:
         else:                                          # Otherwise
             self._subset_ = sorted(subset)             # ... ensure it is sorted
 
+        # Small sample correction details
+        self._small_sample_correction_ = finite_correction
+
         # Storage for results from the Estimation procedure
         self.n_obs = None                 # Number of unique observations (calculated later)
+        self.n_params = len(self.init)    # Number of parameters (unvalidated till call to .estimate())
         self.theta = None                 # Optimized theta values (calculated later)
         self.bread = None                 # Bread from theta values (calculated later)
         self.meat = None                  # Meat from theta values (calculated later)
         self.variance = None              # Covariance matrix for theta values (calculated later)
         self.asymptotic_variance = None   # Asymptotic covariance matrix for theta values (calculated later)
         self.weight_matrix = None         # Weight matrix for the GMM estimator
+
+        # Storage for results to display when requested
+        self._label_ = "General"  # Estimator's name
+        self._solver_ = ''        # Solving algorithm name
+        self._maxiter_ = ''       # Maximum iterations allowed
+        self._tol_ = ''           # Tolerance for solving
+        self._deriv_ = ''         # Derivative method
+        self._dx_ = ''            # Derivative approximation error
+        self._pinv_ = ''          # Pseudo-inverse
+        self._over_identified_ = None
 
     def confidence_intervals(self, alpha=0.05):
         r"""Calculate two-sided Wald-type :math:`(1 - \alpha) \times` 100% confidence intervals using the point
@@ -63,12 +80,17 @@ class _GeneralEstimator:
         check_alpha_level(alpha=alpha)
 
         # 'Looking up' via Z table
-        z_alpha = norm.ppf(1 - alpha / 2, loc=0, scale=1)   # Z_alpha value for CI
+        if self._small_sample_correction_ is None:
+            cv_alpha = norm.ppf(1 - alpha / 2, loc=0, scale=1)   # Z_alpha value for CI
+        else:
+            cv_alpha = tdist.ppf(1 - alpha / 2,                  # t_alpha value for CI
+                                 df=self.n_obs - self.n_params,
+                                 loc=0, scale=1)
 
         # Calculating confidence intervals
         param_se = np.sqrt(np.diag(self.variance))          # Take the diagonal of the sandwich and then SQRT
-        lower_ci = self.theta - z_alpha * param_se          # Calculate lower CI
-        upper_ci = self.theta + z_alpha * param_se          # Calculate upper CI
+        lower_ci = self.theta - cv_alpha * param_se          # Calculate lower CI
+        upper_ci = self.theta + cv_alpha * param_se          # Calculate upper CI
 
         # Return 2D array of lower and upper confidence intervals
         return np.asarray([lower_ci, upper_ci]).T
@@ -118,9 +140,15 @@ class _GeneralEstimator:
         array :
             Array of P-values for :math:`\theta_1, ..., \theta_b`, respectively
         """
-        z_score = self.z_scores(null=null)         # Calculating the Z-scores
-        p_value = norm.sf(np.abs(z_score)) * 2     # Compute the corresponding P-values
-        return p_value                             # Return P-values to the user
+        z_score = self.z_scores(null=null)                       # Calculating the Z-scores
+        if self._small_sample_correction_ is None:
+            p_value = norm.sf(np.abs(z_score)) * 2               # P-value based on Z distribution
+        else:
+            p_value = tdist.sf(np.abs(z_score),                  # P-value based on t distribution
+                               df=self.n_obs-self.n_params) * 2
+
+        # Return P-values to the user
+        return p_value
 
     def s_values(self, null=0):
         r"""Calculate two-sided Wald-type S-values using the point estimates and the sandwich variance. The S-value,
@@ -267,20 +295,93 @@ class _GeneralEstimator:
 
         # Processing parameter vector
         if subset is None:
-            theta = self.theta
-            covar = self.variance
+            theta, covar = self.theta, self.variance
         else:
-            theta = self.theta[subset]
-            covar = self.variance[np.ix_(subset, subset)]
+            theta, covar = self.theta[subset], self.variance[np.ix_(subset, subset)]
 
         # Calculating confidence bands
-        cb = compute_confidence_bands(theta=theta, covariance=covar,
+        cb = compute_confidence_bands(theta=theta,
+                                      covariance=covar,
                                       alpha=alpha,
                                       method=method,
-                                      n_draws=n_draws, seed=seed)
+                                      n_draws=n_draws,
+                                      seed=seed)
 
         # Return 2D array of lower and upper confidence bands
         return cb
+
+    def print_results(self, subset=None, decimals=2, alpha=0.05):
+        r"""Display estimator results to the console. This function prints the results of the estimator object (point
+        estimates, standard error, confidence intervals, P-value, S-value) to the console. This function is only meant
+        as an easy way to display the underlying results to the console without having to call each function separately.
+
+        Parameters
+        ----------
+        subset : list, set, array, None, optional
+            List of indices of a subset of parameters to display in the table. Default is ``None``, which displays all
+            the paramters in the table.
+        decimals : int, optional
+            Number of decimals to display in the table. Default is ``2``. The spacing of the table may be skewed when
+            ``decimals > 5``.
+        alpha : float, optional
+            The :math:`0 < \alpha < 1` level for the corresponding confidence bands. Default is 0.05, which
+            corresponds to 95% confidence intervals.
+
+        Returns
+        -------
+        None
+        """
+        # Some setup for values
+        if subset is None:
+            p_to_print = range(self.n_params)
+        else:
+            p_to_print = subset
+
+        # Computing all quantities needed
+        var = np.diag(self.variance)
+        ci = self.confidence_intervals(alpha=alpha)
+        zscr = self.z_scores(null=0)
+        pval = self.p_values(null=0)
+        sval = self.s_values(null=0)
+
+        # Displaying the estimator information
+        print("==============================================================")
+        print("              Estimation Method: " + self._label_)
+        print("--------------------------------------------------------------")
+        fmt = "No. Observations:  {:>10} | No. Parameters:     {:>10}"
+        print(fmt.format(self.n_obs, self.n_params))
+        fmt = "Solving algorithm: {:>10} | Max Iterations:     {:>10}"
+        print(fmt.format(self._solver_, self._maxiter_))
+        fmt = "Solving tolerance: {:>10} | Allow P-Inverse:    {:>10}"
+        print(fmt.format(self._tol_, self._pinv_))
+        fmt = "Derivative Method: {:>10} | Deriv Approx:       {:>10}"
+        print(fmt.format(self._deriv_, self._dx_))
+
+        # Extra results for GMM in the over-identified setting
+        if self._label_ == 'GMM-estimator' and self._over_identified_:
+            fmt = "OverID Iteration:  {:>10} | OverID Tolerance:   {:>10}"
+            print(fmt.format(self._over_id_iterations_, self._over_id_tolerance_))
+
+        # Extra results for finite-sample correction
+        fmt = "Small N Correction:  {:>8} | Distribution:       {:>10}"
+        if self._small_sample_correction_ is not None:
+            print(fmt.format(self._small_sample_correction_, "t-stat"))
+        else:
+            print(fmt.format("None", "Z-stat"))
+
+        print("==============================================================")
+
+        # Printing tabled results for various metrics
+        fmt = "{:>8} "*7
+        print(fmt.format("Theta", "StdErr", "Z-score", "LCL", "UCL", "P-value", "S-value"))
+        print("--------------------------------------------------------------")
+        decimals_str = str(decimals)
+        fmt_base = "{:8." + decimals_str + "f} "
+        fmt = fmt_base * 7
+        for p in p_to_print:
+            print(fmt.format(self.theta[p], var[p]**0.5, zscr[p],
+                             ci[p, 0], ci[p, 1], pval[p], sval[p]))
+        print("==============================================================")
 
     @staticmethod
     def _eval_ee_(stacked_equations, subset):
@@ -397,6 +498,12 @@ class MEstimator(_GeneralEstimator):
         The input list is used to location index the parameter array via ``np.take()``. The subset list will
         only affect the root-finding procedure (i.e., the sandwich variance estimator ignores the subset argument).
         Default is ``None``, which runs the root-finding procedure for all parameters in the estimating equations.
+    finite_correction : str, None, optional
+        Whether to apply a finite-sample correction when computing the empirical sandwich variance estimator. Default is
+        ``None``, which applies no correction. When set to a string, the t-distribution is used instead of the
+        Z-distribution to compute confidence intervals, P-values, and S-values. Finite-sample corrections include: HC1.
+        The HC1 correction replaces the scaling by :math:`n` with :math:`n-p` where :math:`p` is the number of
+        parameters.
 
     Note
     ----
@@ -545,6 +652,15 @@ class MEstimator(_GeneralEstimator):
         -------
         None
         """
+        # Setting up labels for print_results
+        self._label_ = "M-estimator"   # Naming estimator via label
+        self._solver_ = solver         # Solving algorithm name
+        self._maxiter_ = maxiter       # Maximum iterations allowed
+        self._tol_ = tolerance         # Tolerance for solving
+        self._deriv_ = deriv_method    # Derivative method
+        self._dx_ = dx                 # Derivative approximation error
+        self._pinv_ = allow_pinv       # Pseudo-inverse
+
         # Evaluate stacked estimating equations at init
         vals_at_init = self.stacked_equations(theta=self.init)    # Calculating the initial values
         vals_at_init = np.asarray(vals_at_init                    # Convert output to an array (in case it isn't)
@@ -622,6 +738,11 @@ class MEstimator(_GeneralEstimator):
         # STEP 2.2: slicing the meat
         self.meat = compute_meat(stacked_equations=self.stacked_equations,
                                  theta=self.theta) / self.n_obs
+        # Finite-sample correction if requested
+        self.meat = finite_sample_correction(adjustment=self._small_sample_correction_,
+                                             meat=self.meat,
+                                             n_obs=self.n_obs,
+                                             n_params=len(self.theta))
 
         # STEP 2.3: assembling the sandwich (variance)
         self.asymptotic_variance = build_sandwich(bread=self.bread,
@@ -796,6 +917,12 @@ class GMMEstimator(_GeneralEstimator):
         The input list is used to location index the parameter array via ``np.take()``. The subset list will
         only affect the minimization procedure (i.e., the sandwich variance estimator ignores the subset argument).
         Default is ``None``, which runs the minimization procedure for all parameters in the estimating equations.
+    finite_correction : str, None, optional
+        Whether to apply a finite-sample correction when computing the empirical sandwich variance estimator. Default is
+        ``None``, which applies no correction. When set to a string, the t-distribution is used instead of the
+        Z-distribution to compute confidence intervals, P-values, and S-values. Finite-sample corrections include: HC1.
+        The HC1 correction replaces the scaling by :math:`n` with :math:`n-p` where :math:`p` is the number of
+        parameters.
     overid_maxiter : int, optional
         Maximum number of iterations for the two-step GMM-estimation procedure with over-identified parameters. Note
         that this procedure is only used for estimating equations that include an over-identified parameter, otherwise
@@ -881,9 +1008,11 @@ class GMMEstimator(_GeneralEstimator):
 
     Wirjanto T. (1997). Estimating Functions and Over-Identified Models. *Lecture Notes - Monograph Series*, 239-256.
     """
-    def __init__(self, stacked_equations, init, subset=None, overid_maxiter=10, overid_tolerance=1e-9):
+    def __init__(self, stacked_equations, init, subset=None, finite_correction=None,
+                 overid_maxiter=10, overid_tolerance=1e-9):
         # Calling BaseClass for the initial setup
-        super().__init__(stacked_equations=stacked_equations, init=init, subset=subset)
+        super().__init__(stacked_equations=stacked_equations, init=init, subset=subset,
+                         finite_correction=finite_correction)
 
         # Processing GMM-specific arguments
         self._over_id_iterations_ = overid_maxiter
@@ -933,6 +1062,15 @@ class GMMEstimator(_GeneralEstimator):
         -------
         None
         """
+        # Setting up labels for print_results
+        self._label_ = "GMM-estimator"  # Estimator name
+        self._solver_ = solver          # Solving algorithm name
+        self._maxiter_ = maxiter        # Maximum iterations allowed
+        self._tol_ = tolerance          # Tolerance for solving
+        self._deriv_ = deriv_method     # Derivative method
+        self._dx_ = dx                  # Derivative approximation error
+        self._pinv_ = allow_pinv        # Pseudo-inverse
+
         # Evaluate stacked estimating equations at init
         vals_at_init = self.stacked_equations(theta=self.init)    # Calculating the initial values
         vals_at_init = np.asarray(vals_at_init                    # Convert output to an array (in case it isn't)
@@ -944,7 +1082,7 @@ class GMMEstimator(_GeneralEstimator):
         # Processing dependent on number of estimating functions
         if vals_at_init.ndim == 1:
             n_params = 1
-            over_identified = False
+            self._over_identified_ = False
             if np.asarray(self.init).shape[0] > 1:
                 raise ValueError(
                     "The number of initial values should be less than or equal to the number of rows "
@@ -954,9 +1092,9 @@ class GMMEstimator(_GeneralEstimator):
         elif vals_at_init.ndim == 2:
             n_params = vals_at_init.shape[1]                        # Getting the number of parameters
             if np.asarray(self.init).shape[0] == n_params:          # Finding if the problem is just-identified
-                over_identified = False                             # ... flag for over-ID iteration procedure
+                self._over_identified_ = False                      # ... flag for over-ID iteration procedure
             elif np.asarray(self.init).shape[0] < n_params:         # Finding if the problem is over-identified
-                over_identified = True                              # ... flag for over-ID iteration procedure
+                self._over_identified_ = True                       # ... flag for over-ID iteration procedure
             else:                                                   # Under-identified parameters are not supported
                 raise ValueError(
                     "The number of initial values should be less than or equal to the number of rows "
@@ -998,7 +1136,7 @@ class GMMEstimator(_GeneralEstimator):
         self._solve_for_theta_(solver=solver, maxiter=maxiter, tolerance=tolerance, init=self.theta)
 
         # STEP 1.2: Iterative procedure if we are in the over-identified setting
-        if over_identified:
+        if self._over_identified_:
             # Iterative process argument processing
             current_iteration = 0
             if self._over_id_iterations_ < 1:
@@ -1039,6 +1177,11 @@ class GMMEstimator(_GeneralEstimator):
         # STEP 2.2: slicing the meat
         self.meat = compute_meat(stacked_equations=self.stacked_equations,
                                  theta=self.theta) / self.n_obs
+        # Finite-sample correction if requested
+        self.meat = finite_sample_correction(adjustment=self._small_sample_correction_,
+                                             meat=self.meat,
+                                             n_obs=self.n_obs,
+                                             n_params=len(self.theta))
 
         # STEP 2.3: assembling the sandwich (variance)
         self.asymptotic_variance = build_sandwich(bread=self.bread,
