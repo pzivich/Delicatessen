@@ -11,13 +11,12 @@ import statsmodels.formula.api as smf
 from statsmodels.othermod.betareg import BetaModel
 
 from delicatessen import MEstimator
-from delicatessen.estimating_equations import (ee_regression, ee_glm, ee_mlogit,
+from delicatessen.estimating_equations import (ee_regression, ee_glm, ee_beta_regression, ee_mlogit,
                                                ee_robust_regression,
                                                ee_ridge_regression, ee_lasso_regression, ee_dlasso_regression,
                                                ee_elasticnet_regression,
                                                ee_additive_regression)
 from delicatessen.utilities import additive_design_matrix
-from estimating_equations import ee_beta_regression
 
 
 @pytest.fixture

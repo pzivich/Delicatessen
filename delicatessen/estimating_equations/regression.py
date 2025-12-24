@@ -578,8 +578,6 @@ def ee_beta_regression(theta, X, y, weights=None, offset=None):
     ----------
     Ferrari S, & Cribari-Neto F. (2004). Beta regression for modelling rates and proportions.
     *Journal of Applied Statistics*, 31(7), 799-815.
-
-    
     """
     # Preparation of input shapes and object types
     X, y, theta, offset = _prep_inputs_(X=X, y=y, theta=theta, penalty=None, offset=offset, reshape_y=False)
