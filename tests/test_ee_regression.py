@@ -8,6 +8,7 @@ import numpy.testing as npt
 import pandas as pd
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
+from statsmodels.othermod.betareg import BetaModel
 
 from delicatessen import MEstimator
 from delicatessen.estimating_equations import (ee_regression, ee_glm, ee_mlogit,
@@ -16,6 +17,7 @@ from delicatessen.estimating_equations import (ee_regression, ee_glm, ee_mlogit,
                                                ee_elasticnet_regression,
                                                ee_additive_regression)
 from delicatessen.utilities import additive_design_matrix
+from estimating_equations import ee_beta_regression
 
 
 @pytest.fixture
@@ -76,6 +78,18 @@ class TestEstimatingEquationsRegression:
         d['Y2'] = [0, 0, 1, 0, 0, 1]
         d['weight'] = [4, 2, 3, 1, 2, 2]
         d['C'] = 1
+        return d
+
+    @pytest.fixture
+    def data_unit(self):
+        d = pd.DataFrame()
+        d['X'] = [1, -1, 0, 1, 2, 1, -2, -1, 0, 3, -3, 1, 1, -1, -1, -2, 2, 0, -1, 0]
+        d['Z'] = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        d['Y'] = [0.9, 0.99, 0.87, 0.75, 0.64, 0.2, 0.1, 0.14, 0.25, 0.33, 0.84, 0.72, 0.53, 0.41, 0.21, 0.05, 0.03,
+                  0.88, 0.43, 0.333]
+        d['F'] = [1, 1, 1, 2, 2, 2, 3, 1, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 3, 3]
+        d['w'] = [2, 1, 5, 1, 2, 7, 3, 1, 2, 2, 3, 9, 1, 1, 1, 5, 1, 1, 6, 2]
+        d['I'] = 1
         return d
 
     def test_error_regression(self):
@@ -517,6 +531,97 @@ class TestEstimatingEquationsRegression:
         npt.assert_allclose(estr.theta,
                             ref_params,
                             atol=5e-5)
+
+    def test_beta_regression(self, data_unit):
+        # Setup data
+        d = data_unit
+        y = d['Y']
+        X = d[['I', 'X', 'Z']]
+
+        # M-estimator
+        def psi(theta):
+            return ee_beta_regression(theta=theta, X=X, y=y)
+
+        estr = MEstimator(psi, init=[0., 0., 0., 1.])
+        estr.estimate(solver='lm')
+
+        # Beta regression model from statsmodels
+        brm = BetaModel.from_formula("Y ~ X + Z", d).fit(cov_type="HC1")
+
+        # Checking mean estimate
+        npt.assert_allclose(estr.theta,
+                            np.asarray(brm.params),
+                            atol=1e-5)
+
+        # Checking variance estimates
+        npt.assert_allclose(estr.variance,
+                            np.asarray(brm.cov_params()),
+                            atol=1e-5)
+
+        # Checking confidence interval estimates
+        npt.assert_allclose(estr.confidence_intervals(),
+                            np.asarray(brm.conf_int()),
+                            atol=1e-5)
+
+    def test_beta_regression_weighted(self, data_unit):
+        # Setup data
+        d = data_unit
+        y = d['Y']
+        X = d[['I', 'X', 'Z']]
+
+        # M-estimator
+        def psi(theta):
+            return ee_beta_regression(theta=theta, X=X, y=y, weights=d['w'])
+
+        estr = MEstimator(psi, init=[0., 0., 0., 1.])
+        estr.estimate(solver='lm')
+
+        # Beta regression model from R -- statsmodels doesn't support weights as of 0.14.6
+        params_r = [-0.09136912, 0.12214362, 0.01469653, np.log(2.12562)]
+        # library(betareg)
+        # d = data.frame(X = c(1, -1, 0, 1, 2, 1, -2, -1, 0, 3, -3, 1, 1, -1, -1, -2, 2, 0, -1, 0))
+        # d$Z = c(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+        # d$Y = c(0.9, 0.99, 0.87, 0.75, 0.64, 0.2, 0.1, 0.14, 0.25, 0.33, 0.84, 0.72,
+        #         0.53, 0.41, 0.21, 0.05, 0.03, 0.88, 0.43, 0.333)
+        # d$F = c(1, 1, 1, 2, 2, 2, 3, 1, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 3, 3)
+        # d$w = c(2, 1, 5, 1, 2, 7, 3, 1, 2, 2, 3, 9, 1, 1, 1, 5, 1, 1, 6, 2)
+        # brm = betareg(Y ~ X + Z, data=d, weights=d$w)
+        # brm$coefficients
+
+        # Checking mean estimate
+        npt.assert_allclose(estr.theta,
+                            np.asarray(params_r),
+                            atol=1e-5)
+
+    def test_beta_regression_offset(self, data_unit):
+        # Setup data
+        d = data_unit
+        y = d['Y']
+        X = d[['I', 'X', 'Z']]
+
+        # M-estimator
+        def psi(theta):
+            return ee_beta_regression(theta=theta, X=X, y=y, offset=d['F'])
+
+        estr = MEstimator(psi, init=[0., 0., 0., 1.])
+        estr.estimate(solver='lm')
+
+        # Beta regression model from R -- statsmodels doesn't support weights as of 0.14.6
+        params_r = [-1.79966257, -0.03431921, 0.61100350, np.log(1.421446)]
+        # library(betareg)
+        # d = data.frame(X = c(1, -1, 0, 1, 2, 1, -2, -1, 0, 3, -3, 1, 1, -1, -1, -2, 2, 0, -1, 0))
+        # d$Z = c(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+        # d$Y = c(0.9, 0.99, 0.87, 0.75, 0.64, 0.2, 0.1, 0.14, 0.25, 0.33, 0.84, 0.72,
+        #         0.53, 0.41, 0.21, 0.05, 0.03, 0.88, 0.43, 0.333)
+        # d$F = c(1, 1, 1, 2, 2, 2, 3, 1, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 3, 3)
+        # d$w = c(2, 1, 5, 1, 2, 7, 3, 1, 2, 2, 3, 9, 1, 1, 1, 5, 1, 1, 6, 2)
+        # brm = betareg(Y ~ X + Z, data=d, weights=d$w)
+        # brm$coefficients
+
+        # Checking mean estimate
+        npt.assert_allclose(estr.theta,
+                            np.asarray(params_r),
+                            atol=1e-5)
 
 
 class TestEstimatingEquationsRegressionRobust:
