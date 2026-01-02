@@ -111,6 +111,12 @@ def ee_emax(theta, dose, response, robust=None, k=None):
     Felmlee MA, Morris ME, & Mager DE. (2012). Mechanism-based pharmacodynamic modeling. *Methods Mol Biol*,
     929, 583–600.
 
+    Fomenko I, Durst M, & Balaban D. (2006). Robust regression for high throughput drug screening.
+    *Computer Methods and Programs in Biomedicine*, 82(1), 31-37.
+
+    Lim C, Sen PK, & Peddada SD. (2013). Robust nonlinear regression in applications.
+    *Journal of the Indian Society of Agricultural Statistics*. Indian Society of Agricultural Statistics, 67(2), 215.
+
     Wagner JG. (1968). Kinetics of pharmacologic response I. Proposed relationships between response and drug
     concentration in the intact animal and man. *Journal of Theoretical Biology*, 20(2), 173-201.
     """
@@ -368,13 +374,19 @@ def ee_loglogistic(theta, dose, response, robust=None, k=None):
 
     References
     ----------
-    Ritz C, Baty F, Streibig JC, & Gerhard D. (2015). Dose-response analysis using R. *PloS One*, 10(12), e0146021.
-
     An H, Justin TL, Aubrey GB, Marron JS, & Dittmer DP. (2019). dr4pl: A Stable Convergence Algorithm for the 4
     Parameter Logistic Model. *R J.*, 11(2), 171.
 
+    Fomenko I, Durst M, & Balaban D. (2006). Robust regression for high throughput drug screening.
+    *Computer Methods and Programs in Biomedicine*, 82(1), 31-37.
+
     Inderjit, Streibig JC, & Olofsdotter M. (2002). Joint action of phenolic acid mixtures and its significance in
     allelopathy research. *Physiologia Plantarum*, 114(3), 422-428.
+
+    Lim C, Sen PK, & Peddada SD. (2013). Robust nonlinear regression in applications.
+    *Journal of the Indian Society of Agricultural Statistics*. Indian Society of Agricultural Statistics, 67(2), 215.
+
+    Ritz C, Baty F, Streibig JC, & Gerhard D. (2015). Dose-response analysis using R. *PloS One*, 10(12), e0146021.
     """
     # Processing inputs
     X = np.asarray(dose)               # Convert to NumPy array
