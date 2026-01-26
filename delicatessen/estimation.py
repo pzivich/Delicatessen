@@ -283,6 +283,9 @@ class _GeneralEstimator:
         ----------
         Montiel Olea JL & Plagborg‐Møller M. (2019). Simultaneous confidence bands: Theory, implementation, and an
         application to SVARs. *Journal of Applied Econometrics*, 34(1), 1-17.
+
+        Zivich PN, Cole SR, Greifer N, Montoya LM, Kosorok MR, Edwards JK. (2025). Confidence Regions for Multiple
+        Outcomes, Effect Modifiers, and Other Multiple Comparisons, *arXiv:2510.07076*
         """
         # Check that variance has been estimated
         check_variance_is_not_none(variance=self.variance)
