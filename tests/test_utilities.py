@@ -434,7 +434,7 @@ class TestPredictions:
 
         # Statsmodels function equivalent
         glm = smf.glm("Y ~ X", data).fit(cov_type="HC1")
-        expected = np.asarray(glm.get_prediction(p).summary_frame())
+        expected = np.asarray(glm.get_prediction(p).summary_frame()).copy()
         expected[:, 1] = expected[:, 1]**2
 
         npt.assert_allclose(returned, expected, atol=1e-6)
