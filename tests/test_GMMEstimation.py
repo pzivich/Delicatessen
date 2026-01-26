@@ -794,3 +794,28 @@ class TestGMMEstimationOverID:
                                             [-0.00225699, 0.04731588, -0.04802412],
                                             [0.00485698, -0.04802412, 0.09727285], ],
                             atol=1e-5)
+
+    def test_small_n_hc1(self):
+        d = pd.DataFrame()
+        d['X'] = [1, -1, 0, 1, 2, 1, -2, -1, 0, 3, -3, 1, 1, -1, -1, -2, 2, 0, -1, 0]
+        d['Z'] = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        d['Y'] = [1, 5, 1, 9, -1, 4, 3, 3, 1, -2, 4, -2, 3, 6, 6, 8, 7, 1, -2, 5]
+        d['I'] = 1
+        n = d.shape[0]
+
+        # M-estimation
+        def psi(theta):
+            return ee_regression(theta, X=d[['I', 'X', 'Z']], y=d['Y'], model='linear')
+
+        estr = GMMEstimator(psi, init=[0., 0., 0.], finite_correction='hc1')
+        estr.estimate()
+        var_compute = estr.variance
+
+        # External reference point
+        glm = smf.glm("Y ~ X + Z", d).fit(cov_type="HC1",
+                                          cov_kwds={'scaling_factor': n / (n - 3)})
+
+        # Checking variance estimates
+        npt.assert_allclose(var_compute,
+                            np.asarray(glm.cov_params()),
+                            atol=1e-6)
