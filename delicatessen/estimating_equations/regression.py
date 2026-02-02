@@ -495,7 +495,7 @@ def ee_beta_regression(theta, X, y, weights=None, offset=None):
         \beta = (1 - \mu) \phi, \qquad
         \phi > 0
 
-    where :\math:`\mu = g^{-1}(X_i \eta^T)` is the regression model and :math:`g^{-1}` is the inverse link function.
+    where :math:`\mu = g^{-1}(X_i \eta^T)` is the regression model and :math:`g^{-1}` is the inverse link function.
     The corresponding estimating equation for beta regression are
 
     .. math::
@@ -509,7 +509,7 @@ def ee_beta_regression(theta, X, y, weights=None, offset=None):
         \end{bmatrix}
         = 0
 
-    where :math:`\dot{\gamma}` denotes the digamma function. Here, :math:`\theta` is a 1-by-(`b` :math`+` 1) array,
+    where :math:`\dot{\gamma}` denotes the digamma function. Here, :math:`\theta` is a 1-by-(`b` :math:`+` 1) array,
     where `b` is the distinct covariates included as part of ``X``. For example, if X is a 3-by-`n` matrix, then
     :math:`\theta` will be a 1-by-4 array.
 
@@ -531,7 +531,7 @@ def ee_beta_regression(theta, X, y, weights=None, offset=None):
     Returns
     -------
     array :
-        Returns a (`b`+1)-by-`n` NumPy array evaluated for the input ``theta``.
+        Returns a (b+1)-by-n NumPy array evaluated for the input ``theta``.
 
     Examples
     --------
