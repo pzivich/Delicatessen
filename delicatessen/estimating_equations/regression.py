@@ -485,7 +485,7 @@ def ee_mlogit(theta, X, y, weights=None, offset=None):
 
 
 def ee_beta_regression(theta, X, y, weights=None, offset=None):
-    """Estimating equation for a beta regression model. This estimating equation functionality supports outcome data,
+    r"""Estimating equation for a beta regression model. This estimating equation functionality supports outcome data,
     bounded within :math:`(0,1)`. Here, the mean–precision parameterization of beta regression is used, with the
     parameters for the beta distribution defined as
 
