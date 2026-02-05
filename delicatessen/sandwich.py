@@ -334,6 +334,10 @@ def finite_sample_correction(adjustment, meat, n_obs, n_params):
     if adjustment is not None:
         n_adjust = adjustment.upper()
         if n_adjust.upper() == "HC1":
+            if n_obs <= n_params:
+                raise ValueError("The number of observations, " + str(n_obs) + ", is not greater than the number of "
+                                 "parameters being estimated, " + str(n_params) + ", so the HC1 correction cannot be "
+                                 "applied.")
             meat = meat * n_obs / (n_obs - n_params)
         else:
             raise ValueError("The requested finite-sample correction '" + str(adjustment) + "' is not available. "
