@@ -430,7 +430,7 @@ def aggregate_efuncs(est_funcs, group):
 
     Examples
     --------
-    Using the ``aggregate_estimating_functions`` utility for grouped or clustered data
+    Using the ``aggregate_efuncs`` utility for grouped or clustered data
 
     >>> import numpy as np
     >>> from delicatessen import MEstimator
@@ -445,7 +445,7 @@ def aggregate_efuncs(est_funcs, group):
     Here, we are interested in estimating the mean of Y. There are 10 observations, but these observations only come
     from 6 unique groups (clusters). Therefore, we aggregate the estimating functions for the mean of Y by the group
     IDs. To apply this, we (1) compute the estimating functions at the unit-level, (2) aggregate the contributions at
-    the group level (using ``aggregate_estimating_functions``), and (3) return the group-level estimating functions to
+    the group level (using ``aggregate_efuncs``), and (3) return the group-level estimating functions to
     ``MEstimator`` (or ``GMMEstimator``). The following blocks of code illustrate this process
 
     >>> def psi(theta):
@@ -472,11 +472,13 @@ def aggregate_efuncs(est_funcs, group):
     est_funcs = np.asarray(est_funcs)                       # Converting input into NumPy array
     unique_ids = np.unique(id_vector)                       # Collecting all the unique group IDs
 
+    # Number of observations in the input estimating function
+    if len(est_funcs.shape) == 1:                           # Checking if single parameter
+        n_obs = est_funcs.shape[0]                          # ... because then first index is sample size
+    else:                                                   # Otherwise more than 1 parameter
+        n_obs = est_funcs.shape[1]                          # ... and the second index is the sample size
+
     # Error checking
-    if len(est_funcs.shape) == 1:
-        n_obs = est_funcs.shape[0]
-    else:
-        n_obs = est_funcs.shape[1]
     if id_vector.shape[0] != n_obs:
         raise ValueError("The length of the `group` vector must match the number of units in the provided estimating "
                          "functions. Instead, there were "+str(id_vector.shape[0])+" units and there were "
