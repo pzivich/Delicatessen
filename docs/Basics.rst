@@ -77,6 +77,22 @@ combined via dot products.
 This introduction has all been a little abstract. In the Applied Examples, you can see how these estimators can be used
 to address a variety of different computational problems.
 
+Finite-Sample Corrections
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The sandwich variance estimator can perform poorly with small sample sizes. To help improve performance, there are
+finite-sample corrections. These corrections can be requested using the optional ``finite_correction`` argument.
+Currently, only the HC1 correction, which replaces :math:`n` in the divisor for the variance with :math:`n-p`
+where :math:`p` is the number of parameters, is available.
+
+Clustered Data
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+To handle clustered data, the ``delicatessen.utilities.aggregate_efuncs`` function can be used to condense observations
+along a group or cluster ID variable. This operation does not modify the point estimates but does modify the variance
+estimate. Implicitly, the approach used here assumes observations are independent within clusters. However, the sandwich
+variance estimator is robust to violations of this assumption.
+
 Automatic Differentiation Caveats
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
