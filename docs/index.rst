@@ -4,18 +4,21 @@ Delicatessen
 =====================================
 
 ``delicatessen`` is a one-stop shop for all your sandwich (variance) needs. This Python 3.8+ library supports
-estimation of parameters expressed via estimating equations, which is a general statistical framework for estimating
-unknown parameters. This framework is also commonly known as M-estimation and Generalized Method of Moments.
+simultaneous estimation of parameters expressed as estimating equations, which is a general statistical framework for
+estimating unknown parameters. This framework is also commonly referred tp as as M-estimation, Z-estimation, or
+Generalized Method of Moments.
 
-Here, we provide a brief overview of estimating equations. For a more detailed, please refer to Ross et al. (2024),
-Stefanski & Boos (2002), or Boos & Stefanski (2013). Estimating equations were developed to study the large sample
-properties of robust statistics. However, many common large-sample statistics can be expressed with estimating
-equations, so this framework provides a unified structure and a streamlined approach to estimation. Let the parameter
-of interest be the vector :math:`\theta = (\theta_1, \theta_2, ..., \theta_v)` and data is observed for :math:`n`
-independent units :math:`O_1, O_2, …, O_n`. An M-estimator, :math:`\hat{\theta}`, is the solution to the estimating
-equation :math:`\sum_{i=1}^{n} \psi(O_i, \hat{\theta}) = 0` where :math:`\psi` is a known :math:`v \times 1`-dimension
-estimating function. This construction provides a convenient and automatic method of calculating large-sample variance
-estimators via the empirical sandwich variance estimator:
+Here, we provide a brief overview of estimating equations. For a more detailed, please refer to
+`Ross et al. (2024) <https://pubmed.ncbi.nlm.nih.gov/38423105/>`_,
+`Stefanski & Boos (2002) <https://www.jstor.org/stable/3087324>`_,
+or `Boos & Stefanski (2013) <https://link.springer.com/book/10.1007/978-1-4614-4818-1>`_. Estimating equations were
+originally developed to study the large sample properties of robust statistics. However, many common large-sample
+statistics can be expressed with estimating equations, so this framework provides a unified structure and a streamlined
+approach to estimation. Let the parameter of interest be the vector :math:`\theta = (\theta_1, \theta_2, ..., \theta_v)`
+and data is observed for :math:`n` units :math:`O_1, O_2, …, O_n`. An M-estimator or Z-estimator, :math:`\hat{\theta}`,
+is the solution to the estimating equation :math:`\sum_{i=1}^{n} \psi(O_i, \hat{\theta}) = 0` where :math:`\psi` is a
+valid, user-specified :math:`v \times 1`-dimension estimating function. This construction provides a convenient and
+automatic method of calculating large-sample variance estimators via the empirical sandwich variance estimator:
 
 .. math::
 
@@ -25,27 +28,31 @@ where the 'bread' is
 
 .. math::
 
-    B_n(O,\hat{\theta}) = n^{-1} \sum_{i=1}^n - \psi'(O_i, \hat{\theta})
+    B_n(O,\hat{\theta}) = n^{-1} \sum_{i=1}^n - \nabla \psi(O_i, \hat{\theta}),
 
-where the :math:`\psi'` indicates the partial derivative, and the 'meat' or 'filling' is
+:math:`\nabla` indicates the partial derivatives, and the 'meat' or 'filling' is
 
 .. math::
 
     M_n(O, \hat{\theta}) = n^{-1} \sum_{i=1}^n \psi(O_i, \hat{\theta}) \psi(O_i, \hat{\theta})^T
 
-While estimating equations are general, their application can be hindered by the corresponding derivative and matrix
-calculations. To circumvent these barriers, ``delicatessen`` automates the estimation procedure.
+While estimating equations are general in their setup, their practical application can be hindered by the corresponding
+derivative and matrix calculations. To circumvent these barriers, ``delicatessen`` automates the entire estimation
+procedure. One only needs to specify the data and the estimating functions and ``delicatesseen`` does the rest.
 
-The following description is a high-level overview. The user specifies as :math:`v \times n` array of estimating
-function(s). This array is provided to either the ``MEstimator`` class object or ``GMMEstimator`` class object. The
-different between these objects is how the underlying parameters are estimated (``MEstimator`` uses root-finding
-algorithms, while ``GMMEstimator`` uses minimization algorithms). Regardless, either esitmator object solves for
-:math:`\hat{\theta}`. After successful completion of the root-finding, the bread is computing the partial derivatives
-and the meat is calculated via the outer product. Finally, the empirical sandwich variance is computed.
+The following description is a high-level overview of how ``delicatessen`` operates. The user specifies as
+:math:`v \times n` array of estimating function(s). This array is provided to either the ``MEstimator`` class object
+or ``GMMEstimator`` class object. The difference between these objects is how the underlying parameters are estimated
+(``MEstimator`` uses root-finding algorithms, while ``GMMEstimator`` uses minimization algorithms). Regardless, either
+estimator class object solves for :math:`\hat{\theta}`. After solving for the estiamtes, the bread is computed (either
+through numerical approximation or automatic differentiation) and the meat is calculated via the outer product. Finally,
+the empirical sandwich variance is computed. From this, one can compute confidence intervals, P-values, S-values,
+confidence bands, or other inferential summaries.
 
-If you are an R user, I recommend looking into ``geex``
-(`Saul & Hudgens (2020) <https://bsaul.github.io/geex/>`_). ``delicatessen`` supports a variety of pre-built estimating
-equations as well as custom, user built estimating equations.
+If you are an R user, the R analog of ``delicatessen`` is ``geex``
+(`Saul & Hudgens (2020) <https://bsaul.github.io/geex/>`_). An advantage of switching over to Python and using
+``delicatessen`` is that a variety of pre-built estimating functions are offered by default,  as well as custom
+estimating functions.
 
 Installation:
 -------------
@@ -54,11 +61,11 @@ To install ``delicatessen``, use the following command in terminal or command pr
 
 ``python -m pip install delicatessen``
 
-Only two dependencies for ``delicatessen`` are: ``NumPy``, ``SciPy``.
+The only two dependencies for ``delicatessen`` are: ``NumPy``, ``SciPy``.
 
-While ``pandas`` is not a dependency, several examples are demonstrated with pandas for ease of data processing. To
-replicate the tests in ``tests/`` you will need to also install ``pandas``, ``statsmodels`` and ``pytest`` (but these
-are not necessary for use of the package).
+While ``pandas`` and ``matplotlib`` are not a dependencies, several examples throughout the documentation use these
+packages. To replicate the tests in ``tests/`` you will need to also install ``pandas``, ``statsmodels``, ``lifelines``,
+``scikit-learn`` and ``pytest`` (but these are not necessary for use of the package).
 
 Citation:
 -------------
@@ -82,9 +89,9 @@ Contents:
   :maxdepth: 3
 
   Basics.rst
-  Examples/index
   Custom-EE
   Optimization Advice <Optimization Advice.rst>
+  Examples/index
   Reference/index
   Create a GitHub Issue <https://github.com/pzivich/Deli/issues>
 

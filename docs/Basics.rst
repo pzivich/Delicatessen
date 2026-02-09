@@ -1,7 +1,8 @@
 Basics
 =====================================
 
-Here, the basics of the provided estimation approaches are described.
+Here, the basics of the estimating equations are reviewed. This introduction will be a little abstract. In the Applied
+Examples, specific estimators are reviewed for a variety of different computational problems.
 
 M-estimator
 -------------------------------
@@ -24,7 +25,7 @@ SciPy's root-finding algorithms.
 GMM-estimator
 -------------------------------
 
-The generalized method of moments (GMM) estimator is instead defined as the solution to
+The Generalized Method of Moments (GMM) estimator is instead defined as the solution to
 
 .. math::
 
@@ -47,7 +48,7 @@ cannot.
 Variance Estimation
 -------------------------------
 
-Regardless of the chosen point-estimation strategy, the empirical sandwich variance estimator is used to estimate the
+Regardless of the point-estimation strategy, the empirical sandwich variance estimator is used to estimate the
 variance for :math:`\theta`:
 
 .. math::
@@ -60,11 +61,11 @@ where the 'bread' is
 
     B_n(O,\hat{\theta}) = n^{-1} \sum_{i=1}^n - \nabla \psi(O_i, \hat{\theta})
 
-where the :math:`\nabla` indicates the partial derivatives, and the 'filling' is
+where the :math:`\nabla` indicates the partial derivatives, and the 'meat' or 'filling' is
 
 .. math::
 
-    F_n(O, \hat{\theta}) = n^{-1} \sum_{i=1}^n \psi(O_i, \hat{\theta}) \psi(O_i, \hat{\theta})^T
+    M_n(O, \hat{\theta}) = n^{-1} \sum_{i=1}^n \psi(O_i, \hat{\theta}) \psi(O_i, \hat{\theta})^T
 
 The sandwich variance requires finding the derivative of the estimating functions and some matrix algebra. Again, we
 can get the computer to complete all these calculations for us. For the derivative, ``delicatessen`` offers two
@@ -74,40 +75,34 @@ After computing the derivatives, the filling is computed via a dot product. The 
 If the pseudo-inverse is allowed, the Moore-Penrose inverse is used. Finally, the bread and filling matrices are
 combined via dot products.
 
-This introduction has all been a little abstract. In the Applied Examples, you can see how these estimators can be used
-to address a variety of different computational problems.
+Automatic Differentiation Caveats
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+There are two caveats to the use of automatic differentiation. (1) some NumPy functionalities are not fully
+supported. For example, ``np.log(x, where=0<x)`` will result in an error since there is an attempt to evaluate a
+log at zero internally. When using these specialty functions are necessary, it is better to use numerical approximation
+for differentiation. (2) Consider the following discontinuous function :math:`f(x) = x**2` if :math:`x \ge 1` and
+:math:`f(x) = 0` otherwise. Because of how automatic differentiation operates, the derivative at :math:`x=1` will
+result in :math:`2x` (this is the same behavior as other automatic differentiation software, like ``autograd``).
 
 Finite-Sample Corrections
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The sandwich variance estimator can perform poorly with small sample sizes. To help improve performance, there are
-finite-sample corrections. These corrections can be requested using the optional ``finite_correction`` argument.
-Currently, only the HC1 correction, which replaces :math:`n` in the divisor for the variance with :math:`n-p`
-where :math:`p` is the number of parameters, is available.
+finite-sample corrections. These corrections can be requested using the optional ``finite_correction`` argument
+available for both ``MEstimator`` and ``GMMEstimator``. Currently, only the HC1 correction, which replaces :math:`n`
+in the divisor for the variance with :math:`n-p` where :math:`p` is the number of parameters, is available.
 
 Clustered Data
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-To handle clustered data, the ``delicatessen.utilities.aggregate_efuncs`` function can be used to condense observations
+For clustered data, the ``delicatessen.utilities.aggregate_efuncs`` function can be used to condense observations
 along a group or cluster ID variable. This operation does not modify the point estimates but does modify the variance
-estimate. Implicitly, the approach used here assumes observations are independent within clusters. However, the sandwich
-variance estimator is robust to violations of this assumption.
-
-Automatic Differentiation Caveats
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-There are some caveats to the use of automatic differentiation. First, some NumPy functionalities are not fully
-supported. For example, ``np.log(x, where=0<x)`` will result in an error since there is an attempt to evaluate a
-log at zero internally. When using these specialty functions are necessary, it is better to use numerical approximation
-for differentiation. The second is regarding discontinuities. Consider the following function :math:`f(x) = x**2` if
-:math:`x \ge 1` and :math:`f(x) = 0` otherwise. Because of how automatic differentiation operates, the derivative at
-:math:`x=1` will result in :math:`2x` (this is the same behavior as other automatic differentiation software, like
-``autograd``).
+estimate. Implicitly, the exact variance estimator used here assumes observations are independent within clusters.
+While this may not be the case, the sandwich variance estimator is robust to violations of this assumption.
 
 Code and Issue Tracker
 -----------------------------
 
 Please report any bugs, issues, or feature requests on GitHub
 at `pzivich/Delicatessen <https://github.com/pzivich/Delicatessen/>`_.
-
-Otherwise, you may contact me via email (gmail: zivich.5).
