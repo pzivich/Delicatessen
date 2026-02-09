@@ -16,41 +16,19 @@ from delicatessen.derivative import auto_differentiation, approx_differentiation
 
 
 def compute_sandwich(stacked_equations, theta, deriv_method='approx', dx=1e-9, allow_pinv=True, finite_correction=None):
-    r"""Compute the empirical sandwich variance estimator given a set of estimating equations and parameter estimates.
-    Note that this functionality does not solve for the parameter estimates (unlike ``MEstimator``). Instead, it
-    only computes the sandwich for the provided value.
+    r"""Compute the empirical sandwich variance estimator for a given set of estimating equations and parameter
+    estimates. Note that this functionality does not solve for the parameter estimates (unlike ``MEstimator``).
+    Instead, it only computes the sandwich for the provided values of :math:`\theta`.
 
-    The empirical sandwich variance estimator is defined as
-
-    .. math::
-
-        V_n(O_i; \theta) = B_n(O_i; \theta)^{-1} F_n(O_i; \theta) \left[ B_n(O_i; \theta)^{-1} \right]^{T}
-
-    where :math:`\psi(O_i; \theta)` is the estimating function,
-
-    .. math::
-
-        B_n(O_i; \theta) = \sum_{i=1}^n \frac{\partial}{\partial \theta} \psi(O_i; \theta),
-
-    and
-
-    .. math::
-
-        F_n(O_i; \theta) = \sum_{i=1}^n \psi(O_i; \theta) \psi(O_i; \theta)^T .
-
-    To compute the bread matrix, :math:`B_n`, the matrix of partial derivatives is computed by using either finite
+    To compute the bread matrix, the matrix of partial derivatives is computed by using either finite
     difference methods or automatic differentiation. For finite differences, the default is to use SciPy's
-    ``approx_fprime`` functionality, which uses forward finite differences. However, you can also use the delicatessen
-    homebrew version that allows for forward, backward, and center differences. Automatic differentiation is also
-    supported by a homebrew version.
-
-    To compute the meat matrix, :math:`F_n`, only linear algebra methods, implemented through NumPy, are necessary.
-    The sandwich is then constructed from these pieces using linear algebra methods from NumPy.
+    ``approx_fprime`` functionality, which uses forward finite differences. However, you can also request forward,
+    backward, and center differences. Automatic differentiation is also supported.
 
     Parameters
     ----------
     stacked_equations : function, callable
-        Function that returns a `v`-by-`n` NumPy array of the estimating equations. See provided examples in the
+        Function that returns a `p`-by-`n` NumPy array of the estimating equations. See provided examples in the
         documentation for how to construct a set of estimating equations.
     theta : list, set, array
         Parameter estimates to compute the empirical sandwich variance estimator at. Note that this function assumes
@@ -365,8 +343,8 @@ def delta_method(theta, g, covariance, deriv_method='exact', dx=1e-9):
     As described elsewhere, the sandwich variance estimator automates the Delta Method. Therefore, one can simply
     program the corresponding estimating equation to estimate the variance for that transformation. However, this can be
     computationally inefficient when :math:`g` outputs a large vector. This functionality offers a way to apply the
-    Delta Method outside of ``MEstimator`` and ``GMMEstimator``. Internally, this function is used for some prediction
-    functionalities.
+    Delta Method outside of ``MEstimator`` and ``GMMEstimator``. Internally, this function is used to compute the
+    variance for some prediction functionalities.
 
     Parameters
     ----------
@@ -375,7 +353,7 @@ def delta_method(theta, g, covariance, deriv_method='exact', dx=1e-9):
     g : function, callable
         Vector function that transforms the `v` dimension parameter vector ``theta`` into a `w` dimensional vector.
     covariance : ndarray, list, set
-        Covariance matrix for the parameter vector ``x``.
+        Corresponding cvariance matrix for the parameter vector ``theta``.
     deriv_method : str, optional
         Method to compute the derivative of the function ``g``. Default is ``'exact'``. Options include numerical
         approximation via the forward difference method via SciPy (``'approx'``), forward difference implemented by-hand
@@ -394,16 +372,15 @@ def delta_method(theta, g, covariance, deriv_method='exact', dx=1e-9):
 
     Examples
     --------
-    Using ``delta_method`` to compute the variance should be done similar to the following
+    To illustrate how ``delta_method`` is intended to be used, we will first use an M-estimator to compute the point
+    and variance estimates for the parameter vector :math:`\theta`.
 
     >>> import numpy as np
     >>> import pandas as pd
     >>> from delicatessen import MEstimator, delta_method
     >>> from delicatessen.estimating_equations import ee_ipw
 
-    To illustrate how ``delta_method`` is intended to be used, we will first use an M-estimator to compute the point
-    and variance estimates for the parameter vector :math:`\theta`. Here, we will replicate the example from the
-    documentation for ``ee_ipw``.
+    Here, we will replicate the example from the documentation for ``ee_ipw``.
 
     >>> n = 200
     >>> d = pd.DataFrame()
@@ -414,7 +391,7 @@ def delta_method(theta, g, covariance, deriv_method='exact', dx=1e-9):
     >>> d['Y'] = (1-d['A'])*d['Ya0'] + d['A']*d['Ya1']
     >>> d['C'] = 1
 
-    Defining psi, or the stacked estimating equations
+    Defining :math:`psi`, or the stacked estimating equations
 
     >>> def psi(theta):
     >>>     return ee_ipw(theta, y=d['Y'], A=d['A'],
@@ -430,10 +407,10 @@ def delta_method(theta, g, covariance, deriv_method='exact', dx=1e-9):
     >>> estr.theta[0]        # causal mean difference of 1 versus 0
     >>> estr.variance[0, 0]  # corresponding variance estimate
 
-    Suppose that ``ee_ipw`` did not directly provide the risk difference. Further, imagine we were interested in the
+    Now suppose that ``ee_ipw`` did not directly provide the risk difference. Further, imagine we were interested in the
     risk ratio (log-transformed). Both of these quantities are transformations of the risk under action 1
-    (i.e., ``theta[1]``) and the risk under action 0 (i.e., ``theta[2]``). The following is a function that applies and
-    returns those transformations
+    (i.e., ``theta[1]``) and the risk under action 0 (i.e., ``theta[2]``). The following defines a function that
+    applies and returns this pair of transformations
 
     >>> def causal_contrasts(theta):
     >>>     risk1, risk0 = theta
@@ -442,9 +419,8 @@ def delta_method(theta, g, covariance, deriv_method='exact', dx=1e-9):
     >>>     return risk_diff, log_risk_ratio
 
     To estimate the variance for this transformation, one can now use the *delta method*. While one could manually
-    compute the derivatives for this function, ``delta_method`` automates this procedure for you (using either automatic
-    or numerical approximation methods). Below is how ``delta_method`` can be applied to compute the variance for the
-    risk difference and risk ratio
+    compute the derivatives for this function, ``delta_method`` automates this procedure. Below is how ``delta_method``
+    can be applied to compute the variance
 
     >>> risks = estr.theta[1:3]                     # Risks
     >>> risks_c0var = estr.variance[1:3, 1:3]       # Variance for risks
@@ -463,7 +439,7 @@ def delta_method(theta, g, covariance, deriv_method='exact', dx=1e-9):
     >>> rr_lcl, rr_ucl = np.exp(log_rr - 1.96*rr_stderr), np.exp(log_rr + 1.96*rr_stderr)
 
     While these transformations are straightforward to stack as estimating functions, ``delta_method`` offers another
-    option for estimating the variance of transformations that has computational benefits in some settings.
+    option for estimating the variance of transformations that offers computational benefits in some settings.
 
     References
     ----------

@@ -6,13 +6,12 @@ from scipy.stats import norm
 
 def approx_differentiation(xk, f, epsilon=1e-9, method='capprox'):
     r"""Numerical approximation to compute the gradient. This function implements numerical approximation methods for
-    derivatives generally (i.e., it provides the first-order forward, backward, and central difference approximations).
+    derivatives (i.e., it provides the first-order forward, backward, and central difference approximations). This
+    function is an alternative to SciPy's ``approx_fprime`` (which only offers forward difference).
 
     Note
     ----
-    This functionality is only intended for use behind the scenes in ``delicatessen``. Numerical approximation is
-    implemented from scratch to offer backward and central difference approximations (SciPy's ``approx_fprime`` only
-    offers the forward difference).
+    This functionality is only intended for use behind the scenes in ``delicatessen``.
 
 
     The forward difference approximation is
@@ -52,7 +51,7 @@ def approx_differentiation(xk, f, epsilon=1e-9, method='capprox'):
     Returns
     -------
     numpy.array :
-        Corresponding array of the pairwise derivatives for all different input x values.
+        Corresponding array of the pairwise derivatives for all different input ``x`` values.
 
     Examples
     --------
@@ -91,8 +90,8 @@ def approx_differentiation(xk, f, epsilon=1e-9, method='capprox'):
     >>> approx_differentiation(xk=[0.7, 1.2, -0.9], f=f, method='bapprox')
     >>> approx_differentiation(xk=[0.7, 1.2, -0.9], f=f, method='capprox')
 
-    which will return a 2-by-3 array of all the x-y pair derivatives at the given values. Here, the rows correspond to
-    the output and the columns correspond to the inputs. The approximation methods are forward, backward, and central.
+    which will each return a 2-by-3 array of all the x-y pair derivatives at the given values. Here, rows correspond to
+    the output and the columns correspond to the inputs.
     """
     # Setup parameters for call
     xk = np.asarray(xk)                               # Convert inputs into NumPy array if not already
@@ -139,13 +138,12 @@ def approx_differentiation(xk, f, epsilon=1e-9, method='capprox'):
 
 def auto_differentiation(xk, f):
     r"""Forward-mode automatic differentiation. Automatic differentiation offers a way to compute the exact derivative,
-    rather than numerically approximated (i.e., the central difference method). Automatic differentiation iteratively
-    applies the chain rule through recursive calls to evaluate the derivative.
+    rather than numerically approximate it. Forward-mode automatic differentiation iteratively applies the chain rule
+    through recursive calls to the function.
 
     Note
     ----
-    This functionality is only intended for use behind the scenes in ``delicatessen``. Automatic differentiation is
-    implemented from scratch to avoid additional dependencies.
+    This functionality is only intended for use behind the scenes in ``delicatessen``.
 
 
     This is accomplished by the ``PrimalTangentPairs`` class, which is a special data type in ``delicatessen`` that
@@ -163,7 +161,7 @@ def auto_differentiation(xk, f):
     Returns
     -------
     numpy.array :
-        Corresponding array of the pairwise derivatives for all different input x values.
+        Corresponding array of the pairwise derivatives for all different input ``x`` values.
 
     Examples
     --------
