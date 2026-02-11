@@ -396,6 +396,40 @@ class TestGroupedData:
                             np.asarray(gee.conf_int()),
                             atol=1e-6)
 
+    def test_grouped_unsorted_regression(self, data):
+        d = pd.DataFrame()
+        d['X'] = [1, 0, 0, 1, 1, 1, 0]
+        d['Y'] = [2, -3, 1, -2, 0, 0, 1]
+        d['group'] = [-3, -3, 9, 9, 8, 8, 8]
+        d['C'] = 1
+        data = pd.concat([data, d], ignore_index=True)
+
+        def psi(theta):
+            return aggregate_efuncs(ee_regression(theta=theta, X=data[['C', 'X']], y=data['Y'], model='linear'),
+                                    group=data['group'])
+
+        estr = MEstimator(psi, init=[0., 0.])
+        estr.estimate()
+
+        gee = smf.gee("Y ~ X", "group", data,
+                      cov_struct=sm.cov_struct.Independence(),
+                      family=sm.families.Gaussian()).fit()
+
+        # Checking mean estimate
+        npt.assert_allclose(estr.theta,
+                            np.asarray(gee.params),
+                            atol=1e-6)
+
+        # Checking variance estimates
+        npt.assert_allclose(estr.variance,
+                            np.asarray(gee.cov_params()),
+                            atol=1e-6)
+
+        # Checking confidence interval estimates
+        npt.assert_allclose(estr.confidence_intervals(),
+                            np.asarray(gee.conf_int()),
+                            atol=1e-6)
+
 
 class TestPredictions:
 
