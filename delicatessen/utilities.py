@@ -472,10 +472,14 @@ def aggregate_efuncs(est_funcs, group):
     est_funcs = np.asarray(est_funcs)                       # Converting input into NumPy array
 
     # Number of observations in the input estimating function and observations
+    unique_id, inv = np.unique(group, return_inverse=True)  # Unique IDs present and their corresponding indices
+    g = unique_id.size                                      # Number of unique group IDs
     if len(est_funcs.shape) == 1:                           # Checking if single parameter
         n_obs = est_funcs.shape[0]                          # ... because then first index is sample size
+        n_prm = 1                                           # ... and only a single parameter
     else:                                                   # Otherwise more than 1 parameter
         n_obs = est_funcs.shape[1]                          # ... and the second index is the sample size
+        n_prm = est_funcs.shape[0]                          # ... with the first as the number of parameters
 
     # Error checking for the input shapes (to give informative error)
     if id_vector.shape[0] != n_obs:
@@ -483,8 +487,13 @@ def aggregate_efuncs(est_funcs, group):
                          "functions. Instead, there were "+str(id_vector.shape[0])+" units and there were "
                          +str(n_obs)+" estimating function contributions.")
 
+    # Create indices for bincount operation
+    compact_index = inv[None, :] + np.arange(n_prm)[:, None] * g
+
     # Adding across the id_vector indices in the correct direction
-    return np.add.reduceat(est_funcs, indices=id_vector, axis=1)
+    return np.bincount(compact_index.ravel(),                  # 1D array of the indices for everything
+                       weights=est_funcs.ravel(),              # ... with the weights for the counts from the EFs
+                       minlength=n_prm * g).reshape(n_prm, g)  # ... then shaping back into a 2D array
 
 
 def regression_predictions(X, theta, covariance, offset=None, alpha=0.05):
