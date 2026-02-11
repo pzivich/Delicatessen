@@ -470,25 +470,21 @@ def aggregate_efuncs(est_funcs, group):
     """
     id_vector = np.asarray(group)                           # Converting input into NumPy array
     est_funcs = np.asarray(est_funcs)                       # Converting input into NumPy array
-    unique_ids = np.unique(id_vector)                       # Collecting all the unique group IDs
 
-    # Number of observations in the input estimating function
+    # Number of observations in the input estimating function and observations
     if len(est_funcs.shape) == 1:                           # Checking if single parameter
         n_obs = est_funcs.shape[0]                          # ... because then first index is sample size
     else:                                                   # Otherwise more than 1 parameter
         n_obs = est_funcs.shape[1]                          # ... and the second index is the sample size
 
-    # Error checking
+    # Error checking for the input shapes (to give informative error)
     if id_vector.shape[0] != n_obs:
         raise ValueError("The length of the `group` vector must match the number of units in the provided estimating "
                          "functions. Instead, there were "+str(id_vector.shape[0])+" units and there were "
                          +str(n_obs)+" estimating function contributions.")
 
-    # Creating a matrix of group membership IDs to collapse observations by
-    cluster_matrix = (id_vector == unique_ids[:, None]).T   # Creates a n-by-m matrix
-
-    # Return the aggregated estimating function contributions
-    return np.dot(est_funcs, cluster_matrix)
+    # Adding across the id_vector indices in the correct direction
+    return np.add.reduceat(est_funcs, indices=id_vector, axis=1)
 
 
 def regression_predictions(X, theta, covariance, offset=None, alpha=0.05):
