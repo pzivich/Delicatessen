@@ -185,9 +185,11 @@ class _GeneralEstimator:
         Greenland S. (2019). Valid P-values behave exactly as they should: Some misleading criticisms of P-values and
         their resolution with S-values. *The American Statistician*, 73(sup1), 106-114.
         """
-        p_values = self.p_values(null=null)          # Calculate P-values
-        s_values = -1 * np.log2(p_values)            # Transform into S-values
-        return s_values                              # Return S-values to the user
+        p_values = self.p_values(null=null)                              # Calculate P-values
+        inf_placeholders = np.full_like(p_values, -np.inf, dtype=float)  # Create infinity placeholders
+        s_values = -1 * np.log2(p_values, out=inf_placeholders,          # Compute S-values but
+                                where=(p_values != 0))                   # ... prevent warning when P-values are zero
+        return s_values                                                  # Return S-values to the user
 
     def influence_functions(self, allow_pinv=True):
         r"""Calculate the influence function values for individual observations. Note that the influence function for
