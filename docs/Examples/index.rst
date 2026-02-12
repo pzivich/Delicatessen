@@ -26,6 +26,7 @@ added to this documentations, please contact us.
   Ash-JCheminform-2022
   Zivich-CBands
   SDSS-Quasar
+  ClusteredData
   GMM-OverID
   Generalized-Additive-Model
 
