@@ -44,6 +44,7 @@ Model predictions
   regression_predictions
   aft_predictions_individual
   aft_predictions_function
+  plogit_predict
 
 
 Differentiation

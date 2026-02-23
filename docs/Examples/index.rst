@@ -23,6 +23,7 @@ added to this documentations, please contact us.
   Cole-AJE-2022
   Cole-EPID-2023
   Collett-Survival
+  Zivich-PLogit
   Ash-JCheminform-2022
   Zivich-CBands
   SDSS-Quasar

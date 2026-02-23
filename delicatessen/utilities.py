@@ -1169,14 +1169,32 @@ def plogit_predict(theta, t, delta, X, S=None, times_to_predict=None, measure='s
     >>> from delicatessen.utilities import plogit_predict
     >>> from delicatessen.data import load_breast_cancer
 
-    Loading breast cancer data from Collett 2015
+    Here, we will illustrate pooled logistic regression with breast cancer from the Middlesex Hospital in July 1987.
+    This data can be loaded as follows
 
-    >>> dat = load_breast_cancer()
-    >>> delta = dat[:, 0]
-    >>> t = dat[:, 1]
-    >>> covars = np.asarray([np.ones(dat.shape[0]), dat[:, 0]]).T
+    >>> d = pd.DataFrame(load_breast_cancer(), columns=['d', 't', 'statin'])
 
-    Estimating the parameters of a pooled logistic regression model
+    To start, we estimate the coefficients of a pooled logistic regression where time is modeled disjoint indicators.
+    See ``ee_plogit`` for further details
+
+    >>> unique_event_times = list(np.unique(d.loc[d['d'] == 1, 't']))
+
+    >>> def psi(theta):
+    >>>     return ee_plogit(theta=theta, X=d[['statin', ]], delta=d['d'], t=d['t'])
+
+    >>> inits = [0., ] + [-3., ] + [0., ]*(len(unique_times) - 1)
+    >>> estr = MEstimator(stacked_equations=psi, init=inits)
+    >>> estr.estimate()
+
+    After estimating the parameters, predicted survival metrics can be computed. Here, we compute the risk function
+    for all observations at all unique events times.
+
+    >>> plogit_predict(theta=estr.theta, t=d['t'], delta=d['delta'], X=d[['statin', ]], S=None, measure='risk')
+
+    Note that the shared arguments between ``ee_plogit`` and ``plogit_predict`` (besides ``X``, which can be modified)
+    should match each other. If they do not, unexpected behaviors may occur.
+
+    For further details on how to use ``plogit_predict``, see the Applied Examples.
 
     References
     ----------
