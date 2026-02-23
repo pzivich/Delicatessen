@@ -6,11 +6,12 @@ import pytest
 import numpy as np
 import numpy.testing as npt
 import pandas as pd
+import statsmodels.api as sm
+import statsmodels.formula.api as smf
 from lifelines import ExponentialFitter, WeibullFitter, WeibullAFTFitter
 
 from delicatessen import MEstimator
-from delicatessen.data import load_breast_cancer
-from delicatessen.estimating_equations import ee_survival_model, ee_aft
+from delicatessen.estimating_equations import ee_survival_model, ee_aft, ee_pooled_logistic
 
 
 class TestEstimatingEquationsSurvParam:
@@ -322,3 +323,258 @@ class TestEstimatingEquationsAFT:
                             atol=1e-5)
 
         # No variance check, since lifelines uses a different variance estimator
+
+
+class TestEstimatingEquationsDiscreteSurvival:
+    # Discrete-time survival analysis estimating equation tests
+
+    @pytest.fixture
+    def data(self):
+        d = pd.DataFrame()
+        d['W'] = [1, 1, 1, 0, 0, 0, 0, 0]
+        d['X'] = [1, 0, 1, 0, 1, 1, 0, 0]
+        d['Z'] = [-1, 0, 1, 2, 3, -2, -3, 0]
+        d['T'] = [1, 2, 5, 1, 1, 2, 2, 3]
+        d['D'] = [1, 1, 0, 0, 1, 1, 1, 1]
+        d['w'] = [1, 2, 5, 1.2, 2, 1, 3, 0.5]
+        d['I'] = 1
+        return d
+
+    @pytest.fixture
+    def data_long(self):
+        d = pd.DataFrame()
+        d['W'] = [1,
+                  1, 1,
+                  1, 1, 1, 1, 1,
+                  0,
+                  0,
+                  0, 0,
+                  0, 0,
+                  0, 0, 0]
+        d['X'] = [1,
+                  0, 0,
+                  1, 1, 1, 1, 1,
+                  0,
+                  1,
+                  1, 1,
+                  0, 0,
+                  0, 0, 0]
+        d['Z'] = [-1,
+                  0, 0,
+                  1, 1, 1, 1, 1,
+                  2,
+                  3,
+                  -2, -2,
+                  -3, -3,
+                  0, 0, 0]
+        d['T'] = [1,
+                  1, 2,
+                  1, 2, 3, 4, 5,
+                  1,
+                  1,
+                  1, 2,
+                  1, 2,
+                  1, 2, 3]
+        d['D'] = [1,
+                  0, 1,
+                  0, 0, 0, 0, 0,
+                  0,
+                  1,
+                  0, 1,
+                  0, 1,
+                  0, 0, 1]
+        d['w'] = [1,
+                  2, 2,
+                  5, 5, 5, 5, 5,
+                  1.2,
+                  2,
+                  1, 1,
+                  3, 3,
+                  0.5, 0.5, 0.5]
+        d['wtv'] = [1,
+                    2, 1,
+                    3, 2, 1, 2, 3,
+                    1.2,
+                    2,
+                    1, 2,
+                    1, 5,
+                    0.5, 6, 2.1]
+        d['I'] = 1
+        return d
+
+    def test_plogit_error_sdim(self, data):
+        d = data
+        t_steps = np.asarray(range(1, np.max(d['T'])-1))
+        intercept = np.ones(t_steps.shape)[:, None]
+        s_matrix = np.concatenate([intercept, t_steps[:, None]], axis=1)
+
+        def psi(theta):
+            return ee_pooled_logistic(theta, X=d[['X', 'Z']], t=d['T'], delta=d['D'],
+                                      S=s_matrix)
+
+        estr = MEstimator(psi, init=[0., 0., ] + [-2., 0., 0.])
+        with pytest.raises(ValueError, match="unit-time intervals were created"):
+            estr.estimate()
+
+    def test_plogit_error_wdim(self, data):
+        d = data
+        weight_short = [[1, 0, 0],
+                        [2, 1, 0],
+                        [3, 2, 1],
+                        [1, 2, 9],
+                        [1, 5, 0],
+                        [0.5, 6, 2.1]]
+
+        def psi(theta):
+            return ee_pooled_logistic(theta, X=d[['X', 'Z']], t=d['T'], delta=d['D'],
+                                      weights=weight_short)
+
+        estr = MEstimator(psi, init=[0., 0., ] + [-2., 0., 0.])
+        with pytest.raises(ValueError, match="2D weight matrix is provided"):
+            estr.estimate()
+
+    def test_plogit_disjoint(self, data, data_long):
+        d, dl = data, data_long
+
+        def psi(theta):
+            return ee_pooled_logistic(theta, X=d[['X', 'Z']], t=d['T'], delta=d['D'], S=None)
+
+        estr = MEstimator(psi, init=[0., 0., ] + [-2., 0., 0.])
+        estr.estimate()
+
+        # Fitting a pooled logistic regression model to a long data set (as default standard)
+        glm = smf.glm("D ~ X + Z + C(T)", dl, family=sm.families.Binomial()).fit()
+        ordering = [-2, -1, 0, 1, 2]
+
+        # Checking mean estimate
+        npt.assert_allclose(estr.theta,
+                            np.asarray(glm.params)[ordering],
+                            atol=1e-6)
+
+        # NOTE: standard errors won't match exactly due to how everything is constructed (but both are valid estimators)
+
+    def test_plogit_linear(self, data, data_long):
+        d, dl = data, data_long
+
+        # Constructing time design matrix
+        t_steps = np.asarray(range(1, np.max(d['T']) + 1))
+        intercept = np.ones(t_steps.shape)[:, None]
+        s_matrix = np.concatenate([intercept, t_steps[:, None]], axis=1)
+
+        def psi(theta):
+            return ee_pooled_logistic(theta, X=d[['X', 'Z']], t=d['T'], delta=d['D'],
+                                      S=s_matrix)
+
+        estr = MEstimator(psi, init=[0., 0., ] + [-2., 0.])
+        estr.estimate()
+
+        # Fitting a pooled logistic regression model to a long data set (as default standard)
+        glm = smf.glm("D ~ X + Z + T", dl, family=sm.families.Binomial()).fit()
+        ordering = [1, 2, 0, -1]
+
+        # Checking mean estimate
+        npt.assert_allclose(estr.theta,
+                            np.asarray(glm.params)[ordering],
+                            atol=1e-6)
+
+        # NOTE: standard errors won't match exactly due to how everything is constructed (but both are valid estimators)
+
+    def test_plogit_quadratic(self, data, data_long):
+        d, dl = data, data_long
+
+        # Constructing time design matrix
+        t_steps = np.asarray(range(1, np.max(d['T']) + 1))
+        intercept = np.ones(t_steps.shape)[:, None]
+        s_matrix = np.concatenate([intercept, t_steps[:, None], t_steps[:, None]**2], axis=1)
+
+        def psi(theta):
+            return ee_pooled_logistic(theta, X=d[['X', 'Z']], t=d['T'], delta=d['D'],
+                                      S=s_matrix)
+
+        estr = MEstimator(psi, init=[0., 0., ] + [-2., 0., 0.])
+        estr.estimate()
+
+        # Fitting a pooled logistic regression model to a long data set (as default standard)
+        dl['Tsq'] = dl['T']**2
+        glm = smf.glm("D ~ X + Z + T + Tsq", dl, family=sm.families.Binomial()).fit()
+        ordering = [1, 2, 0, -2, -1]
+
+        # Checking mean estimate
+        npt.assert_allclose(estr.theta,
+                            np.asarray(glm.params)[ordering],
+                            atol=1e-6)
+
+        # NOTE: standard errors won't match exactly due to how everything is constructed (but both are valid estimators)
+
+    def test_plogit_fixedweights(self, data, data_long):
+        d, dl = data, data_long
+
+        def psi(theta):
+            return ee_pooled_logistic(theta, X=d[['X', 'Z']], t=d['T'], delta=d['D'],
+                                      S=None, weights=d['w'])
+
+        estr = MEstimator(psi, init=[0., 0., ] + [-2., 0., 0.])
+        estr.estimate()
+
+        # Fitting a pooled logistic regression model to a long data set (as default standard)
+        glm = smf.glm("D ~ X + Z + C(T)", dl, family=sm.families.Binomial(), freq_weights=dl['w']).fit()
+        ordering = [-2, -1, 0, 1, 2]
+
+        # Checking mean estimate
+        npt.assert_allclose(estr.theta,
+                            np.asarray(glm.params)[ordering],
+                            atol=1e-6)
+
+        # NOTE: standard errors won't match exactly due to how everything is constructed (but both are valid estimators)
+
+    def test_plogit_varyweights(self, data, data_long):
+        d, dl = data, data_long
+        weight_tvary = [[1, 0, 0],
+                        [2, 1, 0],
+                        [3, 2, 1],
+                        [1.2, 1, 1],
+                        [2, 0, 0],
+                        [1, 2, 9],
+                        [1, 5, 0],
+                        [0.5, 6, 2.1]]
+
+        def psi(theta):
+            return ee_pooled_logistic(theta, X=d[['X', 'Z']], t=d['T'], delta=d['D'],
+                                      S=None, weights=weight_tvary)
+
+        estr = MEstimator(psi, init=[0., 0., ] + [-2., 0., 0.])
+        estr.estimate()
+
+        # Fitting a pooled logistic regression model to a long data set (as default standard)
+        glm = smf.glm("D ~ X + Z + C(T)", dl, family=sm.families.Binomial(), freq_weights=dl['wtv']).fit()
+        ordering = [-2, -1, 0, 1, 2]
+
+        # Checking mean estimate
+        npt.assert_allclose(estr.theta,
+                            np.asarray(glm.params)[ordering],
+                            atol=1e-6)
+
+        # NOTE: standard errors won't match exactly due to how everything is constructed (but both are valid estimators)
+
+    def test_plogit_subset_times(self, data, data_long):
+        d, dl = data, data_long
+
+        def psi(theta):
+            return ee_pooled_logistic(theta, X=d[['Z', ]], t=d['T'], delta=d['D'],
+                                      S=None, unique_times=[1, 2])
+
+        estr = MEstimator(psi, init=[0., ] + [-2., 0.])
+        estr.estimate()
+
+        # Fitting a pooled logistic regression model to a long data set (as default standard)
+        glm = smf.glm("D ~ Z + C(T)", dl.loc[dl['T'] <= 2], family=sm.families.Binomial()).fit()
+        ordering = [-1, 0, 1]
+
+        # Checking mean estimate
+        npt.assert_allclose(estr.theta,
+                            np.asarray(glm.params)[ordering],
+                            atol=1e-6)
+
+        # NOTE: standard errors won't match exactly due to how everything is constructed (but both are valid estimators)
+
+    # TODO test predictions and risk function estimator as well
