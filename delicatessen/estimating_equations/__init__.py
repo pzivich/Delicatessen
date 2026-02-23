@@ -11,7 +11,7 @@ from .pharmacokinetics import (ee_emax, ee_emax_ed,
 from .measurement import (ee_rogan_gladen, ee_rogan_gladen_extended, ee_regression_calibration
                           )
 
-from .regression import (ee_regression, ee_glm, ee_mlogit, ee_beta_regression,
+from .regression import (ee_regression, ee_glm, ee_mlogit, ee_beta_regression, ee_tobit,
                          ee_robust_regression,
                          ee_ridge_regression, ee_lasso_regression, ee_dlasso_regression,
                          ee_elasticnet_regression, ee_bridge_regression,

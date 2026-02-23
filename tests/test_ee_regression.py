@@ -11,7 +11,7 @@ import statsmodels.formula.api as smf
 from statsmodels.othermod.betareg import BetaModel
 
 from delicatessen import MEstimator
-from delicatessen.estimating_equations import (ee_regression, ee_glm, ee_beta_regression, ee_mlogit,
+from delicatessen.estimating_equations import (ee_regression, ee_glm, ee_beta_regression, ee_mlogit, ee_tobit,
                                                ee_robust_regression,
                                                ee_ridge_regression, ee_lasso_regression, ee_dlasso_regression,
                                                ee_elasticnet_regression,
@@ -621,6 +621,235 @@ class TestEstimatingEquationsRegression:
         npt.assert_allclose(estr.theta,
                             np.asarray(params_r),
                             atol=1e-5)
+
+    def test_tobit_nocensor(self, data_c):
+        """Tests tobit regression with the built-in estimating equation where there is no censoring
+        (should match ordinary least squares).
+        """
+        d = data_c
+
+        def psi_builtin_regression(theta):
+            return ee_tobit(theta, X=d[['I', 'X', 'Z']], y=d['Y'])
+
+        estr = MEstimator(psi_builtin_regression, init=[np.mean(d['Y']), 0., 0., 0.])
+        estr.estimate()
+
+        # Statsmodels function equivalent
+        glm = smf.glm("Y ~ X + Z", d).fit(cov_type="HC1")
+
+        # Checking mean estimate
+        npt.assert_allclose(estr.theta[:-1],
+                            np.asarray(glm.params),
+                            atol=1e-6)
+
+        # Checking variance estimates
+        npt.assert_allclose(estr.variance[:-1, :-1],
+                            np.asarray(glm.cov_params()),
+                            atol=1e-6)
+
+        # Checking confidence interval estimates
+        npt.assert_allclose(estr.confidence_intervals()[:-1, :],
+                            np.asarray(glm.conf_int()),
+                            atol=1e-6)
+
+    def test_tobit_bound_error(self, data_c):
+        d = data_c
+        d['Y'] = np.clip(d['Y'], a_min=-1, a_max=None)
+
+        def psi_builtin_regression(theta):
+            return ee_tobit(theta, X=d[['I', 'X', 'Z']], y=d['Y'], lower=1, upper=-1)
+
+        estr = MEstimator(psi_builtin_regression, init=[np.mean(d['Y']), 0., 0., 0.])
+        with pytest.raises(ValueError, match="lower limit must be less"):
+            estr.estimate()
+
+    def test_tobit_outside_error(self, data_c):
+        d = data_c
+        d['Y'] = np.clip(d['Y'], a_min=-1, a_max=7)
+
+        def psi_builtin_regression(theta):
+            return ee_tobit(theta, X=d[['I', 'X', 'Z']], y=d['Y'], lower=0)
+
+        estr = MEstimator(psi_builtin_regression, init=[np.mean(d['Y']), 0., 0., 0.])
+        with pytest.raises(ValueError, match="outcome values below"):
+            estr.estimate()
+
+        def psi_builtin_regression(theta):
+            return ee_tobit(theta, X=d[['I', 'X', 'Z']], y=d['Y'], upper=6)
+
+        estr = MEstimator(psi_builtin_regression, init=[np.mean(d['Y']), 0., 0., 0.])
+        with pytest.raises(ValueError, match="outcome values above"):
+            estr.estimate()
+
+    def test_tobit_leftcensor(self, data_c):
+        """Tests tobit regression with the built-in estimating equation where there is left censoring.
+        """
+        d = data_c
+        d['Y'] = np.clip(d['Y'], a_min=-1, a_max=None)
+
+        def psi_builtin_regression(theta):
+            return ee_tobit(theta, X=d[['I', 'X', 'Z']], y=d['Y'], lower=-1)
+
+        estr = MEstimator(psi_builtin_regression, init=[np.mean(d['Y']), 0., 0., 0.])
+        estr.estimate(deriv_method='exact')
+
+        # External references (computed using R)
+        params_r = [3.1249449, -0.8430839, -0.7554957, 1.2358093]
+        covar_r = [[1.7340345, 0.356371175, -1.6957726, -0.116061154],
+                   [0.3563712, 0.334559929, -0.2012443, -0.005948351],
+                   [-1.6957726, -0.201244275, 2.5729051, 0.163625885],
+                   [-0.1160612, -0.005948351, 0.1636259, 0.039433557]]
+        # library(censReg)
+        # library(sandwich)
+        # d = data.frame(X = c(1, -1, 0, 1, 2, 1, -2, -1, 0, 3, -3, 1, 1, -1, -1, -2, 2, 0, -1, 0))
+        # d$Z = c(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+        # d$Y = c(1, 5, 1, 9, -1, 4, 3, 3, 1, -2, 4, -2, 3, 6, 6, 8, 7, 1, -2, 5)
+        # d$F = c(1, 1, 1, 2, 2, 2, 3, 1, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 3, 3)
+        # d$w = c(2, 1, 5, 1, 2, 7, 3, 1, 2, 2, 3, 9, 1, 1, 1, 5, 1, 1, 6, 2)
+        # d$Y1 = ifelse(d$Y < -1, -1, d$Y)
+        # fm = censReg(Y1 ~ X + Z, data=d, left=-1, right=Inf)
+        # fm$estimate
+        # sandwich(fm)
+
+        # Checking mean estimate
+        npt.assert_allclose(estr.theta,
+                            params_r,
+                            atol=1e-6)
+
+        # Checking variance estimates
+        npt.assert_allclose(estr.variance,
+                            covar_r,
+                            atol=1e-6)
+
+    def test_tobit_rightcensor(self, data_c):
+        """Tests tobit regression with the built-in estimating equation where there is right censoring.
+        """
+        d = data_c
+        d['Y'] = np.clip(d['Y'], a_min=None, a_max=6)
+
+        def psi_builtin_regression(theta):
+            return ee_tobit(theta, X=d[['I', 'X', 'Z']], y=d['Y'], upper=6)
+
+        estr = MEstimator(psi_builtin_regression, init=[np.mean(d['Y']), 0., 0., 0.])
+        estr.estimate(deriv_method='exact')
+
+        # External references (computed using R)
+        params_r = [3.8586445, -0.7017182, -1.3210794, 1.1919088]
+        covar_r = [[2.02425845, 0.21659087, -1.980594441, 0.063522753],
+                   [0.21659087, 0.24168749, -0.205385127, 0.030067468],
+                   [-1.98059444, -0.20538513, 2.520687648, 0.002658435],
+                   [0.06352275, 0.03006747, 0.002658435, 0.037757640]]
+        # library(censReg)
+        # library(sandwich)
+        # d = data.frame(X = c(1, -1, 0, 1, 2, 1, -2, -1, 0, 3, -3, 1, 1, -1, -1, -2, 2, 0, -1, 0))
+        # d$Z = c(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+        # d$Y = c(1, 5, 1, 9, -1, 4, 3, 3, 1, -2, 4, -2, 3, 6, 6, 8, 7, 1, -2, 5)
+        # d$F = c(1, 1, 1, 2, 2, 2, 3, 1, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 3, 3)
+        # d$w = c(2, 1, 5, 1, 2, 7, 3, 1, 2, 2, 3, 9, 1, 1, 1, 5, 1, 1, 6, 2)
+        # d$Y2 = ifelse(d$Y > 6, 6, d$Y)
+        # fm = censReg(Y2 ~ X + Z, data=d, left=-Inf, right=6)
+        # fm$estimate
+        # sandwich(fm)
+
+        # Checking mean estimate
+        npt.assert_allclose(estr.theta,
+                            params_r,
+                            atol=1e-6)
+
+        # Checking variance estimates
+        npt.assert_allclose(estr.variance,
+                            covar_r,
+                            atol=1e-6)
+
+    def test_tobit_bothcensor(self, data_c):
+        """Tests tobit regression with the built-in estimating equation where there is left and right censoring.
+        """
+        d = data_c
+        d['Y'] = np.clip(d['Y'], a_min=-1, a_max=6)
+
+        def psi_builtin_regression(theta):
+            return ee_tobit(theta, X=d[['I', 'X', 'Z']], y=d['Y'], lower=-1, upper=6)
+
+        estr = MEstimator(psi_builtin_regression, init=[np.mean(d['Y']), 0., 0., 0.])
+        estr.estimate(deriv_method='exact')
+
+        # External references (computed using R)
+        params_r = [3.7780813, -0.9871113, -1.5731947, 1.3763457]
+        covar_r = [[2.797477016, 0.35112326, -2.74532477, 0.005894499],
+                   [0.351123261, 0.48426941, -0.19709335, -0.022729087],
+                   [-2.745324773, -0.19709335, 3.60100542, 0.022945235],
+                   [0.005894499, -0.02272909, 0.02294524, 0.076574230]]
+        # library(censReg)
+        # library(sandwich)
+        # d = data.frame(X = c(1, -1, 0, 1, 2, 1, -2, -1, 0, 3, -3, 1, 1, -1, -1, -2, 2, 0, -1, 0))
+        # d$Z = c(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+        # d$Y = c(1, 5, 1, 9, -1, 4, 3, 3, 1, -2, 4, -2, 3, 6, 6, 8, 7, 1, -2, 5)
+        # d$F = c(1, 1, 1, 2, 2, 2, 3, 1, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 3, 3)
+        # d$w = c(2, 1, 5, 1, 2, 7, 3, 1, 2, 2, 3, 9, 1, 1, 1, 5, 1, 1, 6, 2)
+        # d$Y3 = ifelse(d$Y > 6, 6, ifelse(d$Y < -1, -1, d$Y))
+        # fm = censReg(Y3 ~ X + Z, data=d, left=-1, right=6)
+        # fm$estimate
+        # sandwich(fm)
+
+        # Checking mean estimate
+        npt.assert_allclose(estr.theta,
+                            params_r,
+                            atol=1e-6)
+
+        # Checking variance estimates
+        npt.assert_allclose(estr.variance,
+                            covar_r,
+                            atol=1e-6)
+
+    def test_tobit_offset(self, data_c):
+        """Tests tobit regression with the built-in estimating equation where there is left and right censoring.
+        """
+        d = data_c
+
+        def psi_builtin_regression(theta):
+            return ee_tobit(theta, X=d[['I', 'X', 'Z']], y=d['Y'], offset=d['F'])
+
+        estr = MEstimator(psi_builtin_regression, init=[np.mean(d['Y']), 0., 0., 0.])
+        estr.estimate(deriv_method='exact')
+
+        # Comparing to statsmodels GLM (with robust covariance)
+        # NOTE: not actually assessing censoring, since R doesn't support and no option in Python. This just checks
+        #   that offset is integrated as expected (not the ideal test here)
+        glm = smf.glm("Y ~ X + Z", d, offset=d['F'], family=sm.families.Gaussian()).fit(cov_type="HC1")
+
+        # Checking mean estimate
+        npt.assert_allclose(estr.theta[:-1],
+                            np.asarray(glm.params),
+                            atol=1e-6)
+
+        # Checking variance estimates
+        npt.assert_allclose(estr.variance[:-1, :-1],
+                            np.asarray(glm.cov_params()),
+                            atol=1e-6)
+
+    def test_tobit_weight(self, data_c):
+        """Tests tobit regression with the built-in estimating equation where there is left and right censoring.
+        """
+        d = data_c
+        d['Y'] = np.clip(d['Y'], a_min=-1, a_max=6)
+
+        def psi_builtin_regression(theta):
+            return ee_tobit(theta, X=d[['I', 'X', 'Z']], y=d['Y'], weights=d['w'], lower=-1, upper=6)
+
+        estr = MEstimator(psi_builtin_regression, init=[np.mean(d['Y']), 0., 0., 0.])
+        estr.estimate()
+
+        # External references (computed using R)
+        # NOTE: censReg doesn't support weights, so I just expanded out the data by weight counts and compared point
+        params_r = [0.1517922, -1.7236757, 2.2968616, 1.4548301]
+        # dl = transform(d[rep(1:nrow(d), d$w), ])
+        # fm = censReg(Y3 ~ X + Z, data=dl, left=-1, right=6)
+        # fm$estimate
+
+        # Checking mean estimate
+        npt.assert_allclose(estr.theta,
+                            params_r,
+                            atol=1e-6)
 
 
 class TestEstimatingEquationsRegressionRobust:

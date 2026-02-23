@@ -33,6 +33,7 @@ Regression
   ee_mlogit
   ee_glm
   ee_beta_regression
+  ee_tobit
   ee_robust_regression
   ee_ridge_regression
   ee_dlasso_regression

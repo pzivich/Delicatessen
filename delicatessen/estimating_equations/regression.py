@@ -603,6 +603,178 @@ def ee_beta_regression(theta, X, y, weights=None, offset=None):
     return np.vstack([ef_mean, ef_prc])
 
 
+def ee_tobit(theta, X, y, lower=None, upper=None, weights=None, offset=None):
+    r"""Estimating equation for linear regression with censored outcomes. This estimating equations implements Tobit
+    regression (Type I), which can be used for outcomes that are left or right censored. This data arises commonly with
+    biological measurements that have limits of detection. The general estimating equation is
+
+    .. math::
+
+        \sum_{i=1}^n \left\{
+        I(Y_l = Y_i) \frac{\phi(\hat{Y}_i)}{\sigma \Phi(\hat{Y}_i)} +
+        I(Y_l \le Y_i \le Y_u) \frac{Y_{i} - \bar{Y_i}}{\sigma^2} +
+        I(Y_u = Y_i) \frac{\phi(\check{Y}_i)}{(1 - \Phi(\check{Y}_i))\sigma} +
+        \right\} X_i = 0
+
+    where `Y_l` is the lower limit, `Y_u` is the upper limit,
+    `\hat{Y_i} = X_i^T \beta`,
+    :math:`\hat{Y}_i = (Y_l - \bar{Y_i})/\sigma`,
+    :math:`\check{Y}_i = (Y_u - \bar{Y_i})/\sigma`,
+    :math:`\phi` is the standard normal probability density function,
+    and :math:`\Phi` is the standard normal cumulative density function.
+    As seen in this estimating equation, the overall variance of the outcomes also needs to be estimated for the Tobit
+    model. This additional parameter is estimated with censored observations using the following equation
+
+    .. math::
+
+        \sum_{i=1}^n \left\{
+        -I(Y_l = Y_i) \frac{\hat{Y}_i \phi(\hat{Y}_i)}{\sigma \Phi(\hat{Y}_i)} +
+        I(Y_l \le Y_i \le Y_u) \left(\frac{1}{\sigma} + \frac{(Y_i - \bar{Y_i})^2}{\sigma^3} \right) +
+        I(Y_u = Y_i) \frac{\check{Y}_i \phi(\check{Y}_i)}{\sigma \Phi(\check{Y}_i)}
+        \right\} X_i = 0
+
+    Note
+    ----
+    For computational purposes, the input parameter for :math:`\sigma` is actually :math:`\log(\sigma)`, which avoids
+    introduction of non-positive values.
+
+
+    So, :math:`\theta = (\beta, \log(\sigma))` which is a 1-by-(`b`+1) array, where `b` is the dimension of ``X``. For
+    example, if ``X`` is a 3-by-`n` matrix, then :math:`\theta` will be a 1-by-4 array. The code is general to allow
+    for an arbitrary number of elements in ``X``.
+
+    Parameters
+    ----------
+    theta : ndarray, list, vector
+        Theta in this case consists of `b` :math:`\times` (`k`-1) values. Therefore, initial values should consist of
+        the same number as the number of columns present in the design matrix for each category of the outcome matrix
+        besides the reference.
+    X : ndarray, list, vector
+        2-dimensional design matrix of `n` observed covariates for `b` variables.
+    y : ndarray, list, vector
+        2-dimensional indicator matrix of `n` observed outcomes.
+    lower : float, int, None, optional
+        Lower limit of the measurement. Default is ``None``, which corresponds to ``-np.inf``.
+    upper : float, int, None, optional
+        Upper limit of the measurement. Default is ``None``, which corresponds to ``np.inf``.
+    weights : ndarray, list, vector, None, optional
+        1-dimensional vector of `n` weights. Default is ``None``, which assigns a weight of 1 to all observations.
+    offset : ndarray, list, vector, None, optional
+        A 1-dimensional offset to be included in the model. Default is ``None``, which applies no offset term.
+
+    Returns
+    -------
+    array :
+        Returns a (`b`+1)-by-`n` NumPy array evaluated for the input ``theta``.
+
+    Examples
+    --------
+    Construction of an estimating equation(s) with ``ee_tobit`` should be done similar to the following
+
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> from delicatessen import MEstimator
+    >>> from delicatessen.estimating_equations import ee_tobit
+
+    Some generic data to estimate the regression model
+
+    >>> n = 500
+    >>> d = pd.DataFrame()
+    >>> d['X'] = np.random.normal(size=n)
+    >>> d['Z'] = np.random.normal(size=n)
+    >>> d['Y'] = 0.5 + 2*d['X'] - d['Z'] + np.random.normal(loc=0, size=n)
+    >>> d['Yc'] = np.clip(d['Y'], a_min=-2, a_max=3)
+    >>> d['C'] = 1
+
+    Note that ``C`` here is set to all 1's. This will be the intercept in the regression. Here, we observe ``Yc`` which
+    are the censored observations. Defining psi, or the stacked estimating equations
+
+    >>> def psi(theta):
+    >>>     return ee_tobit(theta=theta, X=d[['C', 'X', 'Z']], y=d['Yc'], lower=-2, upper=3)
+
+    Calling the M-estimator (note that ``init`` requires 4 values, since ``X.shape[1]`` is 3).
+
+    >>> estr = MEstimator(psi, init=[np.mean(d['Yc']), 0, 0, 0])
+    >>> estr.estimate()
+
+    Inspecting the estimated parameters
+
+    >>> estr.theta[:-1]  # beta, or model coefficients
+    >>> estr.theta[-1]   # log(sigma), or the log of the variance of Y
+
+    For data that is only censored in one direction (left or right censoring), only the lower or upper limit should be
+    specified. Weighted models can be estimated by specifying the optional ``weights`` argument.
+
+    References
+    ----------
+    Amemiya, T. (1984). Tobit models: A survey. *Journal of Econometrics*, 24(1-2), 3-61.
+
+    Tobin, J. (1958). Estimation of relationships for limited dependent variables. *Econometrica*, 26(1), 24-36.
+    """
+    # Preparation of input shapes and object types
+    X, y, theta, offset = _prep_inputs_(X=X, y=y, theta=theta, penalty=None, offset=offset)
+    w = generate_weights(weights=weights, n_obs=X.shape[0])            # Compute the corresponding weight vector
+    beta = theta[:-1]                                                  # Pull out the regression model coefficients
+    sigma = np.exp(theta[-1])                                          # Exponentiate dispersal parameter
+
+    # Setup terms for estimating functions
+    yhat = np.dot(X, beta) + offset
+    resid = y - yhat
+
+    # Setting up details for the censored observations
+    if lower is not None:
+        lcensor = np.where(y <= lower, 1, 0)
+        scaled_yl = (lower - yhat) / sigma
+        pdf_lower = standard_normal_pdf(scaled_yl)
+        cdf_lower = standard_normal_cdf(scaled_yl)
+        cdf_lower = np.clip(cdf_lower, 1e-14, None)
+        lambda_lower = pdf_lower / cdf_lower
+    else:
+        lower = -np.inf
+        lcensor = 0
+        lambda_lower = 0
+        scaled_yl = 1
+    if upper is not None:
+        rcensor = np.where(y >= upper, 1, 0)
+        scaled_yu = (upper - yhat) / sigma
+        pdf_upper = standard_normal_pdf(scaled_yu)
+        cdf_upper = standard_normal_cdf(scaled_yu)
+        cdf_upper = np.clip(1 - cdf_upper, 1e-14, None)
+        lambda_upper = pdf_upper / cdf_upper
+    else:
+        upper = np.inf
+        rcensor = 0
+        lambda_upper = 0
+        scaled_yu = 1
+    ucensor = (1 - lcensor)*(1 - rcensor)
+
+    # Error checking for the upper and lower limits
+    if lower >= upper:
+        raise ValueError("The lower limit must be less than the upper limit")
+    if np.any(np.where(y < lower, 1, 0)):
+        raise ValueError("There are observations with outcome values below the "
+                         "specified lower limit of detection. "
+                         "This should not occur for the Tobit model.")
+    if np.any(np.where(y > upper, 1, 0)):
+        raise ValueError("There are observations with outcome values above the "
+                         "specified lower limit of detection. "
+                         "This should not occur for the Tobit model.")
+
+    # Regression score
+    ef_treg = w*((lcensor*(-lambda_lower / sigma) +
+                  ucensor*(resid / sigma**2) +
+                  rcensor*(lambda_upper / sigma)
+                  )*X).T
+
+    # Variance score
+    ef_sigma = w*((lcensor*(-scaled_yl * lambda_lower / sigma)).ravel() +
+                  (ucensor*(-1/sigma + resid**2 / sigma**3)).ravel() +
+                  (rcensor*(scaled_yu * lambda_upper / sigma)).ravel())
+
+    # Returning stacked estimating functions
+    return np.vstack([ef_treg, ef_sigma])
+
+
 #################################################################
 # Robust Regression Estimating Equations
 
