@@ -11,7 +11,7 @@ import statsmodels.formula.api as smf
 from lifelines import ExponentialFitter, WeibullFitter, WeibullAFTFitter
 
 from delicatessen import MEstimator
-from delicatessen.estimating_equations import ee_survival_model, ee_aft, ee_pooled_logistic
+from delicatessen.estimating_equations import ee_survival_model, ee_aft, ee_plogit
 
 
 class TestEstimatingEquationsSurvParam:
@@ -409,8 +409,8 @@ class TestEstimatingEquationsDiscreteSurvival:
         s_matrix = np.concatenate([intercept, t_steps[:, None]], axis=1)
 
         def psi(theta):
-            return ee_pooled_logistic(theta, X=d[['X', 'Z']], t=d['T'], delta=d['D'],
-                                      S=s_matrix)
+            return ee_plogit(theta, X=d[['X', 'Z']], t=d['T'], delta=d['D'],
+                             S=s_matrix)
 
         estr = MEstimator(psi, init=[0., 0., ] + [-2., 0., 0.])
         with pytest.raises(ValueError, match="unit-time intervals were created"):
@@ -426,8 +426,8 @@ class TestEstimatingEquationsDiscreteSurvival:
                         [0.5, 6, 2.1]]
 
         def psi(theta):
-            return ee_pooled_logistic(theta, X=d[['X', 'Z']], t=d['T'], delta=d['D'],
-                                      weights=weight_short)
+            return ee_plogit(theta, X=d[['X', 'Z']], t=d['T'], delta=d['D'],
+                             weights=weight_short)
 
         estr = MEstimator(psi, init=[0., 0., ] + [-2., 0., 0.])
         with pytest.raises(ValueError, match="2D weight matrix is provided"):
@@ -437,7 +437,7 @@ class TestEstimatingEquationsDiscreteSurvival:
         d, dl = data, data_long
 
         def psi(theta):
-            return ee_pooled_logistic(theta, X=d[['X', 'Z']], t=d['T'], delta=d['D'], S=None)
+            return ee_plogit(theta, X=d[['X', 'Z']], t=d['T'], delta=d['D'], S=None)
 
         estr = MEstimator(psi, init=[0., 0., ] + [-2., 0., 0.])
         estr.estimate()
@@ -462,8 +462,7 @@ class TestEstimatingEquationsDiscreteSurvival:
         s_matrix = np.concatenate([intercept, t_steps[:, None]], axis=1)
 
         def psi(theta):
-            return ee_pooled_logistic(theta, X=d[['X', 'Z']], t=d['T'], delta=d['D'],
-                                      S=s_matrix)
+            return ee_plogit(theta, X=d[['X', 'Z']], t=d['T'], delta=d['D'], S=s_matrix)
 
         estr = MEstimator(psi, init=[0., 0., ] + [-2., 0.])
         estr.estimate()
@@ -488,8 +487,7 @@ class TestEstimatingEquationsDiscreteSurvival:
         s_matrix = np.concatenate([intercept, t_steps[:, None], t_steps[:, None]**2], axis=1)
 
         def psi(theta):
-            return ee_pooled_logistic(theta, X=d[['X', 'Z']], t=d['T'], delta=d['D'],
-                                      S=s_matrix)
+            return ee_plogit(theta, X=d[['X', 'Z']], t=d['T'], delta=d['D'], S=s_matrix)
 
         estr = MEstimator(psi, init=[0., 0., ] + [-2., 0., 0.])
         estr.estimate()
@@ -510,8 +508,7 @@ class TestEstimatingEquationsDiscreteSurvival:
         d, dl = data, data_long
 
         def psi(theta):
-            return ee_pooled_logistic(theta, X=d[['X', 'Z']], t=d['T'], delta=d['D'],
-                                      S=None, weights=d['w'])
+            return ee_plogit(theta, X=d[['X', 'Z']], t=d['T'], delta=d['D'], S=None, weights=d['w'])
 
         estr = MEstimator(psi, init=[0., 0., ] + [-2., 0., 0.])
         estr.estimate()
@@ -539,8 +536,7 @@ class TestEstimatingEquationsDiscreteSurvival:
                         [0.5, 6, 2.1]]
 
         def psi(theta):
-            return ee_pooled_logistic(theta, X=d[['X', 'Z']], t=d['T'], delta=d['D'],
-                                      S=None, weights=weight_tvary)
+            return ee_plogit(theta, X=d[['X', 'Z']], t=d['T'], delta=d['D'], S=None, weights=weight_tvary)
 
         estr = MEstimator(psi, init=[0., 0., ] + [-2., 0., 0.])
         estr.estimate()
@@ -560,8 +556,8 @@ class TestEstimatingEquationsDiscreteSurvival:
         d, dl = data, data_long
 
         def psi(theta):
-            return ee_pooled_logistic(theta, X=d[['Z', ]], t=d['T'], delta=d['D'],
-                                      S=None, unique_times=[1, 2])
+            return ee_plogit(theta, X=d[['Z', ]], t=d['T'], delta=d['D'],
+                             S=None, unique_times=[1, 2])
 
         estr = MEstimator(psi, init=[0., ] + [-2., 0.])
         estr.estimate()

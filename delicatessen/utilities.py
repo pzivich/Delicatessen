@@ -830,7 +830,7 @@ def aft_predictions_individual(X, times, theta, distribution, measure='survival'
 
     Examples
     --------
-    The following illustrates how to use ``aft_predictions_function`` to generate predicted survival probabilites at
+    The following illustrates how to use ``aft_predictions_individual`` to generate predicted survival probabilites at
     specific times for individuals.
 
     >>> import numpy as np
@@ -975,6 +975,24 @@ def aft_predictions_function(X, times, theta, covariance, distribution, measure=
 
     Parameters
     ----------
+    X : ndarray, list, vector
+        2-dimensional vector of `n` observed values for `b` variables.
+    times : float, int, ndarray, list, vector
+        Either a single time point or a vector of time points to generate predicted measures at. This argument
+        determines the shape of the output.
+    theta : ndarray, list, vector
+        Estimated coefficients from ``MEstimator.theta`` with ``ee_aft``.
+    covariance : ndarray, list, vector
+        Estimated covariance matrix from ``MEstimator.variance`` with ``ee_aft``.
+    distribution : str
+        Distribution to use for the AFT model. See table for options.
+    measure : str, optional
+        Measure to compute. Options include survival (``'survival'``), density (``'density'``), risk or the cumulative
+        density (``'risk'``), hazard (``'hazard'``), or cumulative hazard (``'cumulative_hazard'``). Default is
+        survival
+    alpha : float, optional
+        The :math:`\alpha` level for the corresponding confidence intervals. Default is 0.05, which calculate the
+        95% confidence intervals. Notice that :math:`0 < \alpha < 1`.
 
     Returns
     -------
@@ -1085,6 +1103,150 @@ def aft_predictions_function(X, times, theta, covariance, distribution, measure=
 
     # Return estimates and variance
     return np.vstack([est, variance_m, lower_ci, upper_ci]).T
+
+
+def plogit_predict(theta, t, delta, X, S=None, times_to_predict=None, measure='survival', unique_times=None):
+    r"""Compute predicted survival analysis measures from a pooled logistic regression model for given a design matrix
+    and times. This function is meant to be used with ``ee_pooled_logistic`` to generate predicted survival (or other
+    measures) at designated time points.
+
+    Given a specified covariate and time design matrix, the coefficients from a pooled logistic regression model are
+    used to generate conditional probabilities of the event. These are then transformed into the desired survival
+    measure. Predictions can be output for a selected set of times (``times_to_predict``).
+
+    Note
+    ----
+    Specifications of ```theta``, ``t``, ``delta``, ``S``, and ``unique_times`` should match those provided to
+    ``ee_pooled_logistic``.
+
+
+    Parameters
+    ----------
+    theta : ndarray, list, vector
+        Estimated parameter vector for the pooled logistic model. Composed of the parameters for the baseline
+        covariates and the time coefficients. These should be the values optimized by ``ee_pooled_logistic``.
+    t : ndarray, list, vector
+        1-dimensional vector of `n` observed times. This should be the same values provided to ``ee_pooled_logistic``.
+    delta : ndarray, list, vector
+        1-dimensional vector of `n` event indicators, where 1 indicates an event and 0 indicates right censoring.
+         This should be the same values provided to ``ee_pooled_logistic``.
+    X : ndarray, list, vector
+        2-dimensional vector of `n` observed values for `b` variables. Covariate values can be modify from those given
+        to ``ee_pooled_logistic``, as is done with g-computation estimators.
+    S : ndarray, None, optional
+        Optional argument for parametric function form specifications for time. Default is ``None``, which uses disjoint
+        indicators to model time. Expected to have ``np.max(t)`` rows. This should match the specification provided
+        to ``ee_pooled_logistic``.
+    times_to_predict : int, float, ndarray, list, vector, None, optional
+        Time(s) to generate predicted values for. Specified times must be :math:`[0, \tau]`. Default is ``None``, which
+        generates predicted values at each unique event time (if ``S=None``) or at each unit-time interval (``S!=None``)
+    measure : str, optional
+        Measure to compute. Options include survival (``'survival'``), density (``'density'``), risk or the cumulative
+        density (``'risk'``), hazard (``'hazard'``), or cumulative hazard (``'cumulative_hazard'``). Default is
+        survival
+    unique_times : None, ndarray, list, vector, optional
+        Optional argument to compute the disjoint indicators for only a subset of terms. This argument is intended for
+        use with disjoint indicators for time that are stratified by some external variable. This argument is ignored
+        when ``S`` is not ``None``. This should match the specification provided to ``ee_pooled_logistic``.
+
+    Returns
+    -------
+    array :
+        Returns a `n`-by-`K` NumPy array of predictions, where `n` is the number of rows in the design matrix and `K`
+        is the number of time points to compute the survival measure at.
+
+    Examples
+    --------
+
+    The following illustrates how to use ``plogit_predictions_individual`` to generate predicted survival probabilites
+    at specific times for individuals.
+
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> import matplotlib.pyplot as plt
+    >>> from delicatessen import MEstimator
+    >>> from delicatessen.estimating_equations import ee_plogit
+    >>> from delicatessen.utilities import plogit_predict
+    >>> from delicatessen.data import load_breast_cancer
+
+    Loading breast cancer data from Collett 2015
+
+    >>> dat = load_breast_cancer()
+    >>> delta = dat[:, 0]
+    >>> t = dat[:, 1]
+    >>> covars = np.asarray([np.ones(dat.shape[0]), dat[:, 0]]).T
+
+    Estimating the parameters of a pooled logistic regression model
+
+    References
+    ----------
+    Abbott RD. (1985). Logistic regression in survival analysis. *American Journal of Epidemiology*, 121(3), 465-471.
+
+    D'Agostino RB, Lee ML, Belanger AJ, Cupples LA, Anderson K, & Kannel WB. (1990). Relation of pooled logistic
+    regression to time dependent Cox regression analysis: the Framingham Heart Study.
+    *Statistics in Medicine*, 9(12), 1501-1515.
+
+    Zivich PN, Cole SR, Shook-Sa BE, DeMonte JB, & Edwards JK. (2025). Estimating equations for survival analysis with
+    pooled logistic regression. *arXiv:2504.13291*
+    """
+    # Pre-processing input data
+    t = np.asarray(t)                 # Convert to NumPy array
+    delta = np.asarray(delta)         # Convert to NumPy array
+    X = np.asarray(X)                 # Convert to NumPy array
+    xp = X.shape[1]                   # Get shape of X array to divide parameter vector
+    beta_x = theta[:xp]               # Beta parameters for X design matrix
+    beta_s = np.asarray(theta[xp:])   # Beta parameters for S design matrix
+
+    if S is None:
+        if unique_times is None:
+            event_times = t[delta == 1]
+            unique_times = np.unique(event_times)
+        else:
+            unique_times = np.asarray(unique_times)
+        n_time_steps = unique_times.shape[0]
+
+        # Creating design matrix for time
+        time_design_matrix = np.identity(n=len(unique_times))
+        time_design_matrix[:, 0] = 1
+    else:
+        time_design_matrix = np.asarray(S)
+        unique_times = np.asarray(range(1, int(np.max(t))+1, 1))
+        n_time_steps = len(unique_times)       #
+
+    # Log-odds contributions for covariate and time
+    log_odds_w = np.dot(X, beta_x)
+    log_odds_t = np.dot(time_design_matrix, beta_s)
+
+    # Computing full matrix of predicted values for each time
+    log_odds_w_matrix = np.tile(log_odds_w, (n_time_steps, 1))       # Stacked copies of X contributions for intervals
+    y_pred = inverse_logit(log_odds_w_matrix + log_odds_t[:, None])  # Predicted event at time intervals matrix
+    survival_prediction = np.cumprod(1 - y_pred, axis=0)
+    prediction_matrix = convert_survival_measures(survival_prediction, hazard=y_pred, measure=measure)
+    prediction_t0 = convert_survival_measures(1, 0, measure=measure)
+
+    # Computing requested predictions
+    if times_to_predict is None:
+        return prediction_matrix
+    else:
+        predictions = []
+        for time in times_to_predict:
+            if time == 0 or time < unique_times[0]:
+                prediction = np.ones(t.shape[0]) * prediction_t0
+            elif time > np.max(t):
+                raise ValueError("Cannot predict beyond the maximum observed time")
+            else:
+                if unique_times[-1] <= time:
+                    pred_matrix_index = -1
+                else:
+                    further_times = unique_times[time < unique_times]
+                    if len(further_times) < 1:
+                        nearest = unique_times[time >= unique_times][-1]  # Looks at jump point before
+                    else:
+                        nearest = unique_times[time < unique_times][0]  # Looks at jump point after
+                    pred_matrix_index = np.where(unique_times == nearest)[0][0] - 1
+                prediction = prediction_matrix[pred_matrix_index, :]
+            predictions.append(prediction)
+        return np.asarray(predictions)
 
 
 def spline(variable, knots, power=3, restricted=True, normalized=False):
