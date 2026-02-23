@@ -362,7 +362,7 @@ def ee_aft(theta, X, t, delta, distribution, weights=None):
 # Discrete-Time Models
 
 
-def ee_pooled_logistic(theta, X, t, delta, S=None, unique_times=None, weights=None):
+def ee_plogit(theta, X, t, delta, S=None, unique_times=None, weights=None):
     r"""Estimating equation for pooled logistic regression with discrete-time survival data. One way to model survival
     data is to use survival stacking, where survival data is discretized into intervals. These intervals are expanded
     into a 'long' data set, where each row corresponds to a unique person-period. This standard implementation of
@@ -394,7 +394,7 @@ def ee_pooled_logistic(theta, X, t, delta, S=None, unique_times=None, weights=No
 
     Note
     ----
-    Time-varying covariates are not currently supported for ``ee_pooled_logistic``.
+    Time-varying covariates are not currently supported for ``ee_plogit``.
 
 
     Here, :math:`\mathbb{S}` controls how the hazard is allowed to vary over time and is specified by the ``S``
@@ -442,13 +442,13 @@ def ee_pooled_logistic(theta, X, t, delta, S=None, unique_times=None, weights=No
 
     Examples
     --------
-    Construction of a estimating equation(s) with ``ee_pooled_logistic`` should be done similar to the following
+    Construction of a estimating equation(s) with ``ee_plogit`` should be done similar to the following
 
     >>> import numpy as np
     >>> import pandas as pd
     >>> from scipy.stats import logistic
     >>> from delicatessen import MEstimator
-    >>> from delicatessen.estimating_equations import ee_pooled_logistic
+    >>> from delicatessen.estimating_equations import ee_plogit
     >>> from delicatessen.data import load_breast_cancer
 
     Here, we will illustrate pooled logistic regression with breast cancer from the Middlesex Hospital in July 1987.
@@ -465,7 +465,7 @@ def ee_pooled_logistic(theta, X, t, delta, S=None, unique_times=None, weights=No
     Next, we specify the estimating function and our data.
 
     >>> def psi(theta):
-    >>>     return ee_pooled_logistic(theta=theta, X=d[['statin', ]], delta=d['d'], t=d['t'])
+    >>>     return ee_plogit(theta=theta, X=d[['statin', ]], delta=d['d'], t=d['t'])
 
     Next, M-estimator procedure can be called to estimate ``theta``. Note that ``init`` requires ``X.shape[1]`` plus
     ``len(unique_event_times)`` starting values. To help speed up the parameter solving process, it can be helpful to
@@ -499,7 +499,7 @@ def ee_pooled_logistic(theta, X, t, delta, S=None, unique_times=None, weights=No
     values need to be provided, since the design matrix for time has two terms.
 
     >>> def psi(theta):
-    >>>     return ee_pooled_logistic(theta=theta, X=d[['statin', ]], delta=d['d'], t=d['t'],
+    >>>     return ee_plogit(theta=theta, X=d[['statin', ]], delta=d['d'], t=d['t'],
     >>>                               S=s_matrix)
 
     >>> inits = [0., ] + [-3., 0.]
@@ -508,7 +508,7 @@ def ee_pooled_logistic(theta, X, t, delta, S=None, unique_times=None, weights=No
 
     Weighted models can be estimated by specifying the optional ``weights`` argument. This can be a set of weights
     fixed as baseline, provided as a 1D array (like other regression models). Unlike other regression models,
-    ``ee_pooled_logistic`` also allows for weights to be time-varying (i.e., a 2D array can be input). Note that the
+    ``ee_plogit`` also allows for weights to be time-varying (i.e., a 2D array can be input). Note that the
     dimensions of the 2D array need to correspond to the time intervals of :math:`\mathbb{S}`, so it should be
     `n`-by-`K` dimensions.
 

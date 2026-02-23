@@ -66,6 +66,7 @@ Survival
 
   ee_survival_model
   ee_aft
+  ee_plogit
 
 
 Pharmacokinetic Models
