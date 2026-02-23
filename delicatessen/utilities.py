@@ -1131,9 +1131,9 @@ def plogit_predict(theta, t, delta, X, S=None, times_to_predict=None, measure='s
         1-dimensional vector of `n` event indicators, where 1 indicates an event and 0 indicates right censoring.
          This should be the same values provided to ``ee_pooled_logistic``.
     X : ndarray, list, vector
-        2-dimensional vector of `n` observed values for `b` variables. Covariate values can be modify from those given
+        2-dimensional vector of `n` observed values for `b` variables. Covariate values can be modified from those given
         to ``ee_pooled_logistic``, as is done with g-computation estimators.
-    S : ndarray, None, optional
+    S : ndarray, list, vector, None, optional
         Optional argument for parametric function form specifications for time. Default is ``None``, which uses disjoint
         indicators to model time. Expected to have ``np.max(t)`` rows. This should match the specification provided
         to ``ee_pooled_logistic``.

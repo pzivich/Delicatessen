@@ -13,7 +13,7 @@ from scipy.stats import logistic
 from lifelines import ExponentialFitter, WeibullFitter, WeibullAFTFitter
 
 from delicatessen import MEstimator
-from delicatessen.estimating_equations import ee_mean, ee_regression, ee_survival_model, ee_aft
+from delicatessen.estimating_equations import ee_mean, ee_regression, ee_survival_model, ee_aft, ee_plogit
 from delicatessen.utilities import (identity, inverse_logit, logit,
                                     polygamma, digamma,
                                     robust_loss_functions,
@@ -21,6 +21,7 @@ from delicatessen.utilities import (identity, inverse_logit, logit,
                                     spline,
                                     regression_predictions, survival_predictions,
                                     aft_predictions_individual, aft_predictions_function,
+                                    plogit_predict,
                                     additive_design_matrix)
 
 np.random.seed(80958151)
@@ -444,6 +445,63 @@ class TestPredictions:
         d['t'] = [23, 47, 69, 70, 71, 100, 101, 148, 181, 198, 208, 212, 224, 5, 8, 10, 13, 18, 24, 26, 26, 31, 35, 40,
                   41, 48, 50, 59, 61, 68, 71, 76, 105, 107, 109, 113, 116, 118, 143, 154, 162, 188, 212, 217, 225]
         d['C'] = 1
+        return d
+
+    @pytest.fixture
+    def sdata(self):
+        d = pd.DataFrame()
+        d['W'] = [1, 1, 1, 0, 0, 0, 0, 0]
+        d['X'] = [1, 0, 1, 0, 1, 1, 0, 0]
+        d['Z'] = [-1, 0, 1, 2, 3, -2, -3, 0]
+        d['T'] = [1, 2, 5, 1, 1, 2, 2, 3]
+        d['D'] = [1, 1, 0, 0, 1, 1, 1, 1]
+        d['I'] = 1
+        return d
+
+    @pytest.fixture
+    def sdata_long(self):
+        d = pd.DataFrame()
+        d['W'] = [1,
+                  1, 1,
+                  1, 1, 1, 1, 1,
+                  0,
+                  0,
+                  0, 0,
+                  0, 0,
+                  0, 0, 0]
+        d['X'] = [1,
+                  0, 0,
+                  1, 1, 1, 1, 1,
+                  0,
+                  1,
+                  1, 1,
+                  0, 0,
+                  0, 0, 0]
+        d['Z'] = [-1,
+                  0, 0,
+                  1, 1, 1, 1, 1,
+                  2,
+                  3,
+                  -2, -2,
+                  -3, -3,
+                  0, 0, 0]
+        d['T'] = [1,
+                  1, 2,
+                  1, 2, 3, 4, 5,
+                  1,
+                  1,
+                  1, 2,
+                  1, 2,
+                  1, 2, 3]
+        d['D'] = [1,
+                  0, 1,
+                  0, 0, 0, 0, 0,
+                  0,
+                  1,
+                  0, 1,
+                  0, 1,
+                  0, 0, 1]
+        d['I'] = 1
         return d
 
     def test_regression_predictions_linear(self):
@@ -927,6 +985,146 @@ class TestPredictions:
         # Checking outputs are equal
         npt.assert_allclose(s_t_hat,
                             byhand,
+                            atol=1e-6)
+
+    def test_plogit_predict_hazard(self, sdata, sdata_long):
+        d, dl = sdata, sdata_long
+        d['id'] = d.index
+
+        def psi(theta):
+            return ee_plogit(theta, X=d[['X', 'Z']], t=d['T'], delta=d['D'], S=None)
+
+        estr = MEstimator(psi, init=[0., 0., ] + [-2., 0., 0.])
+        estr.estimate()
+
+        h_hat = plogit_predict(theta=estr.theta, X=d[['X', 'Z']], t=d['T'], delta=d['D'], measure='hazard')
+
+        # Fitting a pooled logistic regression model to a long data set (as default standard)
+        glm = smf.glm("D ~ X + Z + C(T)", dl, family=sm.families.Binomial()).fit()
+        d_predict = pd.DataFrame(np.repeat(d.values, 5, axis=0), columns=d.columns)
+        d_predict['T'] = d_predict.groupby('id')['D'].cumcount() + 1
+        dhaz = np.asarray(glm.predict(d_predict))
+        dhaz = np.reshape(dhaz, (-1, 5)).T
+
+        # Checking mean estimate
+        npt.assert_allclose(h_hat,
+                            dhaz[:3, :],
+                            atol=1e-6)
+
+    def test_plogit_predict_survival(self, sdata, sdata_long):
+        d, dl = sdata, sdata_long
+        d['id'] = d.index
+
+        def psi(theta):
+            return ee_plogit(theta, X=d[['X', 'Z']], t=d['T'], delta=d['D'], S=None)
+
+        estr = MEstimator(psi, init=[0., 0., ] + [-2., 0., 0.])
+        estr.estimate()
+
+        s_hat = plogit_predict(theta=estr.theta, X=d[['X', 'Z']], t=d['T'], delta=d['D'], measure='survival')
+
+        # Fitting a pooled logistic regression model to a long data set (as default standard)
+        glm = smf.glm("D ~ X + Z + C(T)", dl, family=sm.families.Binomial()).fit()
+        d_predict = pd.DataFrame(np.repeat(d.values, 5, axis=0), columns=d.columns)
+        d_predict['T'] = d_predict.groupby('id')['D'].cumcount() + 1
+        d_predict['cS'] = 1 - glm.predict(d_predict)
+        d_predict['S'] = d_predict.groupby('id')['cS'].cumprod()
+        surv = np.asarray(d_predict['S'])
+        surv = np.reshape(surv, (-1, 5)).T
+
+        # Checking mean estimate
+        npt.assert_allclose(s_hat,
+                            surv[:3, :],
+                            atol=1e-6)
+
+    def test_plogit_predict_risk(self, sdata, sdata_long):
+        d, dl = sdata, sdata_long
+        d['id'] = d.index
+
+        def psi(theta):
+            return ee_plogit(theta, X=d[['X', 'Z']], t=d['T'], delta=d['D'], S=None)
+
+        estr = MEstimator(psi, init=[0., 0., ] + [-2., 0., 0.])
+        estr.estimate()
+
+        r_hat = plogit_predict(theta=estr.theta, X=d[['X', 'Z']], t=d['T'], delta=d['D'], measure='risk')
+
+        # Fitting a pooled logistic regression model to a long data set (as default standard)
+        glm = smf.glm("D ~ X + Z + C(T)", dl, family=sm.families.Binomial()).fit()
+        d_predict = pd.DataFrame(np.repeat(d.values, 5, axis=0), columns=d.columns)
+        d_predict['T'] = d_predict.groupby('id')['D'].cumcount() + 1
+        d_predict['cS'] = 1 - glm.predict(d_predict)
+        d_predict['S'] = d_predict.groupby('id')['cS'].cumprod()
+        risk = 1 - np.asarray(d_predict['S'])
+        risk = np.reshape(risk, (-1, 5)).T
+
+        # Checking mean estimate
+        npt.assert_allclose(r_hat,
+                            risk[:3, :],
+                            atol=1e-6)
+
+    def test_plogit_predict_smatrix(self, sdata, sdata_long):
+        d, dl = sdata, sdata_long
+        d['id'] = d.index
+
+        # Constructing time design matrix
+        t_steps = np.asarray(range(1, np.max(d['T']) + 1))
+        intercept = np.ones(t_steps.shape)[:, None]
+        s_matrix = np.concatenate([intercept, t_steps[:, None]], axis=1)
+
+        def psi(theta):
+            return ee_plogit(theta, X=d[['X', 'Z']], t=d['T'], delta=d['D'], S=s_matrix)
+
+        estr = MEstimator(psi, init=[0., 0., ] + [-2., 0.])
+        estr.estimate()
+
+        s_hat = plogit_predict(theta=estr.theta, X=d[['X', 'Z']], t=d['T'], delta=d['D'], measure='survival',
+                               S=s_matrix)
+
+        # Fitting a pooled logistic regression model to a long data set (as default standard)
+        glm = smf.glm("D ~ X + Z + T", dl, family=sm.families.Binomial()).fit()
+        d_predict = pd.DataFrame(np.repeat(d.values, 5, axis=0), columns=d.columns)
+        d_predict['T'] = d_predict.groupby('id')['D'].cumcount() + 1
+        d_predict['cS'] = 1 - glm.predict(d_predict)
+        d_predict['S'] = d_predict.groupby('id')['cS'].cumprod()
+        surv = np.asarray(d_predict['S'])
+        surv = np.reshape(surv, (-1, 5)).T
+
+        # Checking mean estimate
+        npt.assert_allclose(s_hat,
+                            surv,
+                            atol=1e-6)
+
+    def test_plogit_predict_certain_times(self, sdata, sdata_long):
+        d, dl = sdata, sdata_long
+        d['id'] = d.index
+
+        # Constructing time design matrix
+        t_steps = np.asarray(range(1, np.max(d['T']) + 1))
+        intercept = np.ones(t_steps.shape)[:, None]
+        s_matrix = np.concatenate([intercept, t_steps[:, None]], axis=1)
+
+        def psi(theta):
+            return ee_plogit(theta, X=d[['X', 'Z']], t=d['T'], delta=d['D'], S=s_matrix)
+
+        estr = MEstimator(psi, init=[0., 0., ] + [-2., 0.])
+        estr.estimate()
+
+        s_hat = plogit_predict(theta=estr.theta, X=d[['X', 'Z']], t=d['T'], delta=d['D'], measure='survival',
+                               S=s_matrix, times_to_predict=[1, 3, 5])
+
+        # Fitting a pooled logistic regression model to a long data set (as default standard)
+        glm = smf.glm("D ~ X + Z + T", dl, family=sm.families.Binomial()).fit()
+        d_predict = pd.DataFrame(np.repeat(d.values, 5, axis=0), columns=d.columns)
+        d_predict['T'] = d_predict.groupby('id')['D'].cumcount() + 1
+        d_predict['cS'] = 1 - glm.predict(d_predict)
+        d_predict['S'] = d_predict.groupby('id')['cS'].cumprod()
+        surv = np.asarray(d_predict['S'])
+        surv = np.reshape(surv, (-1, 5)).T
+
+        # Checking mean estimate
+        npt.assert_allclose(s_hat,
+                            surv[[0, 2, 4], :],
                             atol=1e-6)
 
 
