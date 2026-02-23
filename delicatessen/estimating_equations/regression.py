@@ -713,40 +713,40 @@ def ee_tobit(theta, X, y, lower=None, upper=None, weights=None, offset=None):
     """
     # Preparation of input shapes and object types
     X, y, theta, offset = _prep_inputs_(X=X, y=y, theta=theta, penalty=None, offset=offset)
-    w = generate_weights(weights=weights, n_obs=X.shape[0])            # Compute the corresponding weight vector
-    beta = theta[:-1]                                                  # Pull out the regression model coefficients
-    sigma = np.exp(theta[-1])                                          # Exponentiate dispersal parameter
+    w = generate_weights(weights=weights, n_obs=X.shape[0])  # Compute the corresponding weight vector
+    beta = theta[:-1]                                        # Pull out the regression model coefficients
+    sigma = np.exp(theta[-1])                                # Exponentiate dispersal parameter
 
     # Setup terms for estimating functions
-    yhat = np.dot(X, beta) + offset
-    resid = y - yhat
+    yhat = np.dot(X, beta) + offset                          # Predicted value of the outcome from regression
+    resid = y - yhat                                         # Computing the regression residual
 
     # Setting up details for the censored observations
-    if lower is not None:
-        lcensor = np.where(y <= lower, 1, 0)
-        scaled_yl = (lower - yhat) / sigma
-        pdf_lower = standard_normal_pdf(scaled_yl)
-        cdf_lower = standard_normal_cdf(scaled_yl)
-        cdf_lower = np.clip(cdf_lower, 1e-14, None)
-        lambda_lower = pdf_lower / cdf_lower
-    else:
-        lower = -np.inf
-        lcensor = 0
-        lambda_lower = 0
-        scaled_yl = 1
-    if upper is not None:
-        rcensor = np.where(y >= upper, 1, 0)
-        scaled_yu = (upper - yhat) / sigma
-        pdf_upper = standard_normal_pdf(scaled_yu)
-        cdf_upper = standard_normal_cdf(scaled_yu)
-        cdf_upper = np.clip(1 - cdf_upper, 1e-14, None)
-        lambda_upper = pdf_upper / cdf_upper
-    else:
-        upper = np.inf
-        rcensor = 0
-        lambda_upper = 0
-        scaled_yu = 1
-    ucensor = (1 - lcensor)*(1 - rcensor)
+    if lower is not None:                                    # If a lower limit is provided by the user
+        lcensor = np.where(y <= lower, 1, 0)                 # ... indicator if left censored
+        scaled_yl = (lower - yhat) / sigma                   # ... scaling distance from lower limit by SD
+        pdf_lower = standard_normal_pdf(scaled_yl)           # ... compute from PDF
+        cdf_lower = standard_normal_cdf(scaled_yl)           # ... compute from CDF
+        cdf_lower = np.clip(cdf_lower, 1e-14, None)          # ... clip CDF since divisor to prevent issues due to far
+        lambda_lower = pdf_lower / cdf_lower                 # ... computing contribution for observation
+    else:                                                    # Otherwise when no lower limit is specified
+        lower = -np.inf                                      # ... manually set lower limit to -infinity
+        lcensor = 0                                          # ... no observations are left censored
+        lambda_lower = 0                                     # ... placeholder (zeroed out later)
+        scaled_yl = 1                                        # ... placeholder (zeroed out later)
+    if upper is not None:                                    # If an upper limit is provided by the user
+        rcensor = np.where(y >= upper, 1, 0)                 # ... indicator if right censored
+        scaled_yu = (upper - yhat) / sigma                   # ... scaling distance from upper limit by SD
+        pdf_upper = standard_normal_pdf(scaled_yu)           # ... compute from PDF
+        cdf_upper = standard_normal_cdf(scaled_yu)           # ... compute from CDF
+        cdf_upper = np.clip(1 - cdf_upper, 1e-14, None)      # ... clip 1-CDF since divisor to prevent issues
+        lambda_upper = pdf_upper / cdf_upper                 # ... computing contribution for observation
+    else:                                                    # Otherwise when no upper limit is specified
+        upper = np.inf                                       # ... manually set upper limit to infinity
+        rcensor = 0                                          # ... no observations are right censored
+        lambda_upper = 0                                     # ... placeholder (zeroed out later)
+        scaled_yu = 1                                        # ... placeholder (zeroed out later)
+    ucensor = (1 - lcensor)*(1 - rcensor)                    # Indicator if in the uncensored region
 
     # Error checking for the upper and lower limits
     if lower >= upper:
@@ -761,15 +761,17 @@ def ee_tobit(theta, X, y, lower=None, upper=None, weights=None, offset=None):
                          "This should not occur for the Tobit model.")
 
     # Regression score
-    ef_treg = w*((lcensor*(-lambda_lower / sigma) +
-                  ucensor*(resid / sigma**2) +
-                  rcensor*(lambda_upper / sigma)
+    ef_treg = w*((                                                          # Regression coefficients
+                  lcensor*(-lambda_lower / sigma) +                         # ... contribution for left censored
+                  ucensor*(resid / sigma**2) +                              # ... contribution for uncensored
+                  rcensor*(lambda_upper / sigma)                            # ... contribution for right censored
                   )*X).T
 
     # Variance score
-    ef_sigma = w*((lcensor*(-scaled_yl * lambda_lower / sigma)).ravel() +
-                  (ucensor*(-1/sigma + resid**2 / sigma**3)).ravel() +
-                  (rcensor*(scaled_yu * lambda_upper / sigma)).ravel())
+    ef_sigma = w*(                                                          # Variance estimate
+                  (lcensor*(-scaled_yl * lambda_lower / sigma)).ravel() +   # ... contribution for left censored
+                  (ucensor*(-1/sigma + resid**2 / sigma**3)).ravel() +      # ... contribution for uncensored
+                  (rcensor*(scaled_yu * lambda_upper / sigma)).ravel())     # ... contribution for right censored
 
     # Returning stacked estimating functions
     return np.vstack([ef_treg, ef_sigma])
