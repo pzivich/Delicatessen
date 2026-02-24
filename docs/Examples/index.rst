@@ -3,33 +3,79 @@ Applied Examples
 
 This section provides illustrative applications of the estimators provided in ``delicatessen``. These examples include
 replication of examples from textbooks, published scientific articles, and custom examples. Both built-in estimating
-equations and use of user-built estimating equations are illustrated. If there are applications you would like to see
-added to this documentations, please contact us.
+equations and use of user-built estimating equations are illustrated. These examples are somewhat organized by the
+topics being covered. Example applications include biomedical research, econometrics, sociology, cheminformatics,
+and astrostatistics. If there are applications you would like to see added to this documentations, please contact us.
 
+
+Essentials
+-------------------
 
 .. toctree::
   :maxdepth: 1
 
   Ross-IJE-2024
-  LifeScienceExamples
-  Agresti-Crime
-  Cole-AJE-2023
   Boos-Stefanski-Ch7
+  LifeScienceExamples
+  Cole-AJE-2023
+  ClusteredData
+  GMM-OverID
+
+
+Regression Models
+-------------------
+
+.. toctree::
+  :maxdepth: 1
+
+  Agresti-Crime
   Bonate-Pharmaco
-  Hernan-Robins-2023
-  Morris-Trials-2022
-  Coffman-2021
   Mroz-1987
   Cole-AJE-2022
   Cole-EPID-2023
+  SDSS-Quasar
+  Generalized-Additive-Model
+
+
+Survival Analysis
+-------------------
+
+.. toctree::
+  :maxdepth: 1
+
   Collett-Survival
   Zivich-PLogit
+
+
+Missing Data
+-------------------
+
+.. toctree::
+  :maxdepth: 1
+
+  Cole-AJE-2022
+  Cole-EPID-2023
+
+
+Causal Inference
+-------------------
+
+.. toctree::
+  :maxdepth: 1
+
+  Hernan-Robins-2023
+  Morris-Trials-2022
+  Coffman-2021
+
+
+Others
+--------
+
+.. toctree::
+  :maxdepth: 1
+
   Ash-JCheminform-2022
   Zivich-CBands
-  SDSS-Quasar
-  ClusteredData
-  GMM-OverID
-  Generalized-Additive-Model
 
 
 Code and Issue Tracker
