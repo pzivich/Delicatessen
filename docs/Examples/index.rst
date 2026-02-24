@@ -28,13 +28,21 @@ Regression Models
 .. toctree::
   :maxdepth: 1
 
-  Agresti-Crime
-  Bonate-Pharmaco
   Mroz-1987
+  Agresti-Crime
+  Generalized-Additive-Model
+  SDSS-Quasar
+
+
+Missing Data
+-------------------
+
+.. toctree::
+  :maxdepth: 1
+
   Cole-AJE-2022
   Cole-EPID-2023
-  SDSS-Quasar
-  Generalized-Additive-Model
+
 
 
 Survival Analysis
@@ -47,14 +55,14 @@ Survival Analysis
   Zivich-PLogit
 
 
-Missing Data
+
+Pharmacokinetics
 -------------------
 
 .. toctree::
   :maxdepth: 1
 
-  Cole-AJE-2022
-  Cole-EPID-2023
+  Bonate-Pharmaco
 
 
 Causal Inference
