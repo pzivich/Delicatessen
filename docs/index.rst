@@ -30,7 +30,8 @@ where the 'bread' is
 
     B_n(O,\hat{\theta}) = n^{-1} \sum_{i=1}^n - \nabla \psi(O_i, \hat{\theta}),
 
-:math:`\nabla` indicates the partial derivatives, and the 'meat' or 'filling' is
+:math:`\nabla` denotes the gradient (i.e., the vector of corresponding partial derivatives), and the 'meat' or
+'filling' is
 
 .. math::
 

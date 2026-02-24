@@ -6,10 +6,10 @@ estimating functions.
 
 A weakness of ``delicatessen`` is that it does not have the fastest or most robust routines for estimating statistical
 parameters. This is the cost of the flexibility of the generic estimating equation implementation used (a cost that
-I have found to be worthwhile).
+``delicatessen`` presumes to be worthwhile when being applied).
 
-Below are a few recommendations for finding :math:`\theta` with ``MEstimator`` or ``GMMEstimator`` that we have used to
-some success.
+Below are a few recommendations for solving :math:`\theta` with ``MEstimator`` or ``GMMEstimator`` that have been used
+to some success in computationally demanding problems previously.
 
 Center initial values
 ---------------------
@@ -36,7 +36,8 @@ values of :math:`\theta` that can't be optimized outside.
 
 This pre-washing approach is particularly useful for regression models, since more stable optimization strategies exist
 for most regression implementations. Pre-washing the initial values allows ``delicatessen`` to 'borrow' the strength of
-more stable methods.
+more stable methods. A pre-washing procedure that does not require solving for all coefficients is to instead set the
+intercept at the mean of the outcome variables (or its transformed variation when using a generalized linear model).
 
 Finally, ``delicatessen`` offers the option to run the optimization procedure for a subset of the estimating functions
 via the optional ``subset`` argument. Therefore, some parameters can be solved outside of the procedure and only the
@@ -47,14 +48,14 @@ Increase iterations
 --------------------
 
 If neither of those works, increasing the number of iterations is a good next place to start. The default is ``5000``
-but can easily be increased via ``MEstimator(...).estimate(..., maxiter=10000)``.
+but can easily be increased via the ``maxiter`` optional argument in the ``estimate()`` function.
 
 Different optimization
 ----------------------
 
 By default, ``MEstimator`` uses the Levenberg-Marquardt for root-finding and ``GMMEstimator`` uses the BFGS
-for minimization. However, ``delicatessen`` also supports other algorithms available in ``scipy.optimize``.
-Additionally, custom or manual root-finding algorithms can be used. Some algorithms may have better operating
+for minimization. ``delicatessen`` also supports other algorithms available in ``scipy.optimize``. Additionally,
+custom or manual root-finding algorithms can be used. Some algorithms may have better operating
 characteristics for particular types of problems.
 
 Non-smooth equations
@@ -70,6 +71,6 @@ A warning
 
 Before ending this section, I want to emphasize that simply increasing ``tolerance`` is not generally advised. While
 it may allow the optimization routine to succeed, it only allows the error of the optimization to be greater.
-Therefore, the optimization will stop 'further' away from the zero of the esitmating equation. Do **not** use this
+Therefore, the optimization will stop 'further' away from the zero of the estimating equation. Do **not** use this
 approach to getting ``delicatessen`` to succeed in the optimization unless you are absolutely sure that the new
 ``tolerance`` is within acceptable computational error tolerance for your problem. The default tolerance is ``1e-9``.

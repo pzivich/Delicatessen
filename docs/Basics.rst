@@ -34,7 +34,7 @@ The Generalized Method of Moments (GMM) estimator is instead defined as the solu
         \left[ \sum_{i=1}^n \psi(O_i, \hat{\theta}) \right]
 
 
-where :math:`\text{\Q}` is a weight matrix. In general, the weight matrix begins as the identity matrix as implemented
+where :math:`\text{Q}` is a weight matrix. In general, the weight matrix begins as the identity matrix as implemented
 in ``delicatessen``.
 
 For this equation, we use a *minimization* algorithm to solve for :math:`\theta`. This is accomplished in
@@ -61,7 +61,7 @@ where the 'bread' is
 
     B_n(O,\hat{\theta}) = n^{-1} \sum_{i=1}^n - \nabla \psi(O_i, \hat{\theta})
 
-where the :math:`\nabla` indicates the partial derivatives, and the 'meat' or 'filling' is
+where the :math:`\nabla` indicates the gradient of the estimating functions, and the 'meat' or 'filling' is
 
 .. math::
 
@@ -81,7 +81,7 @@ Automatic Differentiation Caveats
 There are two caveats to the use of automatic differentiation. (1) some NumPy functionalities are not fully
 supported. For example, ``np.log(x, where=0<x)`` will result in an error since there is an attempt to evaluate a
 log at zero internally. When using these specialty functions are necessary, it is better to use numerical approximation
-for differentiation. (2) Consider the following discontinuous function :math:`f(x) = x**2` if :math:`x \ge 1` and
+for differentiation. (2) Consider the following discontinuous function :math:`f(x) = x^2` if :math:`x \ge 1` and
 :math:`f(x) = 0` otherwise. Because of how automatic differentiation operates, the derivative at :math:`x=1` will
 result in :math:`2x` (this is the same behavior as other automatic differentiation software, like ``autograd``).
 
