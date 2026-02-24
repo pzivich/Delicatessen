@@ -85,11 +85,3 @@ Others
   Ash-JCheminform-2022
   Zivich-CBands
 
-
-Code and Issue Tracker
------------------------------
-
-Please report any bugs, issues, or feature requests on GitHub
-at `pzivich/Delicatessen <https://github.com/pzivich/Delicatessen/>`_.
-
-Otherwise, you may contact me via email (gmail: zivich.5).
