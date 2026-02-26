@@ -82,6 +82,6 @@ Others
 .. toctree::
   :maxdepth: 1
 
-  Ash-JCheminform-2022
   Zivich-CBands
+  Ash-JCheminform-2022
 
