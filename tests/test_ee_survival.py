@@ -572,5 +572,3 @@ class TestEstimatingEquationsDiscreteSurvival:
                             atol=1e-6)
 
         # NOTE: standard errors won't match exactly due to how everything is constructed (but both are valid estimators)
-
-    # TODO test predictions and risk function estimator as well
