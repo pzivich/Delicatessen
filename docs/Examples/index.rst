@@ -32,6 +32,7 @@ Regression Models
   Agresti-Crime
   Generalized-Additive-Model
   SDSS-Quasar
+  CanadianWeather-FDA
 
 
 Missing Data
