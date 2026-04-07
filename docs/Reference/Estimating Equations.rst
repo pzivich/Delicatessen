@@ -98,4 +98,5 @@ Causal Inference
   ee_gestimation_snmm
   ee_iv_causal
   ee_2sls
+  ee_gestimation_snmm_iv
   ee_mean_sensitivity_analysis
