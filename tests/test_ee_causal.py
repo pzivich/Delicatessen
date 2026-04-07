@@ -11,7 +11,7 @@ import statsmodels.api as sm
 from delicatessen import MEstimator, GMMEstimator
 from delicatessen.estimating_equations import (ee_regression,
                                                ee_gformula, ee_ipw, ee_ipw_msm, ee_aipw, ee_gestimation_snmm,
-                                               ee_iv_causal, ee_2sls,
+                                               ee_iv_causal, ee_2sls, ee_gestimation_snmm_iv,
                                                ee_mean_sensitivity_analysis)
 from delicatessen.utilities import inverse_logit
 
@@ -1005,3 +1005,87 @@ class TestEstimatingEquationsIV:
         # Checking point estimates are close
         npt.assert_allclose(estr.theta[:3], tsls_params,
                             atol=1e-6)
+
+    def test_gestimator_usualiv(self, data_b):
+        d = data_b
+        d['C'] = 1
+
+        # Two-stage least squares estimator
+        def psi(theta):
+            return ee_iv_causal(theta=theta, y=d['Y'], A=d['A'], Z=d['Z'])
+
+        estr = GMMEstimator(psi, init=[0, 0])
+        estr.estimate()
+        usiv = estr.theta
+
+        def psi(theta):
+            return ee_gestimation_snmm_iv(theta=theta, y=d['Y'], Z=d['Z'], A=d['A'], W=d[['C', ]], V=d[['C', ]])
+
+        estr = GMMEstimator(psi, init=[0, 0, ])
+        estr.estimate()
+        snmm = estr.theta
+
+        # Checking point estimates are close
+        npt.assert_allclose(snmm[0], usiv[0],
+                            atol=1e-7)
+
+    def test_gestimator_2sls(self, data_2sls):
+        d = data_2sls
+        d['C'] = 1
+
+        def psi(theta):
+            return ee_2sls(theta=theta, y=d['Y'], A=d['A'], Z=d[['Z', ]], W=d[['C', ]])
+
+        estr = GMMEstimator(psi, init=[0, 0, 0, 0])
+        estr.estimate()
+        tsls = estr.theta
+
+        def psi(theta):
+            return ee_gestimation_snmm_iv(theta=theta, y=d['Y'], Z=d['Z'], A=d['A'], W=d[['C', ]], V=d[['C', ]],
+                                          model_instrument='linear')
+
+        estr = GMMEstimator(psi, init=[0, 0, ])
+        estr.estimate()
+        snmm = estr.theta
+
+        # Checking point estimates are close
+        npt.assert_allclose(snmm[0], tsls[0],
+                            atol=1e-5)
+
+        # Checking nuisance is close to expected
+        npt.assert_allclose(snmm[1], np.mean(d['Z']),
+                            atol=1e-7)
+
+    def test_gestimator_2sls_exog(self, data_2sls):
+        d = data_2sls
+
+        def psi(theta):
+            return ee_2sls(theta=theta, y=d['Y'], A=d['A'], Z=d[['Z', ]], W=d[['C', 'X']])
+
+        estr = GMMEstimator(psi, init=[0, 0, 0, 0, 0, 0])
+        estr.estimate()
+        tsls = estr.theta
+
+
+        def psi(theta):
+            return ee_gestimation_snmm_iv(theta=theta, y=d['Y'], Z=d['Z'], A=d['A'], W=d[['C', 'X']], V=d[['C', ]],
+                                          model_instrument='linear')
+
+        estr = GMMEstimator(psi, init=[0, 0, 0])
+        estr.estimate()
+        snmm = estr.theta
+
+        # Checking point estimates are close
+        npt.assert_allclose(snmm[0], tsls[0],
+                            atol=1e-5)
+
+        # Checking nuisance model
+        def psi(theta):
+            return ee_regression(theta=theta, X=d[['C', 'X']], y=d['Z'], model='linear')
+
+        estr = MEstimator(psi, init=[0, 0])
+        estr.estimate()
+
+        npt.assert_allclose(snmm[1:], estr.theta,
+                            atol=1e-7)
+

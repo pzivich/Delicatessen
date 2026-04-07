@@ -1052,7 +1052,7 @@ def ee_gestimation_snmm(theta, y, A, W, V, X=None, model='linear', weights=None)
 
     where :math:`\pi_i = \text{expit}(W_i^T \alpha)`, and
     :math:`H(\beta) = Y - \beta A \mathbb{V}` for a linear SMM and
-    :math:`H(\beta) = Y \times \exp(-A \beta \mathbb{V})` for a log-linear SMM, where .
+    :math:`H(\beta) = Y \times \exp(-A \beta \mathbb{V})` for a log-linear SMM.
     Note that :math:`V \subseteq W`, where :math:`W` is the set of confounding variables.
     The length of the parameter vector is `b`+`c`, where `b` is the number of columns in ``V``, and
     `c` is the number of columns in ``W``.
@@ -1191,7 +1191,6 @@ def ee_gestimation_snmm(theta, y, A, W, V, X=None, model='linear', weights=None)
     Vansteelandt S, & Sjolander A (2016). Revisiting g-estimation of the effect of a time-varying exposure subject to
     time-varying confounding. *Epidemiologic Methods*, 5(1), 37-56.
     """
-    # Future consideration: add bias adjustment via b(A,W; \alpha) to h_psi from Vancak & Sjolander
     # Ensuring correct typing
     y = np.asarray(y)[:, None]                  # Convert to NumPy array and converting shape
     A = np.asarray(A)                           # Convert to NumPy array
@@ -1213,7 +1212,7 @@ def ee_gestimation_snmm(theta, y, A, W, V, X=None, model='linear', weights=None)
     if X is not None:                           # If given an input X
         beta = np.asarray(theta[qdiv:])         # ... theta parameters for the E[Y|W] model
 
-    # # Option for the variations on the structural mean model
+    # Option for the variations on the structural mean model
     if model.lower() == 'linear':                             # Linear structural mean model
         h_phi = y - np.dot(V*A[:, None], phi)                 # ... simply subtract
         y_transform = identity                                # ... transformation for E[h(phi) | X]
@@ -1233,6 +1232,231 @@ def ee_gestimation_snmm(theta, y, A, W, V, X=None, model='linear', weights=None)
                            weights=weights)                          # ... with provided weights
     pi = inverse_logit(np.dot(W, alpha))                             # Converting log-odds to probability
     a_resid = (A - pi)[:, None]                                      # Calculating residuals for A
+
+    # Estimating functions for the corresponding g-estimator of SMM
+    if X is not None:                                            # Specifying an outcome model for efficient
+        X = np.asarray(X)                                        # ... convert X to NumPy array
+        ee_out = ee_regression(theta=beta,                       # ... outcome model with beta
+                               X=X, y=h_phi[:, 0],               # ... for E[h(phi)|W]
+                               model=model,                      # ... transformation to consider
+                               weights=weights)                  # ... using provided weights
+        yhat = y_transform(np.dot(X, beta)[:, None])             # ... get predicted h(phi)
+        eq_add = [ee_out, ]                                      # ... adding outcome model estimating functions
+    else:                                                        # Otherwise uses inefficient g-estimator
+        yhat = 0                                                 # ... residual set manually to zero
+        # This error should not be reached at this time. It is a placeholder for a potential future addition
+        if model.lower() == 'logistic':                          # Error if logistic is requested
+            raise ValueError("The g-estimator with X=None "
+                             "does not support logistic structural mean models.")
+
+    # Estimating function for the structural mean model
+    y0_resid = h_phi - yhat
+    ee_smm = weight * (a_resid * y0_resid * V).T
+
+    # Output (b+c)-by-n array
+    stacked_ee = [ee_smm,            # SMM parameters
+                  ee_log] + eq_add   # Nuisance model parameters
+    return np.vstack(stacked_ee)
+
+
+def ee_gestimation_snmm_iv(theta, y, Z, A, W, V, X=None, model='linear', model_instrument='logistic', weights=None):
+    """Estimating equations for g-estimation of structural mean models (SMMs) with an instrumental variable (IV). The
+    parameter(s) of interest are the parameter(s) of the corresponding SMM. With an IV, the linear (additive) SMM
+    remains the same (see ``ee_gestimation_snmm``). Rather than model the propensity score for the action variables
+    (:math:`A`), we instead model the IV (:math:`Z`). The inefficient g-estimator we solve for :math:`\beta` in the
+    following estimating equation
+
+    .. math::
+
+        \sum_{i=1}^n
+        \begin{bmatrix}
+            \left\{ H(\beta) \times (Z_i - \pi_i) \right\} \times V_i \\
+            \left\{ Z_i - g(W_i^T \alpha) \right\} W_i
+        \end{bmatrix}
+        = 0
+
+    where :math:`\pi_i = \hat{E}[Z \mid W]`, and
+    :math:`H(\beta) = Y - \beta A \mathbb{V}` for a linear SMM and
+    :math:`H(\beta) = Y \times \exp(-A \beta \mathbb{V})` for a log-linear SMM.
+    Note that :math:`V \subseteq W`, where :math:`W` is the set of confounding variables for the instrument (if there
+    are any). The length of the parameter vector is `b`+`c`, where `b` is the number of columns in ``V``, and
+    `c` is the number of columns in ``W``.
+
+    Alternatively, the efficient g-estimator can also be used. Like with the other g-estimator of the structural
+    mean model,  we replace :math:`H(\beta)` with :math:`\{H(\beta) - E[H(\beta) | W]\}` in the prior estimating
+    equation and specify a model for :math:`E[H(\beta) | W]`.
+
+    Parameters
+    ----------
+    theta : ndarray, list, vector
+        Theta consists of 1+`b` values if ``X0`` is ``None``, and 3+b values if ``X0`` is not ``None``.
+    y : ndarray, list, vector
+        1-dimensional vector of `n` observed values of the outcome.
+    Z : ndarray, list, vector
+        1-dimensional vector of `n` observed values of the instrument. Values should all be 0 or 1.
+    A : ndarray, list, vector
+        1-dimensional vector of `n` observed values of the action. Values should all be 0 or 1.
+    W : ndarray, list, vector
+        2-dimensional vector of `n` observed values for b columns of a design matrix to model the expected value of
+        ``A``.
+    V : ndarray, list, vector
+        2-dimensional vector of `n` observed values for `b` columns of a design matrix for the structural mean model.
+        Note that the design matrix here is expected to not include the observed values of ``A``
+    X : ndarray, list, vector, None, optional
+        Default of this argument is ``None``, which implements the estimating equation for the inefficient g-estimator.
+        To use the efficient g-estimator, a 2-dimensional vector of n observed values for `b` columns of a design matrix
+        for the :math:`E[H(\beta) | W]` model should be provided here.
+    model : str, optional
+        Type of structural mean model to fit. Options are currently: ``linear``, ``poisson``. Default is ``linear``.
+        The Poisson model specification can be used for positive continuous data, or with binary data in order to
+        estimate causal risk ratios.
+    model_instrument : str, optional
+        Type of model to fit for the instrument, E[Z | X]. This choice should be made depending on the type of variable
+        the instrument is. Options are currently: ``linear``, ``poisson``, or ``logistic``. Default is ``linear``.
+    weights : ndarray, list, vector, None, optional
+        1-dimensional vector of n weights. Default is ``None``, which assigns a weight of 1 to all observations. This
+        argument is intended to support the use of sampling or missingness weights.
+
+    Returns
+    -------
+    array :
+        Returns a (`b`+`c`)-by-`n` (inefficient) or (`b`+`c`+`d`)-by-`n` (efficient) NumPy array evaluated for the
+        input ``theta``.
+
+    Examples
+    --------
+    Construction of an estimating equation(s) with ``ee_gestimation_snmm`` should be done similar to the following
+
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> from scipy.stats import logistic
+    >>> from delicatessen import MEstimator
+    >>> from delicatessen.estimating_equations import ee_gestimation_snmm
+
+    Some generic data
+
+    >>> n = 200
+    >>> d = pd.DataFrame()
+    >>> d['Z'] = np.random.binomial(n=1, p=0.5, size=n)
+    >>> d['U'] = np.random.normal(size=n)
+    >>> pr_a = inverse_logit(d['U'] + d['Z'])
+    >>> d['A'] = np.random.binomial(n=1, p=pr_a, size=n)
+    >>> d['X'] = np.random.normal(size=n)
+    >>> d['Y'] = 2*d['A'] - d['U'] + 0.1*d['X'] + np.random.normal(size=n)
+    >>> d['C'] = 1
+
+    To start, consider 2SLS without any exogenous variables. The psi function is
+
+    >>> def psi(theta):
+    >>>     return ee_gestimation_snmm_iv(theta, y=d['Y'],
+    >>>                                   Z=d['Z'], A=d['A'],
+    >>>                                   W=d[['C', ]], V=d[['C', ]],
+    >>>                                   model_instrument='logistic')
+
+    Calling the M-estimator. the structural mean model has 2 parameters. Generally, starting with all ``0.`` as
+    initials is reasonable.
+
+    >>> estr = MEstimator(psi,
+    >>>                   init=[0., 0., ])
+    >>> estr.estimate()
+
+    Inspecting the parameter estimates, variance, and 95% confidence intervals
+
+    >>> estr.theta
+    >>> estr.variance
+    >>> estr.confidence_intervals()
+
+    More specifically, the corresponding parameters are
+
+    >>> estr.theta[0]   # Structural mean model parameter
+    >>> estr.theta[1]   # Nuisance model parameter
+
+    Here, the parameter of interest is ``estr.theta[0]``, which under the IV assumptions is a causal effect of
+    :math:`A` on :math:`Y`.
+
+    To add exogenous variables (i.e., variables related to the instrument and outcome), the corresponding g-estimator
+    is specified as
+
+    >>> def psi(theta):
+    >>>     return ee_gestimation_snmm_iv(theta, y=d['Y'],
+    >>>                                   Z=d['Z'], A=d['A'],
+    >>>                                   W=d[['C', 'X']], V=d[['C', ]],
+    >>>                                   model_instrument='logistic')
+
+    Here, 3 parameters are estimated since there is a single exogenous variable that shows up in only the nuisance
+    model
+
+    >>> estr = MEstimator(psi,
+    >>>                   init=[0., 0., 0.])
+    >>> estr.estimate()
+    >>> estr.theta[0]     # Structural Mean Model Parameters
+    >>> estr.theta[1:]    # Nuisance Model Parameters
+
+    Modification by :math:`X` can be assessed by include that variable into the structural mean model (via
+    ``V=d[['C', 'X']]``). A continuous variable can also be used as an IV by updating the ``model_instrument``
+    argument. Finally, a multiplicative structural mean model can be considered instead by updating the ``model``
+    argument.
+
+    References
+    ----------
+    Robins JM (1994). Correcting for non-compliance in randomized trials using structural nested mean models.
+    *Communications in Statistics-Theory and Methods*, 23(8), 2379-2412.
+
+    Vansteelandt S, & Joffe M (2014). Structural nested models and G-estimation: the partially realized promise.
+    *Statist Sci*, 29(4), 707-731.
+    """
+    # Ensuring correct typing
+    y = np.asarray(y)[:, None]                  # Convert to NumPy array and converting shape
+    Z = np.asarray(Z)                           # Convert to NumPy array
+    A = np.asarray(A)                           # Convert to NumPy array
+    W = np.asarray(W)                           # Convert to NumPy array
+    V = np.asarray(V)                           # Convert to NumPy array
+    eq_add = []                                 # Storage for outcome model, default is empty (none)
+    pdiv = V.shape[1]                           # Extracting number of SMM parameters
+    qdiv = W.shape[1] + pdiv                    # Extracting number of E[A|W] parameters
+
+    # Processing weights argument
+    if weights is None:
+        weight = 1
+    else:
+        weight = np.asarray(weights)
+
+    # Extracting theta value for ease
+    phi = np.asarray(theta[0: pdiv])[:, None]   # theta parameters for the SMM
+    alpha = np.asarray(theta[pdiv:qdiv])        # theta parameters for the E[A|W] model
+    if X is not None:                           # If given an input X
+        beta = np.asarray(theta[qdiv:])         # ... theta parameters for the E[Y|W] model
+
+    # Option for the variations on the structural mean model
+    if model.lower() == 'linear':                             # Linear structural mean model
+        h_phi = y - np.dot(V*A[:, None], phi)                 # ... simply subtract
+        y_transform = identity                                # ... transformation for E[h(phi) | X]
+    elif model.lower() == 'poisson':                          # Log-linear structural mean model
+        h_phi = y * np.exp(-1 * np.dot(V*A[:, None], phi))    # ... multiplication and exp transformation
+        y_transform = np.exp                                  # ... transformation for E[h(phi) | X]
+    # Add tanh(.) as a function for the risk difference?
+    else:                                                     # Error checking
+        raise ValueError("model='" + str(model) + "' is not a "
+                         "supported option. Only the following "
+                         "options are supported: linear, poisson")
+
+    # Estimating the E[Z | L] Model
+    if model_instrument.lower() == 'linear':
+        z_transform = identity
+    elif model_instrument.lower() == 'poisson':
+        z_transform = np.exp
+    elif model_instrument.lower() == 'logistic':
+        z_transform = inverse_logit
+    else:
+        raise ValueError("model_instrument='" + str(model) + "' is not a "
+                         "supported option. Only the following "
+                         "options are supported: linear, poisson, logistic")
+    ee_log = ee_regression(theta=alpha,                              # Instrument score parameters
+                           X=W, y=Z,                                 # ... instrument and covariate design matrix
+                           model=model_instrument,                   # ... specified model
+                           weights=weights)                          # ... with provided weights
+    pi = z_transform(np.dot(W, alpha))                               # Converting log-odds to probability
+    a_resid = (Z - pi)[:, None]                                      # Calculating residuals for Z
 
     # Estimating functions for the corresponding g-estimator of SMM
     if X is not None:                                            # Specifying an outcome model for efficient
