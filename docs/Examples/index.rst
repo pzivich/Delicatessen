@@ -77,6 +77,7 @@ Causal Inference
   Hernan-Robins-2023
   Morris-Trials-2022
   Coffman-2021
+  Richardson-AJE-2023
 
 
 Others
