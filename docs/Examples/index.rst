@@ -30,7 +30,9 @@ Regression Models
 
   Mroz-1987
   Agresti-Crime
+  FishingDemand
   Generalized-Additive-Model
+  HubbleConstant
   SDSS-Quasar
   CanadianWeather-FDA
 
