@@ -22,7 +22,7 @@ Essentials
   GMM-OverID
 
 
-Regression Models
+Linear Models
 -------------------
 
 .. toctree::
@@ -37,17 +37,6 @@ Regression Models
   CanadianWeather-FDA
 
 
-Missing Data
--------------------
-
-.. toctree::
-  :maxdepth: 1
-
-  Cole-AJE-2022
-  Cole-EPID-2023
-
-
-
 Survival Analysis
 -------------------
 
@@ -58,16 +47,35 @@ Survival Analysis
   Zivich-PLogit
 
 
+Missing Data
+-------------------
 
-Pharmacokinetics
+.. toctree::
+  :maxdepth: 1
+
+  Cole-AJE-2022
+  Cole-EPID-2023
+
+
+Chemical Biology
 -------------------
 
 .. toctree::
   :maxdepth: 1
 
   Bonate-Pharmaco
+  Treloar1974
   Warfarin-PK
+  Ash-JCheminform-2022
 
+
+Genetics
+-------------------
+
+.. toctree::
+  :maxdepth: 1
+
+  Weir1996
 
 
 Causal Inference
@@ -89,5 +97,4 @@ Others
   :maxdepth: 1
 
   Zivich-CBands
-  Ash-JCheminform-2022
 
