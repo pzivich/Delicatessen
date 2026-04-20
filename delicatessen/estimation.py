@@ -317,6 +317,12 @@ class _GeneralEstimator:
         estimates, standard error, confidence intervals, P-value, S-value) to the console. This function is only meant
         as an easy way to display the underlying results to the console without having to call each function separately.
 
+        Note
+        ----
+        The null hypothesis for the Z-scores, P-values, and S-values is for each parameter being equal to zero. To test
+        against a different null hypotheses, please use the corresponding function instead.
+
+
         Parameters
         ----------
         subset : list, set, array, None, optional

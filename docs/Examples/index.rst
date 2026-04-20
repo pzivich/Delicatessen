@@ -17,6 +17,7 @@ Essentials
   ClusteredData
   GMM-OverID
 
+
 Missing Data
 -------------
 
@@ -25,6 +26,7 @@ Missing Data
 
   Cole-AJE-2022
   Cole-EPID-2023
+
 
 Survival Analysis
 ------------------
@@ -35,15 +37,18 @@ Survival Analysis
   Collett-Survival
   Zivich-PLogit
 
+
 Physical & Natural Sciences
 -----------------------------
 
 .. toctree::
   :maxdepth: 1
 
+  Weir1996
+  Spielman1993
   HubbleConstant
   SDSS-Quasar
-  Weir1996
+
 
 Biochemistry & Pharmacology
 -----------------------------
@@ -55,6 +60,7 @@ Biochemistry & Pharmacology
   Warfarin-PK
   Treloar1974
   Ash-JCheminform-2022
+
 
 Epidemiology & Causal Inference
 ---------------------------------
@@ -68,6 +74,7 @@ Epidemiology & Causal Inference
   Cole-AJE-2023
   Richardson-AJE-2023
 
+
 Econometrics & Social Science
 -------------------------------
 
@@ -78,9 +85,13 @@ Econometrics & Social Science
   Agresti-Crime
   FishingDemand
 
+
 Advanced Modeling
 --------------------
-Generalized-Additive-Model
-CanadianWeather-FDA
-Zivich-CBands
 
+.. toctree::
+  :maxdepth: 1
+
+  Generalized-Additive-Model
+  Zivich-CBands
+  CanadianWeather-FDA
