@@ -481,3 +481,109 @@ def ee_positive_mean_deviation(theta, y):
     # Output 2-by-n matrix of estimating equations
     return ((2*(y_array - theta[1])*(y_array > theta[1])) - theta[0],   # Estimating equation for positive mean dev
             median, )                                                   # Estimating equation for median
+
+
+def ee_meta_random(theta, point_est, var_est):
+    r"""Estimating equation for random-effects meta-analysis using the Paule-Mandel method. This estimating equation
+    allows for one to summarize multiple point estimates together by taking an inverse-variance weighted average.
+    Importantly, this estimating equation also incorporates heterogeneity between studies via a random effect. The
+    corresponding estimating equations are
+
+    .. math::
+
+        \sum_{j=1}^n
+        \begin{bmatrix}
+            \frac{1}{V_j + \tau^2} \times (E_j - \mu) \\
+            \frac{(E_j - \mu)^2}{V_j + \tau^2} - \frac{k-1}{k}
+        \end{bmatrix}
+        = 0
+
+    where :math:`\theta = (\mu, \tau^2)`, :math:`\mu` is the weighted mean across the studies, :math:`\tau^2` is the
+    between-study heterogeneity term, :math:`E_j` is the point estimate from study :math:`j`, and :math:`V_j` is the
+    variance estimate.
+
+    Here, ``delicatessen`` solves for the log-transformed :math:`\tau^2` rather than :math:`\tau^2` directly. This is
+    due to :math:`\tau^2 > 0` and the log constraint enforces this to be non-negative. Note that issues will arise
+    if :math:`\tau^2 = 0`, but a random-effect model would not be appropriate in that setting.
+
+    Note
+    ----
+    Estimates and variances are assumed to be on the same scale. Further, the estimates should be on a scale for which
+    a linear combination is valid (e.g., log-transformed for ratio measures).
+
+
+    Optimization can sometimes be a bit difficult due to the dependence on the inverse of the variance and
+    :math:`\tau^2`. A piece of advice is to first estimate the inverse-variance-weighted mean for :math:`\mu` and then
+    use that as the starting value.
+
+    Parameters
+    ----------
+    theta : ndarray, list, vector
+        Theta consists of 2 values.
+    point_est : ndarray, list, vector
+        1-dimensional vector of `s` point estimates. Note that these should be on a linear scale (e.g., risk or mean
+        differences, log risk ratios)
+    var_est : ndarray, list, vector
+        1-dimensional vector of `s` corresponding variance estimates. Note that these should be on the same scale as
+        those provided in ``point_est``.
+
+    Returns
+    -------
+    array :
+        Returns 2-by-`n` NumPy array evaluated for the input ``theta``.
+
+    Examples
+    --------
+    Construction of estimating equations with ``ee_meta_random`` should be done similar to the following
+
+    >>> import numpy as np
+    >>> from delicatessen import MEstimator
+    >>> from delicatessen.estimating_equations import ee_meta_random
+
+    Some generic data to estimate a random-effects meta-analysis model with.
+
+    >>> p_est = [-0.186, 0.235, 0.037, -0.904, 0.218, -0.135, 0.68, -1.254, -0.154, -1.12]
+    >>> v_est = [0.183, 0.186, 0.054, 0.133, 0.182, 0.201, 0.154, 0.139, 0.115, 0.125]
+
+    Defining psi, or the stacked estimating equations
+
+    >>> def psi(theta):
+    >>>     return ee_meta_random(theta=theta, point_est=p_est, var_est=v_est)
+
+    Calling the M-estimation procedure (``init`` requires 2 values). As starting values, the mean of the point
+    estimates for :math:`\mu` is reasonable. For :math:`\tau^2`, a starting value of 0 correspond to
+    :math:`\exp(0) = 1`.
+
+    >>> estr = MEstimator(psi, init=[np.mean(p_est), 0.])
+    >>> estr.estimate()
+
+    Inspecting the parameter estimates
+
+    >>> estr.theta[0]  # Estimate for mu          (-0.269)
+    >>> estr.theta[1]  # Estimate for log(tau^2)  (-1.346)
+
+    When considering ratio measures, the meta-analysis model should be fit using the log-transformed point estimates
+    (and the variance estimate for the log-ratio). ``delicatessen`` does not implement these transformations and
+    expects the user to provide estimates in a format for which the mean is an appropriate summary.
+
+    References
+    ----------
+    Paule RC & Mandel J. (1982). Consensus values and weighting factors.
+    *Journal of research of the National Bureau of Standards*, 87(5), 377.
+    """
+    # Preparation of input shapes and object types
+    est_p = np.asarray(point_est)                            # Converting to NumPy array
+    est_v = np.asarray(var_est)                              # Converting to NumPy array
+    mu, tau_sq = theta                                       # Subsetting parameters to informative names
+    k = len(est_p)                                           # Number of observations
+    tau_sq = np.exp(tau_sq)
+
+    # Constructing study-specific weight
+    weight = 1 / (est_v + tau_sq)                            # Weight the incorporates between-study heterogeneity
+
+    # Computing estimating functions
+    ee_beta = weight * (est_p - mu)                          # Estimating function for overall mean
+    ee_tau = ((est_p - mu)**2 / (est_v + tau_sq)) - (k-1)/k  # Estimating function for between-study heterogeneity
+
+    # Returning stacked estimating functions
+    return np.vstack([ee_beta, ee_tau])

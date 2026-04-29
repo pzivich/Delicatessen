@@ -8,7 +8,8 @@ import pytest
 from scipy.stats import gmean
 
 from delicatessen import MEstimator
-from delicatessen.estimating_equations import ee_mean, ee_mean_variance, ee_mean_robust, ee_mean_geometric
+from delicatessen.estimating_equations import (ee_mean, ee_mean_variance, ee_mean_robust, ee_mean_geometric,
+                                               ee_meta_random, ee_meta_regression)
 
 
 class TestEstimatingEquationsBase:
@@ -142,3 +143,30 @@ class TestEstimatingEquationsBase:
 
         # Checking mean estimate
         npt.assert_allclose(mu_deli, mu_scipy)
+
+    def test_meta_random(self):
+        point = [-0.889, -1.585, -1.348, -1.442, -0.218, -0.786, -1.621, 0.0120, -0.469, -1.371, -0.339, 0.446, -0.017]
+        var = [0.326, 0.195, 0.415, 0.020, 0.051, 0.007, 0.223, 0.004, 0.056, 0.073, 0.012, 0.533, 0.071]
+
+        def psi(theta):
+            return ee_meta_random(theta=theta, point_est=point, var_est=var)
+
+        # Optimization procedure
+        estr = MEstimator(psi, init=[-0.4, 0.1])
+        estr.estimate()
+
+        # External references (computed using R)
+        comparison_theta = [-0.7147179, 0.3181283]
+        # R code used to check against
+        # library(metafor)
+        # yi = c(-0.889, -1.585, -1.348, -1.442, -0.218, -0.786, -1.621, 0.0120, -0.469,
+        #        -1.371, -0.339, 0.446, -0.017)
+        # vi = c(0.326, 0.195, 0.415, 0.020, 0.051, 0.007, 0.223, 0.004, 0.056,
+        #        0.073, 0.012, 0.533, 0.071)
+        # res <- rma(yi, vi, measure = "RR", method='EB')
+        # res$beta
+        # res$tau2
+
+        # Checking mean estimate
+        npt.assert_allclose(estr.theta[0], comparison_theta[0], atol=1e-5)
+        npt.assert_allclose(np.exp(estr.theta[1]), comparison_theta[1], atol=1e-5)

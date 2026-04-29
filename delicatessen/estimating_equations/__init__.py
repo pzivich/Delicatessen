@@ -1,5 +1,6 @@
 from .basic import (ee_mean, ee_mean_variance, ee_mean_robust, ee_mean_geometric,
-                    ee_percentile, ee_positive_mean_deviation)
+                    ee_percentile, ee_positive_mean_deviation,
+                    ee_meta_random)
 
 from .causal import (ee_ipw, ee_ipw_msm, ee_gformula, ee_aipw, ee_gestimation_snmm,
                      ee_iv_causal, ee_2sls, ee_gestimation_snmm_iv,
@@ -15,7 +16,8 @@ from .regression import (ee_regression, ee_glm, ee_mlogit, ee_beta_regression, e
                          ee_robust_regression,
                          ee_ridge_regression, ee_lasso_regression, ee_dlasso_regression,
                          ee_elasticnet_regression, ee_bridge_regression,
-                         ee_additive_regression)
+                         ee_additive_regression,
+                         ee_meta_regression)
 
 from .survival import (ee_survival_model,
                        ee_aft,
