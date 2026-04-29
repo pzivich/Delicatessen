@@ -17,6 +17,7 @@ Basic
   ee_mean_robust
   ee_mean_geometric
   ee_mean_variance
+  ee_meta_random
   ee_percentile
   ee_positive_mean_deviation
 
@@ -41,6 +42,7 @@ Regression
   ee_elasticnet_regression
   ee_bridge_regression
   ee_additive_regression
+  ee_meta_regression
 
 
 Measurement

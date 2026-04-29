@@ -46,6 +46,7 @@ Physical & Natural Sciences
 
   Weir1996
   Spielman1993
+  Michelson1882
   HubbleConstant
   SDSS-Quasar
 
@@ -94,4 +95,5 @@ Advanced Modeling
 
   Generalized-Additive-Model
   Zivich-CBands
+  Colditz1994
   CanadianWeather-FDA
