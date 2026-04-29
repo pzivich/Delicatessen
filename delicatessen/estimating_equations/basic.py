@@ -512,10 +512,6 @@ def ee_meta_random(theta, point_est, var_est):
     a linear combination is valid (e.g., log-transformed for ratio measures).
 
 
-    Optimization can sometimes be a bit difficult due to the dependence on the inverse of the variance and
-    :math:`\tau^2`. A piece of advice is to first estimate the inverse-variance-weighted mean for :math:`\mu` and then
-    use that as the starting value.
-
     Parameters
     ----------
     theta : ndarray, list, vector

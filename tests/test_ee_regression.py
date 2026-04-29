@@ -15,7 +15,8 @@ from delicatessen.estimating_equations import (ee_regression, ee_glm, ee_beta_re
                                                ee_robust_regression,
                                                ee_ridge_regression, ee_lasso_regression, ee_dlasso_regression,
                                                ee_elasticnet_regression,
-                                               ee_additive_regression)
+                                               ee_additive_regression,
+                                               ee_meta_regression, ee_meta_random)
 from delicatessen.utilities import additive_design_matrix
 
 
@@ -2105,3 +2106,64 @@ class TestEstimatingEquationsGLM:
 
         # Checking variance estimates
         # Can't check variances since statsmodels NB ignores the uncertainty in alpha
+
+
+class TestRandomEffectRegression:
+
+    @pytest.fixture
+    def data_meta(self):
+        # Example data comes from R's MASS library
+        d = pd.DataFrame()
+        d['X'] = [0, 0, 1, 1, 0, 0, 1, 2, 1, 0, 0, 1, 0]
+        d['P'] = [-0.889, -1.585, -1.348, -1.442, -0.218, -0.786, -1.621, 0.0120, -0.469, -1.371, -0.339, 0.446, -0.017]
+        d['V'] = [0.326, 0.195, 0.415, 0.020, 0.051, 0.007, 0.223, 0.004, 0.056, 0.073, 0.012, 0.533, 0.071]
+        d['I'] = 1
+        return d
+
+    def test_meta_random(self, data_meta):
+        d = data_meta
+
+        def psi(theta):
+            return ee_meta_regression(theta, point_est=d['P'], var_est=d['V'])
+
+        estr = MEstimator(psi, init=[np.mean(d['P']), 0.])
+        estr.estimate(solver='lm')
+
+        # Internal comparison
+        def psi(theta):
+            return ee_meta_random(theta, point_est=d['P'], var_est=d['V'])
+
+        estr_ref = MEstimator(psi, init=[np.mean(d['P']), 0.])
+        estr_ref.estimate(solver='lm', deriv_method='exact')
+
+        # Checking mean estimate
+        npt.assert_allclose(estr.theta, estr_ref.theta, atol=1e-6)
+
+        # Checking variance estimates
+        # npt.assert_allclose(estr.variance, estr_ref.variance, atol=1e-6)
+        # NOTE: these variances are not necessarily exactly equal
+
+    def test_meta_regression(self, data_meta):
+        d = data_meta
+
+        def psi(theta):
+            return ee_meta_regression(theta, point_est=d['P'], var_est=d['V'], X=d[['I', 'X']])
+
+        estr = MEstimator(psi, init=[np.mean(d['P']), 0., 0.1])
+        estr.estimate(solver='lm')
+
+        # External references (computed using R)
+        comparison_theta = [-0.7878061, 0.1331194, np.log(0.3481587)]
+        # library(metafor)
+        # d = data.frame(X = c(0, 0, 1, 1, 0, 0, 1, 2, 1, 0, 0, 1, 0))
+        # d$P = c(-0.889, -1.585, -1.348, -1.442, -0.218, -0.786, -1.621, 0.0120, -0.469, -1.371, -0.339, 0.446, -0.017)
+        # d$V = c(0.326, 0.195, 0.415, 0.020, 0.051, 0.007, 0.223, 0.004, 0.056, 0.073, 0.012, 0.533, 0.071)
+        # res <- rma(d$P, d$V, mods = ~ X, data = d, method='EB')
+        # res$beta
+        # res$tau2
+
+        # Checking mean estimate
+        npt.assert_allclose(estr.theta, comparison_theta, atol=5e-6)
+
+        # Checking variance estimates
+        # NOTE: covariances may differ due to differences between variance estimators across software

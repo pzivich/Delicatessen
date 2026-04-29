@@ -1901,6 +1901,122 @@ def ee_additive_regression(theta, X, y, specifications, model, weights=None, off
 
 
 #################################################################
+# Meta-Analysis Regression Methods
+
+
+def ee_meta_regression(theta, point_est, var_est, X=None):
+    r"""Estimating equation for random-effects meta-regression using the Paule-Mandel method. This estimating equation
+    allows for one to regress multiple point estimates with the inverse-variance weighted average. Importantly, this
+    estimating equation also incorporates heterogeneity between studies via a random effect. The corresponding
+    estimating equations are
+
+    .. math::
+
+        \sum_{j=1}^n
+        \begin{bmatrix}
+            \frac{1}{V_j + \tau^2} \times (E_j - X_j \beta^T) \\
+            \frac{(E_j - \mu)^2}{V_j + \tau^2} - \frac{k-1}{k}
+        \end{bmatrix}
+        = 0
+
+    where :math:`\theta = (\beta, \tau^2)`, :math:`\beta` is the weighted meta-regressionmean cofficients,
+    :math:`\tau^2` is the between-study heterogeneity term, :math:`E_j` is the point estimate from study :math:`j`,
+    :math:`X_j` is the design matrix consisting of the study covariates, and :math:`V_j` is the variance estimate.
+
+    Here, ``delicatessen`` solves for the log-transformed :math:`\tau^2` rather than :math:`\tau^2` directly. This is
+    due to :math:`\tau^2 > 0` and the log constraint enforces this to be non-negative. Note that issues will arise
+    if :math:`\tau^2 = 0`, but a random-effect model would not be appropriate in that setting.
+
+    Note
+    ----
+    Due to some of the underlying computations (an inversion of a matrix), ``deriv_method='exact'`` cannot be used
+    with meta-regression.
+
+    Parameters
+    ----------
+    theta : ndarray, list, vector
+        Theta consists of ``p+1`` values.
+    point_est : ndarray, list, vector
+        1-dimensional vector of `s` point estimates. Note that these should be on a linear scale (e.g., risk or mean
+        differences, log risk ratios)
+    var_est : ndarray, list, vector
+        1-dimensional vector of `s` corresponding variance estimates. Note that these should be on the same scale as
+        those provided in ``point_est``.
+    X : ndarray, list, vector, None
+        2-dimensional vector of ``p`` covariates and ``s`` corresponding observations. Default is ``None``, which uses
+        an intercept-only meta-regression model.
+
+    Returns
+    -------
+    array :
+        Returns (`p`+1)-by-`n` NumPy array evaluated for the input ``theta``.
+
+    Examples
+    --------
+    Construction of estimating equations with ``ee_meta_regression`` should be done similar to the following
+
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> from delicatessen import MEstimator
+    >>> from delicatessen.estimating_equations import ee_meta_regression
+
+    Some generic data to estimate a random-effects meta-regression model with.
+
+    >>> d = pd.DataFrame()
+    >>> d['X'] = [0, 0, 1, 1, 0, 0, 1, 2, 1, 0, 0, 1, 0]
+    >>> d['P'] = [-0.89, -1.58, -1.35, -1.44, -0.22, -0.78, -1.62, 0.02, -0.46, -1.37, -0.33, 0.44, -0.02]
+    >>> d['V'] = [0.32, 0.19, 0.41, 0.02, 0.05, 0.01, 0.22, 0.01, 0.06, 0.07, 0.02, 0.53, 0.07]
+    >>> d['I'] = 1
+
+    Defining psi, or the stacked estimating equations
+
+    >>> def psi(theta):
+    >>>     return ee_meta_regression(theta, point_est=d['P'], var_est=d['V'], X=d[['I', 'X']])
+
+    Calling the M-estimation procedure (``init`` requires 3 values, since there is 2 coefficients in the model).
+
+    >>> estr = MEstimator(psi, init=[np.mean(d['P']), 0., 0.])
+    >>> estr.estimate(solver='lm')
+
+    When considering ratio measures, the meta-regression model should be fit using the log-transformed point estimates
+    (and the variance estimate for the log-ratio). ``delicatessen`` does not implement these transformations.
+
+    References
+    ----------
+    Paule RC & Mandel J. (1982). Consensus values and weighting factors.
+    *Journal of research of the National Bureau of Standards*, 87(5), 377.
+    """
+    # Preparation of input shapes and object types
+    beta = theta[:-1]                                        # Regression model parameters
+    tau_sq = np.exp(theta[-1])                               # log-transformed random-effect
+    est_v = np.asarray(var_est)                              # Converting to NumPy array
+    n = est_v.shape[0]                                       # Number of observations
+
+    # Preparing regression covariates for processing
+    if X is None:  # Creating intercept-only design matrix if None is specified
+        X = np.ones((n, 1))
+    X, y, beta_, offset = _prep_inputs_(X=X, y=point_est, theta=beta,
+                                        penalty=None, offset=None)
+
+    # Predicted values from model
+    phat = np.dot(X, beta)                                   # Model-predicted point estimates
+    residual = y - phat[:, None]                             # Computing the residuals for the model
+
+    # Constructing study-specific weights
+    weight = 1 / (est_v + tau_sq)                            # Weight the incorporates between-study heterogeneity
+    cov_matrix = np.linalg.inv(X.T @ (X * weight[:, None]))
+    h_ii = weight * np.einsum('ij,jk,ik->i',
+                              X, cov_matrix, X)
+
+    # Computing estimating functions
+    ee_beta = weight * (residual * X).T                      # Estimating function for the regression parameters
+    ee_tau = (residual.T[0]**2 / (est_v+tau_sq)) - (1-h_ii)  # Estimating function for the log random effect
+
+    # Returning stacked estimating functions
+    return np.vstack([ee_beta, ee_tau])
+
+
+#################################################################
 # Utility functions for regression equations
 
 def _prep_inputs_(X, y, theta, penalty=None, center=None, offset=None, reshape_y=True):
