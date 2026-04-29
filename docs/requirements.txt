@@ -2,7 +2,7 @@
 
 # Defining the exact version so things don't break
 setuptools
-sphinx==4.2.0
+sphinx
 sphinx_rtd_theme==1.0.0
 nbsphinx==0.9.3
 readthedocs-sphinx-search==0.1.1
