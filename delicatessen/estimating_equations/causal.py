@@ -1260,7 +1260,7 @@ def ee_gestimation_snmm(theta, y, A, W, V, X=None, model='linear', weights=None)
 
 
 def ee_gestimation_snmm_iv(theta, y, Z, A, W, V, X=None, model='linear', model_instrument='logistic', weights=None):
-    """Estimating equations for g-estimation of structural mean models (SMMs) with an instrumental variable (IV). The
+    r"""Estimating equations for g-estimation of structural mean models (SMMs) with an instrumental variable (IV). The
     parameter(s) of interest are the parameter(s) of the corresponding SMM. With an IV, the linear (additive) SMM
     remains the same (see ``ee_gestimation_snmm``). Rather than model the propensity score for the action variables
     (:math:`A`), we instead model the IV (:math:`Z`). The inefficient g-estimator we solve for :math:`\beta` in the
