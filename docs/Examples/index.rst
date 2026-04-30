@@ -74,6 +74,7 @@ Epidemiology & Causal Inference
   Coffman-2021
   Cole-AJE-2023
   Richardson-AJE-2023
+  DingCausalBook
 
 
 Econometrics & Social Science
