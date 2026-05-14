@@ -1072,7 +1072,9 @@ def ee_gestimation_snmm(theta, y, A, W, V, X=None, model='linear', weights=None)
         = 0
 
     where :math:`g^{-1}` is the inverse transformation for the specified SMM. Therefore, there are b+c+d parameters
-    for the efficient g-estimator, where `d` is the number of parameters in the model for :math:`E[H(\beta) | W]`.
+    for the efficient g-estimator, where `d` is the number of parameters in the model for :math:`E[H(\beta) | W]`. The
+    efficient g-estimator is multiply-robust in the sense that as long as one of the two nuisance models is correctly
+    specified (and the SMM is correctly specified), then the SMM parameter estimates are unbiased.
 
     Parameters
     ----------
@@ -1284,7 +1286,9 @@ def ee_gestimation_snmm_iv(theta, y, Z, A, W, V, X=None, model='linear', model_i
 
     Alternatively, the efficient g-estimator can also be used. Like with the other g-estimator of the structural
     mean model,  we replace :math:`H(\beta)` with :math:`\{H(\beta) - E[H(\beta) | W]\}` in the prior estimating
-    equation and specify a model for :math:`E[H(\beta) | W]`.
+    equation and specify a model for :math:`E[H(\beta) | W]`.  Again, the efficient g-estimator is multiply-robust in
+    the sense that as long as one of the two nuisance models is correctly specified (and the SMM is correctly
+    specified), then the SMM parameter estimates are unbiased.
 
     Parameters
     ----------
