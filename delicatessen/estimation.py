@@ -48,6 +48,7 @@ class _GeneralEstimator:
         self._dx_ = ''            # Derivative approximation error
         self._pinv_ = ''          # Pseudo-inverse
         self._over_identified_ = None
+        self._theta_buffer_ = np.asarray(self.init, dtype=float)
 
     def confidence_intervals(self, alpha=0.05):
         r"""Calculate two-sided Wald-type :math:`(1 - \alpha) \times` 100% confidence intervals using the point
@@ -412,23 +413,15 @@ class _GeneralEstimator:
         numpy.array
         """
         # IF stacked_equation returns 1 value, only return that 1 value
-        if len(stacked_equations.shape) == 1:          # Checking length
-            vals = np.sum(stacked_equations)           # ... avoid SciPy error by returning value rather than tuple
+        if len(stacked_equations.shape) == 1:                # Checking length of estimating function parameters
+            vals = np.sum(stacked_equations)                 # ... avoid SciPy error by return value rather than tuple
         # ELSE need to return a tuple for the root-finding procedure
-        else:                                          # ... also considering how subset argument is handled
-            # NOTE: switching to np.sum(..., axis=1) didn't speed things up versus a for-loop
-            vals = ()                                  # ... create empty tuple
-            rows = stacked_equations.shape[0]          # ... determine how many rows / parameters are present
-            if subset is None:                         # ... if no subset, then simple loop where
-                for i in range(rows):                  # ... go through each individual theta in the stack
-                    row = stacked_equations[i, :]      # ... extract corresponding row
-                    vals += (np.sum(row), )            # ... then add the theta sum to the tuple of thetas
-            else:                                      # ... if subset, then conditional loop (to speed up)
-                for i in range(rows):                  # ... go through each individual theta in the stack
-                    if i in subset:                    # ... if parameter is in subset then
-                        row = stacked_equations[i, :]  # ... extract corresponding row
-                        vals += (np.sum(row), )        # ... then add the theta sum to the tuple of thetas
-            vals = np.asarray(vals)                    # ... converting to a NumPy array for ease
+        else:                                                # ... also considering how subset argument is handled
+            if subset is None:                               # ... if no subset,
+                efuncs = stacked_equations                   # ... then keep all estimating functions
+            else:                                            # ... if subset,
+                efuncs = stacked_equations[list(subset), :]  # ... then keep only the subset of estimating functions
+            vals = np.sum(efuncs, axis=1)                    # ... Transform EFs to EEs
 
         # Return the calculated values of theta
         return vals
@@ -780,14 +773,16 @@ class MEstimator(_GeneralEstimator):
         if self._subset_ is None:                      # If NOT subset then,
             full_theta = theta                         # ... then use the full input theta
         else:                                          # If subset then,
-            full_theta = np.asarray(self.init)         # ... copy the initial values to ndarray
-            np.put(full_theta,                         # ... update in place the previous array
-                   ind=self._subset_,                  # ... go to the subset indices
-                   v=theta)                            # ... then input current iteration values
+            # Then in _mestimation_answer_:
+            self._theta_buffer_[:] = self.init         # ... carry over intial values to buffer array
+            np.put(self._theta_buffer_,                # ... update in place the previous array
+                   ind=self._subset_,                  # ... at the subset indices
+                   v=theta)                            # ... with current iteration solver values
+            full_theta = self._theta_buffer_           # ... update name convention to match no-subset
 
         stacked_equations = np.asarray(self.stacked_equations(full_theta))  # Returning stacked equation
-        return self._eval_ee_(stacked_equations=stacked_equations,   # Passing to evaluating function
-                              subset=self._subset_)                  # ... with specified subset
+        return self._eval_ee_(stacked_equations=stacked_equations,          # Passing to evaluating function
+                              subset=self._subset_)                         # ... with specified subset
 
     @staticmethod
     def _solve_coefficients_(stacked_equations, init, method, maxiter, tolerance):
@@ -1219,10 +1214,11 @@ class GMMEstimator(_GeneralEstimator):
         if self._subset_ is None:                      # If NOT subset then,
             full_theta = theta                         # ... then use the full input theta
         else:                                          # If subset then,
-            full_theta = np.asarray(self.theta)        # ... copy the initial values to ndarray
-            np.put(full_theta,                         # ... update in place the previous array
-                   ind=self._subset_,                  # ... go to the subset indices
-                   v=theta)                            # ... then input current iteration values
+            self._theta_buffer_[:] = self.init         # ... carry over intial values to buffer array
+            np.put(self._theta_buffer_,                # ... update in place the previous array
+                   ind=self._subset_,                  # ... at the subset indices
+                   v=theta)                            # ... with current iteration solver values
+            full_theta = self._theta_buffer_           # ... update name convention to match no-subset
 
         # Evaluating estimating functions
         stacked_equations = np.asarray(self.stacked_equations(full_theta))  # Returning stacked equation
