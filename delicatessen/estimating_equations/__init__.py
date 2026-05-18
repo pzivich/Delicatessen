@@ -13,7 +13,7 @@ from .measurement import (ee_rogan_gladen, ee_rogan_gladen_extended, ee_regressi
                           )
 
 from .regression import (ee_regression, ee_glm, ee_mlogit, ee_beta_regression, ee_tobit,
-                         ee_robust_regression,
+                         ee_robust_regression, ee_expectile_regression,
                          ee_ridge_regression, ee_lasso_regression, ee_dlasso_regression,
                          ee_elasticnet_regression, ee_bridge_regression,
                          ee_additive_regression,

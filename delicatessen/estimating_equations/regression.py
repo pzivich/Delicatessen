@@ -777,6 +777,135 @@ def ee_tobit(theta, X, y, lower=None, upper=None, weights=None, offset=None):
     return np.vstack([ef_treg, ef_sigma])
 
 
+def ee_expectile_regression(theta, X, y, model, tau=0.5, weights=None, offset=None):
+    r"""Estimating equations for expectile regression. Expectile regression is a generalization of linear (and
+    non-linear) mean regression models for other parts of the distributions. These other parts are referred to as
+    'expectiles', which are analogous to quantiles (but not the same). Expectile regression is implemented through
+    an asymmetric weight, :math:`\tau` on the negative and positive residuals. The general estimating equation is
+
+    .. math::
+
+        \sum_{i=1}^n \omega_i \times \left\{ Y_i - g(X_i^T \theta) \right\} X_i = 0
+
+    where :math:`g` indicates a transformation function. Here, :math:`g` is the identity function for linear,
+    inverse-logit function, :math:`\text{expit}(u) = 1 / (1 + \exp(u))`, for logistic, and :math:`\exp(u)` for Poisson.
+    The parameters are :math:`\theta`, which is a 1-by-`b` array corresponding to the coefficients in the regression
+    model and `b` is the distinct covariates included as part of ``X``. For example, if ``X`` is a 3-by-`n` matrix, then
+    :math:`\theta` will be a 1-by-3 array.
+
+    Here, :math:`\omega_i` are the asymmetric weights, where a weight of :math:`\tau` is assigned when the residual of
+    an observation is above 0 and :math:`1 - \tau` otherwise. Note that :math:`0 < \tau < 1` for expectile regression.
+    While related to quantiles (and thus quantile regression), there are distinctions. Expectile regression is less
+    straightforward to interpret, but it is computationally convenient to compute due to it retaining the L2 loss
+    function. See the references for further details.
+
+    Note
+    ----
+    At :math:`\tau = 0.5`, expectile regression is equivalent to regression for the mean.
+
+    Parameters
+    ----------
+    theta : ndarray, list, vector
+        Theta in this case consists of `b` values. Therefore, initial values should consist of the same number as the
+        number of columns present. This can easily be implemented by ``[0, ] * X.shape[1]``.
+    X : ndarray, list, vector
+        2-dimensional vector of `n` observed values for `b` variables.
+    y : ndarray, list, vector
+        1-dimensional vector of `n` observed values.
+    model : str
+        Type of regression model to estimate. Options are ``'linear'`` (linear regression), ``'logistic'`` (logistic
+        regression), and ``'poisson'`` (Poisson regression).
+    tau : float, optional
+        Asymmetric weight for expectile regression. This parameter controls which of the expectiles is being estimated.
+        Default is ``0.5``, which defaults to linear regression. Note that :math:`0 < \tau < 1`.
+    weights : ndarray, list, vector, None, optional
+        1-dimensional vector of `n` weights. Default is ``None``, which assigns a weight of 1 to all observations.
+    offset : ndarray, list, vector, None, optional
+        A 1-dimensional offset to be included in the model. Default is ``None``, which applies no offset term.
+
+    Examples
+    --------
+    Construction of an estimating equation(s) with ``ee_expectile_regression`` should be done similar to the following
+
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> from scipy.stats import logistic
+    >>> from delicatessen import MEstimator
+    >>> from delicatessen.estimating_equations import ee_expectile_regression
+
+    Some generic data to estimate the regression models
+
+    >>> n = 500
+    >>> data = pd.DataFrame()
+    >>> data['X'] = np.random.normal(size=n)
+    >>> data['Z'] = np.random.normal(size=n)
+    >>> data['Y'] = 0.5 + 2*data['X'] - 1*data['Z'] + np.random.normal(loc=0, size=n)
+    >>> data['C'] = 1
+
+    Note that ``C`` here is set to all 1's. This will be the intercept in the regression.
+
+    >>> X_mat = data[['C', 'X', 'Z']]
+    >>> y = data['Y']
+
+    To start, we will demonstrate expectile regression for the continuous outcome ``Y``. Defining psi, or the stacked
+    estimating equations
+
+    >>> def psi(theta):
+    >>>     return ee_expectile_regression(theta=theta, X=X_mat, y=y, model='linear', tau=0.5)
+
+    Calling the M-estimator (note that ``init`` requires 3 values, since ``X.shape[1]`` is 3).
+
+    >>> estr = MEstimator(stacked_equations=psi, init=[0., 0., 0.,])
+    >>> estr.estimate()
+
+    Inspecting the parameter estimates, variance, and confidence intervals
+
+    >>> estr.theta
+    >>> estr.variance
+    >>> estr.confidence_intervals()
+
+    This previous specification was the same as linear regression. Now we will estimate the 0.75 expectile
+
+    >>> def psi(theta):
+    >>>         return ee_expectile_regression(theta=theta, X=X_mat, y=y, model='linear', tau=0.75)
+
+    >>> estr = MEstimator(stacked_equations=psi, init=[0., 0., 0.,])
+    >>> estr.estimate()
+
+    Weighted models can be estimated by specifying the optional ``weights`` argument.
+
+    References
+    ----------
+    Newey WK, & Powell JL. (1987). Asymmetric least squares estimation and testing. *Econometrica*, 55(4), 819-847.
+
+    Waltrup LS, Sobotka F, Kneib T, & Kauermann G. (2015). Expectile and quantile regression—David and Goliath?.
+    *Statistical Modelling*, 15(5), 433-456.
+    """
+    # Input checking for expectile requested
+    if not 0 < tau < 1:
+        raise ValueError("Expectile regression is only defined for values of tau within the interval (0,1). The "
+                         "specified tau, " + str(tau) + ", lies outside this interval.")
+
+    # Preparation of input shapes and object types
+    X, y, beta, offset = _prep_inputs_(X=X, y=y, theta=theta, penalty=None, offset=offset)
+
+    # Applying transformation function for corresponding model
+    transform = _model_transform_(model=model)    # Looking up corresponding transformation
+    pred_y = transform(np.dot(X, beta) + offset)  # Generating predicted values via speedy matrix calculation
+    residual = y - pred_y                         # Residual from regression model
+
+    # Asymmetric weight for corresponding expectile
+    asym_w = np.where(residual >= 0, tau, 1 - tau)
+
+    # Apply optional user-specified weights
+    if weights is not None:
+        w = generate_weights(weights=weights, n_obs=X.shape[0])
+        asym_w = asym_w * w[:, None]
+
+    # Output b-by-n matrix
+    return (asym_w * residual * X).T              # Return weighted expectile regression score function
+
+
 #################################################################
 # Robust Regression Estimating Equations
 

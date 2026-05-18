@@ -12,7 +12,7 @@ from statsmodels.othermod.betareg import BetaModel
 
 from delicatessen import MEstimator
 from delicatessen.estimating_equations import (ee_regression, ee_glm, ee_beta_regression, ee_mlogit, ee_tobit,
-                                               ee_robust_regression,
+                                               ee_robust_regression, ee_expectile_regression,
                                                ee_ridge_regression, ee_lasso_regression, ee_dlasso_regression,
                                                ee_elasticnet_regression,
                                                ee_additive_regression,
@@ -850,6 +850,263 @@ class TestEstimatingEquationsRegression:
         # Checking mean estimate
         npt.assert_allclose(estr.theta,
                             params_r,
+                            atol=1e-6)
+
+    def test_expectile_error(self, data_c):
+        d = data_c
+        Xvals = np.asarray(d[['I', 'X', 'Z']])
+        yvals = np.asarray(d['Y'])
+
+        def psi(theta):
+            return ee_expectile_regression(theta, X=Xvals, y=yvals, model='linear', tau=-0.1)
+
+        estr = MEstimator(psi, init=[5, 1, 1])
+        with pytest.raises(ValueError, match="Expectile regression is only defined for values"):
+            estr.estimate()
+
+        def psi(theta):
+            return ee_expectile_regression(theta, X=Xvals, y=yvals, model='linear', tau=1.0001)
+
+        estr = MEstimator(psi, init=[5, 1, 1])
+        with pytest.raises(ValueError, match="Expectile regression is only defined for values"):
+            estr.estimate()
+
+    def test_expectile_ols(self, data_c):
+        d = data_c
+        Xvals = np.asarray(d[['I', 'X', 'Z']])
+        yvals = np.asarray(d['Y'])
+
+        def psi(theta):
+            return ee_regression(theta, X=Xvals, y=yvals, model='linear')
+
+        estr_ref = MEstimator(psi, init=[5, 1, 1])
+        estr_ref.estimate()
+
+        def psi(theta):
+            return ee_expectile_regression(theta, X=Xvals, y=yvals, model='linear', tau=0.5)
+
+        estr = MEstimator(psi, init=[5, 1, 1])
+        estr.estimate()
+
+        # Checking mean estimate
+        npt.assert_allclose(estr.theta,
+                            estr_ref.theta,
+                            atol=1e-6)
+
+        # Checking covariance estimate
+        npt.assert_allclose(estr.variance,
+                            estr_ref.variance,
+                            atol=1e-6)
+
+    def test_expectile_ols_offset(self, data_c):
+        """Tests linear regression with the built-in estimating equation and an offset term.
+        """
+        d = data_c
+        Xvals = np.asarray(d[['I', 'X', 'Z']])
+        yvals = np.asarray(d['Y'])
+
+        def psi(theta):
+            return ee_regression(theta, X=Xvals, y=yvals, model='linear', offset=d['F'])
+
+        estr_ref = MEstimator(psi, init=[5, 1, 1])
+        estr_ref.estimate()
+
+        def psi(theta):
+            return ee_expectile_regression(theta, X=Xvals, y=yvals, model='linear', tau=0.5, offset=d['F'])
+
+        estr = MEstimator(psi, init=[5, 1, 1])
+        estr.estimate()
+
+        # Checking mean estimate
+        npt.assert_allclose(estr.theta,
+                            estr_ref.theta,
+                            atol=1e-6)
+
+        # Checking covariance estimate
+        npt.assert_allclose(estr.variance,
+                            estr_ref.variance,
+                            atol=1e-6)
+
+    def test_expectile_wls(self, data_c):
+        d = data_c
+        Xvals = np.asarray(d[['I', 'X', 'Z']])
+        yvals = np.asarray(d['Y'])
+
+        def psi(theta):
+            return ee_regression(theta, X=Xvals, y=yvals, model='linear', weights=d['w'])
+
+        estr_ref = MEstimator(psi, init=[5, 1, 1])
+        estr_ref.estimate()
+
+        def psi(theta):
+            return ee_expectile_regression(theta, X=Xvals, y=yvals, model='linear', tau=0.5, weights=d['w'])
+
+        estr = MEstimator(psi, init=[5, 1, 1])
+        estr.estimate()
+
+        # Checking mean estimate
+        npt.assert_allclose(estr.theta,
+                            estr_ref.theta,
+                            atol=1e-6)
+
+        # Checking covariance estimate
+        npt.assert_allclose(estr.variance,
+                            estr_ref.variance,
+                            atol=1e-6)
+
+    def test_expectile75_intercept(self, data_c):
+        d = data_c
+        Xvals = np.asarray(d[['I', ]])
+        yvals = np.asarray(d['Y'])
+
+        def psi(theta):
+            return ee_expectile_regression(theta, X=Xvals, y=yvals, model='linear', tau=0.75)
+
+        estr = MEstimator(psi, init=[5, ])
+        estr.estimate()
+
+        # External references (computed using R)
+        # library(expectreg)
+        # d = data.frame(X = c(1, -1, 0, 1, 2, 1, -2, -1, 0, 3, -3, 1, 1, -1, -1, -2, 2, 0, -1, 0))
+        # d$Z = c(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+        # d$Y = c(1, 5, 1, 9, -1, 4, 3, 3, 1, -2, 4, -2, 3, 6, 6, 8, 7, 1, -2, 5)
+        # d$F = c(1, 1, 1, 2, 2, 2, 3, 1, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 3, 3)
+        # d$w = c(2, 1, 5, 1, 2, 7, 3, 1, 2, 2, 3, 9, 1, 1, 1, 5, 1, 1, 6, 2)
+        # ex = expectreg.ls(Y ~ 1, data=d, lambda=0, expectiles=c(0.75))
+        # ex$intercepts
+        params_r = [4.470588, ]
+
+        # Checking mean estimate
+        npt.assert_allclose(estr.theta,
+                            params_r,
+                            atol=1e-6)
+
+    def test_expectile75(self, data_c):
+        d = data_c
+        Xvals = np.asarray(d[['I', 'X', 'Z']])
+        yvals = np.asarray(d['Y'])
+
+        def psi(theta):
+            return ee_expectile_regression(theta, X=Xvals, y=yvals, model='linear', tau=0.75)
+
+        estr = MEstimator(psi, init=[5, 1, 1])
+        estr.estimate()
+
+        # External references (computed using R)
+        # library(expectreg)
+        # d = data.frame(X = c(1, -1, 0, 1, 2, 1, -2, -1, 0, 3, -3, 1, 1, -1, -1, -2, 2, 0, -1, 0))
+        # d$Z = c(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+        # d$Y = c(1, 5, 1, 9, -1, 4, 3, 3, 1, -2, 4, -2, 3, 6, 6, 8, 7, 1, -2, 5)
+        # d$F = c(1, 1, 1, 2, 2, 2, 3, 1, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 3, 3)
+        # d$w = c(2, 1, 5, 1, 2, 7, 3, 1, 2, 2, 3, 9, 1, 1, 1, 5, 1, 1, 6, 2)
+        # ex = expectreg.ls(Y ~ Z + X, data=d, lambda=0, expectiles=c(0.75))
+        # ex$intercepts
+        # ex$coefficients
+        params_r = [4.370062, -0.3950426, -0.943842]
+
+        # Checking mean estimate
+        npt.assert_allclose(estr.theta[1:],
+                            params_r[1:],
+                            atol=1e-6)
+
+        # Checking intercept (expectreg does centering, which I don't do)
+        X_raw = np.asarray(d[['X', 'Z']])
+        beta = estr.theta[1:]
+        adjustment = np.mean(X_raw, axis=0) @ beta
+        intercept = estr.theta[0] + adjustment
+        npt.assert_allclose(intercept,
+                            params_r[0],
+                            atol=1e-6)
+
+    def test_expectile15(self, data_c):
+        d = data_c
+        Xvals = np.asarray(d[['I', 'X', 'Z']])
+        yvals = np.asarray(d['Y'])
+
+        def psi(theta):
+            return ee_expectile_regression(theta, X=Xvals, y=yvals, model='linear', tau=0.15)
+
+        estr = MEstimator(psi, init=[5, 1, 1])
+        estr.estimate()
+
+        # External references (computed using R)
+        # library(expectreg)
+        # d = data.frame(X = c(1, -1, 0, 1, 2, 1, -2, -1, 0, 3, -3, 1, 1, -1, -1, -2, 2, 0, -1, 0))
+        # d$Z = c(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+        # d$Y = c(1, 5, 1, 9, -1, 4, 3, 3, 1, -2, 4, -2, 3, 6, 6, 8, 7, 1, -2, 5)
+        # d$F = c(1, 1, 1, 2, 2, 2, 3, 1, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 3, 3)
+        # d$w = c(2, 1, 5, 1, 2, 7, 3, 1, 2, 2, 3, 9, 1, 1, 1, 5, 1, 1, 6, 2)
+        # ex = expectreg.ls(Y ~ Z + X, data=d, lambda=0, expectiles=c(0.15))
+        # ex$intercepts
+        # ex$coefficients
+        params_r = [1.099318, -0.9068782, 0.7807924]
+
+        # Checking mean estimate
+        npt.assert_allclose(estr.theta[1:],
+                            params_r[1:],
+                            atol=1e-6)
+
+        # Checking intercept (expectreg does centering, which I don't do)
+        X_raw = np.asarray(d[['X', 'Z']])
+        beta = estr.theta[1:]
+        adjustment = np.mean(X_raw, axis=0) @ beta
+        intercept = estr.theta[0] + adjustment
+        npt.assert_allclose(intercept,
+                            params_r[0],
+                            atol=1e-6)
+
+    def test_expectile_logit(self, data_b):
+        d = data_b
+        Xvals = np.asarray(d[['I', 'X', 'Z']])
+        yvals = np.asarray(d['Y'])
+
+        def psi(theta):
+            return ee_regression(theta, X=Xvals, y=yvals, model='logistic')
+
+        estr_ref = MEstimator(psi, init=[0, 0, 0])
+        estr_ref.estimate()
+
+        def psi(theta):
+            return ee_expectile_regression(theta, X=Xvals, y=yvals, model='logistic', tau=0.5)
+
+        estr = MEstimator(psi, init=[0, 0, 0])
+        estr.estimate()
+
+        # Checking mean estimate
+        npt.assert_allclose(estr.theta,
+                            estr_ref.theta,
+                            atol=1e-6)
+
+        # Checking covariance estimate
+        npt.assert_allclose(estr.variance,
+                            estr_ref.variance,
+                            atol=1e-6)
+
+    def test_expectile_poisson(self, data_cp):
+        d = data_cp
+        Xvals = np.asarray(d[['I', 'X', 'Z']])
+        yvals = np.asarray(d['Y'])
+
+        def psi(theta):
+            return ee_regression(theta, X=Xvals, y=yvals, model='poisson')
+
+        estr_ref = MEstimator(psi, init=[0, 0, 0])
+        estr_ref.estimate()
+
+        def psi(theta):
+            return ee_expectile_regression(theta, X=Xvals, y=yvals, model='poisson', tau=0.5)
+
+        estr = MEstimator(psi, init=[0, 0, 0])
+        estr.estimate()
+
+        # Checking mean estimate
+        npt.assert_allclose(estr.theta,
+                            estr_ref.theta,
+                            atol=1e-6)
+
+        # Checking covariance estimate
+        npt.assert_allclose(estr.variance,
+                            estr_ref.variance,
                             atol=1e-6)
 
 
