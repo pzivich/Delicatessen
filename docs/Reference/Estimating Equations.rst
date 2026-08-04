@@ -34,6 +34,7 @@ Regression
   ee_mlogit
   ee_glm
   ee_beta_regression
+  ee_expectile_regression
   ee_tobit
   ee_robust_regression
   ee_ridge_regression

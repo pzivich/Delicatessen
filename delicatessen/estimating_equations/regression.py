@@ -780,7 +780,7 @@ def ee_tobit(theta, X, y, lower=None, upper=None, weights=None, offset=None):
 def ee_expectile_regression(theta, X, y, model, tau=0.5, weights=None, offset=None):
     r"""Estimating equations for expectile regression. Expectile regression is a generalization of linear (and
     non-linear) mean regression models for other parts of the distributions. These other parts are referred to as
-    'expectiles', which are analogous to quantiles (but not the same). Expectile regression is implemented through
+    'expectiles', which are analogous to (but not the same as) quantiles. Expectile regression is implemented through
     an asymmetric weight, :math:`\tau` on the negative and positive residuals. The general estimating equation is
 
     .. math::
