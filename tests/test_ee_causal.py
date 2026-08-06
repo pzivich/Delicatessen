@@ -12,7 +12,8 @@ from delicatessen import MEstimator, GMMEstimator
 from delicatessen.estimating_equations import (ee_regression,
                                                ee_gformula, ee_ipw, ee_ipw_msm, ee_aipw, ee_gestimation_snmm,
                                                ee_iv_causal, ee_2sls, ee_gestimation_snmm_iv,
-                                               ee_mean_sensitivity_analysis)
+                                               ee_mean_sensitivity_analysis,
+                                               ee_cbps_ate, ee_cbps_att)
 from delicatessen.utilities import inverse_logit
 
 
@@ -378,6 +379,73 @@ class TestEstimatingEquationsGMethods:
         npt.assert_allclose(mestr.theta[0:2],
                             msm.params,
                             atol=1e-6)
+
+     def test_cbps_ate(self, data_causal_b):
+        d = data_causal_b
+
+        def psi(theta):
+            return ee_cbps_ate(theta, y=d['Y'], A=d['A'], X=d[['I', 'W']])
+
+        mestimator = MEstimator(psi, init=[0., 0.5, 0.5, 0., 0.])
+        mestimator.estimate(solver='lm')
+
+        # By-hand CBPS-ATE estimator
+        pi = inverse_logit(np.dot(d[['I', 'W']], mestimator.theta[3:]))
+        ya1 = d['A'] * d['Y'] / pi
+        ya0 = (1-d['A']) * d['Y'] / (1-pi)
+
+        # Checking mean estimates
+        npt.assert_allclose(mestimator.theta[0],
+                            np.mean(ya1) - np.mean(ya0),
+                            atol=1e-6)
+        npt.assert_allclose(mestimator.theta[1],
+                            np.mean(ya1),
+                            atol=1e-6)
+        npt.assert_allclose(mestimator.theta[2],
+                            np.mean(ya0),
+                            atol=1e-6)
+
+    def test_cbps_ate_truncate(self, data_causal_b):
+        d = data_causal_b
+
+        def psi(theta):
+            return ee_cbps_ate(theta, y=d['Y'], A=d['A'], X=d[['I', 'W']],
+                              truncate=(0.1, 0.5))
+
+        mestimator = MEstimator(psi, init=[0., 0.5, 0.5, 0., 0.])
+        mestimator.estimate(solver='lm')
+
+        pi = inverse_logit(np.dot(d[['I', 'W']], mestimator.theta[3:]))
+        pi = np.clip(pi, 0.1, 0.5)
+        ya1 = d['A'] * d['Y'] / pi
+        ya0 = (1-d['A']) * d['Y'] / (1-pi)
+
+        npt.assert_allclose(mestimator.theta[0],
+                            np.mean(ya1) - np.mean(ya0),
+                            atol=1e-6)
+        npt.assert_allclose(mestimator.theta[1],
+                            np.mean(ya1),
+                            atol=1e-6)
+        npt.assert_allclose(mestimator.theta[2],
+                            np.mean(ya0),
+                            atol=1e-6)
+
+    def test_cbps_att(self, data_causal_b):
+        d = data_causal_b
+
+        def psi(theta):
+            return ee_cbps_att(theta, y=d['Y'], A=d['A'], X=d[['I', 'W']])
+
+        mestimator = MEstimator(psi, init=[0., 0.5, 0.5, 0., 0.])
+        mestimator.estimate(solver='lm')
+
+        pi = inverse_logit(np.dot(d[['I', 'W']], mestimator.theta[3:]))
+        mu1 = np.sum(d['A'] * d['Y']) / np.sum(d['A'])
+        mu0 = np.sum((1 - d['A']) * d['Y'] / pi) / np.sum((1 - d['A']) / pi)
+        att = mu1 - mu0
+
+        npt.assert_allclose(mestimator.theta[0], att, atol=1e-6)
+        npt.assert_allclose(mestimator.theta[1], mu1, atol=1e-6)
 
     def test_aipw(self, data_causal_b):
         d = data_causal_b

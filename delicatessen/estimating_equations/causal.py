@@ -724,6 +724,138 @@ def ee_aipw(theta, y, A, W, X, X1, X0, truncate=None, force_continuous=False):
                       y0_star[None, :],  # theta[2] is for R0
                       pi_model,          # theta[b] is for the treatment model coefficients
                       m_model))          # theta[c] is for the outcome model coefficients
+def ee_cbps_ate(theta, y, A, X, truncate=None, weights=None):
+    r"""Estimating equation for the covariate balancing propensity score (CBPS) estimator for the average treatment
+    effect (ATE). CBPS estimates propensity scores by directly optimizing covariate balance.
+
+    The stacked estimating equations are
+
+    .. math::
+
+        \sum_{i=1}^n
+        \begin{bmatrix}
+            (\theta_1 - \theta_2) - \theta_0 \\
+            \frac{A_i Y_i}{\pi_i} - \theta_1 \\
+            \frac{(1-A_i) Y_i}{1-\pi_i} - \theta_2 \\
+            \frac{A_i - \pi_i}{\pi_i (1-\pi_i)} X_i
+        \end{bmatrix}
+        = 0
+
+    where :math:`A` is the action, :math:`X` is the set of confounders, and :math:`\pi_i = \text{expit}(X_i^T \beta)`.
+
+    Parameters
+    ----------
+    theta : ndarray
+        Theta consists of 3+`b` values.
+    y : ndarray
+        1-dimensional vector of `n` observed values.
+    A : ndarray
+        1-dimensional vector of `n` observed values.
+    X : ndarray
+        2-dimensional vector of `n` observed values.
+    truncate : None or tuple
+        Bounds to truncate the estimated probabilities.
+    weights : ndarray, None
+        1-dimensional vector of n weights.
+
+    Returns
+    -------
+    array : NumPy array
+
+    References
+    ----------
+    Imai K, & Ratkovic M. (2014). Covariate balancing propensity score.
+    *Journal of the Royal Statistical Society: Series B*, 76(1), 243-263.
+    """
+    X = np.asarray(X)
+    A = np.asarray(A)
+    y = np.asarray(y)
+    beta = theta[3:]
+
+    pi = inverse_logit(np.dot(X, beta))
+
+    if truncate is not None:
+        if truncate[0] > truncate[1]:
+            raise ValueError("truncate values must be specified in ascending order")
+        pi = np.clip(pi, a_min=truncate[0], a_max=truncate[1])
+
+    if weights is None:
+        weights = 1
+
+    cbps_balance = ((A - pi) / (pi * (1 - pi)))[:, None] * X
+    cbps_model = cbps_balance.T
+
+    ya1 = (A * y) / pi * weights - theta[1]
+    ya0 = ((1-A) * y) / (1-pi) * weights - theta[2]
+    ate = np.ones(y.shape[0]) * (theta[1] - theta[2]) - theta[0]
+
+    return np.vstack((ate, ya1[None, :], ya0[None, :], cbps_model))
+
+
+def ee_cbps_att(theta, y, A, X, truncate=None, weights=None):
+    r"""Estimating equation for the CBPS estimator for the average treatment effect on the treated (ATT).
+
+    The stacked estimating equations are
+
+    .. math::
+
+        \sum_{i=1}^n
+        \begin{bmatrix}
+            \mu_1 - \theta_0 \\
+            A_i (Y_i - \mu_1) - \theta_1 \\
+            (1-A_i) (Y_i - \theta_2) / \pi_i - \theta_1 \\
+            \frac{A_i - \pi_i}{1-\pi_i} X_i
+        \end{bmatrix}
+        = 0
+
+    Parameters
+    ----------
+    theta : ndarray
+        Theta consists of 3+`b` values.
+    y : ndarray
+        1-dimensional vector of `n` observed values.
+    A : ndarray
+        1-dimensional vector of `n` observed values.
+    X : ndarray
+        2-dimensional vector of `n` observed values.
+    truncate : None or tuple
+        Bounds to truncate the estimated probabilities.
+    weights : ndarray, None
+        1-dimensional vector of n weights.
+
+    Returns
+    -------
+    array : NumPy array
+
+    References
+    ----------
+    Imai K, & Ratkovic M. (2014). Covariate balancing propensity score.
+    *Journal of the Royal Statistical Society: Series B*, 76(1), 243-263.
+    """
+    X = np.asarray(X)
+    A = np.asarray(A)
+    y = np.asarray(y)
+    beta = theta[3:]
+
+    pi = inverse_logit(np.dot(X, beta))
+
+    if truncate is not None:
+        if truncate[0] > truncate[1]:
+            raise ValueError("truncate values must be specified in ascending order")
+        pi = np.clip(pi, a_min=truncate[0], a_max=truncate[1])
+
+    if weights is None:
+        weights = 1
+
+    cbps_balance = ((A - pi) / (1 - pi))[:, None] * X
+    cbps_model = cbps_balance.T
+
+    mu1 = A * y * weights - theta[1] * A * weights
+    mu0 = (1 - A) * (y - theta[2]) / pi * weights
+    att = np.ones(y.shape[0]) * (theta[1] - theta[2]) - theta[0]
+
+    return np.vstack((att, mu1[None, :], mu0[None, :], cbps_model))
+
 
 
 #################################################################
