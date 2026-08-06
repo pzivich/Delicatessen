@@ -532,6 +532,106 @@ def ee_ipw_msm(theta, y, A, W, V, distribution, link, hyperparameter=None, trunc
                       preds_reg))      # theta[c:] is for the regression coefficients
 
 
+def ee_ipw_proximal(theta, y, A, Z, W, X):
+    r"""Estimating equation for proximal causal inference based on inverse probability weighting (IPW). Like the other
+    IPW estimators, the proximal IPW estimator involves the estimation of propensity scores. However, the proximal
+    IPW estimator differs in some key aspects. First, proximal causal inference is designed to account for an
+    unmeasured confounding variable through a pair(s) of proxy variables. As a result, the propensity score estimation
+    is done through the 'confounding bridge function' instead of the standard logistic regression model. The stacked
+    estimating equations are
+
+    .. math::
+
+        \sum_{i=1}^n
+        \begin{bmatrix}
+            \left\{ -1^{(1-A)} q(X_i,Z_i,A_i;\alpha) \right\} \times X_i^T - 1 \\
+            \left\{ -1^{(1-A)} q(X_i,Z_i,A_i;\alpha) \right\} \times W_i^T - 1 \\
+            \left\{ -1^{(1-A)} q(X_i,Z_i,A_i;\alpha) \right\} \times A_i^T - 1 \\
+            Y_i A_i \times q(X_i,Z_i,A_i;\alpha) - \mu_1 \\
+            Y_i (1-A_i) \times q(X_i,Z_i,A_i;\alpha) - \mu_0 \\
+            \mu_1 - \mu_0 - \delta \\
+        \end{bmatrix}
+        = 0
+
+    where :math:`A` is the action, math:`X` is the set of observed confounders, :math:`Z` is the treatment proxy (or
+    proxies), :math:`W` is the outcome proxy (or proxies), and
+    :math:`q(X,Z,A;\alpha) = 1 + \exp \left(-1^{1-A} \times (X \alpha_X^T + Z \alpha_Z^T + A \alpha_A) \right)`.
+    Here, the :math:`q` function is the confounding bridge function. Note that :math:`Z` and :math:`W` play
+    complimentary roles in the function, so they must be of the same dimension for estimation.
+
+    The first estimating equations are for the parameters of the confounding bridge function (i.e., the generalization
+    of the propensity score). The second estimating equation is the risk had everyone taken :math:`A=1`, third is the
+    risk had everyone taken :math:`A=0`, and the last is for the causal risk difference. See the references for the
+    corresponding causal identification assumptions used with proximal causal inference.
+
+    Parameters
+    ----------
+    theta : ndarray, list, vector
+        Theta consists of 3+`b` values.
+    y : ndarray, list, vector
+        1-dimensional vector of `n` observed values.
+    A : ndarray, list, vector
+        1-dimensional vector of `n` observed values. All the A values should be either 0 or 1.
+    Z : ndarray, list, vector
+        2-dimensional vector of `n` observed values for the `k` treatment proxy variables. Note that this matrix must
+        have the same dimensions as ``W``.
+    W : ndarray, list, vector
+        2-dimensional vector of `n` observed values for the `k` outcome proxy variables. Note that this matrix must
+        have the same dimensions as ``Z``.
+    X : ndarray, list, vector
+        2-dimensional vector of `n` observed values for `j` confounding variables.
+
+    Returns
+    -------
+    array :
+        Returns a (3+`b`)-by-`n` NumPy array evaluated for the input ``theta``.
+
+    Examples
+    --------
+    Construction of an estimating equation(s) with ``ee_ipw_proximal`` should be done similar to the following
+
+    References
+    ----------
+    Cui Y, Pu H, Shi X, Miao W, & Tchetgen Tchetgen E. (2024). Semiparametric proximal causal inference.
+    *Journal of the American Statistical Association*, 119(546), 1348-1359.
+
+    Zivich PN, Cole SR, Edwards JK, Mulholland GE, Shook-Sa BE, & Tchetgen Tchetgen EJ. (2023). Introducing proximal
+    causal inference for epidemiologists. *American Journal of Epidemiology*, 192(7), 1224-1227.
+    """
+    # Ensuring correct typing
+    y = np.asarray(y)              # Convert to NumPy array
+    A = np.asarray(A)              # Convert to NumPy array
+    Z = np.asarray(Z)              # Convert to NumPy array
+    W = np.asarray(W)              # Convert to NumPy array
+    X = np.asarray(X)              # Convert to NumPy array
+    mu = theta[:3]                 # Parameters of interest
+    beta = theta[3:]               # Nuisance model coefficients
+
+    if Z.shape[1] != W.shape[1]:
+        raise ValueError("For the proximal IPW estimator, the dimension of the design matrix for the ")
+
+    # Building design matrices
+    XZA = np.hstack([X, Z, A[:, None]])
+    XWA = np.hstack([X, W, A[:, None]])
+
+    # Building the confounding bridge function
+    linear_pred = np.dot(XZA, beta)
+    q_function = 1 + np.exp((-1)**(1 - A) * linear_pred)
+
+    # Confounding bridge function contributions
+    shifter = np.zeros(XWA.shape[1])
+    shifter[-1] = 1
+    ee_cbf = ((-1)**(1-A) * q_function)[:, None] * XWA - shifter
+
+    # Parameters of interest
+    ee_rd = np.ones(y.shape[0]) * (mu[1] - mu[2]) - mu[0]
+    ee_r1 = A * q_function * y - mu[1]
+    ee_r0 = (1-A) * q_function * y - mu[2]
+
+    # Returning the stacked estimating functions
+    return np.vstack([ee_rd, ee_r1, ee_r0, ee_cbf.T])
+
+
 def ee_aipw(theta, y, A, W, X, X1, X0, truncate=None, force_continuous=False):
     r"""Estimating equation for augmented inverse probability weighting (AIPW) estimator. AIPW consists of two nuisance
     models (the propensity score model and the outcome model).
