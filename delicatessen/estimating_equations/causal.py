@@ -239,18 +239,18 @@ def ee_gformula(theta, y, X, X1, X0=None, force_continuous=False):
                           preds_reg))     # theta[3:] is for the regression coefficients
 
 
-def ee_ipw(theta, y, A, W, truncate=None, weights=None):
+def ee_ipw(theta, y, A, W, truncate=None, weights=None, weight_type='horvitz-thompson'):
     r"""Estimating equation for inverse probability weighting (IPW) estimator. The average causal effect is estimated by
     this implementation of the IPW estimator. For estimation of the propensity scores, a logistic model is used.
 
-    The stacked estimating equations are
+    The stacked estimating equations for the Horvitz-Thompson IPW estimator are
 
     .. math::
 
         \sum_{i=1}^n
         \begin{bmatrix}
             (\theta_1 - \theta_2) - \theta_0 \\
-            \frac{A_i Y_i}{\pi_i} - \theta_1 - \theta_1 \\
+            \frac{A_i Y_i}{\pi_i} - \theta_1 \\
             \frac{(1-A_i) Y_i}{1-\pi_i} - \theta_2 \\
             \left\{ A_i - \text{expit}(W_i^T \alpha) \right\} W_i
         \end{bmatrix}
@@ -261,6 +261,19 @@ def ee_ipw(theta, y, A, W, truncate=None, weights=None):
     the third is for the mean under :math:`A:=0`, and the last is the logistic regression model for the propensity
     scores. Here, the length of the theta vector is 3+`b`, where `b` is the number of parameters in the regression
     model.
+
+    The Hajek variation of the IPW estimator has the following second and third estimating equations
+
+    .. math::
+
+        \sum_{i=1}^n
+        \begin{bmatrix}
+            \frac{A_i}{\pi_i} \times (Y_i - \theta_1) \\
+            \frac{1-A_i}{1-\pi_i} \times (Y_i - \theta_2) \\
+        \end{bmatrix}
+        = 0
+
+    which applies a self-normalization that can improve performance in some settings with more extreme weights.
 
     Parameters
     ----------
@@ -281,6 +294,10 @@ def ee_ipw(theta, y, A, W, truncate=None, weights=None):
         1-dimensional vector of n weights. Default is ``None``, which assigns a weight of 1 to all observations. This
         argument is intended to support the use of missingness weights. The propensity score model is *not* fit using
         these weights.
+    weight_type : str, optional
+        The type of weighting estimator to use. Options are ``'Horvitz-Thompson'`` or ``'Hajek'``. The default is the
+        Horvitz-Thompson estimator. Note that the Hajek estimator uses self-normalization, so its performance may
+        be preferred.
 
     Returns
     -------
@@ -348,7 +365,8 @@ def ee_ipw(theta, y, A, W, truncate=None, weights=None):
     W = np.asarray(W)                            # Convert to NumPy array
     A = np.asarray(A)                            # Convert to NumPy array
     y = np.asarray(y)                            # Convert to NumPy array
-    beta = theta[3:]                             # Extracting out theta's for the regression model
+    mu = theta[:3]                               # Extracting parameters of interest
+    beta = theta[3:]                             # Extracting out nuisance parameters
 
     # Estimating propensity score
     preds_reg = ee_regression(theta=beta,        # Using logistic regression
@@ -367,17 +385,24 @@ def ee_ipw(theta, y, A, W, truncate=None, weights=None):
     if weights is None:
         weights = 1
 
-    # Calculating Y(a=1)
-    ya1 = (A * y) / pi * weights - theta[1]                # i's contribution is (AY) / \pi
-    # Calculating Y(a=0)
-    ya0 = ((1-A) * y) / (1-pi) * weights - theta[2]        # i's contribution is ((1-A)Y) / (1-\pi)
-    # Calculating Y(a=1) - Y(a=0)
+    # Calculating weighted means
+    if weight_type.lower() in ['horvitz-thompson', 'horvitz_thompson', 'horvitz']:
+        ef_y1 = y * A / pi * weights - mu[1]               # i's contribution is (AY) / \pi
+        ef_y0 = y * (1-A) / (1-pi) * weights - mu[2]       # i's contribution is ((1-A)Y) / (1-\pi)
+    elif weight_type.lower() in ['hajek', ]:
+        ef_y1 = A / pi * weights * (y - mu[1])             # i's contribution is (AY) / \pi
+        ef_y0 = (1-A) / (1-pi) * weights * (y - mu[2])     # i's contribution is ((1-A)Y) / (1-\pi)
+    else:
+        raise ValueError("The selected weight_type, " + str(weight_type) + ", is not a valid option. Please select "
+                         "one of the following: Horvitz-Thompson, Hajek.")
+
+    # Calculating the average causal effect
     ate = np.ones(y.shape[0]) * (theta[1] - theta[2]) - theta[0]
 
     # Output (3+b)-by-n stacked array
     return np.vstack((ate,             # theta[0] is for the ATE
-                      ya1[None, :],    # theta[1] is for R1
-                      ya0[None, :],    # theta[2] is for R0
+                      ef_y1[None, :],    # theta[1] is for R1
+                      ef_y0[None, :],    # theta[2] is for R0
                       preds_reg))      # theta[3:] is for the regression coefficients
 
 
@@ -532,6 +557,151 @@ def ee_ipw_msm(theta, y, A, W, V, distribution, link, hyperparameter=None, trunc
                       preds_reg))      # theta[c:] is for the regression coefficients
 
 
+def ee_ipw_cbps(theta, y, A, W, weights=None, weight_type='horvitz-thompson'):
+    r"""Estimating equation for inverse probability weighting (IPW) estimator. The average causal effect is estimated by
+    this implementation of the IPW estimator. Rather than using a logistic model to estimate the propensity score, an
+    alternative approach is used: the Covariate Balancing Propensity Score (CBPS). The CBPS model looks similar to a
+    logistic model, but it explicitly focusing on balancing the covariate distributions rather than predicting the
+    action variable. Here, the just-identified version of the CBPS model is used, so the CBPS balance the first-moment
+    of the covariates in the design matrix (i.e., the mean).
+
+    The corresponding stacked estimating equations are
+
+    .. math::
+
+        \sum_{i=1}^n
+        \begin{bmatrix}
+            (\theta_1 - \theta_2) - \theta_0 \\
+            \frac{A_i Y_i}{\pi_i} - \theta_1 \\
+            \frac{(1-A_i) Y_i}{1-\pi_i} - \theta_2 \\
+            \left\{ \frac{A_i}{\pi_i} - \frac{1-A_i}{1-\pi_i} \right\} W_i
+        \end{bmatrix}
+        = 0
+
+    where :math:`A` is the action, math:`W` is the set of confounders, and :math:`\pi_i = expit(W_i^T \alpha)`. The
+    first estimating equation is for the average causal effect, the second is for the mean under :math:`A:=1`,
+    the third is for the mean under :math:`A:=0`, and the last is the CBPS model for the propensity scores. Here, the
+    length of the theta vector is 3+`b`, where `b` is the number of parameters in the nuisance model.
+
+    As with the IPW estimator, the Horvitz-Thompson version can be switched to the Hajek version by modifying the second
+    and third estimating functions.
+
+    Parameters
+    ----------
+    theta : ndarray, list, vector
+        Theta consists of 3+`b` values.
+    y : ndarray, list, vector
+        1-dimensional vector of `n` observed values.
+    A : ndarray, list, vector
+        1-dimensional vector of `n` observed values. The A values should all be 0 or 1.
+    W : ndarray, list, vector
+        2-dimensional vector of `n` observed values for `b` variables to model the probability of ``A`` with.
+    weights : ndarray, list, vector, None, optional
+        1-dimensional vector of n weights. Default is ``None``, which assigns a weight of 1 to all observations. This
+        argument is intended to support the use of missingness weights. The propensity score model is *not* fit using
+        these weights.
+    weight_type : str, optional
+        The type of weighting estimator to use. Options are ``'Horvitz-Thompson'`` or ``'Hajek'``. The default is the
+        Horvitz-Thompson estimator. Note that the Hajek estimator uses self-normalization, so its performance may
+        be preferred.
+
+    Returns
+    -------
+    array :
+        Returns a (3+`b`)-by-`n` NumPy array evaluated for the input ``theta``.
+
+
+    Examples
+    --------
+    Construction of an estimating equation(s) with ``ee_ipw_cbps`` should be done similar to the following
+
+        >>> import numpy as np
+    >>> import pandas as pd
+    >>> from delicatessen import MEstimator
+    >>> from delicatessen.estimating_equations import ee_ipw_cbps
+
+    Some generic data
+
+    >>> n = 200
+    >>> d = pd.DataFrame()
+    >>> d['W'] = np.random.binomial(1, p=0.5, size=n)
+    >>> d['A'] = np.random.binomial(1, p=(0.25 + 0.5*d['W']), size=n)
+    >>> d['Ya0'] = np.random.binomial(1, p=(0.75 - 0.5*d['W']), size=n)
+    >>> d['Ya1'] = np.random.binomial(1, p=(0.75 - 0.5*d['W'] - 0.1*1), size=n)
+    >>> d['Y'] = (1-d['A'])*d['Ya0'] + d['A']*d['Ya1']
+    >>> d['C'] = 1
+
+    Defining psi, or the stacked estimating equations. Note that ``'A'`` is the action.
+
+    >>> def psi(theta):
+    >>>     return ee_ipw_cbps(theta, y=d['Y'], A=d['A'],
+    >>>                        W=d[['C', 'W']])
+
+    Calling the M-estimation procedure. Since ``W`` is 2-by-n here and IPW has 3 additional parameters, the initial
+    values should be of length 3+2=5. In general, it will be best to start with ``[0., 0.5, 0.5, ...]`` as the starting
+    values when ``Y`` is binary. Otherwise, starting with ``np.mean(d['Y'])`` is reasonable.
+
+    >>> estr = MEstimator(psi, init=[0., 0.5, 0.5, 0., 0.])
+    >>> estr.estimate(solver='lm')
+
+    Inspecting the parameter estimates, variance, and 95% confidence intervals
+
+    >>> estr.theta
+    >>> estr.variance
+    >>> estr.confidence_intervals()
+
+    More specifically, the corresponding parameters are
+
+    >>> estr.theta[0]    # causal mean difference of 1 versus 0
+    >>> estr.theta[1]    # causal mean under A=1
+    >>> estr.theta[2]    # causal mean under A=0
+    >>> estr.theta[3:]   # logistic regression coefficients
+
+    References
+    ----------
+    Imai K & Ratkovic M. (2014). Covariate balancing propensity score.
+    *Journal of the Royal Statistical Society Series B: Statistical Methodology*, 76(1), 243-263.
+
+    Wyss R, Ellis AR, Brookhart MA, Girman CJ, Jonsson-Funk M, LoCasale R, & Stürmer T. (2014). The role of prediction
+    modeling in propensity score estimation: an evaluation of logistic regression, bCART, and the covariate-balancing
+    propensity score. *American Journal of Epidemiology*, 180(6), 645-655.
+    """
+    # Ensuring correct typing
+    W = np.asarray(W)                            # Convert to NumPy array
+    A = np.asarray(A)                            # Convert to NumPy array
+    y = np.asarray(y)                            # Convert to NumPy array
+    mu = theta[:3]                               # Extracting parameters of interest
+    beta = theta[3:]                             # Extracting out nuisance parameters
+
+    # Processing external weights argument
+    if weights is None:
+        weights = 1
+
+    # Estimating weights
+    pi = inverse_logit(np.dot(W, beta))          # Getting Pr(A|W) from model
+    ef_cbps = ((A / pi - (1-A)/(1-pi))[:, None] * W).T
+
+    # Calculating weighted means
+    if weight_type.lower() in ['horvitz-thompson', 'horvitz_thompson', 'horvitz']:
+        ef_y1 = y * A / pi * weights - mu[1]               # i's contribution is (AY) / \pi
+        ef_y0 = y * (1-A) / (1-pi) * weights - mu[2]       # i's contribution is ((1-A)Y) / (1-\pi)
+    elif weight_type.lower() in ['hajek', ]:
+        ef_y1 = A / pi * weights * (y - mu[1])             # i's contribution is (AY) / \pi
+        ef_y0 = (1-A) / (1-pi) * weights * (y - mu[2])     # i's contribution is ((1-A)Y) / (1-\pi)
+    else:
+        raise ValueError("The selected weight_type, " + str(weight_type) + ", is not a valid option. Please select "
+                         "one of the following: Horvitz-Thompson, Hajek.")
+
+    # Calculating the average causal effect
+    ate = np.ones(y.shape[0]) * (mu[1] - mu[2]) - mu[0]
+
+    # Output (3+b)-by-n stacked array
+    return np.vstack((ate,             # theta[0] is for the ATE
+                      ef_y1[None, :],    # theta[1] is for R1
+                      ef_y0[None, :],    # theta[2] is for R0
+                      ef_cbps))      # theta[3:] is for the regression coefficients
+
+
 def ee_ipw_proximal(theta, y, A, Z, W, X):
     r"""Estimating equation for proximal causal inference based on inverse probability weighting (IPW). Like the other
     IPW estimators, the proximal IPW estimator involves the estimation of propensity scores. However, the proximal
@@ -590,6 +760,58 @@ def ee_ipw_proximal(theta, y, A, Z, W, X):
     --------
     Construction of an estimating equation(s) with ``ee_ipw_proximal`` should be done similar to the following
 
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> from scipy.stats import logistic
+    >>> from delicatessen import MEstimator
+    >>> from delicatessen.estimating_equations import ee_ipw_proximal
+
+    Some generic data with an unobserved confounder and valid proxies
+
+    >>> n = 500
+    >>> d = pd.DataFrame()
+    >>> d['X'] = np.random.normal(size=n)           # observed confounder
+    >>> d['U'] = d['X'] + np.random.normal(size=n)  # unobserved confounder
+    >>> d['Z'] = d['U'] + np.random.normal(size=n)  # treatment proxy
+    >>> d['W'] = d['U'] + np.random.normal(size=n)  # outcome proxy
+    >>> pr_a = logistic.cdf(d['Z'] + d['U'] + d['X'])
+    >>> d['A'] = np.random.binomial(n=1, p=pr_a, size=n)
+    >>> ya0 = d['W'] + d['U'] + d['X'] + np.random.normal(scale=1, size=n)
+    >>> ya1 = ya0 - 1
+    >>> d['Y'] = np.where(d['A'] == 1, ya1, ya0)
+    >>> d['C'] = 1
+
+    Defining psi, or the stacked estimating equations. Note that ``'A'`` is the action.
+
+    >>> def psi(theta):
+    >>>     return ee_ipw_proximal(theta, y=d['Y'], A=d['A'],
+    >>>                            X=d[['C', 'X']], Z=d[['Z']], W=d[['W', ]])
+
+    Calling the estimation procedure. Since ``X`` is 2-by-n here and nuisance model has 4 parameters, so the starting
+    values should be of length 3+4=7. In general, it will be best to start with ``[0., 0.5, 0.5, ...]`` as the starting
+    values when ``Y`` is binary. Otherwise, starting with ``[0, np.mean(y), np.mean(y), ...]`` is reasonable.
+
+    >>> estr = MEstimator(stacked_equations=psi, init=[0., 0.5, 0.5, 0., 0., 0., 0.])
+    >>> estr.estimate(solver='lm')
+
+    Inspecting the parameter estimates, variance, and 95% confidence intervals
+
+    >>> estr.theta
+    >>> estr.variance
+    >>> estr.confidence_intervals()
+
+    More specifically, the corresponding parameters are
+
+    >>> estr.theta[0]    # causal mean difference of 1 versus 0
+    >>> estr.theta[1]    # causal mean under A=1
+    >>> estr.theta[2]    # causal mean under A=0
+    >>> estr.theta[3:]   # logistic regression coefficients
+
+    If you want to see how truncating the probabilities works, try repeating the above code but specifying
+    ``truncate=(0.1, 0.9)`` as an optional argument in ``ee_ipw``.
+
+
+
     References
     ----------
     Cui Y, Pu H, Shi X, Miao W, & Tchetgen Tchetgen E. (2024). Semiparametric proximal causal inference.
@@ -611,8 +833,10 @@ def ee_ipw_proximal(theta, y, A, Z, W, X):
         raise ValueError("For the proximal IPW estimator, the dimension of the design matrix for the ")
 
     # Building design matrices
-    XZA = np.hstack([X, Z, A[:, None]])
-    XWA = np.hstack([X, W, A[:, None]])
+    XZA = np.hstack([X, Z, A[:, None]
+                     ])
+    XWA = np.hstack([X, W, A[:, None]
+                     ])
 
     # Building the confounding bridge function
     linear_pred = np.dot(XZA, beta)
@@ -624,9 +848,10 @@ def ee_ipw_proximal(theta, y, A, Z, W, X):
     ee_cbf = ((-1)**(1-A) * q_function)[:, None] * XWA - shifter
 
     # Parameters of interest
+    # q_function = np.clip(q_function, a_min=1, a_max=20)
     ee_rd = np.ones(y.shape[0]) * (mu[1] - mu[2]) - mu[0]
-    ee_r1 = A * q_function * y - mu[1]
-    ee_r0 = (1-A) * q_function * y - mu[2]
+    ee_r1 = A * q_function * (y - mu[1])
+    ee_r0 = (1-A) * q_function * (y - mu[2])
 
     # Returning the stacked estimating functions
     return np.vstack([ee_rd, ee_r1, ee_r0, ee_cbf.T])
