@@ -10,7 +10,7 @@ import statsmodels.api as sm
 
 from delicatessen import MEstimator, GMMEstimator
 from delicatessen.estimating_equations import (ee_regression,
-                                               ee_gformula, ee_ipw, ee_ipw_msm, ee_aipw, ee_gestimation_snmm,
+                                               ee_gformula, ee_ipw, ee_ipw_msm, ee_ipw_cbps, ee_aipw, ee_gestimation_snmm,
                                                ee_iv_causal, ee_2sls, ee_gestimation_snmm_iv,
                                                ee_mean_sensitivity_analysis)
 from delicatessen.utilities import inverse_logit
@@ -264,6 +264,36 @@ class TestEstimatingEquationsGMethods:
                             np.mean(ya0),
                             atol=1e-6)
 
+    def test_ipw_hajek(self, data_causal_b):
+        d = data_causal_b
+
+        def psi(theta):
+            return ee_ipw(theta, y=d['Y'], A=d['A'], W=d[['I', 'W']], weight_type='hajek')
+
+        mestimator = MEstimator(psi, init=[0., 0.5, 0.5, 0., 0.])
+        mestimator.estimate(solver='lm')
+
+        # By-hand IPW estimator with statsmodels
+        glm = sm.GLM(d['A'], d[['I', 'W']], family=sm.families.Binomial()).fit()
+        pi = glm.predict()
+        mu_1 = np.sum(d['A'] * d['Y'] / pi) / np.sum(d['A'] / pi)
+        mu_0 = np.sum((1-d['A']) * d['Y'] / (1-pi)) / np.sum((1-d['A']) / (1-pi))
+
+        # Checking logistic coefficients (nuisance model estimates)
+        npt.assert_allclose(mestimator.theta[3:],
+                            np.asarray(glm.params),
+                            atol=1e-6)
+        # Checking mean estimates
+        npt.assert_allclose(mestimator.theta[0],
+                            mu_1 - mu_0,
+                            atol=1e-6)
+        npt.assert_allclose(mestimator.theta[1],
+                            mu_1,
+                            atol=1e-6)
+        npt.assert_allclose(mestimator.theta[2],
+                            mu_0,
+                            atol=1e-6)
+
     def test_ipw_msm(self, data_causal_b):
         d = data_causal_b
 
@@ -377,6 +407,105 @@ class TestEstimatingEquationsGMethods:
         # Checking mean estimates
         npt.assert_allclose(mestr.theta[0:2],
                             msm.params,
+                            atol=1e-6)
+
+    def test_ipw_cbps(self, data_causal_b):
+        d = data_causal_b
+
+        def psi(theta):
+            return ee_ipw_cbps(theta, y=d['Y'], A=d['A'], W=d[['I', 'W']])
+
+        mestimator = MEstimator(psi, init=[0., 0.5, 0.5, 0., 0.])
+        mestimator.estimate(solver='lm')
+
+        # Checking against WeightIt
+        #
+        # library(WeightIt)
+        # d = data.frame(W = c(1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3,
+        #                      1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3))
+        # d$V = c(1, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 1, 1, 0, 0,
+        #         1, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 1, 1, 0, 0)
+        # d$A = c(1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 0, 1, 0, 1,
+        #         1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 0, 1, 0, 1)
+        # d$Y = c(0, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 0, 1, 1, 1, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0,
+        #         1, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0)
+        # d$I = 1
+        # w.out <- weightit(A ~ W, data=d, method='cbps')
+        # w.out$weights
+        prop_score = [0.7435483, 0.5467310, 0.3341329, 0.7435483, 0.5467310, 0.3341329, 0.7435483, 0.5467310, 0.3341329,
+                      0.7435483, 0.5467310, 0.3341329,
+                      0.7435483, 0.5467310, 0.3341329, 0.7435483, 0.5467310, 0.3341329, 0.7435483, 0.5467310, 0.3341329,
+                      0.7435483, 0.5467310, 0.3341329,
+                      0.7435483, 0.5467310, 0.3341329, 0.7435483, 0.5467310, 0.3341329, 0.7435483, 0.5467310, 0.3341329,
+                      0.7435483, 0.5467310, 0.3341329,
+                      0.7435483, 0.5467310, 0.3341329, 0.7435483, 0.5467310, 0.3341329, 0.7435483, 0.5467310, 0.3341329]
+        # By-Hand Horvitz-Thompson estimator from WeightIt propensity scores
+        d['ps'] = prop_score
+        d['ipw'] = d['A'] / prop_score + (1-d['A'])/(1-d['ps'])
+
+        # Checking propensity score outputs
+        npt.assert_allclose(inverse_logit(np.dot(d[['I', 'W']], mestimator.theta[3:])),
+                            prop_score,
+                            atol=1e-6)
+        # Checking parameter of interest
+        npt.assert_allclose(mestimator.theta[0],
+                            np.mean(d['ipw']*d['A']*d['Y']) - np.mean(d['ipw']*(1-d['A'])*d['Y']),
+                            atol=1e-6)
+
+    def test_ipw_cbps_hajek(self, data_causal_b):
+        d = data_causal_b
+
+        def psi(theta):
+            return ee_ipw_cbps(theta, y=d['Y'], A=d['A'], W=d[['I', 'W']], weight_type='hajek')
+
+        mestimator = MEstimator(psi, init=[0., 0.5, 0.5, 0., 0.])
+        mestimator.estimate(solver='lm')
+
+        # Checking against WeightIt
+        #
+        # library(WeightIt)
+        # d = data.frame(W = c(1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3,
+        #                      1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3))
+        # d$V = c(1, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 1, 1, 0, 0,
+        #         1, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 1, 1, 0, 0)
+        # d$A = c(1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 0, 1, 0, 1,
+        #         1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 0, 1, 0, 1)
+        # d$Y = c(0, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 0, 1, 1, 1, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0,
+        #         1, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0)
+        # d$I = 1
+        # w.out <- weightit(A ~ W, data=d, method='cbps')
+        # w.out$weights
+        # w.out$ps
+        # fit <- lm_weightit(Y ~ A, data = d, weightit = w.out)
+        # summary(fit)
+        prop_score = [0.7435483, 0.5467310, 0.3341329, 0.7435483, 0.5467310, 0.3341329, 0.7435483, 0.5467310, 0.3341329,
+                      0.7435483, 0.5467310, 0.3341329,
+                      0.7435483, 0.5467310, 0.3341329, 0.7435483, 0.5467310, 0.3341329, 0.7435483, 0.5467310, 0.3341329,
+                      0.7435483, 0.5467310, 0.3341329,
+                      0.7435483, 0.5467310, 0.3341329, 0.7435483, 0.5467310, 0.3341329, 0.7435483, 0.5467310, 0.3341329,
+                      0.7435483, 0.5467310, 0.3341329,
+                      0.7435483, 0.5467310, 0.3341329, 0.7435483, 0.5467310, 0.3341329, 0.7435483, 0.5467310, 0.3341329]
+        r0_rd = [0.40929526, -0.05014062]
+        covar = [[0.01164564, -0.01126071],
+                 [-0.01126071, 0.02188925]]
+
+        # Checking propensity score outputs
+        npt.assert_allclose(inverse_logit(np.dot(d[['I', 'W']], mestimator.theta[3:])),
+                            prop_score,
+                            atol=1e-6)
+        # Checking parameter of interest
+        npt.assert_allclose(mestimator.theta[[2, 0]],
+                            r0_rd,
+                            atol=1e-6)
+        # Checking covariance matrix
+        npt.assert_allclose(mestimator.variance[2, 2],
+                            covar[0][0],
+                            atol=1e-6)
+        npt.assert_allclose(mestimator.variance[0, 0],
+                            covar[1][1],
+                            atol=1e-6)
+        npt.assert_allclose(mestimator.variance[0, 2],
+                            covar[0][1],
                             atol=1e-6)
 
     def test_aipw(self, data_causal_b):
