@@ -10,7 +10,6 @@ import statsmodels.api as sm
 import statsmodels.formula.api as smf
 from statsmodels.othermod.betareg import BetaModel
 
-from build.lib.delicatessen.utilities import inverse_logit
 from delicatessen import MEstimator
 from delicatessen.estimating_equations import (ee_regression, ee_glm, ee_beta_regression, ee_mlogit, ee_tobit,
                                                ee_robust_regression, ee_expectile_regression, ee_cbps,
@@ -18,7 +17,7 @@ from delicatessen.estimating_equations import (ee_regression, ee_glm, ee_beta_re
                                                ee_elasticnet_regression,
                                                ee_additive_regression,
                                                ee_meta_regression, ee_meta_random)
-from delicatessen.utilities import additive_design_matrix
+from delicatessen.utilities import additive_design_matrix, inverse_logit
 
 
 @pytest.fixture
