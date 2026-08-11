@@ -469,6 +469,30 @@ class TestConfBands:
                                                alpha=alpha, method='supt', n_draws=10000000)
         npt.assert_allclose(c_alpha, expected, atol=1e-1)
 
+    def test_cv_supt3_block(self):
+        # When parameters are independent, equivalent to Bonferroni correction
+        alpha = 0.10
+        expected = norm.ppf(1 - alpha / (2 * 3), loc=0, scale=1)
+        c_alpha = compute_critical_value_bands(theta=[0, 0, 0],
+                                               covariance=[[1, 0, 0],
+                                                           [0, 1, 0],
+                                                           [0, 0, 1]],
+                                               alpha=alpha, method='supt', n_draws=10000000, blocks=10)
+        npt.assert_allclose(c_alpha, expected, atol=1e-1)
+
+    def test_cv_supt_block_warn(self):
+        # When parameters are independent, equivalent to Bonferroni correction
+        alpha = 0.10
+        expected = norm.ppf(1 - alpha / (2 * 3), loc=0, scale=1)
+
+        with pytest.warns(UserWarning, match="not perfectly divisible"):
+            compute_critical_value_bands(theta=[0, 0, 0],
+                                         covariance=[[1, 0, 0],
+                                                     [0, 1, 0],
+                                                     [0, 0, 1]],
+                                         alpha=alpha, method='supt',
+                                         n_draws=1000, blocks=93)
+
     def test_cv_supt_corr(self):
         # When parameters are independent, equivalent to Bonferroni correction
         alpha = 0.05

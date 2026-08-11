@@ -494,7 +494,7 @@ def delta_method(theta, g, covariance, deriv_method='exact', dx=1e-9):
     return covariance_g
 
 
-def compute_critical_value_bands(theta, covariance, alpha=0.05, method='supt', n_draws=100000, seed=None):
+def compute_critical_value_bands(theta, covariance, alpha=0.05, method='supt', n_draws=100000, blocks=1, seed=None):
     """Function to compute the critical value for parameter vectors.
 
     Confidence bands are an extension of confidence intervals. Confidence intervals claim to cover the true parameter
@@ -519,6 +519,10 @@ def compute_critical_value_bands(theta, covariance, alpha=0.05, method='supt', n
         Default is ``'supt'``
     n_draws : int, optional
         Number of random draws to use for any methods based on simulated approximation. Default is ``100000``.
+    blocks : int, optional
+        Optional argument to divide the sup-t random sampling procedure into separate blocks. Dividing this process
+        into separate steps can reduce memory usage when drawing from the multivariate normal distribution. Default is
+        ``1`` which draws all ``n_draws`` simultaneously. Input must be a positive integer and ``blocks <= n_draws``
     seed : int, optional
         Seed to intialize a pseudo RNG for methods based on simulated approximations. Default is ``None``
         which does not use a reproducible seed. To consistently obtain the exact same confidence bands, please use
@@ -560,20 +564,32 @@ def compute_critical_value_bands(theta, covariance, alpha=0.05, method='supt', n
 
     # Processing
     stderr = np.diag(covariance) ** 0.5
-
-    # Approximate c
-    rng = np.random.default_rng(seed=seed)
     k = len(theta)
+    rng = np.random.default_rng(seed=seed)
+
+    # Approximate c from sup-t algorithm
     if method.lower() in ['supt', 'sup-t']:
-        mvn = rng.multivariate_normal([0., ] * k, cov=covariance, size=n_draws)
-        if (stderr <= 0).any():
-            raise ValueError("There is at least one parameter with a standard error of zero or less. The sup-t method "
-                             "cannot be applied as it would require division by zero for the rescaling process.")
-        scaled_mvn = np.abs(mvn / stderr)
-        ts = np.max(scaled_mvn, axis=1)
+        block_size = n_draws // blocks
+        if n_draws % blocks > 0:
+            warnings.warn("`n_draws` is not perfectly divisible by `blocks`, so only " + str(block_size*blocks) +
+                          " random draws are being done.")
+        ts_all = []
+        for _ in range(blocks):
+            mvn = rng.multivariate_normal([0., ] * k, cov=covariance, size=block_size)
+            if (stderr <= 0).any():
+                raise ValueError(
+                    "There is at least one parameter with a standard error of zero or less. The sup-t method "
+                    "cannot be applied as it would require division by zero for the rescaling process.")
+            scaled_mvn = np.abs(mvn / stderr)
+            ts_all.append(np.max(scaled_mvn, axis=1))
+        ts = np.concatenate(ts_all)
         critical_value = np.percentile(ts, q=(1 - alpha) * 100)
+
+    # Exact c from Bonferroni correction
     elif method.lower() == 'bonferroni':
         critical_value = norm.ppf(1 - alpha / (2 * k), loc=0, scale=1)
+
+    # Unsupported options
     else:
         raise ValueError("The method '" + str(method) + "' was specified, but only the following "
                          "methods are supported: 'supt', 'bonferroni'.")
