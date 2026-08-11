@@ -35,6 +35,7 @@ Regression
   ee_glm
   ee_beta_regression
   ee_expectile_regression
+  ee_cbps
   ee_tobit
   ee_robust_regression
   ee_ridge_regression
@@ -97,6 +98,7 @@ Causal Inference
   ee_gformula
   ee_ipw
   ee_ipw_msm
+  ee_ipw_cbps
   ee_aipw
   ee_gestimation_snmm
   ee_iv_causal

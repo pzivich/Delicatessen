@@ -613,7 +613,7 @@ def ee_ipw_cbps(theta, y, A, W, weights=None, weight_type='horvitz-thompson'):
     --------
     Construction of an estimating equation(s) with ``ee_ipw_cbps`` should be done similar to the following
 
-        >>> import numpy as np
+    >>> import numpy as np
     >>> import pandas as pd
     >>> from delicatessen import MEstimator
     >>> from delicatessen.estimating_equations import ee_ipw_cbps

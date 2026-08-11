@@ -56,7 +56,7 @@ def ee_regression(theta, X, y, model, weights=None, offset=None):
 
     Examples
     --------
-    Construction of a estimating equation(s) with ``ee_regression`` should be done similar to the following
+    Construction of an estimating equation(s) with ``ee_regression`` should be done similar to the following
 
     >>> import numpy as np
     >>> import pandas as pd
@@ -964,6 +964,70 @@ def ee_cbps(theta, X, y, weights=None, balance_to=None):
     --------
     Construction of an estimating equation with ``ee_cbps`` should be done similar to the following
 
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> from scipy.stats import logistic
+    >>> from delicatessen import MEstimator
+    >>> from delicatessen.estimating_equations import ee_cbps
+    >>> from delicatessen.utilities import inverse_logit
+
+    Some generic data to estimate the regression models
+
+    >>> n = 500
+    >>> data = pd.DataFrame()
+    >>> data['X'] = np.random.normal(size=n)
+    >>> data['Z'] = np.random.normal(size=n)
+    >>> data['Y'] = np.random.binomial(n=1, p=logistic.cdf(0.5 + 2*data['X'] - 1*data['Z']), size=n)
+    >>> data['C'] = 1
+
+    Note that ``C`` here is set to all 1's. This will be the intercept in the regression.
+
+    Defining psi, or the stacked estimating equations for the overall balancing condition
+
+    >>> def psi(theta):
+    >>>     return ee_cbps(theta=theta, X=data[['C', 'X', 'Z']], y=data['Y'])
+
+    Calling the M-estimator (note that ``init`` requires 3 values, since ``X.shape[1]`` is 3).
+
+    >>> estr = MEstimator(stacked_equations=psi, init=[0., 0., 0.,])
+    >>> estr.estimate()
+
+    The propensity score from the CBPS can be computed via
+
+    >>> ps = inverse_logit(np.dot(data[['C', 'X', 'Z']], estr.theta))
+
+    These can then be transformed into inverse probability weights as follows
+
+    >>> ipw = (data['Y'] == 1) / ps + (data['Y'] == 0) / (1-ps)
+
+    If you are interested in estimating the average causal effect, the ``ee_ipw_cbps`` function provides an easy-to-use
+    interface that automates this process for you. See that function's documentation for further details.
+
+    To balance values to the observations with :math:`Y=1`, the estimating equations are instead
+
+    >>> def psi(theta):
+    >>>     return ee_cbps(theta=theta, X=data[['C', 'X', 'Z']], y=data['Y'], balance_to=1)
+    >>>
+    >>> estr = MEstimator(stacked_equations=psi, init=[0., 0., 0.,])
+    >>> estr.estimate()
+
+    Constructing weights differs a bit in this context. Here, we construct odds weights for the observations with
+    :math:`Y=0`, which can be done as follows
+
+    >>> ps = inverse_logit(np.dot(data[['C', 'X', 'Z']], estr.theta))
+    >>> iow = (data['Y'] == 1) + (data['Y'] == 0) * ps / (1-ps)
+
+    For balancing to :math:`Y=0`, the roles are simply flipped. A weighted CBPS model can be estimated by specifying
+    the optional ``weights`` argument.
+
+    References
+    ----------
+    Imai K & Ratkovic M. (2014). Covariate balancing propensity score.
+    *Journal of the Royal Statistical Society Series B: Statistical Methodology*, 76(1), 243-263.
+
+    Wyss R, Ellis AR, Brookhart MA, Girman CJ, Jonsson-Funk M, LoCasale R, & Stürmer T. (2014). The role of prediction
+    modeling in propensity score estimation: an evaluation of logistic regression, bCART, and the covariate-balancing
+    propensity score. *American Journal of Epidemiology*, 180(6), 645-655.
     """
     # Preparation of input shapes and object types
     X, y, beta, offset = _prep_inputs_(X=X, y=y, theta=theta, penalty=None, offset=None)
