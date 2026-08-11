@@ -10,9 +10,10 @@ import statsmodels.api as sm
 import statsmodels.formula.api as smf
 from statsmodels.othermod.betareg import BetaModel
 
+from build.lib.delicatessen.utilities import inverse_logit
 from delicatessen import MEstimator
 from delicatessen.estimating_equations import (ee_regression, ee_glm, ee_beta_regression, ee_mlogit, ee_tobit,
-                                               ee_robust_regression, ee_expectile_regression,
+                                               ee_robust_regression, ee_expectile_regression, ee_cbps,
                                                ee_ridge_regression, ee_lasso_regression, ee_dlasso_regression,
                                                ee_elasticnet_regression,
                                                ee_additive_regression,
@@ -1107,6 +1108,127 @@ class TestEstimatingEquationsRegression:
         # Checking covariance estimate
         npt.assert_allclose(estr.variance,
                             estr_ref.variance,
+                            atol=1e-6)
+
+    def test_cbps_overall(self, data_b):
+        d = data_b
+        Xvals = np.asarray(d[['I', 'X', 'Z']])
+        yvals = np.asarray(d['Y'])
+
+        def psi(theta):
+            return ee_cbps(theta, X=Xvals, y=yvals)
+
+        estr = MEstimator(psi, init=[0, 0, 0])
+        estr.estimate()
+
+        # External references (computed using R)
+        # library(WeightIt)
+        # d = data.frame(X = c(1, -1, 0, 1, 2, 1, -2, -1, 0, 3, -3, 1, 1, -1, -1, -2, 2, 0, -1, 0))
+        # d$Z = c(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+        # d$Y = c(1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 0, 0)
+        # d$F = c(1, 1, 1, 2, 2, 2, 3, 1, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 3, 3)
+        # d$w = c(2, 1, 5, 1, 2, 7, 3, 1, 2, 2, 3, 9, 1, 1, 1, 5, 1, 1, 6, 2)
+        # d$I = 1
+        # out <- weightit(Y ~ X + Z, data=d, method='cbps', estimand='ATE')
+        # out$ps
+        preds = [0.5189507, 0.4474343, 0.4831060, 0.5189507, 0.5546014, 0.5189507, 0.4122956, 0.4474343, 0.4831060,
+                 0.5896990, 0.3154535, 0.4499230, 0.4499230, 0.3803970, 0.3803970, 0.3472148, 0.4856188, 0.4147355,
+                 0.3803970, 0.4147355]
+
+        # Checking model predicted values
+        npt.assert_allclose(inverse_logit(np.dot(Xvals, estr.theta)),
+                            preds,
+                            atol=1e-6)
+
+    def test_cbps_weights(self, data_b):
+        d = data_b
+        Xvals = np.asarray(d[['I', 'X', 'Z']])
+        yvals = np.asarray(d['Y'])
+        weight = np.asarray(d['w'])
+
+        def psi(theta):
+            return ee_cbps(theta, X=Xvals, y=yvals, weights=weight)
+
+        estr = MEstimator(psi, init=[0, 0, 0])
+        estr.estimate()
+
+        # External references (computed using R)
+        # library(WeightIt)
+        # d = data.frame(X = c(1, -1, 0, 1, 2, 1, -2, -1, 0, 3, -3, 1, 1, -1, -1, -2, 2, 0, -1, 0))
+        # d$Z = c(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+        # d$Y = c(1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 0, 0)
+        # d$F = c(1, 1, 1, 2, 2, 2, 3, 1, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 3, 3)
+        # d$w = c(2, 1, 5, 1, 2, 7, 3, 1, 2, 2, 3, 9, 1, 1, 1, 5, 1, 1, 6, 2)
+        # d$I = 1
+        # out <- weightit(Y ~ X + Z, data=d, method='cbps', estimand='ATE', s.weights=d$w)
+        # out$ps
+        preds = [0.4579011, 0.3040818, 0.3779249, 0.4579011, 0.5401073, 0.4579011, 0.2391208, 0.3040818, 0.3779249,
+                 0.6201877, 0.2851721, 0.5985271, 0.5985271, 0.4354108, 0.4354108, 0.3567774, 0.6745642, 0.5174333,
+                 0.4354108, 0.5174333]
+
+        # Checking model predicted values
+        npt.assert_allclose(inverse_logit(np.dot(Xvals, estr.theta)),
+                            preds,
+                            atol=1e-6)
+
+    def test_cbps_y1(self, data_b):
+        d = data_b
+        Xvals = np.asarray(d[['I', 'X', 'Z']])
+        yvals = np.asarray(d['Y'])
+
+        def psi(theta):
+            return ee_cbps(theta, X=Xvals, y=yvals, balance_to=1)
+
+        estr = MEstimator(psi, init=[0, 0, 0])
+        estr.estimate()
+
+        # External references (computed using R)
+        # library(WeightIt)
+        # d = data.frame(X = c(1, -1, 0, 1, 2, 1, -2, -1, 0, 3, -3, 1, 1, -1, -1, -2, 2, 0, -1, 0))
+        # d$Z = c(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+        # d$Y = c(1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 0, 0)
+        # d$F = c(1, 1, 1, 2, 2, 2, 3, 1, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 3, 3)
+        # d$w = c(2, 1, 5, 1, 2, 7, 3, 1, 2, 2, 3, 9, 1, 1, 1, 5, 1, 1, 6, 2)
+        # d$I = 1
+        # out <- weightit(Y ~ X + Z, data=d, method='cbps', estimand='ATT')
+        # out$ps
+        preds = [0.5200888, 0.4526595, 0.4863118, 0.5200888, 0.5536830, 0.5200888, 0.4194344, 0.4526595, 0.4863118,
+                 0.5867940, 0.3189384, 0.4457158, 0.4457158, 0.3802881, 0.3802881, 0.3489881, 0.4793040, 0.4126161,
+                 0.3802881, 0.4126161]
+
+        # Checking model predicted values
+        npt.assert_allclose(inverse_logit(np.dot(Xvals, estr.theta)),
+                            preds,
+                            atol=1e-6)
+
+    def test_cbps_y0(self, data_b):
+        d = data_b
+        Xvals = np.asarray(d[['I', 'X', 'Z']])
+        yvals = np.asarray(d['Y'])
+
+        def psi(theta):
+            return ee_cbps(theta, X=Xvals, y=yvals, balance_to=0)
+
+        estr = MEstimator(psi, init=[0, 0, 0])
+        estr.estimate()
+
+        # External references (computed using R)
+        # library(WeightIt)
+        # d = data.frame(X = c(1, -1, 0, 1, 2, 1, -2, -1, 0, 3, -3, 1, 1, -1, -1, -2, 2, 0, -1, 0))
+        # d$Z = c(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+        # d$Y = c(1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 0, 0)
+        # d$F = c(1, 1, 1, 2, 2, 2, 3, 1, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 3, 3)
+        # d$w = c(2, 1, 5, 1, 2, 7, 3, 1, 2, 2, 3, 9, 1, 1, 1, 5, 1, 1, 6, 2)
+        # d$I = 1
+        # out <- weightit(Y ~ X + Z, data=d, method='cbps', estimand='ATC')
+        # out$ps
+        preds = [0.5181453, 0.4427121, 0.4803165, 0.5181453, 0.5557672, 0.5181453, 0.4057531, 0.4427121, 0.4803165,
+                 0.5927604, 0.3124412, 0.4543326, 0.4543326, 0.3808468, 0.3808468, 0.3458473, 0.4920526, 0.4171296,
+                 0.3808468, 0.4171296]
+
+        # Checking model predicted values
+        npt.assert_allclose(inverse_logit(np.dot(Xvals, estr.theta)),
+                            preds,
                             atol=1e-6)
 
 

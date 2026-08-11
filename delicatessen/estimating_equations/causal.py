@@ -4,8 +4,7 @@
 
 import numpy as np
 
-from .basic import ee_mean
-from .regression import ee_regression, ee_glm
+from .regression import ee_regression, ee_glm, ee_cbps
 from delicatessen.utilities import logit, inverse_logit, identity
 
 
@@ -558,10 +557,9 @@ def ee_ipw_msm(theta, y, A, W, V, distribution, link, hyperparameter=None, trunc
 
 
 def ee_ipw_cbps(theta, y, A, W, weights=None, weight_type='horvitz-thompson'):
-    r"""Estimating equation for inverse probability weighting (IPW) estimator. The average causal effect is estimated by
-    this implementation of the IPW estimator. Rather than using a logistic model to estimate the propensity score, an
-    alternative approach is used: the Covariate Balancing Propensity Score (CBPS). The CBPS model looks similar to a
-    logistic model, but it explicitly focusing on balancing the covariate distributions rather than predicting the
+    r"""Estimating equation for inverse probability weighting (IPW) estimator of the average causal effect. This
+    implementation of the IPW estimator uses the Covariate Balancing Propensity Score (CBPS). The CBPS model looks
+    similar to a logistic model, but focuses on balancing the covariate distributions rather than predicting the
     action variable. Here, the just-identified version of the CBPS model is used, so the CBPS balance the first-moment
     of the covariates in the design matrix (i.e., the mean).
 
@@ -679,7 +677,7 @@ def ee_ipw_cbps(theta, y, A, W, weights=None, weight_type='horvitz-thompson'):
 
     # Estimating weights
     pi = inverse_logit(np.dot(W, beta))          # Getting Pr(A|W) from model
-    ef_cbps = ((A / pi - (1-A)/(1-pi))[:, None] * W).T
+    ef_cbps = ee_cbps(theta=beta, X=W, y=A, weights=weights, balance_to=None)
 
     # Calculating weighted means
     if weight_type.lower() in ['horvitz-thompson', 'horvitz_thompson', 'horvitz']:

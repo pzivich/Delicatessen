@@ -906,6 +906,87 @@ def ee_expectile_regression(theta, X, y, model, tau=0.5, weights=None, offset=No
     return (asym_w * residual * X).T              # Return weighted expectile regression score function
 
 
+def ee_cbps(theta, X, y, weights=None, balance_to=None):
+    r"""Estimating equation for the balance condition of the Covariate Balancing Propensity Scores (CBPS). Only binary
+    outcomes, and thus a logistic model, is supported. The estimating equations for the full study sample balance
+    condition are
+
+    .. math::
+
+        \sum_{i=1}^n
+        \begin{bmatrix}
+            \left\{ \frac{Y_i}{\hat{Y}_i} - \frac{1-Y_i}{1-\hat{Y}_i} \right\} X_i
+        \end{bmatrix}
+        = 0
+
+    where :math:`Y` is the dependent variable, math:`W` is the set of independent varaibles, and
+    :math:`\hat{Y}_i = expit(X_i^T \theta)`. Note that is equation balances the :math:`Y=1` and :math:`Y=0` groups so
+    that the mean of each variable in :math:`X_i` matches the overall mean of the population. Another balance condition
+    is to have the :math:`Y=0` group match the means of :math:`X_i` of the :math:`Y=1` group. This estimating equation
+    is
+
+    .. math::
+
+        \sum_{i=1}^n
+        \begin{bmatrix}
+            \left\{ Y_i - \frac{(1-Y_i) \hat{Y}_i}{1-\hat{Y}_i} \right\} X_i
+        \end{bmatrix}
+        = 0
+
+    A similar analog can be used to have the :math:`Y=1` group match the means of :math:`X_i` of the :math:`Y=0` group.
+
+    From any of these balancing conditions, the propensity scores can then be computed as :math:`expit(X_i^T \theta)`.
+    Those propensity scores can then be used to construct inverse probability weights (when balancing to the overall),
+    or inverse odds weights (when balancing to the other group).
+
+    Parameters
+    ----------
+    theta : ndarray, list, vector
+        Theta in this case consists of `b` values. Therefore, initial values should consist of the same number as the
+        number of columns present. This can easily be implemented by ``[0, ] * X.shape[1]``.
+    X : ndarray, list, vector
+        2-dimensional vector of `n` observed values for `b` variables.
+    y : ndarray, list, vector
+        1-dimensional vector of `n` observed values.
+    weights : ndarray, list, vector, None, optional
+        1-dimensional vector of `n` weights. Default is ``None``, which assigns a weight of 1 to all observations.
+    balance_to : None, int, optional
+        Specification of which value of ``y`` for the balance condition. Default is ``None``, which balances to the
+        overall study sample. Other available options are ``1`` which balances to ``y=1`` and ``0`` which balances to
+        ``y=0``.
+
+    Returns
+    -------
+    array :
+        Returns a `b`-by-`n` NumPy array evaluated for the input ``theta``.
+
+    Examples
+    --------
+    Construction of an estimating equation with ``ee_cbps`` should be done similar to the following
+
+    """
+    # Preparation of input shapes and object types
+    X, y, beta, offset = _prep_inputs_(X=X, y=y, theta=theta, penalty=None, offset=None)
+
+    # Determining transformation function to use for the regression model
+    transform = _model_transform_(model='logistic')    # Looking up corresponding transformation
+    pred_y = transform(np.dot(X, beta) + offset)       # Generating predicted values via speedy matrix calculation
+
+    # Allowing for a weighted linear model
+    w = generate_weights(weights=weights, n_obs=X.shape[0])
+
+    # Return weighted regression balancing moments for the CBPS
+    if balance_to is None:
+        return w*((y/pred_y - (1-y)/(1-pred_y)) * X).T
+    elif balance_to == 1:
+        return w*((y - (1-y)*pred_y/(1-pred_y)) * X).T
+    elif balance_to == 0:
+        return w*((y*(1-pred_y)/pred_y - (1-y)) * X).T
+    else:
+        raise ValueError("The `balance_to` condition must be specified as `None` (balance to the overall population),"
+                         "`1` (balance to y=1), or `0` (balance to y=0). Instead, "+str(balance_to)+" was provided.")
+
+
 #################################################################
 # Robust Regression Estimating Equations
 
