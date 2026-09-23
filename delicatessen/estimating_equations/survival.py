@@ -161,11 +161,109 @@ def ee_survival_model(theta, t, delta, distribution):
                           ef_gamma))
 
 
+
+def ee_piecewise_exponential(theta, X, t, delta, time_intervals, weights=None):
+    r"""Estimating equation for the piecewise exponential model.
+
+    Parameters
+    ----------
+    theta : ndarray, list, vector
+        theta consists of `b`+`k` values. Therefore, initial values should consist of the same number as the number of
+        columns present in ``X`` plus the length of ``time_intervals``. This can easily be implemented via
+        ``[0, ] * X.shape[1] + [0, ]*len(time_intervals)``.
+    X : ndarray, list, vector
+        2-dimensional vector of `n` observed values for `b` variables.
+    t : ndarray, list, vector
+        1-dimensional vector of `n` observed times.
+    delta : ndarray, list, vector
+        1-dimensional vector of `n` values indicating whether the time was an event or censoring.
+    time_intervals : ndarray, list, vector
+        1-dimensional vector of `k` values providing the upper values where to divide the time contributed into
+        piecewise intervals
+    weights : ndarray, list, vector, None, optional
+        1-dimensional vector of `n` weights. Default is ``None``, which assigns a weight of 1 to all observations.
+
+    Returns
+    -------
+    array :
+        Returns a (`b` + `k`)-by-`n` NumPy array evaluated for the input ``theta``.
+
+    Examples
+    --------
+
+    References
+    ----------
+    Allison, P. D. (2010). *Survival analysis using SAS: a practical guide*. SAS Institute. pg 112-116
+
+    Friedman, M. (1982). Piecewise exponential models for survival data with covariates. *The Annals of Statistics*,
+    10(1), 101-113.
+
+    Holford TR. (1980). The analysis of rates and of survivorship using log-linear models. *Biometrics*, 36(2), 299-305
+    """
+    X = np.asarray(X)                                 # Convert to NumPy array
+    dim_x = X.shape[1]                                # Number of covariates in the baseline design matrix
+    t = np.asarray(t)[:, None]                        # Convert to NumPy array and shape for matrix algebra
+    delta = np.asarray(delta)[:, None]                # Convert to NumPy array and shape for matrix algebra
+    t_intervals = np.asarray(sorted(time_intervals))  # Convert to Numpy array
+    beta_x = theta[:dim_x]                            # Coefficients for X design matrix
+    beta_s = np.asarray(theta[dim_x:])                # Coefficients for piecewise time design matrix
+
+    # Error checking
+    if np.max(t) > np.max(time_intervals):
+        raise ValueError("The largest value provided in `time_intervals` should be larger than the maximum value in"
+                         "`t` but the input values do not correspond to this convention.")
+
+    # Creating time and risk set matrices
+    lag_interval = np.asarray([0., ] + list(t_intervals[:-1]))  # Lagging the time-split by one unit and initial as zero
+    time_design_matrix = np.identity(n=len(t_intervals))        # Create piecewise indicator design matrix
+    time_design_matrix[:, 0] = 1                                # Set first column to be the intercept
+    in_interval = (t >= lag_interval).astype(int)               # Indicator if individual is in the risk set at k
+
+    # Creating offset matrix for time
+    offset_matrix = []                                          # Creating blank storage for offsets
+    prior_t = 0                                                 # Getting the initial time (which is always zero)
+    for c in range(len(t_intervals)):                           # For each time-split used to construct the intervals
+        offset_c = np.where(t_intervals[c] <= t,                # ... check whether observation is present for full
+                            t_intervals[c] - prior_t,           # ... if so give the full length of the interval
+                            t - prior_t)                        # ... otherwise give only time contributed
+        offset_c = np.where(t <= prior_t, 1e-7, offset_c)       # ... removing zeroes to prevent np.log warning
+        # NOTE: because only those in the risk set ever contribute, assigning non-zero values at this prior step has
+        #   not influence on the results. The non-zero contributions are later zeroed out by `in_interval`
+        offset_matrix.append(offset_c.T[0])                     # ... add time-specific offsets to matrix storage
+        prior_t = t_intervals[c]                                # ... update the prior interval value to the current
+
+    offset_t = np.log(np.asarray(offset_matrix))                # Log transform 2D array of the log-time offsets
+
+    # Constructing design matrices and predicted values
+    log_w = np.dot(X, beta_x)                                   # Covariate contributions to the log odds
+    log_w_matrix = np.tile(log_w, (len(t_intervals), 1))        # Stacked copies of X contributions for intervals
+    log_t = np.dot(time_design_matrix, beta_s)                  # Time-specific contributions to the log odds
+    y_pred = np.exp(log_w_matrix + log_t[:, None]               # Predicted event at time intervals matrix
+                    + offset_t)                                 # ... with the corresponding offset
+
+    # Matrix of when the observations with the outcome and in which interval it occurs
+    y_obs = delta * ((lag_interval < t) & (t <= t_intervals)).astype(int)
+
+    # Poisson model score function
+    residual_matrix = (y_obs - y_pred.T) * in_interval          # Computing residuals at time intervals matrix
+
+    # TODO add weights feature
+
+    # Score matrix contributions for X and piecewise
+    n_ones = np.ones(shape=(1, len(t_intervals)))               # Vector of ones for cumulative sum across intervals
+    y_resid = np.dot(n_ones, residual_matrix.T)[0]              # Adding residuals across all intervals
+    x_score = y_resid[:, None] * X                              # Compute the overall score for X
+    t_score = residual_matrix.T                                 # Residual matrix is simple the score for piecewise
+
+    # Returning the overall score function matrix stacked together
+    return np.vstack([x_score.T, t_score])
+
+
 #################################################################
 # Accelerated Failure Time Models
 
 def ee_aft(theta, X, t, delta, distribution, weights=None):
-    r"""Estimating equation for a generalized accelerated failure time (AFT) model. Let :math:`T_i` indicate the time
+    r"""Estimating equation for a generalized Accelerated Failure Time (AFT) model. Let :math:`T_i` indicate the time
     of the event and :math:`C_i` indicate the time to right censoring. Therefore, the observable data consists of
     :math:`t_i = \min(T_i, C_i)` and :math:`\Delta_i = I(t_i = T_i)`. The estimating equations are
 
@@ -515,6 +613,8 @@ def ee_plogit(theta, X, t, delta, S=None, unique_times=None, weights=None):
     References
     ----------
     Abbott RD. (1985). Logistic regression in survival analysis. *American Journal of Epidemiology*, 121(3), 465-471.
+
+    Allison, P. D. (2010). *Survival analysis using SAS: a practical guide*. SAS Institute. pg 235-240.
 
     D'Agostino RB, Lee ML, Belanger AJ, Cupples LA, Anderson K, & Kannel WB. (1990). Relation of pooled logistic
     regression to time dependent Cox regression analysis: the Framingham Heart Study.
