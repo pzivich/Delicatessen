@@ -1,2 +1,2 @@
-# Peanut Butter & Jelly
-__version__ = "4.3"
+# Peanut Butter & Banana
+__version__ = "4.4"
