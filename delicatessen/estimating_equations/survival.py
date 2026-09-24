@@ -11,7 +11,7 @@ from delicatessen.utilities import inverse_logit, standard_normal_cdf, standard_
 
 
 #################################################################
-# Parametric Survival Estimating Equations
+# Basic Survival Models
 
 def ee_survival_model(theta, t, delta, distribution, weights=None):
     r"""Estimating equation for a parametric survival models. Let :math:`T_i` indicate the time of the event and
@@ -166,6 +166,8 @@ def ee_survival_model(theta, t, delta, distribution, weights=None):
                           ef_gamma * weights))
 
 
+#################################################################
+# Parametric Continuous Survival Models
 
 def ee_piecewise_exp(theta, X, t, delta, cut_points, weights=None):
     r"""Estimating equation for the piecewise exponential model. The piecewise exponential (or Poisson) model is a
@@ -274,9 +276,6 @@ def ee_piecewise_exp(theta, X, t, delta, cut_points, weights=None):
     # Returning the overall score function matrix stacked together
     return np.vstack([x_score.T, t_score])
 
-
-#################################################################
-# Accelerated Failure Time Models
 
 def ee_aft(theta, X, t, delta, distribution, weights=None):
     r"""Estimating equation for a generalized Accelerated Failure Time (AFT) model. Let :math:`T_i` indicate the time
@@ -472,7 +471,6 @@ def ee_aft(theta, X, t, delta, distribution, weights=None):
 
 #################################################################
 # Discrete-Time Models
-
 
 def ee_plogit(theta, X, t, delta, S=None, unique_times=None, weights=None):
     r"""Estimating equation for pooled logistic regression with discrete-time survival data. One way to model survival
