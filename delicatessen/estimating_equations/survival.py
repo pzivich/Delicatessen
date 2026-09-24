@@ -162,8 +162,17 @@ def ee_survival_model(theta, t, delta, distribution):
 
 
 
-def ee_piecewise_exponential(theta, X, t, delta, time_intervals, weights=None):
-    r"""Estimating equation for the piecewise exponential model.
+def ee_piecewise_exp(theta, X, t, delta, cut_points, weights=None):
+    r"""Estimating equation for the piecewise exponential model. The piecewise exponential (or Poisson) model is a
+    simple but flexible parametric survival modeling method. Unlike the exponential model, which assumes the hazard is
+    constant across the duration of follow-up, the piecewise exponential model only assumes that the hazard is constant
+    within the user-specified intervals.
+
+    Note
+    ----
+    While the piecewise exponential model also allows for splines or other parametric functional form for time,
+    ``ee_piecewise_exp`` only allows for disjoint indicators. Smooth functional forms can be manually programmed with
+    a 'long' data set combined with ``ee_regression`` and ``aggegrate_efuncs``.
 
     Parameters
     ----------
@@ -177,7 +186,7 @@ def ee_piecewise_exponential(theta, X, t, delta, time_intervals, weights=None):
         1-dimensional vector of `n` observed times.
     delta : ndarray, list, vector
         1-dimensional vector of `n` values indicating whether the time was an event or censoring.
-    time_intervals : ndarray, list, vector
+    cut_points : ndarray, list, vector
         1-dimensional vector of `k` values providing the upper values where to divide the time contributed into
         piecewise intervals
     weights : ndarray, list, vector, None, optional
@@ -204,14 +213,17 @@ def ee_piecewise_exponential(theta, X, t, delta, time_intervals, weights=None):
     dim_x = X.shape[1]                                # Number of covariates in the baseline design matrix
     t = np.asarray(t)[:, None]                        # Convert to NumPy array and shape for matrix algebra
     delta = np.asarray(delta)[:, None]                # Convert to NumPy array and shape for matrix algebra
-    t_intervals = np.asarray(sorted(time_intervals))  # Convert to Numpy array
+    t_intervals = np.asarray(sorted(cut_points))      # Convert to Numpy array
     beta_x = theta[:dim_x]                            # Coefficients for X design matrix
     beta_s = np.asarray(theta[dim_x:])                # Coefficients for piecewise time design matrix
 
     # Error checking
-    if np.max(t) > np.max(time_intervals):
+    if np.max(t) > np.max(t_intervals):
         raise ValueError("The largest value provided in `time_intervals` should be larger than the maximum value in"
                          "`t` but the input values do not correspond to this convention.")
+
+    # Setting up weights argument for later use
+    weights = generate_weights(weights, n_obs=t.shape[0])            # Pre-processing weight argument
 
     # Creating time and risk set matrices
     lag_interval = np.asarray([0., ] + list(t_intervals[:-1]))  # Lagging the time-split by one unit and initial as zero
@@ -246,8 +258,7 @@ def ee_piecewise_exponential(theta, X, t, delta, time_intervals, weights=None):
 
     # Poisson model score function
     residual_matrix = (y_obs - y_pred.T) * in_interval          # Computing residuals at time intervals matrix
-
-    # TODO add weights feature
+    residual_matrix = residual_matrix * weights                 # Incorporating any user-provided weights
 
     # Score matrix contributions for X and piecewise
     n_ones = np.ones(shape=(1, len(t_intervals)))               # Vector of ones for cumulative sum across intervals
@@ -421,11 +432,8 @@ def ee_aft(theta, X, t, delta, distribution, weights=None):
     # Computing error distribution for each observation
     z_i = (np.log(t) - np.dot(X, beta)) / sigma
 
-    # Allowing for a weighted Weibull-AFT model
-    if weights is None:                         # If weights is unspecified
-        w = np.ones(X.shape[0])                 # ... assign weight of 1 to all observations
-    else:                                       # Otherwise
-        w = np.asarray(weights)                 # ... set weights as input vector
+    # Allowing for a weighted AFT model
+    weights = generate_weights(weights, n_obs=t.shape[0])  # Pre-processing weight argument
 
     # Handling different distribution specifications
     if distribution in ['exponential', 'weibull']:
@@ -447,10 +455,11 @@ def ee_aft(theta, X, t, delta, distribution, weights=None):
     # Contributions to the estimating functions
     score_scale = -1/sigma * lambda_epsilon * X
     if distribution == 'exponential':
-        efunc = w * score_scale.T
+        efunc = weights * score_scale.T
     else:
         score_shape = (-1 / sigma * lambda_epsilon * z_i) - (delta / sigma)
-        efunc = np.vstack((w * score_scale.T, w * score_shape.T))
+        efunc = np.vstack((weights * score_scale.T,
+                           weights * score_shape.T))
 
     # Output b-by-n matrix
     return efunc

@@ -23,6 +23,6 @@ from .regression import (ee_regression, ee_glm, ee_mlogit, ee_beta_regression, e
                          ee_meta_regression)
 
 from .survival import (ee_survival_model,
-                       ee_piecewise_exponential,
+                       ee_piecewise_exp,
                        ee_aft,
                        ee_plogit)
