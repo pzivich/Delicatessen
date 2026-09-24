@@ -76,7 +76,7 @@ def ee_survival_model(theta, t, delta, distribution, weights=None):
 
     Examples
     --------
-    Construction of a estimating equation(s) with ``ee_survival_model`` should be done similar to the following
+    Construction of an estimating equation(s) with ``ee_survival_model`` should be done similar to the following
 
     >>> import numpy as np
     >>> import pandas as pd
@@ -96,9 +96,9 @@ def ee_survival_model(theta, t, delta, distribution, weights=None):
     Defining psi, or the stacked estimating equations
 
     >>> def psi(theta):
-    >>>         return ee_survival_model(theta=theta,
-    >>>                                  t=data['t'], delta=data['delta'],
-    >>>                                  distribution='weibull')
+    >>>     return ee_survival_model(theta=theta,
+    >>>                              t=data['t'], delta=data['delta'],
+    >>>                              distribution='weibull')
 
     Calling the M-estimator
 
@@ -552,7 +552,7 @@ def ee_plogit(theta, X, t, delta, S=None, unique_times=None, weights=None):
 
     Examples
     --------
-    Construction of a estimating equation(s) with ``ee_plogit`` should be done similar to the following
+    Construction of an estimating equation(s) with ``ee_plogit`` should be done similar to the following
 
     >>> import numpy as np
     >>> import pandas as pd
@@ -707,3 +707,162 @@ def ee_plogit(theta, X, t, delta, S=None, unique_times=None, weights=None):
 
     # Returning the overall score function matrix stacked together
     return np.vstack([x_score.T, t_score])
+
+
+#################################################################
+# Summarizations of Survival Functions
+
+def ee_rmst(theta, times, survival, t, method='right'):
+    r"""Estimating equation for the Restricted Mean Survival Time (RMST). The RMST is a useful summary measure for how
+    survival unfolds over time. Specifically, it provides a single number to summarize the survival function that does
+    not need the survival function to meet certain criteria (e.g., going below 0.5, proportional hazards). The RMST
+    corresponds to the area under the survival curve, which is computed here using Riemann sums.
+
+    Note
+    ----
+    For estimators with monotonic step functions (e.g., Kaplan-Meier), the right-hand Riemann summation computes the
+    area exactly. With parametric survival models (e.g., Weibull model), this method provides an approximation. The
+    more times the Riemann sum is evaluated at, the better the approximation will be
+
+
+    The area under the survival curve can be computed via the right-hand Riemann sum, left-hand Riemann sum, or the
+    trapezoidal rule. Let :math:`S_k` denote the survival at time `t_k`. These summations are then defined as
+    :math:`\sum_{k} S_{k+1} \times (t_{k+1} = t_k)`,
+    :math:`\sum_{k} S_{k} \times (t_{k+1} = t_k)`,
+    and
+    :math:`\sum_{k} 0.5 \times (S_{k+1} + S_{k}) \times (t_{k+1} = t_k)`,
+    respectively.
+    The corresponding estimating equation is then simply defined as
+
+    .. math::
+
+        \sum_{i=1}^n
+        (AUC - \theta)
+        = 0
+
+    where :math:`AUC` denotes the area under the survival curve according to the chosen method. Note that this
+    estimating equation does not depend on :math:`i` as it is simply a transformation of the survival function.
+
+    Parameters
+    ----------
+    theta : ndarray, list, vector
+        theta consists of `b`+1 values. Therefore, initial values should consist of the same number as the number of
+        columns present in ``X`` plus 1. This can easily be implemented via ``[0, ] * X.shape[1] + [0, ]``. Note that
+        if using an exponential model, only `b` values need to be provided.
+    times : ndarray, list, vector
+        1-dimensional vector of `k` unique, ascending times that the survival function was evaluated at. This intervals
+        can be equally or unequally spaced. These times must correspond to the input survival values. In other words,
+        ``survival[k]`` should correspond to ``times[k]``.
+    survival : ndarray, list, vector
+        1-dimensional vector of `k` unique, survival estimates. These times must correspond to the input survival
+        values. In other words, ``survival[k]`` should correspond to ``times[k]``.
+    t : ndarray, list, vector
+        1-dimensional vector of `n` observed times. This argument is only used to extract the number of observations
+        in the data.
+    method : str, optional
+        Method used to approximate the area under the survival function. Default is ``'right'`` which used the
+        right-hand Riemann sum. Note that this approach should always be used with step functions, as this method
+        computes that area exactly. For estimators that produce smooth (i.e., non-step) functions, either the left-hand
+        Riemann sum (``'left'``) or the trapezoidal rule (``'trapezoid'``) can be used instead.
+
+    Returns
+    -------
+    array :
+        Returns a 1-by-`n` NumPy array evaluated for the input ``theta``.
+
+    Examples
+    --------
+    Construction of an estimating equation(s) with ``ee_rmst`` should be done similar to the following. Here, a
+    parametric survival model is shown for demonstration
+
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> from delicatessen import MEstimator
+    >>> from delicatessen.estimating_equations import ee_survival_model, ee_rmst
+    >>> from delicatessen.utilities import survival_predictions
+
+    Some generic survival data to estimate a parametric survival model with
+
+    >>> n = 100
+    >>> data = pd.DataFrame()
+    >>> data['C'] = np.random.weibull(a=1, size=n)
+    >>> data['C'] = np.where(data['C'] > 5, 5, data['C'])
+    >>> data['T'] = 0.8*np.random.weibull(a=0.8, size=n)
+    >>> data['delta'] = np.where(data['T'] < data['C'], 1, 0)
+    >>> data['t'] = np.where(data['delta'] == 1, data['T'], data['C'])
+
+    Defining psi, or the stacked estimating equations
+
+    >>> def psi(theta):
+    >>>     dist = 'weibull'
+    >>>     times_to_predict = np.linspace(0, np.max(data['t']), 200)
+    >>>     ee_model = ee_survival_model(theta=theta[:-1],
+    >>>                                  t=data['t'], delta=data['delta'],
+    >>>                                  distribution=dist)
+    >>>     surv = survival_predictions(times=times_to_predict,
+    >>>                                 theta=estr.theta,
+    >>>                                 covariance=estr.variance,
+    >>>                                 distribution=dist)
+    >>>     ee_auc = ee_rmst(theta[-1], times=times_to_predict,
+    >>>                      survival=surv, t=data['t'], method='trapezoid')
+    >>>     return np.vstack([ee_model, ee_auc])
+
+    Calling the M-estimator
+
+    >>> estr = MEstimator(stacked_equations=psi, init=[1., 1., 2.5])
+    >>> estr.estimate(solver='lm')
+
+    Inspecting the RMST estimate and corresponding confidence intervals
+
+    >>> estr.theta[-1]
+    >>> estr.confidence_intervals()[-1, :]
+
+    Note that because it is relatively cheap to compute the survival with parametric models, the resolution of
+    ``times_to_predict`` can be quite high to get a better approximation. Further, the trapezoidal rule provides a
+    better approximation with parametric models.
+
+    References
+    ----------
+    Cole SR, Chu H, & Nie L. (2009). Nonparametric estimator of relative time with application to the Acyclovir
+    Prevention Trial. *Clinical Trials*, 6(4), 320-328.
+
+    Kim DH, Uno H, & Wei LJ. (2017). Restricted mean survival time as a measure to interpret clinical trial results.
+    *JAMA Cardiology*, 2(11), 1179.
+
+    Nemes S, Bülow E, & Gustavsson A. (2020). A brief overview of restricted mean survival time estimators and
+    associated variances. *Stats*, 3(2), 107-119.
+
+    Royston P, & Parmar MK. (2013). Restricted mean survival time: an alternative to the hazard ratio for the design
+    and analysis of randomized trials with a time-to-event outcome. *BMC Medical Research Methodology*, 13(1), 152.
+    """
+    n = np.asarray(t).shape[0]
+    times = np.asarray(times)
+    survival = np.asarray(survival)
+
+    # Error checking that inputs are as expected for survival
+    if times[0] != 0:
+        raise ValueError("The function `ee_rmst` expects that the first time is equal to zero. Instead, the provided "
+                         "initial time is " + str(times[0]))
+    if times.shape[0] != survival.shape[0]:
+        raise ValueError("The input `times` and `survival` must have the same length. The input times has length "
+                         + str(times.shape[0]) + " while the input survival has length " + str(survival.shape[0]))
+
+    # Computing the time changes for the approximation
+    t_delta = times[1:] - times[:-1]
+
+    # Determining which approximation to use
+    if method.lower() == 'right':
+        area_rectangle = t_delta * survival[1:]
+    elif method.lower() == 'left':
+        area_rectangle = t_delta * survival[:-1]
+    elif method.lower() == 'trapezoid':
+        area_rectangle = t_delta * (survival[1:] + survival[:-1]) / 2
+    else:
+        raise ValueError("The method " + str(method) + " is not available. "
+                         "Please select from 'right', 'left', or 'trapezoid'")
+
+    area_total = np.sum(area_rectangle)
+
+    # Returning the score function
+    return (area_total - theta) * np.ones(n)
+

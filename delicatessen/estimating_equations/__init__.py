@@ -25,4 +25,5 @@ from .regression import (ee_regression, ee_glm, ee_mlogit, ee_beta_regression, e
 from .survival import (ee_survival_model,
                        ee_piecewise_exp,
                        ee_aft,
-                       ee_plogit)
+                       ee_plogit,
+                       ee_rmst)
