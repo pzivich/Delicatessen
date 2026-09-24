@@ -11,9 +11,9 @@ from delicatessen.utilities import inverse_logit, standard_normal_cdf, standard_
 
 
 #################################################################
-# Parametric Survival Estimating Equations
+# Basic Survival Models
 
-def ee_survival_model(theta, t, delta, distribution):
+def ee_survival_model(theta, t, delta, distribution, weights=None):
     r"""Estimating equation for a parametric survival models. Let :math:`T_i` indicate the time of the event and
     :math:`C_i` indicate the time to right censoring. Therefore, the observable data consists of
     :math:`t_i = min(T_i, C_i)` and :math:`\Delta_i = I(t_i = T_i)`. The general estimating equations are
@@ -65,6 +65,8 @@ def ee_survival_model(theta, t, delta, distribution):
         missing data should be included (missing data may cause unexpected behavior).
     distribution : str
         Distribution for the parametric survival model.
+    weights : ndarray, list, vector, None, optional
+        1-dimensional vector of `n` weights. Default is ``None``, which assigns a weight of 1 to all observations.
 
     Returns
     -------
@@ -74,7 +76,7 @@ def ee_survival_model(theta, t, delta, distribution):
 
     Examples
     --------
-    Construction of a estimating equation(s) with ``ee_survival_model`` should be done similar to the following
+    Construction of an estimating equation(s) with ``ee_survival_model`` should be done similar to the following
 
     >>> import numpy as np
     >>> import pandas as pd
@@ -94,9 +96,9 @@ def ee_survival_model(theta, t, delta, distribution):
     Defining psi, or the stacked estimating equations
 
     >>> def psi(theta):
-    >>>         return ee_survival_model(theta=theta,
-    >>>                                  t=data['t'], delta=data['delta'],
-    >>>                                  distribution='weibull')
+    >>>     return ee_survival_model(theta=theta,
+    >>>                              t=data['t'], delta=data['delta'],
+    >>>                              distribution='weibull')
 
     Calling the M-estimator
 
@@ -129,6 +131,9 @@ def ee_survival_model(theta, t, delta, distribution):
     # Error checking for survival data formatting
     check_survival_data_valid(delta=delta, time=t)
 
+    # Setting up weights argument for later use
+    weights = generate_weights(weights, n_obs=t.shape[0])            # Pre-processing weight argument
+
     # Extracting and naming parameters for my convenience
     if distribution == 'exponential':
         lambd = theta[0]
@@ -155,17 +160,125 @@ def ee_survival_model(theta, t, delta, distribution):
 
     # Returning stacked estimating equations
     if distribution == 'exponential':
-        return ef_lambda
+        return ef_lambda * weights
     else:
-        return np.vstack((ef_lambda,
-                          ef_gamma))
+        return np.vstack((ef_lambda * weights,
+                          ef_gamma * weights))
 
 
 #################################################################
-# Accelerated Failure Time Models
+# Parametric Continuous Survival Models
+
+def ee_piecewise_exp(theta, X, t, delta, cut_points, weights=None):
+    r"""Estimating equation for the piecewise exponential model. The piecewise exponential (or Poisson) model is a
+    simple but flexible parametric survival modeling method. Unlike the exponential model, which assumes the hazard is
+    constant across the duration of follow-up, the piecewise exponential model only assumes that the hazard is constant
+    within the user-specified intervals.
+
+    Note
+    ----
+    While the piecewise exponential model also allows for splines or other parametric functional form for time,
+    ``ee_piecewise_exp`` only allows for disjoint indicators. Smooth functional forms can be manually programmed with
+    a 'long' data set combined with ``ee_regression`` and ``aggegrate_efuncs``.
+
+    Parameters
+    ----------
+    theta : ndarray, list, vector
+        theta consists of `b`+`k` values. Therefore, initial values should consist of the same number as the number of
+        columns present in ``X`` plus the length of ``time_intervals``. This can easily be implemented via
+        ``[0, ] * X.shape[1] + [0, ]*len(time_intervals)``.
+    X : ndarray, list, vector
+        2-dimensional vector of `n` observed values for `b` variables.
+    t : ndarray, list, vector
+        1-dimensional vector of `n` observed times.
+    delta : ndarray, list, vector
+        1-dimensional vector of `n` values indicating whether the time was an event or censoring.
+    cut_points : ndarray, list, vector
+        1-dimensional vector of `k` values providing the upper values where to divide the time contributed into
+        piecewise intervals
+    weights : ndarray, list, vector, None, optional
+        1-dimensional vector of `n` weights. Default is ``None``, which assigns a weight of 1 to all observations.
+
+    Returns
+    -------
+    array :
+        Returns a (`b` + `k`)-by-`n` NumPy array evaluated for the input ``theta``.
+
+    Examples
+    --------
+
+    References
+    ----------
+    Allison, P. D. (2010). *Survival analysis using SAS: a practical guide*. SAS Institute. pg 112-116
+
+    Friedman, M. (1982). Piecewise exponential models for survival data with covariates. *The Annals of Statistics*,
+    10(1), 101-113.
+
+    Holford TR. (1980). The analysis of rates and of survivorship using log-linear models. *Biometrics*, 36(2), 299-305
+    """
+    X = np.asarray(X)                                 # Convert to NumPy array
+    dim_x = X.shape[1]                                # Number of covariates in the baseline design matrix
+    t = np.asarray(t)[:, None]                        # Convert to NumPy array and shape for matrix algebra
+    delta = np.asarray(delta)[:, None]                # Convert to NumPy array and shape for matrix algebra
+    t_intervals = np.asarray(sorted(cut_points))      # Convert to Numpy array
+    beta_x = theta[:dim_x]                            # Coefficients for X design matrix
+    beta_s = np.asarray(theta[dim_x:])                # Coefficients for piecewise time design matrix
+
+    # Error checking
+    if np.max(t) > np.max(t_intervals):
+        raise ValueError("The largest value provided in `time_intervals` should be larger than the maximum value in"
+                         "`t` but the input values do not correspond to this convention.")
+
+    # Setting up weights argument for later use
+    weights = generate_weights(weights, n_obs=t.shape[0])            # Pre-processing weight argument
+
+    # Creating time and risk set matrices
+    lag_interval = np.asarray([0., ] + list(t_intervals[:-1]))  # Lagging the time-split by one unit and initial as zero
+    time_design_matrix = np.identity(n=len(t_intervals))        # Create piecewise indicator design matrix
+    time_design_matrix[:, 0] = 1                                # Set first column to be the intercept
+    in_interval = (t >= lag_interval).astype(int)               # Indicator if individual is in the risk set at k
+
+    # Creating offset matrix for time
+    offset_matrix = []                                          # Creating blank storage for offsets
+    prior_t = 0                                                 # Getting the initial time (which is always zero)
+    for c in range(len(t_intervals)):                           # For each time-split used to construct the intervals
+        offset_c = np.where(t_intervals[c] <= t,                # ... check whether observation is present for full
+                            t_intervals[c] - prior_t,           # ... if so give the full length of the interval
+                            t - prior_t)                        # ... otherwise give only time contributed
+        offset_c = np.where(t <= prior_t, 1e-7, offset_c)       # ... removing zeroes to prevent np.log warning
+        # NOTE: because only those in the risk set ever contribute, assigning non-zero values at this prior step has
+        #   not influence on the results. The non-zero contributions are later zeroed out by `in_interval`
+        offset_matrix.append(offset_c.T[0])                     # ... add time-specific offsets to matrix storage
+        prior_t = t_intervals[c]                                # ... update the prior interval value to the current
+
+    offset_t = np.log(np.asarray(offset_matrix))                # Log transform 2D array of the log-time offsets
+
+    # Constructing design matrices and predicted values
+    log_w = np.dot(X, beta_x)                                   # Covariate contributions to the log odds
+    log_w_matrix = np.tile(log_w, (len(t_intervals), 1))        # Stacked copies of X contributions for intervals
+    log_t = np.dot(time_design_matrix, beta_s)                  # Time-specific contributions to the log odds
+    y_pred = np.exp(log_w_matrix + log_t[:, None]               # Predicted event at time intervals matrix
+                    + offset_t)                                 # ... with the corresponding offset
+
+    # Matrix of when the observations with the outcome and in which interval it occurs
+    y_obs = delta * ((lag_interval < t) & (t <= t_intervals)).astype(int)
+
+    # Poisson model score function
+    residual_matrix = (y_obs - y_pred.T) * in_interval          # Computing residuals at time intervals matrix
+    residual_matrix = residual_matrix * weights                 # Incorporating any user-provided weights
+
+    # Score matrix contributions for X and piecewise
+    n_ones = np.ones(shape=(1, len(t_intervals)))               # Vector of ones for cumulative sum across intervals
+    y_resid = np.dot(n_ones, residual_matrix.T)[0]              # Adding residuals across all intervals
+    x_score = y_resid[:, None] * X                              # Compute the overall score for X
+    t_score = residual_matrix.T                                 # Residual matrix is simple the score for piecewise
+
+    # Returning the overall score function matrix stacked together
+    return np.vstack([x_score.T, t_score])
+
 
 def ee_aft(theta, X, t, delta, distribution, weights=None):
-    r"""Estimating equation for a generalized accelerated failure time (AFT) model. Let :math:`T_i` indicate the time
+    r"""Estimating equation for a generalized Accelerated Failure Time (AFT) model. Let :math:`T_i` indicate the time
     of the event and :math:`C_i` indicate the time to right censoring. Therefore, the observable data consists of
     :math:`t_i = \min(T_i, C_i)` and :math:`\Delta_i = I(t_i = T_i)`. The estimating equations are
 
@@ -313,6 +426,9 @@ def ee_aft(theta, X, t, delta, distribution, weights=None):
     # Error checking for survival data formatting
     check_survival_data_valid(delta=delta, time=t)
 
+    # Setting up weights argument for later use
+    weights = generate_weights(weights, n_obs=t.shape[0])  # Pre-processing weight argument
+
     # Extract coefficients
     beta = np.asarray(theta[:beta_dim])[:, None]
     if distribution == 'exponential':
@@ -322,12 +438,6 @@ def ee_aft(theta, X, t, delta, distribution, weights=None):
 
     # Computing error distribution for each observation
     z_i = (np.log(t) - np.dot(X, beta)) / sigma
-
-    # Allowing for a weighted Weibull-AFT model
-    if weights is None:                         # If weights is unspecified
-        w = np.ones(X.shape[0])                 # ... assign weight of 1 to all observations
-    else:                                       # Otherwise
-        w = np.asarray(weights)                 # ... set weights as input vector
 
     # Handling different distribution specifications
     if distribution in ['exponential', 'weibull']:
@@ -349,10 +459,11 @@ def ee_aft(theta, X, t, delta, distribution, weights=None):
     # Contributions to the estimating functions
     score_scale = -1/sigma * lambda_epsilon * X
     if distribution == 'exponential':
-        efunc = w * score_scale.T
+        efunc = weights * score_scale.T
     else:
         score_shape = (-1 / sigma * lambda_epsilon * z_i) - (delta / sigma)
-        efunc = np.vstack((w * score_scale.T, w * score_shape.T))
+        efunc = np.vstack((weights * score_scale.T,
+                           weights * score_shape.T))
 
     # Output b-by-n matrix
     return efunc
@@ -360,7 +471,6 @@ def ee_aft(theta, X, t, delta, distribution, weights=None):
 
 #################################################################
 # Discrete-Time Models
-
 
 def ee_plogit(theta, X, t, delta, S=None, unique_times=None, weights=None):
     r"""Estimating equation for pooled logistic regression with discrete-time survival data. One way to model survival
@@ -442,7 +552,7 @@ def ee_plogit(theta, X, t, delta, S=None, unique_times=None, weights=None):
 
     Examples
     --------
-    Construction of a estimating equation(s) with ``ee_plogit`` should be done similar to the following
+    Construction of an estimating equation(s) with ``ee_plogit`` should be done similar to the following
 
     >>> import numpy as np
     >>> import pandas as pd
@@ -515,6 +625,8 @@ def ee_plogit(theta, X, t, delta, S=None, unique_times=None, weights=None):
     References
     ----------
     Abbott RD. (1985). Logistic regression in survival analysis. *American Journal of Epidemiology*, 121(3), 465-471.
+
+    Allison, P. D. (2010). *Survival analysis using SAS: a practical guide*. SAS Institute. pg 235-240.
 
     D'Agostino RB, Lee ML, Belanger AJ, Cupples LA, Anderson K, & Kannel WB. (1990). Relation of pooled logistic
     regression to time dependent Cox regression analysis: the Framingham Heart Study.
@@ -595,3 +707,162 @@ def ee_plogit(theta, X, t, delta, S=None, unique_times=None, weights=None):
 
     # Returning the overall score function matrix stacked together
     return np.vstack([x_score.T, t_score])
+
+
+#################################################################
+# Summarizations of Survival Functions
+
+def ee_rmst(theta, times, survival, t, method='right'):
+    r"""Estimating equation for the Restricted Mean Survival Time (RMST). The RMST is a useful summary measure for how
+    survival unfolds over time. Specifically, it provides a single number to summarize the survival function that does
+    not need the survival function to meet certain criteria (e.g., going below 0.5, proportional hazards). The RMST
+    corresponds to the area under the survival curve, which is computed here using Riemann sums.
+
+    Note
+    ----
+    For estimators with monotonic step functions (e.g., Kaplan-Meier), the right-hand Riemann summation computes the
+    area exactly. With parametric survival models (e.g., Weibull model), this method provides an approximation. The
+    more times the Riemann sum is evaluated at, the better the approximation will be
+
+
+    The area under the survival curve can be computed via the right-hand Riemann sum, left-hand Riemann sum, or the
+    trapezoidal rule. Let :math:`S_k` denote the survival at time `t_k`. These summations are then defined as
+    :math:`\sum_{k} S_{k+1} \times (t_{k+1} = t_k)`,
+    :math:`\sum_{k} S_{k} \times (t_{k+1} = t_k)`,
+    and
+    :math:`\sum_{k} 0.5 \times (S_{k+1} + S_{k}) \times (t_{k+1} = t_k)`,
+    respectively.
+    The corresponding estimating equation is then simply defined as
+
+    .. math::
+
+        \sum_{i=1}^n
+        (AUC - \theta)
+        = 0
+
+    where :math:`AUC` denotes the area under the survival curve according to the chosen method. Note that this
+    estimating equation does not depend on :math:`i` as it is simply a transformation of the survival function.
+
+    Parameters
+    ----------
+    theta : ndarray, list, vector
+        theta consists of `b`+1 values. Therefore, initial values should consist of the same number as the number of
+        columns present in ``X`` plus 1. This can easily be implemented via ``[0, ] * X.shape[1] + [0, ]``. Note that
+        if using an exponential model, only `b` values need to be provided.
+    times : ndarray, list, vector
+        1-dimensional vector of `k` unique, ascending times that the survival function was evaluated at. This intervals
+        can be equally or unequally spaced. These times must correspond to the input survival values. In other words,
+        ``survival[k]`` should correspond to ``times[k]``.
+    survival : ndarray, list, vector
+        1-dimensional vector of `k` unique, survival estimates. These times must correspond to the input survival
+        values. In other words, ``survival[k]`` should correspond to ``times[k]``.
+    t : ndarray, list, vector
+        1-dimensional vector of `n` observed times. This argument is only used to extract the number of observations
+        in the data.
+    method : str, optional
+        Method used to approximate the area under the survival function. Default is ``'right'`` which used the
+        right-hand Riemann sum. Note that this approach should always be used with step functions, as this method
+        computes that area exactly. For estimators that produce smooth (i.e., non-step) functions, either the left-hand
+        Riemann sum (``'left'``) or the trapezoidal rule (``'trapezoid'``) can be used instead.
+
+    Returns
+    -------
+    array :
+        Returns a 1-by-`n` NumPy array evaluated for the input ``theta``.
+
+    Examples
+    --------
+    Construction of an estimating equation(s) with ``ee_rmst`` should be done similar to the following. Here, a
+    parametric survival model is shown for demonstration
+
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> from delicatessen import MEstimator
+    >>> from delicatessen.estimating_equations import ee_survival_model, ee_rmst
+    >>> from delicatessen.utilities import survival_predictions
+
+    Some generic survival data to estimate a parametric survival model with
+
+    >>> n = 100
+    >>> data = pd.DataFrame()
+    >>> data['C'] = np.random.weibull(a=1, size=n)
+    >>> data['C'] = np.where(data['C'] > 5, 5, data['C'])
+    >>> data['T'] = 0.8*np.random.weibull(a=0.8, size=n)
+    >>> data['delta'] = np.where(data['T'] < data['C'], 1, 0)
+    >>> data['t'] = np.where(data['delta'] == 1, data['T'], data['C'])
+
+    Defining psi, or the stacked estimating equations
+
+    >>> def psi(theta):
+    >>>     dist = 'weibull'
+    >>>     times_to_predict = np.linspace(0, np.max(data['t']), 200)
+    >>>     ee_model = ee_survival_model(theta=theta[:-1],
+    >>>                                  t=data['t'], delta=data['delta'],
+    >>>                                  distribution=dist)
+    >>>     surv = survival_predictions(times=times_to_predict,
+    >>>                                 theta=estr.theta,
+    >>>                                 covariance=estr.variance,
+    >>>                                 distribution=dist)
+    >>>     ee_auc = ee_rmst(theta[-1], times=times_to_predict,
+    >>>                      survival=surv, t=data['t'], method='trapezoid')
+    >>>     return np.vstack([ee_model, ee_auc])
+
+    Calling the M-estimator
+
+    >>> estr = MEstimator(stacked_equations=psi, init=[1., 1., 2.5])
+    >>> estr.estimate(solver='lm')
+
+    Inspecting the RMST estimate and corresponding confidence intervals
+
+    >>> estr.theta[-1]
+    >>> estr.confidence_intervals()[-1, :]
+
+    Note that because it is relatively cheap to compute the survival with parametric models, the resolution of
+    ``times_to_predict`` can be quite high to get a better approximation. Further, the trapezoidal rule provides a
+    better approximation with parametric models.
+
+    References
+    ----------
+    Cole SR, Chu H, & Nie L. (2009). Nonparametric estimator of relative time with application to the Acyclovir
+    Prevention Trial. *Clinical Trials*, 6(4), 320-328.
+
+    Kim DH, Uno H, & Wei LJ. (2017). Restricted mean survival time as a measure to interpret clinical trial results.
+    *JAMA Cardiology*, 2(11), 1179.
+
+    Nemes S, Bülow E, & Gustavsson A. (2020). A brief overview of restricted mean survival time estimators and
+    associated variances. *Stats*, 3(2), 107-119.
+
+    Royston P, & Parmar MK. (2013). Restricted mean survival time: an alternative to the hazard ratio for the design
+    and analysis of randomized trials with a time-to-event outcome. *BMC Medical Research Methodology*, 13(1), 152.
+    """
+    n = np.asarray(t).shape[0]
+    times = np.asarray(times)
+    survival = np.asarray(survival)
+
+    # Error checking that inputs are as expected for survival
+    if times[0] != 0:
+        raise ValueError("The function `ee_rmst` expects that the first time is equal to zero. Instead, the provided "
+                         "initial time is " + str(times[0]))
+    if times.shape[0] != survival.shape[0]:
+        raise ValueError("The input `times` and `survival` must have the same length. The input times has length "
+                         + str(times.shape[0]) + " while the input survival has length " + str(survival.shape[0]))
+
+    # Computing the time changes for the approximation
+    t_delta = times[1:] - times[:-1]
+
+    # Determining which approximation to use
+    if method.lower() == 'right':
+        area_rectangle = t_delta * survival[1:]
+    elif method.lower() == 'left':
+        area_rectangle = t_delta * survival[:-1]
+    elif method.lower() == 'trapezoid':
+        area_rectangle = t_delta * (survival[1:] + survival[:-1]) / 2
+    else:
+        raise ValueError("The method " + str(method) + " is not available. "
+                         "Please select from 'right', 'left', or 'trapezoid'")
+
+    area_total = np.sum(area_rectangle)
+
+    # Returning the score function
+    return (area_total - theta) * np.ones(n)
+

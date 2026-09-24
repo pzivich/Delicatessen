@@ -237,7 +237,7 @@ class _GeneralEstimator:
         ifunc_i = np.dot(bread_invert, efunc_i)
         return ifunc_i.T
 
-    def confidence_bands(self, subset=None, alpha=0.05, method='supt', n_draws=1000000, seed=None):
+    def confidence_bands(self, subset=None, alpha=0.05, method='supt', n_draws=1000000, blocks=1, seed=None):
         r"""Calculate two-sided :math:`(1 - \alpha) \times` 100% confidence bands from the point and sandwich variance
         estimates. Rather than cover a single parameter, the confidence bands provide coverage for parameter *vectors*.
         The formula for the confidence bands is
@@ -271,6 +271,11 @@ class _GeneralEstimator:
         n_draws : int, optional
             Number of random draws to use for any methods based on simulated approximation. Default is one million,
             ``1000000``.
+        blocks : int, optional
+            Optional argument to divide the sup-t random sampling procedure into separate blocks. Dividing this process
+            into separate steps can reduce memory usage when drawing from the multivariate normal distribution. Default
+            is``1`` which draws all ``n_draws`` simultaneously. Input must be a positive integer and
+            ``blocks <= n_draws``
         seed : int, optional
             Seed to initialize a pseudo RNG for methods based on simulated approximations. Default is ``None``
             which does not use a reproducible seed. To consistently obtain the same confidence bands with approximation
@@ -308,6 +313,7 @@ class _GeneralEstimator:
                                       alpha=alpha,
                                       method=method,
                                       n_draws=n_draws,
+                                      blocks=blocks,
                                       seed=seed)
 
         # Return 2D array of lower and upper confidence bands

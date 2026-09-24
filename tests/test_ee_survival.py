@@ -123,6 +123,62 @@ class TestEstimatingEquationsSurvParam:
         # Checking mean estimate
         npt.assert_allclose(estr.theta, comparison_theta, atol=1e-6)
 
+    def test_survival_model_weibull_weighted(self, data_s):
+        times, events = data_s
+        weights = [2, 1, 3, 2, 1, 1, 1, 3, 5, 2, 2, 1]
+
+        def psi(theta):
+            return ee_survival_model(theta=theta, t=times, delta=events,
+                                     distribution='weibull', weights=weights)
+
+        estr = MEstimator(psi, init=[1., 1.])
+        estr.estimate(solver="lm")
+
+        # Lifelines Weibull model as comparison
+        wbf = WeibullFitter()
+        wbf.fit(times, events, weights=weights)
+        results = np.asarray(wbf.summary[['coef', 'se(coef)', 'coef lower 95%', 'coef upper 95%']])
+
+        # Checking mean estimate
+        npt.assert_allclose([(1 / estr.theta[0])**(1/estr.theta[1]), estr.theta[1]],
+                            np.asarray(results[:, 0]),
+                            atol=1e-4)
+
+        # No robust variance for lifeline's WeibullFitter, so not checking against
+        # Checking variance estimates
+        # npt.assert_allclose(np.sqrt(np.diag(mestimator.variance)),
+        #                     np.asarray(results[0, 1]),
+        #                     atol=1e-6)
+
+        # Checking confidence interval estimates
+        # npt.assert_allclose(mestimator.confidence_intervals(),
+        #                     np.asarray(results[0, 2:]),
+        #                     atol=1e-5)
+
+    def test_survival_model_gompertz_weighted(self, data_s):
+        # library(flexsurv)
+        # times = c(1, 2, 3, 4, 5, 1, 1, 2, 2.5, 3, 4, 5)
+        # event = c(1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0)
+        # w = c(2, 1, 3, 2, 1, 1, 1, 3, 5, 2, 2, 1)
+        # fit < - flexsurv::flexsurvreg(Surv(times, event)
+        # ~ 1, dist = "gompertz", weights = w)
+        # exp(fit$coefficients['rate'])  # 0.02769808
+        # fit$coefficients['shape']  # 0.8454154
+        comparison_theta = np.asarray([0.0276980816322343, 0.845415435568433])
+
+        times, events = data_s
+        weights = [2, 1, 3, 2, 1, 1, 1, 3, 5, 2, 2, 1]
+
+        def psi(theta):
+            return ee_survival_model(theta=theta, t=times, delta=events,
+                                     distribution='gompertz', weights=weights)
+
+        estr = MEstimator(psi, init=[0.01, 0.5])
+        estr.estimate(solver="lm")
+
+        # Checking mean estimate
+        npt.assert_allclose(estr.theta, comparison_theta, atol=1e-5)
+
 
 class TestEstimatingEquationsAFT:
 
