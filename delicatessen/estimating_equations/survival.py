@@ -13,7 +13,7 @@ from delicatessen.utilities import inverse_logit, standard_normal_cdf, standard_
 #################################################################
 # Parametric Survival Estimating Equations
 
-def ee_survival_model(theta, t, delta, distribution):
+def ee_survival_model(theta, t, delta, distribution, weights=None):
     r"""Estimating equation for a parametric survival models. Let :math:`T_i` indicate the time of the event and
     :math:`C_i` indicate the time to right censoring. Therefore, the observable data consists of
     :math:`t_i = min(T_i, C_i)` and :math:`\Delta_i = I(t_i = T_i)`. The general estimating equations are
@@ -65,6 +65,8 @@ def ee_survival_model(theta, t, delta, distribution):
         missing data should be included (missing data may cause unexpected behavior).
     distribution : str
         Distribution for the parametric survival model.
+    weights : ndarray, list, vector, None, optional
+        1-dimensional vector of `n` weights. Default is ``None``, which assigns a weight of 1 to all observations.
 
     Returns
     -------
@@ -129,6 +131,9 @@ def ee_survival_model(theta, t, delta, distribution):
     # Error checking for survival data formatting
     check_survival_data_valid(delta=delta, time=t)
 
+    # Setting up weights argument for later use
+    weights = generate_weights(weights, n_obs=t.shape[0])            # Pre-processing weight argument
+
     # Extracting and naming parameters for my convenience
     if distribution == 'exponential':
         lambd = theta[0]
@@ -155,10 +160,10 @@ def ee_survival_model(theta, t, delta, distribution):
 
     # Returning stacked estimating equations
     if distribution == 'exponential':
-        return ef_lambda
+        return ef_lambda * weights
     else:
-        return np.vstack((ef_lambda,
-                          ef_gamma))
+        return np.vstack((ef_lambda * weights,
+                          ef_gamma * weights))
 
 
 
@@ -422,6 +427,9 @@ def ee_aft(theta, X, t, delta, distribution, weights=None):
     # Error checking for survival data formatting
     check_survival_data_valid(delta=delta, time=t)
 
+    # Setting up weights argument for later use
+    weights = generate_weights(weights, n_obs=t.shape[0])  # Pre-processing weight argument
+
     # Extract coefficients
     beta = np.asarray(theta[:beta_dim])[:, None]
     if distribution == 'exponential':
@@ -431,9 +439,6 @@ def ee_aft(theta, X, t, delta, distribution, weights=None):
 
     # Computing error distribution for each observation
     z_i = (np.log(t) - np.dot(X, beta)) / sigma
-
-    # Allowing for a weighted AFT model
-    weights = generate_weights(weights, n_obs=t.shape[0])  # Pre-processing weight argument
 
     # Handling different distribution specifications
     if distribution in ['exponential', 'weibull']:
