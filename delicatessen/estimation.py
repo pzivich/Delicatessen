@@ -612,6 +612,9 @@ class MEstimator(_GeneralEstimator):
     Boos DD, & Stefanski LA. (2013). M-estimation (estimating equations). In Essential Statistical Inference
     (pp. 297-337). Springer, New York, NY.
 
+    Duncan GM. (1987). A simplified approach to M-estimation with application to two-stage estimators.
+    *Journal of Econometrics*, 34(3), 373-389.
+
     Ross RK, Zivich PN, Stringer JSA, & Cole SR. (2024). M-estimation for common epidemiological measures: introduction
     and applied examples. *International Journal of Epidemiology*, 53(2), dyae030.
 
