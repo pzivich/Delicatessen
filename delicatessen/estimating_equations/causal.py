@@ -825,26 +825,25 @@ def ee_ipw_proximal(theta, y, A, Z, W, X):
     mu = theta[:3]                 # Parameters of interest
     beta = theta[3:]               # Nuisance model coefficients
 
+    # Error checking for input shapes of proxy design matrices
     if Z.shape[1] != W.shape[1]:
-        raise ValueError("For the proximal IPW estimator, the dimension of the design matrix for the ")
+        raise ValueError("For the proximal IPW estimator, the dimension of the design matrix for the action proxy (Z) "
+                         "must match the dimension of the design matrix for the outcome proxy (W). Currently, Z "
+                         "includes " + str(Z.shape[1]) + " terms and W includes " + str(W.shape[1]) + " terms.")
 
-    # Building design matrices
-    XZA = np.hstack([X, Z, A[:, None]
-                     ])
-    XWA = np.hstack([X, W, A[:, None]
-                     ])
+    # Setup for nuisance model score function
+    XZ_dmat = np.hstack([X, Z])
+    XW_dmat = np.hstack([X, W])
+    sign_a = (-1) ** (1 - A)
 
     # Building the confounding bridge function
-    linear_pred = np.dot(XZA, beta)
-    q_function = 1 + np.exp((-1)**(1 - A) * linear_pred)
+    linear_pred = np.dot(XZ_dmat, beta)
+    q_function = 1 + np.exp(sign_a * linear_pred)
 
-    # Confounding bridge function contributions
-    shifter = np.zeros(XWA.shape[1])
-    shifter[-1] = 1
-    ee_cbf = ((-1)**(1-A) * q_function)[:, None] * XWA - shifter
+    # Action-confounding bridge estimating function
+    ee_cbf = (sign_a * q_function)[:, None] * XW_dmat
 
     # Parameters of interest
-    # q_function = np.clip(q_function, a_min=1, a_max=20)
     ee_rd = np.ones(y.shape[0]) * (mu[1] - mu[2]) - mu[0]
     ee_r1 = A * q_function * (y - mu[1])
     ee_r0 = (1-A) * q_function * (y - mu[2])
