@@ -598,7 +598,7 @@ def compute_critical_value_bands(theta, covariance, alpha=0.05, method='supt', n
     return critical_value
 
 
-def compute_confidence_bands(theta, covariance, alpha=0.05, method='supt', n_draws=100000, seed=None):
+def compute_confidence_bands(theta, covariance, alpha=0.05, method='supt', n_draws=100000, blocks=1, seed=None):
     r"""Function to compute the confidence bands for a given parameter vector and covariance matrix.
 
     Confidence bands are an extension of confidence intervals. Confidence intervals claim to cover the true parameter
@@ -622,6 +622,10 @@ def compute_confidence_bands(theta, covariance, alpha=0.05, method='supt', n_dra
         Default is ``'supt'``
     n_draws : int, optional
         Number of random draws to use for any methods based on simulated approximation. Default is ``100000``.
+    blocks : int, optional
+        Optional argument to divide the sup-t random sampling procedure into separate blocks. Dividing this process
+        into separate steps can reduce memory usage when drawing from the multivariate normal distribution. Default is
+        ``1`` which draws all ``n_draws`` simultaneously. Input must be a positive integer and ``blocks <= n_draws``
     seed : int, optional
         Seed to intialize a pseudo RNG for methods based on simulated approximations. Default is ``None``
         which does not use a reproducible seed. To consistently obtain the exact same confidence bands, please use
@@ -647,7 +651,8 @@ def compute_confidence_bands(theta, covariance, alpha=0.05, method='supt', n_dra
     # Computing the critical value
     critical_value = compute_critical_value_bands(theta=theta, covariance=covariance,
                                                   alpha=alpha, method=method,
-                                                  n_draws=n_draws, seed=seed)
+                                                  n_draws=n_draws, blocks=blocks,
+                                                  seed=seed)
 
     # Processing inputs
     theta = np.asarray(theta)

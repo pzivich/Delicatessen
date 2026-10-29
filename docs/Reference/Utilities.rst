@@ -42,6 +42,7 @@ Model predictions
   :toctree: generated/
 
   regression_predictions
+  survival_predictions
   aft_predictions_individual
   aft_predictions_function
   plogit_predict
