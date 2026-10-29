@@ -832,16 +832,18 @@ def ee_ipw_proximal(theta, y, A, Z, W, X):
                          "includes " + str(Z.shape[1]) + " terms and W includes " + str(W.shape[1]) + " terms.")
 
     # Setup for nuisance model score function
-    XZ_dmat = np.hstack([X, Z])
-    XW_dmat = np.hstack([X, W])
+    XZA_dmat = np.hstack([X, Z, A[:, None]])
+    XWA_dmat = np.hstack([X, W, A[:, None]])
     sign_a = (-1) ** (1 - A)
 
     # Building the confounding bridge function
-    linear_pred = np.dot(XZ_dmat, beta)
+    linear_pred = np.dot(XZA_dmat, beta)
     q_function = 1 + np.exp(sign_a * linear_pred)
 
     # Action-confounding bridge estimating function
-    ee_cbf = (sign_a * q_function)[:, None] * XW_dmat
+    shifter = np.zeros(XWA_dmat.shape[1])
+    shifter[-1] = 1
+    ee_cbf = (sign_a * q_function)[:, None] * XWA_dmat - shifter
 
     # Parameters of interest
     ee_rd = np.ones(y.shape[0]) * (mu[1] - mu[2]) - mu[0]
