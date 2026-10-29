@@ -730,8 +730,15 @@ def survival_predictions(times, theta, covariance, distribution, measure='surviv
                 lambd = theta[0]
                 gamma = theta[1]
             # Computing predicted survival
-            survival_t = np.exp(-lambd * (times ** gamma))     # Survival calculation from parameters
-            hazard_t = lambd * gamma * (times ** (gamma - 1))  # hazard calculation from parameters
+            if distribution in ['exponential', 'weibull']:
+                survival_t = np.exp(-lambd * (times ** gamma))  # Survival calculation from parameters
+                hazard_t = lambd * gamma * (times ** (gamma - 1))  # hazard calculation from parameters
+            elif distribution == 'gompertz':
+                survival_t = np.exp(-lambd / gamma * (np.exp(gamma * times) - 1))
+                hazard_t = lambd * np.exp(gamma * times)
+            else:
+                raise ValueError("The distribution '" + str(distribution) + "' was specified, but only the following "
+                                 "distributions are supported: 'exponential', 'weibull', 'gompertz'.")
             metric = convert_survival_measures(survival=survival_t, hazard=hazard_t, measure=measure)
             return metric
         else:

@@ -11,6 +11,8 @@ import statsmodels.api as sm
 import statsmodels.formula.api as smf
 from scipy.stats import logistic
 from lifelines import ExponentialFitter, WeibullFitter, WeibullAFTFitter
+from lifelines.fitters import ParametricUnivariateFitter
+import autograd.numpy as anp
 
 from delicatessen import MEstimator
 from delicatessen.estimating_equations import ee_mean, ee_regression, ee_survival_model, ee_aft, ee_plogit
@@ -841,6 +843,66 @@ class TestPredictions:
         npt.assert_allclose(s_hat,
                             byhand,
                             atol=1e-7)
+
+    def test_survival_gompertz_survival(self):
+        # times, events = bcancer['t'], bcancer['delta']
+        # R code
+        # library(flexsurv)
+        # times = c(1, 2, 3, 4, 5, 1, 1, 2, 2.5, 3, 4, 5)
+        # event = c(1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0)
+        # fit <- flexsurv::flexsurvreg(Surv(times, event) ~ 1, dist = "gompertz")
+        # summary(fit, type = "survival")
+        times = [1, 2, 3, 4, 5, 1, 1, 2, 2.5, 3, 4, 5]
+        events = [1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0]
+        times_to_predict = [1, 2, 3, 4, 5]
+        dist = 'gompertz'
+
+        def psi(theta):
+            return ee_survival_model(theta=theta, t=times, delta=events,
+                                     distribution=dist)
+
+        estr = MEstimator(psi, init=[0.01, 0.1])
+        estr.estimate(solver='hybr')
+        s_hat = survival_predictions(times=times_to_predict, theta=estr.theta, covariance=estr.variance,
+                                     distribution=dist, measure='survival')
+
+        # Lifelines Weibull for comparison
+        comparison = [0.9612274, 0.8812349, 0.7280842, 0.4786429, 0.1904354]
+
+        # Checking mean estimate
+        npt.assert_allclose(s_hat[:, 0],
+                            comparison,
+                            atol=1e-5)
+
+    def test_survival_gompertz_chazard(self):
+        # times, events = bcancer['t'], bcancer['delta']
+        # R code
+        # library(flexsurv)
+        # times = c(1, 2, 3, 4, 5, 1, 1, 2, 2.5, 3, 4, 5)
+        # event = c(1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0)
+        # fit <- flexsurv::flexsurvreg(Surv(times, event) ~ 1, dist = "gompertz")
+        # summary(fit, type = "hazard")
+        times = [1, 2, 3, 4, 5, 1, 1, 2, 2.5, 3, 4, 5]
+        events = [1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0]
+        times_to_predict = [1, 2, 3, 4, 5]
+        dist = 'gompertz'
+
+        def psi(theta):
+            return ee_survival_model(theta=theta, t=times, delta=events,
+                                     distribution=dist)
+
+        estr = MEstimator(psi, init=[0.01, 0.1])
+        estr.estimate(solver='hybr')
+        s_hat = survival_predictions(times=times_to_predict, theta=estr.theta, covariance=estr.variance,
+                                     distribution=dist, measure='hazard')
+
+        # Lifelines Weibull for comparison
+        comparison = [0.05712984, 0.12552567, 0.27580496, 0.60599857, 1.33149985]
+
+        # Checking mean estimate
+        npt.assert_allclose(s_hat[:, 0],
+                            comparison,
+                            atol=1e-5)
 
     def test_aft_ind_survival(self, bcancer):
         dist = 'weibull'
