@@ -99,6 +99,7 @@ Causal Inference
   ee_ipw
   ee_ipw_msm
   ee_ipw_cbps
+  ee_ipw_proximal
   ee_aipw
   ee_gestimation_snmm
   ee_iv_causal
