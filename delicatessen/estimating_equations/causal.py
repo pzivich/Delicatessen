@@ -807,6 +807,10 @@ def ee_ipw_proximal(theta, y, A, Z, W, X):
     >>> estr.theta[2]    # causal mean under A=0
     >>> estr.theta[3:]   # nuisance model coefficients
 
+    Note: the proximal IPW estimator can behave poorly when overlap is weak between covariates. This poor performance
+    often manifests as an extreme coefficient for ``A`` in the nuisance model (which will be the last coefficient,
+    ``estr.theta[-1]``). This issue then induces a large variance for the other parameters. 
+
     References
     ----------
     Cui Y, Pu H, Shi X, Miao W, & Tchetgen Tchetgen E. (2024). Semiparametric proximal causal inference.
