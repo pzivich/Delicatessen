@@ -701,12 +701,12 @@ def ee_ipw_cbps(theta, y, A, W, weights=None, weight_type='horvitz-thompson'):
 
 
 def ee_ipw_proximal(theta, y, A, Z, W, X):
-    r"""Estimating equation for proximal causal inference based on inverse probability weighting (IPW). Like the other
-    IPW estimators, the proximal IPW estimator involves the estimation of propensity scores. However, the proximal
-    IPW estimator differs in some key aspects. First, proximal causal inference is designed to account for an
-    unmeasured confounding variable through a pair(s) of proxy variables. As a result, the propensity score estimation
+    r"""Estimating equation for proximal inverse probability weighting (IPW). Like the other IPW estimators, the
+    proximal IPW estimator involves the estimation of propensity scores. However, the proximal IPW estimator differs
+    in that it is based on proximal causal inference. Proximal causal inference is designed to account for some types
+    of unmeasured confounding variable via a pair(s) of proxy variables. As a result, the propensity score estimation
     is done through the 'confounding bridge function' instead of the standard logistic regression model. The stacked
-    estimating equations are
+    estimating equations for this alternative weighting approach are
 
     .. math::
 
@@ -724,18 +724,19 @@ def ee_ipw_proximal(theta, y, A, Z, W, X):
     where :math:`A` is the action, math:`X` is the set of observed confounders, :math:`Z` is the treatment proxy (or
     proxies), :math:`W` is the outcome proxy (or proxies), and
     :math:`q(X,Z,A;\alpha) = 1 + \exp \left(-1^{1-A} \times (X \alpha_X^T + Z \alpha_Z^T + A \alpha_A) \right)`.
-    Here, the :math:`q` function is the confounding bridge function. Note that :math:`Z` and :math:`W` play
-    complimentary roles in the function, so they must be of the same dimension for estimation.
+    Here, the :math:`q` function is the confounding bridge function. Note that :math:`Z` plays the role of an instrument
+    for :math:`W` in the confounding bridge function. This feature has the implication that those two design matrices
+    must be of the same dimension for estimation.
 
     The first estimating equations are for the parameters of the confounding bridge function (i.e., the generalization
     of the propensity score). The second estimating equation is the risk had everyone taken :math:`A=1`, third is the
-    risk had everyone taken :math:`A=0`, and the last is for the causal risk difference. See the references for the
-    corresponding causal identification assumptions used with proximal causal inference.
+    risk had everyone taken :math:`A=0`, and the last is for the causal risk difference. See the provided references
+    below for further discussion of the corresponding causal identification assumptions for proximal causal inference.
 
     Parameters
     ----------
     theta : ndarray, list, vector
-        Theta consists of 3+`b` values.
+        Theta consists of 3+`b` values. Here, `b` is equal to `k+j+1`
     y : ndarray, list, vector
         1-dimensional vector of `n` observed values.
     A : ndarray, list, vector
@@ -772,7 +773,7 @@ def ee_ipw_proximal(theta, y, A, Z, W, X):
     >>> d['U'] = d['X'] + np.random.normal(size=n)  # unobserved confounder
     >>> d['Z'] = d['U'] + np.random.normal(size=n)  # treatment proxy
     >>> d['W'] = d['U'] + np.random.normal(size=n)  # outcome proxy
-    >>> pr_a = logistic.cdf(d['Z'] + d['U'] + d['X'])
+    >>> pr_a = logistic.cdf(0.25*(d['Z'] + d['U'] + d['X']))
     >>> d['A'] = np.random.binomial(n=1, p=pr_a, size=n)
     >>> ya0 = d['W'] + d['U'] + d['X'] + np.random.normal(scale=1, size=n)
     >>> ya1 = ya0 - 1
@@ -785,11 +786,12 @@ def ee_ipw_proximal(theta, y, A, Z, W, X):
     >>>     return ee_ipw_proximal(theta, y=d['Y'], A=d['A'],
     >>>                            X=d[['C', 'X']], Z=d[['Z']], W=d[['W', ]])
 
-    Calling the estimation procedure. Since ``X`` is 2-by-n here and nuisance model has 4 parameters, so the starting
-    values should be of length 3+4=7. In general, it will be best to start with ``[0., 0.5, 0.5, ...]`` as the starting
-    values when ``Y`` is binary. Otherwise, starting with ``[0, np.mean(y), np.mean(y), ...]`` is reasonable.
+    Calling the estimation procedure. Since ``X`` is 2-by-n and both ``Z`` and ``W`` are 1-by-n, the nuisance model
+    has 4 parameters (one additional parameter for ``A``), so the starting values should be of length 2+1+1=4. In
+    general, it will be best to start with ``[0., 0.5, 0.5] + [0., ]*4`` as the starting values when ``Y`` is binary.
+    Otherwise, starting with ``[0, np.mean(y), np.mean(y), ...]`` is reasonable.
 
-    >>> estr = MEstimator(stacked_equations=psi, init=[0., 0.5, 0.5, 0., 0., 0., 0.])
+    >>> estr = MEstimator(stacked_equations=psi, init=[0., 0.5, 0.5] + [0., ]*4)
     >>> estr.estimate(solver='lm')
 
     Inspecting the parameter estimates, variance, and 95% confidence intervals
@@ -803,10 +805,7 @@ def ee_ipw_proximal(theta, y, A, Z, W, X):
     >>> estr.theta[0]    # causal mean difference of 1 versus 0
     >>> estr.theta[1]    # causal mean under A=1
     >>> estr.theta[2]    # causal mean under A=0
-    >>> estr.theta[3:]   # logistic regression coefficients
-
-    If you want to see how truncating the probabilities works, try repeating the above code but specifying
-    ``truncate=(0.1, 0.9)`` as an optional argument in ``ee_ipw``.
+    >>> estr.theta[3:]   # nuisance model coefficients
 
     References
     ----------
@@ -832,23 +831,23 @@ def ee_ipw_proximal(theta, y, A, Z, W, X):
                          "includes " + str(Z.shape[1]) + " terms and W includes " + str(W.shape[1]) + " terms.")
 
     # Setup for nuisance model score function
-    XZA_dmat = np.hstack([X, Z, A[:, None]])
-    XWA_dmat = np.hstack([X, W, A[:, None]])
-    sign_a = (-1) ** (1 - A)
+    XZA_dmat = np.hstack([X, Z, A[:, None]])         # Manually stack design matrix for predictions
+    XWA_dmat = np.hstack([X, W, A[:, None]])         # Manually stack design matrix for evaluating predictions
+    sign_a = (-1) ** (1 - A)                         # Getting the sign for evaluating differences by A
 
     # Building the confounding bridge function
-    linear_pred = np.dot(XZA_dmat, beta)
-    q_function = 1 + np.exp(sign_a * linear_pred)
+    linear_pred = np.dot(XZA_dmat, beta)             # Linear prediction
+    q_function = 1 + np.exp(sign_a * linear_pred)    # Transforming according to the q function
 
     # Action-confounding bridge estimating function
-    shifter = np.zeros(XWA_dmat.shape[1])
-    shifter[-1] = 1
-    ee_cbf = (sign_a * q_function)[:, None] * XWA_dmat - shifter
+    shifter = np.zeros(XWA_dmat.shape[1])                       # Getting vector of zeroes by size of design matrix
+    shifter[-1] = 1                                             # Replacing last row (corresponds to A) with 1
+    ee_cbf = (sign_a*q_function)[:, None] * XWA_dmat - shifter  # Score function with manual shift for A column
 
     # Parameters of interest
-    ee_rd = np.ones(y.shape[0]) * (mu[1] - mu[2]) - mu[0]
-    ee_r1 = A * q_function * (y - mu[1])
-    ee_r0 = (1-A) * q_function * (y - mu[2])
+    ee_rd = np.ones(y.shape[0]) * (mu[1] - mu[2]) - mu[0]       # Estimating function for risk difference
+    ee_r1 = A * q_function * (y - mu[1])                        # Estimating function for risk under A:=1 (Hajek)
+    ee_r0 = (1-A) * q_function * (y - mu[2])                    # Estimating function for risk under A:=0 (Hajek)
 
     # Returning the stacked estimating functions
     return np.vstack([ee_rd, ee_r1, ee_r0, ee_cbf.T])
