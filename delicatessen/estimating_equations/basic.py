@@ -586,8 +586,8 @@ def ee_meta_random(theta, point_est, var_est):
 
 
 def ee_auc(theta, x_vals, y_vals, n_obs, method='left'):
-    r"""Estimating equation for the Area Under a Curve (AUC). The AUC can be computed via the right-hand Riemann sum,
-    left-hand Riemann sum, or the trapezoidal rule. Let :math:`Y_k` denote the height of the curve at `X_k`. These
+    r"""Estimating equation for the Area Under a Curve (AUC). The AUC can be computed via the left-hand Riemann sum,
+    right-hand Riemann sum, or the trapezoidal rule. Let :math:`Y_k` denote the height of the curve at `X_k`. These
     summations are then defined as
     :math:`AUC_{l} = \sum_{k} Y_{k} \times (X_{k+1} - X_k)`,
     :math:`AUC_{r} = \sum_{k} Y_{k+1} \times (X_{k+1} - X_k)`,
