@@ -207,6 +207,35 @@ def ee_piecewise_exp(theta, X, t, delta, cut_points, weights=None):
 
     Examples
     --------
+    Construction of an estimating equation(s) with ``ee_piecewise_exp`` should be done similar to the following
+
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> from delicatessen import MEstimator
+    >>> from delicatessen.estimating_equations import ee_piecewise_exp
+
+    Some generic survival data to estimate a parametric survival model with
+
+    >>> d = pd.DataFrame()
+    >>> d['T'] = [1, 2, 3, 4, 5, 6, 7]
+    >>> d['D'] = [1, 0, 1, 1, 0, 1, 0]
+    >>> d['X'] = [1, 1, 0, 1, 0, 1, 1]
+
+    Defining psi, or the stacked estimating equations
+
+    >>> def psi(theta):
+    >>>     return ee_piecewise_exp(theta=theta, X=d[['X', ]],
+    >>>                             t=d['T'], delta=d['D'], cut_points=[3.5, 7])
+
+    Here, the hazard is assumed to be constant over (0, 3.5] and (3.5, 7]. Calling the M-estimator
+
+    >>> estr = MEstimator(psi, init=[0, 0, 0])
+    >>> estr.estimate()
+
+    Inspecting the parameter estimates
+
+    >>> estr.theta[0]   # Coefficient for X
+    >>> estr.theta[1:]  # Coefficients for interval-specific intercepts
 
     References
     ----------
@@ -227,7 +256,7 @@ def ee_piecewise_exp(theta, X, t, delta, cut_points, weights=None):
 
     # Error checking
     if np.max(t) > np.max(t_intervals):
-        raise ValueError("The largest value provided in `time_intervals` should be larger than the maximum value in"
+        raise ValueError("The largest value provided in `time_intervals` should be larger than the maximum value in "
                          "`t` but the input values do not correspond to this convention.")
 
     # Setting up weights argument for later use
@@ -266,7 +295,7 @@ def ee_piecewise_exp(theta, X, t, delta, cut_points, weights=None):
 
     # Poisson model score function
     residual_matrix = (y_obs - y_pred.T) * in_interval          # Computing residuals at time intervals matrix
-    residual_matrix = residual_matrix * weights                 # Incorporating any user-provided weights
+    residual_matrix = residual_matrix * weights[:, None]        # Incorporating any user-provided weights
 
     # Score matrix contributions for X and piecewise
     n_ones = np.ones(shape=(1, len(t_intervals)))               # Vector of ones for cumulative sum across intervals

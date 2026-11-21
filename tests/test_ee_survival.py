@@ -485,7 +485,6 @@ class TestEstimatingEquationsPWE:
         # Not checking sandwich, since R treats observations as independent so won't match
 
 
-
 class TestEstimatingEquationsDiscreteSurvival:
     # Discrete-time survival analysis estimating equation tests
 
