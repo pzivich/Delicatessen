@@ -70,6 +70,7 @@ Survival
   :toctree: generated/
 
   ee_survival_model
+  ee_piecewise_exp
   ee_aft
   ee_plogit
   ee_rmst
