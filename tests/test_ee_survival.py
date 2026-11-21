@@ -11,7 +11,7 @@ import statsmodels.formula.api as smf
 from lifelines import ExponentialFitter, WeibullFitter, WeibullAFTFitter
 
 from delicatessen import MEstimator
-from delicatessen.estimating_equations import ee_survival_model, ee_aft, ee_plogit
+from delicatessen.estimating_equations import ee_survival_model, ee_aft, ee_plogit, ee_rmst
 
 
 class TestEstimatingEquationsSurvParam:
@@ -628,3 +628,75 @@ class TestEstimatingEquationsDiscreteSurvival:
                             atol=1e-6)
 
         # NOTE: standard errors won't match exactly due to how everything is constructed (but both are valid estimators)
+
+
+class TestEstimatingEquationsSummaryMeasures:
+
+    def test_rmst_error_not_zero(self):
+        times = [0.5, 1, 3, 5, 7, 10]
+        points = [0, 0.1, -0.1, 0.2, 0.3, -0.4]
+
+        with pytest.raises(ValueError, match="function `ee_rmst` expects"):
+            ee_rmst(theta=[0, ], times=times, survival=points, t=np.asarray([1, ]))
+
+    def test_rmst_error_length(self):
+        with pytest.raises(ValueError, match="`survival` must have"):
+            times = [0, 1, 3, 5, 7]
+            points = [0, 0.1, -0.1, 0.2, 0.3, -0.4]
+            ee_rmst(theta=[0, ], times=times, survival=points, t=np.asarray([1, ]))
+
+        with pytest.raises(ValueError, match="`survival` must have"):
+            times = [0, 1, 3, 5, 7, 10]
+            points = [0, 0.1, -0.1, 0.2, 0.3]
+            ee_rmst(theta=[0, ], times=times, survival=points, t=np.asarray([1, ]))
+
+    def test_rmst_lhs(self):
+        times = [0, 1, 3, 5, 7, 10]
+        points = [0, 0.1, -0.1, 0.2, 0.3, -0.4]
+
+        # By-hand
+        area = ((1 * 0) +     # (1-0) * 0
+                (2 * 0.1) +   # (3-1) * 0.1
+                (2 * -0.1) +  # (5-3) * -0.1
+                (2 * 0.2) +   # (7-5) * 0.2
+                (3 * 0.3))    # (10-7) * 0.3
+
+        # Estimating function
+        rmst = ee_rmst(theta=[0, ], times=times, survival=points, t=np.asarray([1, ]), method='left')
+
+        # Checking these match
+        npt.assert_allclose(rmst[0], area, atol=1e-8)
+
+    def test_rmst_rhs(self):
+        times = [0, 1, 3, 5, 7, 10]
+        points = [0, 0.1, -0.1, 0.2, 0.3, -0.4]
+
+        # By-hand
+        area = ((1 * 0.1) +     # (1-0) * 0.1
+                (2 * -0.1) +    # (3-1) * -0.1
+                (2 * 0.2) +     # (5-3) * 0.2
+                (2 * 0.3) +     # (7-5) * 0.3
+                (3 * -0.4))     # (10-7) * -0.4
+
+        # Estimating function
+        rmst = ee_rmst(theta=[0, ], times=times, survival=points, t=np.asarray([1, ]), method='right')
+
+        # Checking these match
+        npt.assert_allclose(rmst[0], area, atol=1e-8)
+
+    def test_rmst_trpz(self):
+        times = [0, 1, 3, 5, 7, 10]
+        points = [0, 0.1, -0.1, 0.2, 0.3, -0.4]
+
+        # By-hand
+        area = ((1 * 0.05) +     # (1-0) * (0.1 + 0)/2
+                (2 * 0.) +       # (3-1) * (-0.1 + 0.1)/2
+                (2 * 0.05) +     # (5-3) * (0.2 - 0.1)/2
+                (2 * 0.25) +     # (7-5) * (0.3 + 0.2)/2
+                (3 * -0.05))     # (10-7) * (0.3 - 0.4)/2
+
+        # Estimating function
+        rmst = ee_rmst(theta=[0, ], times=times, survival=points, t=np.asarray([1, ]), method='trapezoid')
+
+        # Checking these match
+        npt.assert_allclose(rmst[0], area, atol=1e-8)

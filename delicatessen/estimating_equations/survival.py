@@ -5,6 +5,7 @@
 import warnings
 import numpy as np
 
+from delicatessen.estimating_equations import ee_auc
 from delicatessen.errors import check_survival_data_valid
 from delicatessen.estimating_equations.processing import generate_weights
 from delicatessen.utilities import inverse_logit, standard_normal_cdf, standard_normal_pdf
@@ -712,7 +713,7 @@ def ee_plogit(theta, X, t, delta, S=None, unique_times=None, weights=None):
 #################################################################
 # Summarizations of Survival Functions
 
-def ee_rmst(theta, times, survival, t, method='right'):
+def ee_rmst(theta, times, survival, t, method='left'):
     r"""Estimating equation for the Restricted Mean Survival Time (RMST). The RMST is a useful summary measure for how
     survival unfolds over time. Specifically, it provides a single number to summarize the survival function that does
     not need the survival function to meet certain criteria (e.g., going below 0.5, proportional hazards). The RMST
@@ -720,27 +721,27 @@ def ee_rmst(theta, times, survival, t, method='right'):
 
     Note
     ----
-    For estimators with monotonic step functions (e.g., Kaplan-Meier), the right-hand Riemann summation computes the
-    area exactly. With parametric survival models (e.g., Weibull model), this method provides an approximation. The
+    For estimators with right-continuous step functions (e.g., Kaplan-Meier), the left-hand Riemann summation computes
+    the RMST exactly. With parametric survival models (e.g., Weibull model), this method provides an approximation. The
     more times the Riemann sum is evaluated at, the better the approximation will be
 
 
-    The area under the survival curve can be computed via the right-hand Riemann sum, left-hand Riemann sum, or the
-    trapezoidal rule. Let :math:`S_k` denote the survival at time `t_k`. These summations are then defined as
-    :math:`\sum_{k} S_{k+1} \times (t_{k+1} = t_k)`,
-    :math:`\sum_{k} S_{k} \times (t_{k+1} = t_k)`,
+    The RMST can be computed via the right-hand Riemann sum, left-hand Riemann sum, or the trapezoidal rule. Let
+    :math:`S_k` denote the survival at time `t_k`. These summations are then defined as
+    :math:`\sum_{k} S_{k+1} \times (t_{k+1} - t_k)`,
+    :math:`\sum_{k} S_{k} \times (t_{k+1} - t_k)`,
     and
-    :math:`\sum_{k} 0.5 \times (S_{k+1} + S_{k}) \times (t_{k+1} = t_k)`,
+    :math:`\sum_{k} 0.5 \times (S_{k+1} + S_{k}) \times (t_{k+1} - t_k)`,
     respectively.
     The corresponding estimating equation is then simply defined as
 
     .. math::
 
         \sum_{i=1}^n
-        (AUC - \theta)
+        (RMST - \theta)
         = 0
 
-    where :math:`AUC` denotes the area under the survival curve according to the chosen method. Note that this
+    where :math:`RMST` denotes the area under the survival curve according to the chosen method. Note that this
     estimating equation does not depend on :math:`i` as it is simply a transformation of the survival function.
 
     Parameters
@@ -760,10 +761,11 @@ def ee_rmst(theta, times, survival, t, method='right'):
         1-dimensional vector of `n` observed times. This argument is only used to extract the number of observations
         in the data.
     method : str, optional
-        Method used to approximate the area under the survival function. Default is ``'right'`` which used the
-        right-hand Riemann sum. Note that this approach should always be used with step functions, as this method
-        computes that area exactly. For estimators that produce smooth (i.e., non-step) functions, either the left-hand
-        Riemann sum (``'left'``) or the trapezoidal rule (``'trapezoid'``) can be used instead.
+        Method used to approximate the area under the survival function. Default is ``'left'`` which used the
+        left-hand Riemann sum. Note that the left-hand Riemann sum should always be used with the Kaplan-Meier or other
+        estimators that produce step functions, as this method computes the desired area exactly. For estimators that
+        produce smooth (i.e., non-step) functions, either the right-hand Riemann sum (``'left'``) or the trapezoidal
+        rule (``'trapezoid'``) can be used instead.
 
     Returns
     -------
@@ -796,16 +798,16 @@ def ee_rmst(theta, times, survival, t, method='right'):
     >>> def psi(theta):
     >>>     dist = 'weibull'
     >>>     times_to_predict = np.linspace(0, np.max(data['t']), 200)
-    >>>     ee_model = ee_survival_model(theta=theta[:-1],
+    >>>     ef_model = ee_survival_model(theta=theta[:-1],
     >>>                                  t=data['t'], delta=data['delta'],
     >>>                                  distribution=dist)
     >>>     surv = survival_predictions(times=times_to_predict,
     >>>                                 theta=estr.theta,
     >>>                                 covariance=estr.variance,
     >>>                                 distribution=dist)
-    >>>     ee_auc = ee_rmst(theta[-1], times=times_to_predict,
-    >>>                      survival=surv, t=data['t'], method='trapezoid')
-    >>>     return np.vstack([ee_model, ee_auc])
+    >>>     ef_rmst = ee_rmst(theta[-1], times=times_to_predict,
+    >>>                       survival=surv, t=data['t'], method='trapezoid')
+    >>>     return np.vstack([ef_model, ef_auc])
 
     Calling the M-estimator
 
@@ -839,30 +841,13 @@ def ee_rmst(theta, times, survival, t, method='right'):
     times = np.asarray(times)
     survival = np.asarray(survival)
 
-    # Error checking that inputs are as expected for survival
+    # Error checking that inputs are as expected for survival setting
     if times[0] != 0:
         raise ValueError("The function `ee_rmst` expects that the first time is equal to zero. Instead, the provided "
                          "initial time is " + str(times[0]))
-    if times.shape[0] != survival.shape[0]:
+    if times.shape[0] != survival.shape[0]:  # Note: this error is also checked by AUC, but labels might not be clear
         raise ValueError("The input `times` and `survival` must have the same length. The input times has length "
                          + str(times.shape[0]) + " while the input survival has length " + str(survival.shape[0]))
 
-    # Computing the time changes for the approximation
-    t_delta = times[1:] - times[:-1]
-
-    # Determining which approximation to use
-    if method.lower() == 'right':
-        area_rectangle = t_delta * survival[1:]
-    elif method.lower() == 'left':
-        area_rectangle = t_delta * survival[:-1]
-    elif method.lower() == 'trapezoid':
-        area_rectangle = t_delta * (survival[1:] + survival[:-1]) / 2
-    else:
-        raise ValueError("The method " + str(method) + " is not available. "
-                         "Please select from 'right', 'left', or 'trapezoid'")
-
-    area_total = np.sum(area_rectangle)
-
-    # Returning the score function
-    return (area_total - theta) * np.ones(n)
-
+    # Using the other built-in estimating function for the AUC to build the RMST estimating function
+    return ee_auc(theta=theta, x_vals=times, y_vals=survival, n_obs=n, method=method)
