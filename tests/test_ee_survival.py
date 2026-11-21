@@ -11,7 +11,7 @@ import statsmodels.formula.api as smf
 from lifelines import ExponentialFitter, WeibullFitter, WeibullAFTFitter
 
 from delicatessen import MEstimator
-from delicatessen.estimating_equations import ee_survival_model, ee_aft, ee_plogit, ee_rmst
+from delicatessen.estimating_equations import ee_survival_model, ee_aft, ee_piecewise_exp, ee_plogit, ee_rmst
 
 
 class TestEstimatingEquationsSurvParam:
@@ -379,6 +379,111 @@ class TestEstimatingEquationsAFT:
                             atol=1e-5)
 
         # No variance check, since lifelines uses a different variance estimator
+
+
+class TestEstimatingEquationsPWE:
+
+    @pytest.fixture
+    def data(self):
+        d = pd.DataFrame()
+        d['T'] = [1, 2, 3, 4, 5, 6, 7]
+        d['D'] = [1, 0, 1, 1, 0, 1, 0]
+        d['X'] = [1, 1, 0, 1, 0, 1, 1]
+        d['Z'] = [1, 2, -1, 1, 0, 3, 2]
+        d['W'] = [1, 3.4, 2, 1, 1, 3, 1]
+        return d
+
+    def test_pwe_error_maxt(self, data):
+        with pytest.raises(ValueError, match="largest value provided"):
+            ee_piecewise_exp(theta=[0, 0, 0], X=data[['X', ]], t=data['T'], delta=data['D'], cut_points=[3.5, 5])
+
+    def test_pwe_binary(self, data):
+        # R code for comparison
+        # ---
+        # library(survival)
+        # d = data.frame(X=c(1, 1, 0, 1, 0, 1, 1))
+        # d$T = c(1, 2, 3, 4, 5, 6, 7)
+        # d$D = c(1, 0, 1, 1, 0, 1, 0)
+        # d_split <- survSplit(Surv(T, D) ~ X,
+        #                      data = d, cut = c(3.5),
+        #                      episode = "interval")
+        # d_split$exposure <- d_split$T - d_split$tstart
+        # fit_pwe <- glm(D ~ factor(interval) + X + offset(log(exposure)), data = d_split,
+        #                family = poisson(link = "log"))
+        # summary(fit_pwe)
+        comparison_theta = np.asarray([0.03389431, -2.32558926, 0.91166888])
+
+        def psi(theta):
+            return ee_piecewise_exp(theta=theta, X=data[['X', ]],
+                                    t=data['T'], delta=data['D'], cut_points=[3.5, 7])
+
+        estr = MEstimator(psi, init=[0, 0, 0])
+        estr.estimate()
+
+        # Checking point estimates
+        npt.assert_allclose(estr.theta, comparison_theta, atol=1e-6)
+
+        # Checking covariance estimates
+        # Not checking sandwich, since R treats observations as independent so won't match
+
+    def test_pwe_continuous(self, data):
+        # R code for comparison
+        # ---
+        # library(survival)
+        # d = data.frame(X=c(1, 2, -1, 1, 0, 3, 2))
+        # d$T = c(1, 2, 3, 4, 5, 6, 7)
+        # d$D = c(1, 0, 1, 1, 0, 1, 0)
+        # d_split <- survSplit(Surv(T, D) ~ X,
+        #                      data = d, cut = c(3.5),
+        #                      episode = "interval")
+        # d_split$exposure <- d_split$T - d_split$tstart
+        # fit_pwe <- glm(D ~ factor(interval) + X + offset(log(exposure)), data = d_split,
+        #                family = poisson(link = "log"))
+        # summary(fit_pwe)
+        comparison_theta = np.asarray([-0.3453364, -2.0097005, 1.1997716])
+
+        def psi(theta):
+            return ee_piecewise_exp(theta=theta, X=data[['Z', ]],
+                                    t=data['T'], delta=data['D'], cut_points=[3.5, 7])
+
+        estr = MEstimator(psi, init=[0, 0, 0])
+        estr.estimate()
+
+        # Checking point estimates
+        npt.assert_allclose(estr.theta, comparison_theta, atol=1e-6)
+
+        # Checking covariance estimates
+        # Not checking sandwich, since R treats observations as independent so won't match
+
+    def test_pwe_weighted(self, data):
+        # R code for comparison
+        # ---
+        # library(survival)
+        # d = data.frame(X=c(1, 2, -1, 1, 0, 3, 2))
+        # d$T = c(1, 2, 3, 4, 5, 6, 7)
+        # d$D = c(1, 0, 1, 1, 0, 1, 0)
+        # d_split <- survSplit(Surv(T, D) ~ X,
+        #                      data = d, cut = c(3.5),
+        #                      episode = "interval")
+        # d_split$exposure <- d_split$T - d_split$tstart
+        # fit_pwe <- glm(D ~ factor(interval) + X + offset(log(exposure)), data = d_split,
+        #                family = poisson(link = "log"))
+        # summary(fit_pwe)
+        comparison_theta = np.asarray([-0.6097656, -2.0476928, 1.3862944])
+
+        def psi(theta):
+            return ee_piecewise_exp(theta=theta, X=data[['X', ]],
+                                    t=data['T'], delta=data['D'], cut_points=[3.5, 7], weights=data['W'])
+
+        estr = MEstimator(psi, init=[0, 0, 0])
+        estr.estimate()
+
+        # Checking point estimates
+        npt.assert_allclose(estr.theta, comparison_theta, atol=1e-6)
+
+        # Checking covariance estimates
+        # Not checking sandwich, since R treats observations as independent so won't match
+
 
 
 class TestEstimatingEquationsDiscreteSurvival:
