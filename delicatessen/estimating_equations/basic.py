@@ -583,3 +583,141 @@ def ee_meta_random(theta, point_est, var_est):
 
     # Returning stacked estimating functions
     return np.vstack([ee_beta, ee_tau])
+
+
+def ee_auc(theta, x_vals, y_vals, n_obs, method='left'):
+    r"""Estimating equation for the Area Under a Curve (AUC). The AUC can be computed via the right-hand Riemann sum,
+    left-hand Riemann sum, or the trapezoidal rule. Let :math:`Y_k` denote the height of the curve at `X_k`. These
+    summations are then defined as
+    :math:`AUC_{l} = \sum_{k} Y_{k} \times (X_{k+1} - X_k)`,
+    :math:`AUC_{r} = \sum_{k} Y_{k+1} \times (X_{k+1} - X_k)`,
+    and
+    :math:`AUC_{t} =  \sum_{k} 0.5 \times (Y_{k+1} + Y_{k}) \times (X_{k+1} - X_k)`,
+    respectively. The corresponding estimating equation is then simply defined as
+
+    .. math::
+
+        \sum_{i=1}^n
+        (AUC - \theta)
+        = 0
+
+    where :math:`AUC` denotes the computed AUC according to the chosen method. Note that this estimating equation does
+    not depend on :math:`i` as it is simply a transformation of other inputs.
+
+    Note
+    ----
+    For estimators with right-continuous step functions, the left-hand Riemann summation computes the area exactly.
+    Otherwise, any other method provides an approximation. The more points :math:`k` the Riemann sum is evaluated at,
+    the better the approximation will be.
+
+    Parameters
+    ----------
+    theta : ndarray, list, vector
+        theta consists of `b`+1 values. Therefore, initial values should consist of the same number as the number of
+        columns present in ``X`` plus 1. This can easily be implemented via ``[0, ] * X.shape[1] + [0, ]``. Note that
+        if using an exponential model, only `b` values need to be provided.
+    x_vals : ndarray, list, vector
+        1-dimensional vector of `k` unique, ascending points that the function was evaluated at. These intervals
+        can be equally or unequally spaced. These ordering of these points must correspond to the function output. In
+        other words, ``x_vals[k]`` should correspond to ``y_vals[k]``.
+    y_vals : ndarray, list, vector
+        1-dimensional vector of `k` outputs from the given function. These times must correspond to the input X values.
+        In other words, ``y_vals[k]`` should correspond to ``x_vals[k]``.
+    n_obs : int
+        Number of observations in the data. As this estimating function does not depend on the data, this information
+        cannot be inferred. It must be manually provided.
+    method : str, optional
+        Method used to approximate the area under the survival function. Default is ``'left'`` which used the
+        left-hand Riemann sum. Other options include the right-hand Riemann sum (``'left'``) or the trapezoidal
+        rule (``'trapezoid'``).
+
+    Returns
+    -------
+    array :
+        Returns a 1-by-`n` NumPy array evaluated for the input ``theta``.
+
+    Examples
+    --------
+    Construction of an estimating equation(s) with ``ee_auc`` should be done similar to the following. Here, the AUC
+    for a linear model is shown for illustration
+
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> from delicatessen import MEstimator
+    >>> from delicatessen.estimating_equations import ee_regression, ee_auc
+
+    Some generic survival data to estimate a parametric survival model with
+
+    >>> n = 100
+    >>> d = pd.DataFrame()
+    >>> d['X'] = np.random.uniform(-1, 1, size=n)
+    >>> d['Y'] = 0.2 + d['X'] + np.random.normal(size=n)
+    >>> d['C'] = 1
+
+    Creating a data set of observations from which to generate predictions from. Here, we will estimate the AUC for the
+    X range of [-0.6, 0.9]. To reduce approximation error, 500 points in that space will be generated
+
+    >>> p = pd.DataFrame()
+    >>> p['X'] = np.linspace(-0.6, 0.9, 500)
+    >>> p['C'] = 1
+
+    Defining psi, or the stacked estimating equations for the linear regression model and the desired AUC
+
+    >>> def psi(theta):
+    >>>     beta = theta[:-1]
+    >>>     # Estimating function for the linear model
+    >>>     ef_model = ee_regression(beta, X=d[['C', 'X']], y=d['Y'],
+    >>>                              model='linear')
+    >>>     # Predictions across the desired range
+    >>>     yhat = np.dot(p[['C', 'X']], beta)
+    >>>     # Estimating function for the AUC
+    >>>     ef_area = ee_auc(theta[-1], x_vals=p['X'], y_vals=yhat, n_obs=d.shape[0], method='trapezoid')
+    >>>     # Stacked estimating functions
+    >>>     return np.vstack([ef_model, ef_area])
+
+    Calling the M-estimator
+
+    >>> estr = MEstimator(stacked_equations=psi, init=[0., 0., 0])
+    >>> estr.estimate(solver='lm')
+
+    Inspecting the AUC estimate and corresponding confidence intervals
+
+    >>> estr.theta[-1]
+    >>> estr.confidence_intervals()[-1, :]
+
+    Note that because it is relatively cheap to compute the output with a parametric regression model, the resolution
+    of ``x_vals`` and ``y_vals`` is quite high here to get a better approximation. Further, the trapezoidal rule
+    provides a better approximation.
+
+    References
+    ----------
+    Janssens ACJ & Martens FK. (2020). Reflection on modern methods: Revisiting the area under the ROC Curve.
+    *International Journal of Epidemiology*, 49(4), 1397-1403.
+    """
+    xks = np.asarray(x_vals)
+    yks = np.asarray(y_vals)
+
+    # Error checking that inputs are as expected for survival
+    if xks.shape[0] != yks.shape[0]:
+        raise ValueError("The input `x_vals` and `y_vals` must have the same length. The input X has length "
+                         + str(xks.shape[0]) + " while the input Y has length " + str(yks.shape[0]))
+
+    # Computing the X changes for the approximation
+    x_delta = xks[1:] - xks[:-1]
+
+    # Determining which approximation to use
+    if method.lower() == 'right':
+        area_rectangle = x_delta * yks[1:]
+    elif method.lower() == 'left':
+        area_rectangle = x_delta * yks[:-1]
+    elif method.lower() == 'trapezoid':
+        area_rectangle = x_delta * (yks[1:] + yks[:-1]) / 2
+    else:
+        raise ValueError("The method " + str(method) + " is not available. "
+                         "Please select from 'right', 'left', or 'trapezoid'")
+
+    # Computing the corresponding area
+    area_total = np.sum(area_rectangle)
+
+    # Returning the score function
+    return (area_total - theta) * np.ones(n_obs)

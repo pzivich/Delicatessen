@@ -18,6 +18,7 @@ Basic
   ee_mean_geometric
   ee_mean_variance
   ee_meta_random
+  ee_auc
   ee_percentile
   ee_positive_mean_deviation
 
@@ -71,6 +72,7 @@ Survival
   ee_survival_model
   ee_aft
   ee_plogit
+  ee_rmst
 
 
 Pharmacokinetic Models

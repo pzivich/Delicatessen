@@ -9,7 +9,7 @@ from scipy.stats import gmean
 
 from delicatessen import MEstimator
 from delicatessen.estimating_equations import (ee_mean, ee_mean_variance, ee_mean_robust, ee_mean_geometric,
-                                               ee_meta_random, ee_meta_regression)
+                                               ee_meta_random, ee_auc)
 
 
 class TestEstimatingEquationsBase:
@@ -170,3 +170,84 @@ class TestEstimatingEquationsBase:
         # Checking mean estimate
         npt.assert_allclose(estr.theta[0], comparison_theta[0], atol=1e-5)
         npt.assert_allclose(np.exp(estr.theta[1]), comparison_theta[1], atol=1e-5)
+
+    def test_auc_lhs_first_jump(self):
+        x = [0, 1]
+        y = [0, 0.5]
+
+        # Estimating function
+        auc = ee_auc(theta=[0, ], x_vals=x, y_vals=y, n_obs=1, method='left')
+
+        # Checking these match
+        npt.assert_allclose(auc[0], 0, atol=1e-8)
+
+    def test_auc_rhs_first_jump(self):
+        x = [0, 1]
+        y = [0, 0.5]
+
+        # Estimating function
+        auc = ee_auc(theta=[0, ], x_vals=x, y_vals=y, n_obs=1, method='right')
+
+        # Checking these match
+        npt.assert_allclose(auc[0], 0.5, atol=1e-8)
+
+    def test_auc_trpz_first_jump(self):
+        x = [0, 1]
+        y = [0, 0.5]
+
+        # Estimating function
+        auc = ee_auc(theta=[0, ], x_vals=x, y_vals=y, n_obs=1, method='trapezoid')
+
+        # Checking these match
+        npt.assert_allclose(auc[0], 0.25, atol=1e-8)
+
+    def test_auc_lhs(self):
+        x = [-0.5, 1, 3, 5, 7, 10]
+        y = [0, 0.1, -0.1, 0.2, 0.3, -0.4]
+
+        # By-hand
+        area = ((1.5 * 0) +   # (1+0.5) * 0
+                (2 * 0.1) +   # (3-1) * 0.1
+                (2 * -0.1) +  # (5-3) * -0.1
+                (2 * 0.2) +   # (7-5) * 0.2
+                (3 * 0.3))    # (10-7) * 0.3
+
+        # Estimating function
+        auc = ee_auc(theta=[0, ], x_vals=x, y_vals=y, n_obs=1, method='left')
+
+        # Checking these match
+        npt.assert_allclose(auc[0], area, atol=1e-8)
+
+    def test_auc_rhs(self):
+        x = [-0.5, 1, 3, 5, 7, 10]
+        y = [0, 0.1, -0.1, 0.2, 0.3, -0.4]
+
+        # By-hand
+        area = ((1.5 * 0.1) +   # (1+0.5) * 0.1
+                (2 * -0.1) +    # (3-1) * -0.1
+                (2 * 0.2) +     # (5-3) * 0.2
+                (2 * 0.3) +     # (7-5) * 0.3
+                (3 * -0.4))     # (10-7) * -0.4
+
+        # Estimating function
+        auc = ee_auc(theta=[0, ], x_vals=x, y_vals=y, n_obs=1, method='right')
+
+        # Checking these match
+        npt.assert_allclose(auc[0], area, atol=1e-8)
+
+    def test_auc_trpz(self):
+        x = [-0.5, 1, 3, 5, 7, 10]
+        y = [0, 0.1, -0.1, 0.2, 0.3, -0.4]
+
+        # By-hand
+        area = ((1.5 * 0.05) +   # (1+0.5) * (0.1 + 0)/2
+                (2 * 0.) +       # (3-1) * (-0.1 + 0.1)/2
+                (2 * 0.05) +     # (5-3) * (0.2 - 0.1)/2
+                (2 * 0.25) +     # (7-5) * (0.3 + 0.2)/2
+                (3 * -0.05))     # (10-7) * (0.3 - 0.4)/2
+
+        # Estimating function
+        auc = ee_auc(theta=[0, ], x_vals=x, y_vals=y, n_obs=1, method='trapezoid')
+
+        # Checking these match
+        npt.assert_allclose(auc[0], area, atol=1e-8)
