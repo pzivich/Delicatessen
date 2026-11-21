@@ -177,7 +177,18 @@ class TestEstimatingEquationsBase:
 
         # Estimating function
         with pytest.raises(ValueError, match="sorted in ascending order"):
-            auc = ee_auc(theta=[0, ], x_vals=x, y_vals=y, n_obs=1, method='left')
+            ee_auc(theta=[0, ], x_vals=x, y_vals=y, n_obs=1, method='left')
+
+    def test_auc_error_length(self):
+        with pytest.raises(ValueError, match="must have the same length"):
+            x = [-1, 0, 1]
+            y = [0, 1, 0.5, -3]
+            ee_auc(theta=[0, ], x_vals=x, y_vals=y, n_obs=1, method='left')
+
+        with pytest.raises(ValueError, match="must have the same length"):
+            x = [-1, 0, 1, 2]
+            y = [0, 1, 0.5]
+            ee_auc(theta=[0, ], x_vals=x, y_vals=y, n_obs=1, method='left')
 
     def test_auc_lhs_first_jump(self):
         x = [0, 1]
