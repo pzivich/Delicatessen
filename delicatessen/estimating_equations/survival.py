@@ -260,7 +260,7 @@ def ee_piecewise_exp(theta, X, t, delta, cut_points, weights=None):
                          "`t` but the input values do not correspond to this convention.")
 
     # Setting up weights argument for later use
-    weights = generate_weights(weights, n_obs=t.shape[0])            # Pre-processing weight argument
+    weights = generate_weights(weights, n_obs=t.shape[0])       # Pre-processing weight argument
 
     # Creating time and risk set matrices
     lag_interval = np.asarray([0., ] + list(t_intervals[:-1]))  # Lagging the time-split by one unit and initial as zero
