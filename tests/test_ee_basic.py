@@ -171,6 +171,14 @@ class TestEstimatingEquationsBase:
         npt.assert_allclose(estr.theta[0], comparison_theta[0], atol=1e-5)
         npt.assert_allclose(np.exp(estr.theta[1]), comparison_theta[1], atol=1e-5)
 
+    def test_auc_error_sort(self):
+        x = [-1, 0, 2, 1]
+        y = [0, 1, 0.5, -3]
+
+        # Estimating function
+        with pytest.raises(ValueError, match="sorted in ascending order"):
+            auc = ee_auc(theta=[0, ], x_vals=x, y_vals=y, n_obs=1, method='left')
+
     def test_auc_lhs_first_jump(self):
         x = [0, 1]
         y = [0, 0.5]

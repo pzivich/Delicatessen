@@ -697,10 +697,13 @@ def ee_auc(theta, x_vals, y_vals, n_obs, method='left'):
     xks = np.asarray(x_vals)
     yks = np.asarray(y_vals)
 
-    # Error checking that inputs are as expected for survival
+    # Error checking that inputs are as expected
     if xks.shape[0] != yks.shape[0]:
         raise ValueError("The input `x_vals` and `y_vals` must have the same length. The input X has length "
                          + str(xks.shape[0]) + " while the input Y has length " + str(yks.shape[0]))
+    if sorted(xks) != list(xks):
+        raise ValueError("The provided `x_vals` should be sorted in ascending order, but it was detected that they "
+                         "are not sorted.")
 
     # Computing the X changes for the approximation
     x_delta = xks[1:] - xks[:-1]
@@ -719,5 +722,5 @@ def ee_auc(theta, x_vals, y_vals, n_obs, method='left'):
     # Computing the corresponding area
     area_total = np.sum(area_rectangle)
 
-    # Returning the score function
+    # Returning the estimating function for the AUC
     return (area_total - theta) * np.ones(n_obs)
