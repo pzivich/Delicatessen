@@ -1657,6 +1657,102 @@ def ee_gestimation_snmm_iv(theta, y, Z, A, W, V, X=None, model='linear', model_i
 
 
 #################################################################
+# Causal Inference Bounds Estimating Equations
+
+
+def ee_bounds_ace(theta, y, A):
+    r"""Compute the nonparametric Fréchet probability bounds for the Average Causal Effect (ACE). Rather than point
+    identification, one can partially identify the ACE only under the assumptions of no measurement error and causal
+    consistency. The bounds for the average causal effect, :math:`\phi`, are
+
+    .. math::
+
+        \le \phi \le
+
+    For estimating the boundary points, [...].
+
+    Parameters
+    ----------
+    theta : ndarray, list, vector
+        Theta consists of the lower bound and upper bound (i.e., 2 values).
+    y : ndarray, list, vector
+        1-dimensional vector of `n` observed outcome values.
+    A : ndarray, list, vector
+        1-dimensional vector of `n` observed action values, with all values being either 0 or 1.
+
+    Returns
+    -------
+    array :
+        Returns a 2-by-`n` NumPy array evaluated for the input ``theta``.
+
+    Examples
+    --------
+    Construction of an estimating equation(s) with ``ee_bounds_ace`` should be done similar to the following
+
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> from delicatessen import MEstimator
+    >>> from delicatessen.estimating_equations import ee_bounds_ace
+
+    Some generic data to illustrate the bounds with
+
+    >>> d = pd.DataFrame()
+    >>> d['A'] = [1, 1, 1, 1, 0, 0, 0, 0, 0, 0]
+    >>> d['Y'] = [1, 1, 0, 0, 1, 1, 1, 1, 0, 0]
+
+    Defining psi, or the stacked estimating equations. Note that ``'A'`` is the action.
+
+    >>> def psi(theta):
+    >>>     return ee_bounds_ace(theta, y=d['Y'], A=d['A'])
+
+    Calling the M-estimation procedure. Here, both the lower and upper bounds are computed, so the initial values
+    should be of length 2.
+
+    >>> estr = MEstimator(stacked_equations=psi, init=[-0.5, 0.5])
+    >>> estr.estimate(solver='lm')
+
+    Inspecting the boundary estimates
+
+    >>> estr.theta
+
+    More specifically, the corresponding parameters are
+
+    >>> estr.theta[0]    # lower bound for the ACE
+    >>> estr.theta[1]    # upper bound for the ACE
+
+    For inference, it is recommended to use the sup-t confidence bands since two parameters are being estimated and
+    they are expected to be correlated with each other
+
+    >>> estr.confidence_bands(method='supt')
+
+    The lower confidence band for the lower bound and the upper confidence band for the upper bound can then be
+    reported alongside the bound estimates.
+
+    References
+    ----------
+    Manski CF. (1990). Nonparametric bounds on treatment effects. *The American Economic Review*, 80(2), 319-323.
+
+    Robins JM. (1989). The analysis of randomized and non-randomized AIDS treatment trials using a new approach to
+    causal inference in longitudinal studies. *Health Service Research Methodology: a Focus on AIDS*, 113-159.
+
+    Zivich PN. (2026). Unifying statistical and mathematical modeling through a causal inference lens. *Patterns*,
+    7(11), 101637.
+    """
+    # Computing the lower bound for ACE
+    y1_lower = np.where(A == 1, y, 0)               # Everyone with A=1 but didn't would have not had the outcome
+    y0_lower = np.where(A == 1, 1, y)               # Everyone with A=1 would have had the outcome otherwise
+    ef_lower_b =  y1_lower - y0_lower - theta[0]    # Computing the lower bound
+
+    # Upper bound
+    y1_upper = np.where(A == 1, y, 1)               # Everyone with A=1 but didn't would have had the outcome
+    y0_upper = np.where(A == 1, 0, y)               # Everyone with A=1 would not have had the outcome otherwise
+    ef_upper_b =  y1_upper - y0_upper - theta[1]    # Computing the upper bound
+
+    # Return stacked estimating function for the boundary points
+    return np.vstack([ef_lower_b, ef_upper_b])
+
+
+#################################################################
 # Causal Inference (Sensitivity Analysis) Estimating Equations
 
 def ee_mean_sensitivity_analysis(theta, y, delta, X, q_eval, H_function):
