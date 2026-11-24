@@ -7,6 +7,7 @@ from .causal import (ee_ipw, ee_ipw_msm, ee_ipw_cbps,
                      ee_aipw,
                      ee_gestimation_snmm, ee_gestimation_snmm_iv,
                      ee_iv_causal, ee_2sls,
+                     ee_bounds_ace,
                      ee_mean_sensitivity_analysis)
 
 from .pharmacokinetics import (ee_emax, ee_emax_ed,

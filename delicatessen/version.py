@@ -1,2 +1,2 @@
-# Peanut Butter & Banana
-__version__ = "4.4"
+# Croque-monsieur
+__version__ = "5.0"
